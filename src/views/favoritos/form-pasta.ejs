@@ -1,0 +1,49 @@
+<div class="modal-header" data-modal-size="modal-xl">
+  <div>
+    <h5 class="modal-title fw-semibold mb-0">
+      <i class="bi bi-folder-plus me-2 text-warning"></i>Nova Pasta
+    </h5>
+    <div class="text-muted small"><%= usuario.nomeCompleto %></div>
+  </div>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/favoritos/<%= usuario.id %>/pasta"
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome da Pasta <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        placeholder="Ex: Relatórios Fiscais" autofocus>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Pasta Pai (opcional)</label>
+      <select name="parentId" class="form-select form-select-sm">
+        <option value="">Nenhuma — pasta raiz</option>
+        <% todasPastas.forEach(function(p) { %>
+          <option value="<%= p.id %>"><%= p.nome %></option>
+        <% }) %>
+      </select>
+      <div class="form-text">Deixe em branco para criar na raiz (como no Chrome).</div>
+    </div>
+  </div>
+
+  <div class="modal-footer justify-content-between">
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+      hx-get="/admin/favoritos/<%= usuario.id %>/modal"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </button>
+    <button type="submit" class="btn btn-sm btn-warning">
+      <i class="bi bi-folder-plus me-1"></i>Criar Pasta
+    </button>
+  </div>
+</form>

@@ -1,0 +1,106 @@
+<div class="modal-header" data-modal-size="modal-xl">
+  <div>
+    <h5 class="modal-title fw-semibold mb-0">
+      <i class="bi bi-star me-2 text-warning"></i>Adicionar Favorito
+    </h5>
+    <div class="text-muted small"><%= usuario.nomeCompleto %></div>
+  </div>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/favoritos/<%= usuario.id %>/add"
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Tipo de Relatório <span class="text-danger">*</span></label>
+      <div class="d-flex gap-3">
+        <div class="form-check">
+          <input type="radio" class="form-check-input" name="tipoRel" id="tipo-fixo"
+            value="fixo" checked onchange="alternarTipoRel('fixo')">
+          <label class="form-check-label small" for="tipo-fixo">Relatório Fixo</label>
+        </div>
+        <div class="form-check">
+          <input type="radio" class="form-check-input" name="tipoRel" id="tipo-personalizado"
+            value="personalizado" onchange="alternarTipoRel('personalizado')">
+          <label class="form-check-label small" for="tipo-personalizado">Relatório Personalizado</label>
+        </div>
+      </div>
+    </div>
+
+    <div id="painel-fixo" class="mb-3">
+      <label class="form-label small fw-semibold">Relatório Fixo <span class="text-danger">*</span></label>
+      <select name="relatorioFixoId" id="sel-fixo" class="form-select form-select-sm">
+        <option value="">Selecione...</option>
+        <% relatoriosFixos.forEach(function(r) { %>
+          <option value="<%= r.id %>">[<%= r.sistema.nome %>] <%= r.nome %></option>
+        <% }) %>
+      </select>
+      <% if (relatoriosFixos.length === 0) { %>
+        <div class="form-text text-warning-emphasis">Nenhum relatório fixo ativo disponível.</div>
+      <% } %>
+    </div>
+
+    <div id="painel-personalizado" class="mb-3 d-none">
+      <label class="form-label small fw-semibold">Relatório Personalizado <span class="text-danger">*</span></label>
+      <select name="relatorioPersonalizadoId" id="sel-personalizado" class="form-select form-select-sm" disabled>
+        <option value="">Selecione...</option>
+        <% relatoriosPersonalizados.forEach(function(r) { %>
+          <option value="<%= r.id %>"><%= r.nome %></option>
+        <% }) %>
+      </select>
+      <% if (relatoriosPersonalizados.length === 0) { %>
+        <div class="form-text text-muted">Este usuário não possui relatórios personalizados ativos.</div>
+      <% } %>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Salvar em (opcional)</label>
+      <select name="pastaId" class="form-select form-select-sm">
+        <option value="">Raiz (sem pasta)</option>
+        <% todasPastas.forEach(function(p) { %>
+          <option value="<%= p.id %>"><%= p.nome %></option>
+        <% }) %>
+      </select>
+    </div>
+  </div>
+
+  <div class="modal-footer justify-content-between">
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+      hx-get="/admin/favoritos/<%= usuario.id %>/modal"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-star me-1"></i>Adicionar
+    </button>
+  </div>
+</form>
+
+<script>
+function alternarTipoRel(tipo) {
+  var painelFixo = document.getElementById('painel-fixo')
+  var painelPers = document.getElementById('painel-personalizado')
+  var selFixo    = document.getElementById('sel-fixo')
+  var selPers    = document.getElementById('sel-personalizado')
+  if (tipo === 'fixo') {
+    painelFixo.classList.remove('d-none')
+    painelPers.classList.add('d-none')
+    selFixo.disabled = false
+    selPers.disabled = true
+    selPers.value = ''
+  } else {
+    painelFixo.classList.add('d-none')
+    painelPers.classList.remove('d-none')
+    selFixo.disabled = true
+    selPers.disabled = false
+    selFixo.value = ''
+  }
+}
+</script>

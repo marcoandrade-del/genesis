@@ -1,0 +1,79 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="h5 fw-bold mb-0"><i class="bi bi-star me-2 text-warning"></i>Favoritos</h2>
+    <div class="text-muted small mt-1"><%= total %> usuário(s) encontrado(s)</div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3">
+    <form method="GET" action="/admin/favoritos" class="d-flex align-items-center gap-2 flex-wrap">
+      <input type="text" name="busca" class="form-control form-control-sm" style="max-width:300px"
+        placeholder="Buscar por nome ou e-mail..." value="<%= busca %>">
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-search me-1"></i>Filtrar
+      </button>
+      <% if (busca) { %>
+        <a href="/admin/favoritos" class="btn btn-sm btn-link text-muted text-decoration-none">Limpar</a>
+      <% } %>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Usuário</th>
+          <th>E-mail</th>
+          <th>Status</th>
+          <th class="text-center">Pastas</th>
+          <th class="text-center">Favoritos</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (usuarios.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2 opacity-50"></i>Nenhum usuário encontrado.
+          </td></tr>
+        <% } %>
+        <% usuarios.forEach(function(u) { %>
+          <tr>
+            <td class="ps-3 fw-semibold small"><%= u.nomeCompleto %></td>
+            <td class="small text-muted"><%= u.emailPrincipal %></td>
+            <td>
+              <span class="badge rounded-pill <%= u.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75" style="font-size:.65rem">
+                <%= u.ativo ? 'Ativo' : 'Inativo' %>
+              </span>
+            </td>
+            <td class="text-center">
+              <% if (u._count.pastas > 0) { %>
+                <span class="badge bg-warning text-dark bg-opacity-75"><%= u._count.pastas %></span>
+              <% } else { %>
+                <span class="text-muted small">—</span>
+              <% } %>
+            </td>
+            <td class="text-center">
+              <% if (u._count.favoritos > 0) { %>
+                <span class="badge bg-primary bg-opacity-75"><%= u._count.favoritos %></span>
+              <% } else { %>
+                <span class="text-muted small">—</span>
+              <% } %>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-warning"
+                hx-get="/admin/favoritos/<%= u.id %>/modal"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Gerenciar favoritos">
+                <i class="bi bi-star me-1"></i>Gerenciar
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

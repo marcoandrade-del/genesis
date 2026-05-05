@@ -9,6 +9,7 @@ import { adminLookupRoutes } from './lookup.js'
 import { adminLixeiraRoutes } from './lixeira.js'
 import { adminPermissoesRoutes } from './permissoes.js'
 import { adminRelatoriosRoutes } from './relatorios.js'
+import { adminFavoritosRoutes } from './favoritos.js'
 
 async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
@@ -45,6 +46,7 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminLookupRoutes, { prefix: '/lookup' })
     admin.register(adminPermissoesRoutes, { prefix: '/permissoes' })
     admin.register(adminRelatoriosRoutes, { prefix: '/relatorios' })
+    admin.register(adminFavoritosRoutes, { prefix: '/favoritos' })
     admin.register(adminLixeiraRoutes, { prefix: '/lixeira' })
   })
 }

@@ -1,0 +1,105 @@
+<div class="modal-header" data-modal-size="modal-xl">
+  <div>
+    <h5 class="modal-title fw-semibold mb-0">
+      <i class="bi bi-star-fill me-2 text-warning"></i><%= usuario.nomeCompleto %>
+    </h5>
+    <div class="text-muted small"><%= usuario.emailPrincipal %></div>
+  </div>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body" style="max-height:65vh;overflow-y:auto">
+  <% const vazio = pastas.length === 0 && favoritosRaiz.length === 0 %>
+  <% if (vazio) { %>
+    <div class="text-center text-muted py-5">
+      <i class="bi bi-star fs-2 d-block mb-2 opacity-25"></i>
+      <div class="small">Nenhum favorito ou pasta criado.</div>
+      <div class="small text-muted mt-1">Use os botões abaixo para começar.</div>
+    </div>
+  <% } %>
+
+  <%# ── Favoritos na raiz (sem pasta) ── %>
+  <% if (favoritosRaiz.length > 0) { %>
+    <div class="mb-3">
+      <div class="d-flex align-items-center gap-2 text-muted small fw-semibold mb-1 px-1">
+        <i class="bi bi-star text-warning"></i>Sem pasta
+      </div>
+      <%- include('_linha-favorito', { favoritos: favoritosRaiz, usuario, pastasPlanas, pastaAtualId: null }) %>
+    </div>
+  <% } %>
+
+  <%# ── Pastas raiz ── %>
+  <% pastas.forEach(function(pasta) { %>
+    <div class="mb-2">
+      <%# Cabeçalho da pasta %>
+      <div class="d-flex align-items-center gap-2 bg-light rounded px-2 py-1">
+        <i class="bi bi-folder2-open text-warning"></i>
+        <span class="small fw-semibold flex-grow-1"><%= pasta.nome %></span>
+        <% if (pasta.favoritos.length === 0 && pasta.subPastas.length === 0) { %>
+          <button class="btn btn-sm btn-outline-danger py-0 px-1"
+            hx-delete="/admin/favoritos/pasta/<%= pasta.id %>?usuarioId=<%= usuario.id %>"
+            hx-target="#modal-body"
+            hx-swap="innerHTML"
+            hx-confirm="Excluir pasta '<%= pasta.nome %>'? Esta ação não pode ser desfeita."
+            title="Excluir pasta">
+            <i class="bi bi-trash" style="font-size:.75rem"></i>
+          </button>
+        <% } else { %>
+          <span class="text-muted" style="font-size:.7rem"><%= pasta.favoritos.length + pasta.subPastas.reduce(function(a,s){ return a + s.favoritos.length }, 0) %> item(s)</span>
+        <% } %>
+      </div>
+
+      <%# Favoritos diretos da pasta %>
+      <% if (pasta.favoritos.length > 0) { %>
+        <div class="ms-3 mt-1">
+          <%- include('_linha-favorito', { favoritos: pasta.favoritos, usuario, pastasPlanas, pastaAtualId: pasta.id }) %>
+        </div>
+      <% } %>
+
+      <%# Subpastas %>
+      <% pasta.subPastas.forEach(function(sub) { %>
+        <div class="ms-3 mt-1">
+          <div class="d-flex align-items-center gap-2 rounded px-2 py-1" style="background:#f8f9fa;border-left:3px solid #dee2e6">
+            <i class="bi bi-folder text-warning" style="font-size:.85rem"></i>
+            <span class="small fw-semibold flex-grow-1 text-secondary"><%= pasta.nome %> / <%= sub.nome %></span>
+            <% if (sub.favoritos.length === 0) { %>
+              <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                hx-delete="/admin/favoritos/pasta/<%= sub.id %>?usuarioId=<%= usuario.id %>"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                hx-confirm="Excluir subpasta '<%= sub.nome %>'?"
+                title="Excluir subpasta">
+                <i class="bi bi-trash" style="font-size:.75rem"></i>
+              </button>
+            <% } else { %>
+              <span class="text-muted" style="font-size:.7rem"><%= sub.favoritos.length %> item(s)</span>
+            <% } %>
+          </div>
+          <% if (sub.favoritos.length > 0) { %>
+            <div class="ms-3 mt-1">
+              <%- include('_linha-favorito', { favoritos: sub.favoritos, usuario, pastasPlanas, pastaAtualId: sub.id }) %>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+    </div>
+  <% }) %>
+</div>
+
+<div class="modal-footer justify-content-between">
+  <div class="d-flex gap-2">
+    <button class="btn btn-sm btn-outline-secondary"
+      hx-get="/admin/favoritos/<%= usuario.id %>/form-pasta"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-folder-plus me-1"></i>Nova Pasta
+    </button>
+    <button class="btn btn-sm btn-primary"
+      hx-get="/admin/favoritos/<%= usuario.id %>/form-favorito"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-star me-1"></i>Adicionar Favorito
+    </button>
+  </div>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Fechar</button>
+</div>
