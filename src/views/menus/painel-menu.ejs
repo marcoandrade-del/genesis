@@ -1,0 +1,95 @@
+<div class="card-painel-header">
+  <i class="bi bi-list-nested text-warning"></i>
+  <span class="fw-semibold small"><%= editando ? 'Menu' : 'Novo Menu' %></span>
+  <% if (editando && menu) { %>
+    <span class="badge <%= menu.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 ms-auto" style="font-size:.65rem">
+      <%= menu.ativo ? 'Ativo' : 'Inativo' %>
+    </span>
+  <% } %>
+</div>
+
+<div class="card-body">
+  <% if (editando && menu) { %>
+    <div class="text-muted small mb-3">
+      <i class="bi bi-boxes me-1 text-success"></i><%= menu.modulo.nome %>
+      <i class="bi bi-chevron-right mx-1"></i><strong><%= menu.nome %></strong>
+    </div>
+  <% } else { %>
+    <div class="text-muted small mb-3">
+      <i class="bi bi-boxes me-1 text-success"></i><strong><%= modulo ? modulo.nome : '' %></strong>
+      <i class="bi bi-chevron-right mx-1"></i><span class="fst-italic">Novo Menu</span>
+    </div>
+  <% } %>
+
+  <% if (erro) { %>
+    <div class="alert alert-danger py-2 small mb-3"><%= erro %></div>
+  <% } %>
+
+  <form
+    <% if (editando && menu) { %>
+      hx-put="/admin/menus/menu/<%= menu.id %>"
+    <% } else { %>
+      hx-post="/admin/menus/novo/menu"
+    <% } %>
+    hx-target="#painel-detalhe" hx-swap="innerHTML"
+    hx-trigger="submit">
+
+    <% if (!editando) { %>
+      <input type="hidden" name="moduloId" value="<%= modulo ? modulo.id : '' %>">
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= editando && menu ? menu.nome : '' %>" required>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Ícone</label>
+        <input type="text" name="icone" class="form-control form-control-sm"
+          value="<%= editando && menu ? (menu.icone || '') : '' %>"
+          placeholder="ex: house, gear">
+        <div class="form-text" style="font-size:.65rem">Nome Bootstrap Icons</div>
+      </div>
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Ordem</label>
+        <input type="number" name="ordem" class="form-control form-control-sm"
+          value="<%= editando && menu ? menu.ordem : 0 %>" min="0">
+      </div>
+    </div>
+
+    <% if (editando && menu) { %>
+    <div class="form-check mb-3">
+      <input type="hidden" name="ativo" id="pmenu-ativo-val" value="<%= menu.ativo ? 'true' : 'false' %>">
+      <input type="checkbox" class="form-check-input" id="pmenu-ativo-chk"
+        <%= menu.ativo ? 'checked' : '' %>
+        onchange="document.getElementById('pmenu-ativo-val').value = this.checked ? 'true' : 'false'">
+      <label for="pmenu-ativo-chk" class="form-check-label small">Menu ativo</label>
+    </div>
+    <% } %>
+
+    <div class="d-flex align-items-center gap-2 pt-2 border-top">
+      <button type="submit" class="btn btn-sm btn-warning text-dark">
+        <i class="bi bi-check-lg me-1"></i>Salvar
+      </button>
+      <% if (editando && menu) { %>
+        <button type="button" class="btn btn-sm btn-primary"
+          hx-get="/admin/menus/novo/item?menuId=<%= menu.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-plus me-1"></i>Novo Item
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          hx-get="/admin/menus/painel/menu/<%= menu.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-x me-1"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
+          hx-delete="/admin/menus/menu/<%= menu.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-trash"></i>
+        </button>
+      <% } %>
+    </div>
+  </form>
+</div>

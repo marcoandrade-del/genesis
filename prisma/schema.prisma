@@ -1,0 +1,256 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Sistema {
+  id           String          @id @default(uuid())
+  nome         String          @unique
+  descricao    String?
+  ativo        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+  admins       AdminSistema[]
+  modulos      Modulo[]
+  relatorios   RelatorioFixo[]
+
+  @@map("sistemas")
+}
+
+model Modulo {
+  id           String        @id @default(uuid())
+  nome         String
+  descricao    String?
+  ativo        Boolean       @default(true)
+  ordem        Int           @default(0)
+  criadoEm     DateTime      @default(now())
+  atualizadoEm DateTime      @updatedAt
+  sistemaId    String
+  admins       AdminModulo[]
+  menus        Menu[]
+  sistema      Sistema       @relation(fields: [sistemaId], references: [id])
+
+  @@unique([nome, sistemaId])
+  @@map("modulos")
+}
+
+model Menu {
+  id           String               @id @default(uuid())
+  nome         String
+  icone        String?
+  ordem        Int                  @default(0)
+  ativo        Boolean              @default(true)
+  criadoEm     DateTime             @default(now())
+  atualizadoEm DateTime             @updatedAt
+  moduloId     String
+  itens        ItemFuncionalidade[]
+  modulo       Modulo               @relation(fields: [moduloId], references: [id])
+
+  @@unique([nome, moduloId])
+  @@map("menus")
+}
+
+model ItemFuncionalidade {
+  id                 String               @id @default(uuid())
+  nome               String
+  descricao          String?
+  tipo               TipoItem
+  tipoFuncionalidade TipoFuncionalidade?
+  rota               String?
+  icone              String?
+  ordem              Int                  @default(0)
+  ativo              Boolean              @default(true)
+  criadoEm           DateTime             @default(now())
+  atualizadoEm       DateTime             @updatedAt
+  menuId             String
+  parentId           String?
+  menu               Menu                 @relation(fields: [menuId], references: [id])
+  parent             ItemFuncionalidade?  @relation("SubItens", fields: [parentId], references: [id])
+  subItens           ItemFuncionalidade[] @relation("SubItens")
+  permissoes         PermissaoAcesso[]
+
+  @@map("itens_funcionalidade")
+}
+
+model Usuario {
+  id                       String                   @id @default(uuid())
+  cpf                      String?                  @unique
+  idEstrangeiro            String?                  @unique
+  nomeCompleto             String
+  nomeSocial               String
+  dataNascimento           DateTime                 @db.Date
+  emailPrincipal           String                   @unique
+  emailAlternativo         String?
+  telefonePrincipal        String
+  telefoneAlternativo      String?
+  emailValidado            Boolean                  @default(false)
+  celularValidado          Boolean                  @default(false)
+  ativo                    Boolean                  @default(false)
+  criadoEm                 DateTime                 @default(now())
+  atualizadoEm             DateTime                 @updatedAt
+  senhaHash                String?
+  adminModulos             AdminModulo[]
+  adminSistemas            AdminSistema[]
+  codigosValidacao         CodigoValidacao[]
+  favoritos                FavoritoRelatorio[]
+  lixeira                  Lixeira[]
+  pastas                   PastaFavorito[]
+  permissoes               PermissaoAcesso[]
+  relatoriosPersonalizados RelatorioPersonalizado[]
+
+  @@map("usuarios")
+}
+
+model Lixeira {
+  id            String   @id @default(uuid())
+  tipo          String
+  nome          String
+  estrutura     Json
+  excluidoEm   DateTime @default(now())
+  excluidoPorId String
+  excluidoPor  Usuario  @relation(fields: [excluidoPorId], references: [id])
+
+  @@map("lixeira")
+}
+
+model CodigoValidacao {
+  id         String        @id @default(uuid())
+  codigo     String
+  tipo       TipoValidacao
+  expiradoEm DateTime
+  usadoEm    DateTime?
+  criadoEm   DateTime      @default(now())
+  usuarioId  String
+  usuario    Usuario       @relation(fields: [usuarioId], references: [id])
+
+  @@map("codigos_validacao")
+}
+
+model AdminSistema {
+  id        String   @id @default(uuid())
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+  usuarioId String
+  sistemaId String
+  sistema   Sistema  @relation(fields: [sistemaId], references: [id])
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, sistemaId])
+  @@map("admins_sistema")
+}
+
+model AdminModulo {
+  id        String   @id @default(uuid())
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+  usuarioId String
+  moduloId  String
+  modulo    Modulo   @relation(fields: [moduloId], references: [id])
+  usuario   Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, moduloId])
+  @@map("admins_modulo")
+}
+
+model PermissaoAcesso {
+  id           String             @id @default(uuid())
+  nivel        NivelAcesso
+  ativo        Boolean            @default(true)
+  criadoEm     DateTime           @default(now())
+  atualizadoEm DateTime           @updatedAt
+  usuarioId    String
+  itemId       String
+  item         ItemFuncionalidade @relation(fields: [itemId], references: [id])
+  usuario      Usuario            @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, itemId])
+  @@map("permissoes_acesso")
+}
+
+model RelatorioFixo {
+  id        String              @id @default(uuid())
+  nome      String
+  descricao String?
+  rota      String
+  ativo     Boolean             @default(true)
+  criadoEm  DateTime            @default(now())
+  sistemaId String
+  favoritos FavoritoRelatorio[]
+  sistema   Sistema             @relation(fields: [sistemaId], references: [id])
+
+  @@map("relatorios_fixos")
+}
+
+model RelatorioPersonalizado {
+  id           String              @id @default(uuid())
+  nome         String
+  descricao    String?
+  configuracao Json
+  ativo        Boolean             @default(true)
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
+  usuarioId    String
+  favoritos    FavoritoRelatorio[]
+  usuario      Usuario             @relation(fields: [usuarioId], references: [id])
+
+  @@map("relatorios_personalizados")
+}
+
+model PastaFavorito {
+  id        String              @id @default(uuid())
+  nome      String
+  ordem     Int                 @default(0)
+  criadoEm  DateTime            @default(now())
+  parentId  String?
+  usuarioId String
+  favoritos FavoritoRelatorio[]
+  parent    PastaFavorito?      @relation("SubPastas", fields: [parentId], references: [id])
+  subPastas PastaFavorito[]     @relation("SubPastas")
+  usuario   Usuario             @relation(fields: [usuarioId], references: [id])
+
+  @@map("pastas_favorito")
+}
+
+model FavoritoRelatorio {
+  id                       String                  @id @default(uuid())
+  ordem                    Int                     @default(0)
+  criadoEm                 DateTime                @default(now())
+  usuarioId                String
+  pastaId                  String?
+  relatorioFixoId          String?
+  relatorioPersonalizadoId String?
+  pasta                    PastaFavorito?          @relation(fields: [pastaId], references: [id])
+  relatorioFixo            RelatorioFixo?          @relation(fields: [relatorioFixoId], references: [id])
+  relatorioPersonalizado   RelatorioPersonalizado? @relation(fields: [relatorioPersonalizadoId], references: [id])
+  usuario                  Usuario                 @relation(fields: [usuarioId], references: [id])
+
+  @@map("favoritos_relatorio")
+}
+
+enum TipoItem {
+  FUNCIONALIDADE
+  SUBMENU
+}
+
+enum TipoFuncionalidade {
+  CRUD
+  TELA
+  RELATORIO
+}
+
+enum TipoValidacao {
+  EMAIL
+  CELULAR
+}
+
+enum NivelAcesso {
+  VISUALIZAR
+  CRIAR
+  EDITAR
+  EXCLUIR
+  TOTAL
+}

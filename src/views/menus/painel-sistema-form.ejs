@@ -1,0 +1,83 @@
+<div class="card-painel-header">
+  <i class="bi bi-grid-3x3-gap text-primary"></i>
+  <span class="fw-semibold small"><%= sistema ? 'Editar Sistema' : 'Novo Sistema' %></span>
+  <% if (sistema) { %>
+    <span class="badge <%= sistema.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 ms-auto" style="font-size:.65rem">
+      <%= sistema.ativo ? 'Ativo' : 'Inativo' %>
+    </span>
+  <% } %>
+</div>
+
+<div class="card-body">
+  <% if (erro) { %>
+    <div class="alert alert-danger py-2 small mb-3"><%= erro %></div>
+  <% } %>
+
+  <form id="form-sistema"
+    <% if (sistema) { %>
+      hx-put="/admin/menus/sistema/<%= sistema.id %>"
+    <% } else { %>
+      hx-post="/admin/menus/novo/sistema"
+    <% } %>
+    hx-target="#painel-detalhe"
+    hx-swap="innerHTML"
+    hx-trigger="submit">
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= sistema ? sistema.nome : '' %>" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição</label>
+      <textarea name="descricao" class="form-control form-control-sm" rows="2"><%= sistema ? (sistema.descricao || '') : '' %></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">
+        Administrador <% if (!sistema) { %><span class="text-danger">*</span><% } %>
+      </label>
+      <input type="hidden" name="adminUsuarioId" id="sf-adminId"
+        value="<%= sistema ? (adminAtual ? adminAtual.id : '') : (adminPadrao ? adminPadrao.id : '') %>">
+      <div class="input-group input-group-sm">
+        <input type="text" id="sf-adminDisplay" class="form-control form-control-sm"
+          value="<%= sistema ? (adminAtual ? adminAtual.nomeCompleto : '') : (adminPadrao ? adminPadrao.nomeCompleto : '') %>"
+          placeholder="Selecione um usuário..." readonly>
+        <button type="button" class="btn btn-outline-secondary"
+          onclick="abrirLookup('usuarios', function(id, nome) {
+            document.getElementById('sf-adminId').value = id;
+            document.getElementById('sf-adminDisplay').value = nome;
+          })">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+      <% if (sistema) { %>
+        <div class="form-text text-warning-emphasis" style="font-size:.7rem">Alterar substituirá o administrador atual.</div>
+      <% } %>
+    </div>
+
+    <% if (sistema) { %>
+    <div class="form-check mb-3">
+      <input type="hidden" name="ativo" id="sf-ativo-val" value="<%= sistema.ativo ? 'true' : 'false' %>">
+      <input type="checkbox" class="form-check-input" id="sf-ativo-chk"
+        <%= sistema.ativo ? 'checked' : '' %>
+        onchange="document.getElementById('sf-ativo-val').value = this.checked ? 'true' : 'false'">
+      <label for="sf-ativo-chk" class="form-check-label small">Sistema ativo</label>
+    </div>
+    <% } %>
+
+    <div class="d-flex align-items-center gap-2 pt-2 border-top">
+      <button type="submit" class="btn btn-sm btn-primary">
+        <i class="bi bi-check-lg me-1"></i>Salvar
+      </button>
+      <% if (sistema) { %>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          hx-get="/admin/menus/painel/sistema/<%= sistema.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-x me-1"></i>Cancelar
+        </button>
+      <% } %>
+    </div>
+  </form>
+</div>

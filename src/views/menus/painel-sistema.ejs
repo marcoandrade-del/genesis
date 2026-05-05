@@ -1,0 +1,66 @@
+<div class="card-painel-header">
+  <i class="bi bi-grid-3x3-gap text-primary"></i>
+  <span class="fw-semibold small">Sistema</span>
+  <span class="badge <%= sistema.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 ms-auto" style="font-size:.65rem">
+    <%= sistema.ativo ? 'Ativo' : 'Inativo' %>
+  </span>
+</div>
+
+<div class="card-body">
+  <h5 class="fw-bold mb-1"><%= sistema.nome %></h5>
+  <% if (sistema.descricao) { %>
+    <p class="text-muted small mb-3"><%= sistema.descricao %></p>
+  <% } else { %>
+    <p class="text-muted small mb-3 fst-italic">Sem descrição</p>
+  <% } %>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6">
+      <div class="border rounded p-2 text-center">
+        <div class="fw-bold fs-5"><%= sistema._count.modulos %></div>
+        <div class="small text-muted">Módulo(s)</div>
+      </div>
+    </div>
+    <div class="col-6">
+      <div class="border rounded p-2 text-center">
+        <div class="fw-bold fs-5"><%= sistema.admins.length %></div>
+        <div class="small text-muted">Administrador(es)</div>
+      </div>
+    </div>
+  </div>
+
+  <% if (sistema.admins.length > 0) { %>
+  <div class="mb-4">
+    <div class="small fw-semibold text-muted text-uppercase mb-2" style="letter-spacing:.05em; font-size:.7rem">
+      <i class="bi bi-person-check me-1"></i>Administradores
+    </div>
+    <% sistema.admins.forEach(function(a) { %>
+      <div class="small d-flex align-items-center gap-1 mb-1">
+        <i class="bi bi-person-circle text-muted"></i>
+        <%= a.usuario.nomeCompleto %>
+      </div>
+    <% }) %>
+  </div>
+  <% } %>
+
+  <div class="d-flex gap-2 flex-wrap">
+    <button class="btn btn-sm btn-success"
+      hx-get="/admin/menus/novo/modulo?sistemaId=<%= sistema.id %>"
+      hx-target="#painel-detalhe"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus me-1"></i>Novo Módulo
+    </button>
+    <button class="btn btn-sm btn-outline-secondary"
+      hx-get="/admin/menus/painel/sistema/<%= sistema.id %>/editar"
+      hx-target="#painel-detalhe"
+      hx-swap="innerHTML">
+      <i class="bi bi-pencil me-1"></i>Editar
+    </button>
+    <button class="btn btn-sm btn-outline-danger ms-auto"
+      hx-delete="/admin/menus/sistema/<%= sistema.id %>"
+      hx-target="#painel-detalhe"
+      hx-swap="innerHTML">
+      <i class="bi bi-trash"></i>
+    </button>
+  </div>
+</div>

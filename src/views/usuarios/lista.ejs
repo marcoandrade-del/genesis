@@ -1,0 +1,60 @@
+<% if (usuarios.length === 0) { %>
+  <tr><td colspan="7" class="text-center text-muted py-5">
+    <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum usuário encontrado.
+  </td></tr>
+<% } %>
+<% usuarios.forEach(function(u) { %>
+  <tr id="usuario-<%= u.id %>">
+    <td class="ps-3">
+      <div class="fw-semibold small"><%= u.nomeCompleto %></div>
+      <div class="text-muted" style="font-size:.75rem"><%= u.nomeSocial %></div>
+    </td>
+    <td class="small"><%= u.emailPrincipal %></td>
+    <td class="small font-monospace text-muted">
+      <%= u.cpf ? u.cpf : (u.idEstrangeiro || '—') %>
+    </td>
+    <td>
+      <span title="E-mail" class="me-1">
+        <i class="bi bi-envelope-fill <%= u.emailValidado ? 'text-success' : 'text-secondary' %>" style="font-size:.85rem"></i>
+      </span>
+      <span title="Celular">
+        <i class="bi bi-phone-fill <%= u.celularValidado ? 'text-success' : 'text-secondary' %>" style="font-size:.85rem"></i>
+      </span>
+    </td>
+    <td>
+      <% if (u.ativo) { %>
+        <span class="badge rounded-pill bg-success bg-opacity-75">Ativo</span>
+      <% } else if (u.emailValidado || u.celularValidado) { %>
+        <span class="badge rounded-pill bg-warning bg-opacity-75 text-dark">Pendente</span>
+      <% } else { %>
+        <span class="badge rounded-pill bg-secondary bg-opacity-75">Inativo</span>
+      <% } %>
+    </td>
+    <td>
+      <% if (u._count.adminSistemas > 0) { %>
+        <span class="badge bg-primary bg-opacity-75" title="Admin de <%= u._count.adminSistemas %> sistema(s)">
+          <i class="bi bi-shield-fill-check me-1"></i><%= u._count.adminSistemas %>
+        </span>
+      <% } else { %>
+        <span class="text-muted small">—</span>
+      <% } %>
+    </td>
+    <td class="text-end pe-3">
+      <button class="btn btn-sm btn-outline-secondary me-1"
+        hx-get="/admin/usuarios/<%= u.id %>/form"
+        hx-target="#modal-body"
+        hx-swap="innerHTML"
+        title="Editar">
+        <i class="bi bi-pencil"></i>
+      </button>
+      <button class="btn btn-sm btn-outline-danger"
+        hx-delete="/admin/usuarios/<%= u.id %>"
+        hx-target="#usuario-<%= u.id %>"
+        hx-swap="outerHTML"
+        title="Excluir">
+        <i class="bi bi-trash"></i>
+      </button>
+    </td>
+  </tr>
+<% }) %>
+<span id="total-usuarios" hx-swap-oob="true"><%= total %> usuário(s) cadastrado(s)</span>

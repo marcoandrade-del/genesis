@@ -1,0 +1,22 @@
+<% if (itens.length === 0) { %>
+  <div class="text-center text-muted py-5 small">Nenhum item encontrado.</div>
+<% } %>
+<% itens.forEach(function(it) { %>
+  <button type="button"
+    class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
+    data-id="<%= it.id %>"
+    data-nome="<%= it.nome %>"
+    onclick="selecionarItem(this.dataset.id, this.dataset.nome)">
+    <div class="fw-semibold small"><%= it.nome %></div>
+    <div class="d-flex gap-2 mt-1 align-items-center">
+      <span class="text-muted" style="font-size:.7rem">
+        <i class="bi bi-grid-3x3-gap" style="font-size:.65rem"></i> <%= it.menu.modulo.sistema.nome %>
+        <i class="bi bi-chevron-right mx-1" style="font-size:.6rem"></i><%= it.menu.modulo.nome %>
+        <i class="bi bi-chevron-right mx-1" style="font-size:.6rem"></i><%= it.menu.nome %>
+      </span>
+      <% if (it.tipoFuncionalidade) { %>
+        <span class="badge bg-light text-dark border" style="font-size:.6rem"><%= it.tipoFuncionalidade %></span>
+      <% } %>
+    </div>
+  </button>
+<% }) %>

@@ -1,0 +1,25 @@
+<div class="modal-header">
+  <div>
+    <h5 class="modal-title fw-semibold mb-0">
+      <i class="bi bi-shield-lock me-2 text-primary"></i><%= usuario.nomeCompleto %>
+    </h5>
+    <div class="text-muted small"><%= usuario.emailPrincipal %></div>
+  </div>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body p-0">
+  <div id="perm-linhas">
+    <%- include('linhas-permissoes', { permissoes, usuarioId: usuario.id }) %>
+  </div>
+</div>
+
+<div class="modal-footer justify-content-between">
+  <button class="btn btn-sm btn-primary"
+    hx-get="/admin/permissoes/<%= usuario.id %>/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Adicionar Permissão
+  </button>
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Fechar</button>
+</div>

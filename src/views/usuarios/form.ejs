@@ -1,0 +1,131 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-person-fill me-2 text-primary"></i><%= usuario ? 'Editar Usuário' : 'Novo Usuário' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (usuario) { %>
+    hx-put="/admin/usuarios/<%= usuario.id %>"
+  <% } else { %>
+    hx-post="/admin/usuarios"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (!usuario) { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Tipo de documento <span class="text-danger">*</span></label>
+        <div class="d-flex gap-3 mb-2">
+          <div class="form-check">
+            <input type="radio" class="form-check-input" name="_tipoDoc" id="rd-cpf" value="cpf"
+              checked onchange="alternarDoc(this.value)">
+            <label for="rd-cpf" class="form-check-label small">CPF (brasileiro)</label>
+          </div>
+          <div class="form-check">
+            <input type="radio" class="form-check-input" name="_tipoDoc" id="rd-est" value="est"
+              onchange="alternarDoc(this.value)">
+            <label for="rd-est" class="form-check-label small">ID estrangeiro</label>
+          </div>
+        </div>
+        <div id="campo-cpf">
+          <input type="text" name="cpf" id="f-cpf" class="form-control form-control-sm"
+            placeholder="000.000.000-00">
+        </div>
+        <div id="campo-est" style="display:none">
+          <input type="text" name="idEstrangeiro" id="f-idEst" class="form-control form-control-sm"
+            placeholder="Número do documento estrangeiro" disabled>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Documento</label>
+        <input type="text" class="form-control form-control-sm font-monospace"
+          value="<%= usuario.cpf || usuario.idEstrangeiro || '—' %>" readonly>
+      </div>
+    <% } %>
+
+    <div class="row g-2 mb-3">
+      <div class="col-8">
+        <label class="form-label small fw-semibold">Nome completo <span class="text-danger">*</span></label>
+        <input type="text" name="nomeCompleto" class="form-control form-control-sm"
+          value="<%= usuario ? usuario.nomeCompleto : '' %>" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small fw-semibold">Nome social <span class="text-danger">*</span></label>
+        <input type="text" name="nomeSocial" class="form-control form-control-sm"
+          value="<%= usuario ? (usuario.nomeSocial || '') : '' %>" required>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Data de nascimento <span class="text-danger">*</span></label>
+      <input type="date" name="dataNascimento" class="form-control form-control-sm"
+        value="<%= usuario && usuario.dataNascimento ? new Date(usuario.dataNascimento).toISOString().slice(0,10) : '' %>"
+        required>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-7">
+        <label class="form-label small fw-semibold">E-mail principal <span class="text-danger">*</span></label>
+        <input type="email" name="emailPrincipal" class="form-control form-control-sm"
+          value="<%= usuario ? usuario.emailPrincipal : '' %>"
+          <% if (!usuario) { %>required<% } else { %>readonly<% } %>>
+      </div>
+      <div class="col-5">
+        <label class="form-label small fw-semibold">E-mail alternativo</label>
+        <input type="email" name="emailAlternativo" class="form-control form-control-sm"
+          value="<%= usuario ? (usuario.emailAlternativo || '') : '' %>">
+      </div>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Telefone principal <span class="text-danger">*</span></label>
+        <input type="text" name="telefonePrincipal" class="form-control form-control-sm"
+          value="<%= usuario ? usuario.telefonePrincipal : '' %>" required>
+      </div>
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Telefone alternativo</label>
+        <input type="text" name="telefoneAlternativo" class="form-control form-control-sm"
+          value="<%= usuario ? (usuario.telefoneAlternativo || '') : '' %>">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">
+        Senha
+        <% if (!usuario) { %><span class="text-danger">*</span><% } else { %>
+        <span class="text-muted fw-normal">(deixe em branco para manter)</span>
+        <% } %>
+      </label>
+      <input type="password" name="senha" class="form-control form-control-sm"
+        minlength="8"
+        <% if (!usuario) { %>required<% } %>
+        placeholder="Mínimo 8 caracteres">
+    </div>
+
+    <div class="form-check">
+      <input type="hidden" name="ativo" id="uf-ativo-val"
+        value="<%= usuario ? (usuario.ativo ? 'true' : 'false') : 'true' %>">
+      <input type="checkbox" class="form-check-input" id="chk-ativo"
+        <%= (!usuario || usuario.ativo) ? 'checked' : '' %>
+        onchange="document.getElementById('uf-ativo-val').value = this.checked ? 'true' : 'false'">
+      <label for="chk-ativo" class="form-check-label small">Usuário ativo</label>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

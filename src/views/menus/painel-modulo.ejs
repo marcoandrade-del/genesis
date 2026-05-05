@@ -1,0 +1,104 @@
+<div class="card-painel-header">
+  <i class="bi bi-boxes text-success"></i>
+  <span class="fw-semibold small"><%= editando ? 'Módulo' : 'Novo Módulo' %></span>
+  <% if (editando && modulo) { %>
+    <span class="badge <%= modulo.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 ms-auto" style="font-size:.65rem">
+      <%= modulo.ativo ? 'Ativo' : 'Inativo' %>
+    </span>
+  <% } %>
+</div>
+
+<div class="card-body">
+  <% if (editando && modulo) { %>
+    <div class="text-muted small mb-3">
+      <i class="bi bi-grid-3x3-gap me-1 text-primary"></i><%= modulo.sistema.nome %>
+      <i class="bi bi-chevron-right mx-1"></i>
+      <strong><%= modulo.nome %></strong>
+      &nbsp;·&nbsp;<%= modulo._count.menus %> menu(s)
+    </div>
+  <% } else { %>
+    <div class="text-muted small mb-3">
+      <i class="bi bi-grid-3x3-gap me-1 text-primary"></i><strong><%= sistema ? sistema.nome : '' %></strong>
+      <i class="bi bi-chevron-right mx-1"></i><span class="fst-italic">Novo Módulo</span>
+    </div>
+  <% } %>
+
+  <% if (erro) { %>
+    <div class="alert alert-danger py-2 small mb-3"><%= erro %></div>
+  <% } %>
+
+  <form
+    <% if (editando && modulo) { %>
+      hx-put="/admin/menus/modulo/<%= modulo.id %>"
+    <% } else { %>
+      hx-post="/admin/menus/novo/modulo"
+    <% } %>
+    hx-target="#painel-detalhe" hx-swap="innerHTML"
+    hx-trigger="submit">
+
+    <% if (!editando) { %>
+      <input type="hidden" name="sistemaId" value="<%= sistema ? sistema.id : '' %>">
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= editando && modulo ? modulo.nome : '' %>" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição</label>
+      <textarea name="descricao" class="form-control form-control-sm" rows="2"><%= editando && modulo ? (modulo.descricao || '') : '' %></textarea>
+    </div>
+
+    <% if (!editando) { %>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Administrador <span class="text-danger">*</span></label>
+      <input type="hidden" name="adminUsuarioId" id="pm-adminId" value="<%= adminPadrao ? adminPadrao.id : '' %>">
+      <div class="input-group input-group-sm">
+        <input type="text" id="pm-adminDisplay" class="form-control form-control-sm"
+          value="<%= adminPadrao ? adminPadrao.nomeCompleto : '' %>"
+          placeholder="Selecione um usuário..." readonly>
+        <button type="button" class="btn btn-outline-secondary"
+          onclick="abrirLookup('usuarios', function(id, nome) {
+            document.getElementById('pm-adminId').value = id;
+            document.getElementById('pm-adminDisplay').value = nome;
+          })"><i class="bi bi-search"></i></button>
+      </div>
+    </div>
+    <% } %>
+
+    <% if (editando && modulo) { %>
+    <div class="form-check mb-3">
+      <input type="hidden" name="ativo" id="pm-ativo-val" value="<%= modulo.ativo ? 'true' : 'false' %>">
+      <input type="checkbox" class="form-check-input" id="pm-ativo-chk"
+        <%= modulo.ativo ? 'checked' : '' %>
+        onchange="document.getElementById('pm-ativo-val').value = this.checked ? 'true' : 'false'">
+      <label for="pm-ativo-chk" class="form-check-label small">Módulo ativo</label>
+    </div>
+    <% } %>
+
+    <div class="d-flex align-items-center gap-2 pt-2 border-top">
+      <button type="submit" class="btn btn-sm btn-success">
+        <i class="bi bi-check-lg me-1"></i>Salvar
+      </button>
+      <% if (editando && modulo) { %>
+        <button type="button" class="btn btn-sm btn-primary"
+          hx-get="/admin/menus/novo/menu?moduloId=<%= modulo.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-plus me-1"></i>Novo Menu
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          hx-get="/admin/menus/painel/modulo/<%= modulo.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-x me-1"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
+          hx-delete="/admin/menus/modulo/<%= modulo.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-trash"></i>
+        </button>
+      <% } %>
+    </div>
+  </form>
+</div>

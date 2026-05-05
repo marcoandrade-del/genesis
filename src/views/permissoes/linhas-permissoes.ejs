@@ -1,0 +1,52 @@
+<% if (permissoes.length === 0) { %>
+  <div class="text-center text-muted py-4 small">
+    <i class="bi bi-shield fs-4 d-block mb-2 opacity-50"></i>Nenhuma permissão concedida.
+  </div>
+<% } else { %>
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th class="ps-3">Item</th>
+        <th>Tipo</th>
+        <th style="width:180px">Nível</th>
+        <th class="text-end pe-3" style="width:60px"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% permissoes.forEach(function(p) { %>
+        <tr>
+          <td class="ps-3 small fw-semibold"><%= p.item.nome %></td>
+          <td>
+            <% if (p.item.tipoFuncionalidade) { %>
+              <span class="badge bg-light text-dark border" style="font-size:.65rem"><%= p.item.tipoFuncionalidade %></span>
+            <% } else { %>
+              <span class="text-muted small">—</span>
+            <% } %>
+          </td>
+          <td>
+            <select name="nivel" class="form-select form-select-sm"
+              style="font-size:.75rem"
+              hx-put="/admin/permissoes/perm/<%= p.id %>"
+              hx-target="#perm-linhas"
+              hx-swap="innerHTML"
+              hx-vals='{"usuarioId": "<%= usuarioId %>"}'>
+              <% ['VISUALIZAR','CRIAR','EDITAR','EXCLUIR','TOTAL'].forEach(function(n) { %>
+                <option value="<%= n %>" <%= p.nivel === n ? 'selected' : '' %>><%= n %></option>
+              <% }) %>
+            </select>
+          </td>
+          <td class="text-end pe-3">
+            <button class="btn btn-sm btn-outline-danger py-0 px-1"
+              hx-delete="/admin/permissoes/perm/<%= p.id %>?usuarioId=<%= usuarioId %>"
+              hx-target="#perm-linhas"
+              hx-swap="innerHTML"
+              hx-confirm="Revogar permissão de '<%= p.item.nome %>'?"
+              title="Revogar">
+              <i class="bi bi-trash" style="font-size:.8rem"></i>
+            </button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+<% } %>

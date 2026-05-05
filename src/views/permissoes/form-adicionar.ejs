@@ -1,0 +1,61 @@
+<div class="modal-header">
+  <div>
+    <h5 class="modal-title fw-semibold mb-0">
+      <i class="bi bi-plus-circle me-2 text-primary"></i>Adicionar Permissão
+    </h5>
+    <div class="text-muted small"><%= usuario.nomeCompleto %></div>
+  </div>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/permissoes/<%= usuario.id %>"
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Item / Funcionalidade <span class="text-danger">*</span></label>
+      <input type="hidden" name="itemId" id="perm-itemId">
+      <div class="input-group input-group-sm">
+        <input type="text" id="perm-itemDisplay" class="form-control form-control-sm"
+          placeholder="Selecione um item..." readonly>
+        <button type="button" class="btn btn-outline-secondary"
+          onclick="abrirLookup('itens', function(id, nome) {
+            document.getElementById('perm-itemId').value = id;
+            document.getElementById('perm-itemDisplay').value = nome;
+          })">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+      <div class="form-text" style="font-size:.7rem">Apenas itens do tipo FUNCIONALIDADE.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nível de Acesso <span class="text-danger">*</span></label>
+      <select name="nivel" class="form-select form-select-sm" required>
+        <option value="">Selecione...</option>
+        <option value="VISUALIZAR">VISUALIZAR — somente leitura</option>
+        <option value="CRIAR">CRIAR — pode criar registros</option>
+        <option value="EDITAR">EDITAR — pode editar registros</option>
+        <option value="EXCLUIR">EXCLUIR — pode excluir registros</option>
+        <option value="TOTAL">TOTAL — acesso completo</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="modal-footer justify-content-between">
+    <button type="button" class="btn btn-sm btn-outline-secondary"
+      hx-get="/admin/permissoes/<%= usuario.id %>/modal"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Conceder
+    </button>
+  </div>
+</form>

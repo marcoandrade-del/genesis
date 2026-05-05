@@ -1,0 +1,117 @@
+<style>
+  .tree-label {
+    cursor: pointer; border-radius: 4px; padding: 2px 4px;
+    user-select: none; flex-grow: 1; min-width: 0;
+  }
+  .tree-label:hover { background: rgba(0,0,0,.06); }
+  .tree-label.selecionado { background: rgba(13,110,253,.12); color: #0a58ca; font-weight: 600; }
+  .tree-toggle {
+    border: none; background: none; padding: 0; width: 18px; height: 18px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: #6c757d; cursor: pointer; border-radius: 3px; transition: background .1s;
+  }
+  .tree-toggle:hover { background: rgba(0,0,0,.08); }
+  .tree-actions { opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+  .tree-row:hover .tree-actions { opacity: 1; }
+  .tree-row { display: flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 4px; }
+  .tree-row:hover { background: rgba(0,0,0,.03); }
+  .tree-children { padding-left: 16px; }
+  #painel-detalhe { min-height: 400px; }
+  /* Modo mover: item selecionado para reordenação */
+  .tree-mover-ativo > .tree-row,
+  .tree-row.tree-mover-ativo {
+    background: rgba(13,110,253,.1) !important;
+    outline: 2px solid rgba(13,110,253,.4);
+    border-radius: 4px;
+  }
+  .tree-mover-ativo .tree-actions,
+  .tree-row.tree-mover-ativo .tree-actions { opacity: 1 !important; }
+  .tree-mover-hint { font-size: .65rem; color: #0d6efd; padding: 0 4px; }
+  .card-painel-header {
+    background: #f8f9fa; border-bottom: 1px solid rgba(0,0,0,.08);
+    padding: .6rem 1rem; display: flex; align-items: center; gap: .5rem;
+    border-radius: calc(.375rem - 1px) calc(.375rem - 1px) 0 0;
+  }
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 fw-bold mb-0">
+    <i class="bi bi-diagram-3 me-2 text-primary"></i>Estrutura de Navegação
+  </h2>
+  <span class="text-muted small">Clique em um nó para ver detalhes ou criar filhos</span>
+</div>
+
+<div class="row g-3" style="min-height: calc(100vh - 180px)">
+
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-header bg-white py-2 d-flex align-items-center justify-content-between">
+        <span class="small fw-semibold text-muted text-uppercase" style="letter-spacing:.05em; font-size:.7rem">
+          <i class="bi bi-diagram-3 me-1"></i>Hierarquia
+        </span>
+        <button class="btn btn-outline-primary py-0 px-2" style="font-size:.7rem"
+          hx-get="/admin/menus/novo/sistema"
+          hx-target="#painel-detalhe"
+          hx-swap="innerHTML">
+          <i class="bi bi-plus"></i> Novo Sistema
+        </button>
+      </div>
+      <div class="card-body p-2 overflow-auto" style="max-height: calc(100vh - 240px)">
+        <div id="arvore-container"
+          hx-get="/admin/menus/arvore"
+          hx-trigger="refresh-tree from:body"
+          hx-swap="innerHTML">
+          <%- include('./arvore', { arvore }) %>
+        </div>
+        <% if (arvore.length === 0) { %>
+          <div class="text-center text-muted py-4">
+            <i class="bi bi-inbox fs-4 d-block mb-2 opacity-50"></i>
+            <span class="small">Nenhum sistema cadastrado.</span>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-8">
+    <div id="painel-detalhe" class="card border-0 shadow-sm h-100">
+      <%- include('./painel-vazio') %>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let _noSelecionado = null
+
+  function selecionarNo(el, nodeId) {
+    document.querySelectorAll('.tree-label.selecionado').forEach(n => n.classList.remove('selecionado'))
+    el.classList.add('selecionado')
+    _noSelecionado = nodeId
+  }
+
+  function toggleNo(btn, targetId) {
+    const children = document.getElementById(targetId)
+    if (!children) return
+    const icon = btn.querySelector('i')
+    const isOpen = children.style.display !== 'none' && children.style.display !== ''
+    if (isOpen) {
+      children.style.display = 'none'
+      if (icon) icon.className = 'bi bi-chevron-right'
+    } else {
+      children.style.display = 'block'
+      if (icon) icon.className = 'bi bi-chevron-down'
+    }
+  }
+
+  // Restaura seleção visual e limpa modo mover após refresh da árvore
+  document.body.addEventListener('htmx:afterSwap', function(e) {
+    if (e.detail.target.id === 'arvore-container') {
+      if (window._moverState) { window._moverState = null }
+      if (_noSelecionado) {
+        const el = document.querySelector('[data-node="' + _noSelecionado + '"]')
+        if (el) el.classList.add('selecionado')
+      }
+    }
+  })
+</script>

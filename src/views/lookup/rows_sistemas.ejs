@@ -1,0 +1,16 @@
+<% if (sistemas.length === 0) { %>
+  <div class="text-center text-muted py-5 small">Nenhum sistema encontrado.</div>
+<% } %>
+<% sistemas.forEach(function(s) { %>
+  <button type="button"
+    class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
+    onclick="selecionarItem('<%= s.id %>', '<%= s.nome.replace(/'/g, `\\'`) %>')">
+    <div class="fw-semibold small"><%= s.nome %></div>
+    <% if (s.descricao) { %>
+      <div class="text-muted" style="font-size:.75rem"><%= s.descricao %></div>
+    <% } %>
+    <span class="badge rounded-pill <%= s.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 mt-1" style="font-size:.65rem">
+      <%= s.ativo ? 'Ativo' : 'Inativo' %>
+    </span>
+  </button>
+<% }) %>

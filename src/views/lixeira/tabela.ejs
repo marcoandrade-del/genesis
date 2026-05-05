@@ -1,0 +1,56 @@
+<% if (!itens || itens.length === 0) { %>
+  <div class="card">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-trash" style="font-size:2rem"></i>
+      <p class="mt-2 mb-0">Lixeira vazia.</p>
+    </div>
+  </div>
+<% } else { %>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Tipo</th>
+          <th>Nome</th>
+          <th>Excluído por</th>
+          <th>Excluído em</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% itens.forEach(function(item) { %>
+        <tr>
+          <td class="ps-3">
+            <% const icones = { sistema: 'grid-3x3-gap text-primary', modulo: 'boxes text-success', menu: 'list-nested text-warning', item: 'lightning text-secondary' } %>
+            <i class="bi bi-<%= icones[item.tipo] || 'circle' %>"></i>
+            <span class="text-capitalize ms-1"><%= item.tipo %></span>
+          </td>
+          <td><%= item.nome %></td>
+          <td><%= item.excluidoPor.nomeCompleto %></td>
+          <td>
+            <%= new Date(item.excluidoEm).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) %>
+          </td>
+          <td class="text-end pe-3">
+            <button class="btn btn-sm btn-outline-success me-1"
+              hx-post="/admin/lixeira/<%= item.id %>/restaurar"
+              hx-target="#lixeira-tabela"
+              hx-swap="innerHTML"
+              hx-confirm="Restaurar '<%= item.nome %>'? A estrutura será recriada no banco de dados.">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar
+            </button>
+            <button class="btn btn-sm btn-outline-danger"
+              hx-delete="/admin/lixeira/<%= item.id %>"
+              hx-target="#lixeira-tabela"
+              hx-swap="innerHTML"
+              hx-confirm="Excluir permanentemente '<%= item.nome %>'? Esta ação não pode ser desfeita.">
+              <i class="bi bi-trash3 me-1"></i>Apagar
+            </button>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+<% } %>

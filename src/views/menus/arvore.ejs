@@ -1,0 +1,337 @@
+<% arvore.forEach(function(s) { %>
+<div class="mb-1">
+
+  <%# ── Linha do Sistema ──────────────────────────────────────────────── %>
+  <div class="tree-row" data-id="<%= s.id %>" data-tipo="sistema">
+    <button class="tree-toggle" onclick="toggleNo(this, 'kids-s-<%= s.id %>')" title="Expandir/Recolher">
+      <i class="bi bi-chevron-<%= s.modulos.length > 0 ? 'down' : 'right' %>"></i>
+    </button>
+    <span class="tree-label d-flex align-items-center gap-1 small"
+      data-node="sistema-<%= s.id %>"
+      hx-get="/admin/menus/painel/sistema/<%= s.id %>"
+      hx-target="#painel-detalhe"
+      hx-swap="innerHTML"
+      onclick="selecionarNo(this, 'sistema-<%= s.id %>')">
+      <i class="bi bi-grid-3x3-gap text-primary" style="font-size:.8rem; flex-shrink:0"></i>
+      <span class="text-truncate fw-semibold"><%= s.nome %></span>
+      <% if (!s.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+    </span>
+    <div class="tree-actions">
+      <button class="btn btn-sm btn-outline-success py-0 px-1" style="font-size:.7rem; line-height:1.4"
+        hx-get="/admin/menus/novo/modulo?sistemaId=<%= s.id %>"
+        hx-target="#painel-detalhe"
+        hx-swap="innerHTML"
+        title="Novo Módulo">
+        <i class="bi bi-plus-lg"></i>
+      </button>
+    </div>
+  </div>
+
+  <%# ── Filhos: Módulos ──────────────────────────────────────────────── %>
+  <div id="kids-s-<%= s.id %>" class="tree-children" data-sortable="modulos" data-sistema-id="<%= s.id %>">
+    <% s.modulos.forEach(function(m) { %>
+    <div class="mb-0" data-id="<%= m.id %>">
+
+      <%# Linha do Módulo %>
+      <div class="tree-row" data-id="<%= m.id %>" data-tipo="modulo">
+        <button class="tree-toggle" onclick="toggleNo(this, 'kids-m-<%= m.id %>')" title="Expandir/Recolher">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+        <span class="tree-label d-flex align-items-center gap-1 small"
+          data-node="modulo-<%= m.id %>"
+          hx-get="/admin/menus/painel/modulo/<%= m.id %>"
+          hx-target="#painel-detalhe"
+          hx-swap="innerHTML"
+          onclick="selecionarNo(this, 'modulo-<%= m.id %>')">
+          <i class="bi bi-boxes text-success" style="font-size:.8rem; flex-shrink:0"></i>
+          <span class="text-truncate"><%= m.nome %></span>
+          <% if (!m.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+        </span>
+        <div class="tree-actions">
+          <button class="btn btn-sm btn-outline-warning py-0 px-1" style="font-size:.7rem; line-height:1.4"
+            hx-get="/admin/menus/novo/menu?moduloId=<%= m.id %>"
+            hx-target="#painel-detalhe"
+            hx-swap="innerHTML"
+            title="Novo Menu">
+            <i class="bi bi-plus-lg"></i>
+          </button>
+          <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+            onclick="iniciarMover(this)" title="Mover (↑↓ Enter / Esc)">
+            <i class="bi bi-arrow-down-up"></i>
+          </button>
+        </div>
+      </div>
+
+      <%# Filhos: Menus (começam recolhidos) %>
+      <div id="kids-m-<%= m.id %>" class="tree-children" style="display:none" data-sortable="menus" data-modulo-id="<%= m.id %>">
+        <% m.menus.forEach(function(menu) { %>
+        <div class="mb-0" data-id="<%= menu.id %>">
+
+          <%# Linha do Menu %>
+          <div class="tree-row" data-id="<%= menu.id %>" data-tipo="menu">
+            <button class="tree-toggle" onclick="toggleNo(this, 'kids-menu-<%= menu.id %>')" title="Expandir/Recolher">
+              <i class="bi bi-chevron-right"></i>
+            </button>
+            <span class="tree-label d-flex align-items-center gap-1 small"
+              data-node="menu-<%= menu.id %>"
+              hx-get="/admin/menus/painel/menu/<%= menu.id %>"
+              hx-target="#painel-detalhe"
+              hx-swap="innerHTML"
+              onclick="selecionarNo(this, 'menu-<%= menu.id %>')">
+              <i class="bi bi-<%= menu.icone || 'list-nested' %> text-warning" style="font-size:.8rem; flex-shrink:0"></i>
+              <span class="text-truncate"><%= menu.nome %></span>
+              <% if (!menu.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+            </span>
+            <div class="tree-actions">
+              <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                hx-get="/admin/menus/novo/item?menuId=<%= menu.id %>"
+                hx-target="#painel-detalhe"
+                hx-swap="innerHTML"
+                title="Novo Item">
+                <i class="bi bi-plus-lg"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                onclick="iniciarMover(this)" title="Mover (↑↓ Enter / Esc)">
+                <i class="bi bi-arrow-down-up"></i>
+              </button>
+            </div>
+          </div>
+
+          <%# Filhos: Itens do menu (depth 0) %>
+          <div id="kids-menu-<%= menu.id %>" class="tree-children" style="display:none"
+               data-sortable="itens" data-menu-id="<%= menu.id %>" data-parent-id="">
+            <% menu.itens.forEach(function(item) { %>
+            <div class="mb-0" data-id="<%= item.id %>">
+
+              <%# Linha do Item (depth 0) %>
+              <div class="tree-row" data-id="<%= item.id %>" data-tipo="item"
+                   data-item-tipo="<%= item.tipo %>"
+                   data-menu-id="<%= menu.id %>" data-parent-id="">
+                <% if (item.tipo === 'SUBMENU') { %>
+                  <button class="tree-toggle" onclick="toggleNo(this, 'kids-item-<%= item.id %>')" title="Expandir/Recolher">
+                    <i class="bi bi-chevron-right"></i>
+                  </button>
+                <% } else { %>
+                  <span style="width:18px; flex-shrink:0"></span>
+                <% } %>
+                <span class="tree-label d-flex align-items-center gap-1 small"
+                  data-node="item-<%= item.id %>"
+                  hx-get="/admin/menus/painel/item/<%= item.id %>"
+                  hx-target="#painel-detalhe"
+                  hx-swap="innerHTML"
+                  onclick="selecionarNo(this, 'item-<%= item.id %>')">
+                  <% if (item.tipo === 'SUBMENU') { %>
+                    <i class="bi bi-folder text-warning" style="font-size:.8rem; flex-shrink:0"></i>
+                  <% } else { %>
+                    <i class="bi bi-lightning text-secondary" style="font-size:.8rem; flex-shrink:0"></i>
+                  <% } %>
+                  <span class="text-truncate"><%= item.nome %></span>
+                  <% if (!item.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+                </span>
+                <div class="tree-actions">
+                  <% if (item.tipo === 'SUBMENU') { %>
+                    <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                      hx-get="/admin/menus/novo/item?menuId=<%= menu.id %>&parentId=<%= item.id %>"
+                      hx-target="#painel-detalhe"
+                      hx-swap="innerHTML"
+                      title="Novo Item">
+                      <i class="bi bi-plus-lg"></i>
+                    </button>
+                  <% } %>
+                  <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                    onclick="iniciarMover(this)" title="Mover (↑↓ Enter / Esc)">
+                    <i class="bi bi-arrow-down-up"></i>
+                  </button>
+                </div>
+              </div>
+
+              <%# Filhos: SubItens (depth 1) %>
+              <% if (item.tipo === 'SUBMENU') { %>
+              <div id="kids-item-<%= item.id %>" class="tree-children" style="display:none"
+                   data-sortable="itens" data-menu-id="<%= menu.id %>" data-parent-id="<%= item.id %>">
+                <% item.subItens.forEach(function(sub1) { %>
+                <div class="mb-0" data-id="<%= sub1.id %>">
+
+                  <%# Linha SubItem depth 1 %>
+                  <div class="tree-row" data-id="<%= sub1.id %>" data-tipo="item"
+                       data-item-tipo="<%= sub1.tipo %>"
+                       data-menu-id="<%= menu.id %>" data-parent-id="<%= item.id %>">
+                    <% if (sub1.tipo === 'SUBMENU') { %>
+                      <button class="tree-toggle" onclick="toggleNo(this, 'kids-item-<%= sub1.id %>')" title="Expandir/Recolher">
+                        <i class="bi bi-chevron-right"></i>
+                      </button>
+                    <% } else { %>
+                      <span style="width:18px; flex-shrink:0"></span>
+                    <% } %>
+                    <span class="tree-label d-flex align-items-center gap-1 small"
+                      data-node="item-<%= sub1.id %>"
+                      hx-get="/admin/menus/painel/item/<%= sub1.id %>"
+                      hx-target="#painel-detalhe"
+                      hx-swap="innerHTML"
+                      onclick="selecionarNo(this, 'item-<%= sub1.id %>')">
+                      <% if (sub1.tipo === 'SUBMENU') { %>
+                        <i class="bi bi-folder text-warning" style="font-size:.8rem; flex-shrink:0"></i>
+                      <% } else { %>
+                        <i class="bi bi-lightning text-secondary" style="font-size:.8rem; flex-shrink:0"></i>
+                      <% } %>
+                      <span class="text-truncate"><%= sub1.nome %></span>
+                      <% if (!sub1.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+                    </span>
+                    <div class="tree-actions">
+                      <% if (sub1.tipo === 'SUBMENU') { %>
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                          hx-get="/admin/menus/novo/item?menuId=<%= menu.id %>&parentId=<%= sub1.id %>"
+                          hx-target="#painel-detalhe"
+                          hx-swap="innerHTML"
+                          title="Novo Item (somente FUNCIONALIDADE)">
+                          <i class="bi bi-plus-lg"></i>
+                        </button>
+                      <% } %>
+                      <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                        onclick="iniciarMover(this)" title="Mover (↑↓ Enter / Esc)">
+                        <i class="bi bi-arrow-down-up"></i>
+                      </button>
+                    </div>
+                  </div>
+
+                  <%# Filhos: SubItens depth 2 (somente FUNCIONALIDADE) %>
+                  <% if (sub1.tipo === 'SUBMENU') { %>
+                  <div id="kids-item-<%= sub1.id %>" class="tree-children" style="display:none"
+                       data-sortable="itens" data-menu-id="<%= menu.id %>" data-parent-id="<%= sub1.id %>">
+                    <% sub1.subItens.forEach(function(sub2) { %>
+                    <div class="tree-row" data-id="<%= sub2.id %>" data-tipo="item"
+                         data-item-tipo="<%= sub2.tipo %>"
+                         data-menu-id="<%= menu.id %>" data-parent-id="<%= sub1.id %>">
+                      <span style="width:18px; flex-shrink:0"></span>
+                      <span class="tree-label d-flex align-items-center gap-1 small"
+                        data-node="item-<%= sub2.id %>"
+                        hx-get="/admin/menus/painel/item/<%= sub2.id %>"
+                        hx-target="#painel-detalhe"
+                        hx-swap="innerHTML"
+                        onclick="selecionarNo(this, 'item-<%= sub2.id %>')">
+                        <i class="bi bi-lightning text-secondary" style="font-size:.8rem; flex-shrink:0"></i>
+                        <span class="text-truncate"><%= sub2.nome %></span>
+                        <% if (!sub2.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
+                      </span>
+                      <div class="tree-actions">
+                        <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                          onclick="iniciarMover(this)" title="Mover (↑↓ Enter / Esc)">
+                          <i class="bi bi-arrow-down-up"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <% }) %>
+                  </div>
+                  <% } %>
+
+                </div>
+                <% }) %>
+              </div>
+              <% } %>
+
+            </div>
+            <% }) %>
+          </div>
+
+        </div>
+        <% }) %>
+      </div>
+
+    </div>
+    <% }) %>
+  </div>
+
+</div>
+<% }) %>
+
+<script>
+// ── Reordenação por teclado ────────────────────────────────────────────────────
+// iniciarMover é global (chamado por onclick inline)
+function iniciarMover(btn) {
+  var row = btn.closest('.tree-row')
+  if (!row) return
+
+  // Determina wrapper (o que se move) e container ([data-sortable])
+  var wrapper, container
+  var rowParent = row.parentElement
+  if (rowParent && rowParent.dataset && rowParent.dataset.sortable) {
+    // depth-2: tree-row é filho direto do [data-sortable]
+    wrapper = row
+    container = rowParent
+  } else if (rowParent && rowParent.parentElement && rowParent.parentElement.dataset && rowParent.parentElement.dataset.sortable) {
+    // normal: div.mb-0 → [data-sortable]
+    wrapper = rowParent
+    container = rowParent.parentElement
+  } else {
+    return
+  }
+  if (!wrapper.dataset.id) return
+
+  // Cancela mover anterior se existir
+  if (window._moverState) _cancelarMover()
+
+  window._moverState = {
+    wrapper: wrapper,
+    container: container,
+    originalNextSibling: wrapper.nextElementSibling,
+  }
+  wrapper.classList.add('tree-mover-ativo')
+  wrapper.scrollIntoView({ block: 'nearest' })
+}
+
+function _moverCima() {
+  var s = window._moverState
+  if (!s) return
+  var prev = s.wrapper.previousElementSibling
+  if (prev) s.container.insertBefore(s.wrapper, prev)
+}
+
+function _moverBaixo() {
+  var s = window._moverState
+  if (!s) return
+  var next = s.wrapper.nextElementSibling
+  if (next) next.after(s.wrapper)
+}
+
+function _confirmarMover() {
+  var s = window._moverState
+  if (!s) return
+  window._moverState = null
+  s.wrapper.classList.remove('tree-mover-ativo')
+  var tipo = s.container.dataset.sortable
+  var ids = Array.from(s.container.children)
+    .map(function(c) { return c.dataset.id })
+    .filter(Boolean)
+  fetch('/admin/menus/reordenar/' + tipo, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ ids: JSON.stringify(ids) }),
+  }).then(function(r) {
+    if (!r.ok) _mostrarConfirmar({ titulo: 'Erro', texto: 'Erro ao salvar ordem.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function(){})
+  })
+}
+
+function _cancelarMover() {
+  var s = window._moverState
+  if (!s) return
+  window._moverState = null
+  if (s.originalNextSibling) {
+    s.container.insertBefore(s.wrapper, s.originalNextSibling)
+  } else {
+    s.container.appendChild(s.wrapper)
+  }
+  s.wrapper.classList.remove('tree-mover-ativo')
+}
+
+// Listener de teclado — registrado apenas uma vez
+if (!window._moverKeyOk) {
+  window._moverKeyOk = true
+  document.addEventListener('keydown', function(e) {
+    if (!window._moverState) return
+    if (e.key === 'ArrowUp')   { e.preventDefault(); _moverCima() }
+    if (e.key === 'ArrowDown') { e.preventDefault(); _moverBaixo() }
+    if (e.key === 'Enter')     { e.preventDefault(); _confirmarMover() }
+    if (e.key === 'Escape')    { e.preventDefault(); _cancelarMover() }
+  })
+}
+</script>

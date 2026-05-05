@@ -1,0 +1,168 @@
+<%
+  const isSubmenu = editando && item && item.tipo === 'SUBMENU'
+  const podeSerSubmenu = profundidade < 2
+  const somenteFuncionalidade = !podeSerSubmenu
+%>
+
+<div class="card-painel-header">
+  <% if (editando && item) { %>
+    <i class="bi bi-<%= isSubmenu ? 'folder' : 'lightning' %> <%= isSubmenu ? 'text-warning' : 'text-secondary' %>"></i>
+    <span class="fw-semibold small"><%= isSubmenu ? 'Submenu' : 'Funcionalidade' %></span>
+    <span class="badge <%= item.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75 ms-auto" style="font-size:.65rem">
+      <%= item.ativo ? 'Ativo' : 'Inativo' %>
+    </span>
+  <% } else { %>
+    <i class="bi bi-node-plus text-muted"></i>
+    <span class="fw-semibold small">Novo Item</span>
+  <% } %>
+</div>
+
+<div class="card-body">
+  <%# breadcrumb %>
+  <div class="text-muted small mb-3">
+    <% if (editando && item) { %>
+      <i class="bi bi-list-nested me-1 text-warning"></i><%= item.menu.nome %>
+      <% if (item.parent) { %>
+        <i class="bi bi-chevron-right mx-1"></i><i class="bi bi-folder text-warning" style="font-size:.8rem"></i> <%= item.parent.nome %>
+      <% } %>
+      <i class="bi bi-chevron-right mx-1"></i><strong><%= item.nome %></strong>
+    <% } else { %>
+      <i class="bi bi-list-nested me-1 text-warning"></i><strong><%= menu ? menu.nome : '' %></strong>
+      <% if (parentItem) { %>
+        <i class="bi bi-chevron-right mx-1"></i><i class="bi bi-folder text-warning" style="font-size:.8rem"></i> <%= parentItem.nome %>
+      <% } %>
+      <i class="bi bi-chevron-right mx-1"></i><span class="fst-italic">Novo Item</span>
+    <% } %>
+  </div>
+
+  <% if (somenteFuncionalidade && !editando) { %>
+    <div class="alert alert-info py-2 small mb-3">
+      <i class="bi bi-info-circle me-1"></i>Profundidade máxima — apenas tipo <strong>FUNCIONALIDADE</strong> é permitido.
+    </div>
+  <% } %>
+
+  <% if (erro) { %>
+    <div class="alert alert-danger py-2 small mb-3"><%= erro %></div>
+  <% } %>
+
+  <form
+    <% if (editando && item) { %>
+      hx-put="/admin/menus/item/<%= item.id %>"
+    <% } else { %>
+      hx-post="/admin/menus/novo/item"
+    <% } %>
+    hx-target="#painel-detalhe" hx-swap="innerHTML"
+    hx-trigger="submit">
+
+    <% if (!editando) { %>
+      <input type="hidden" name="menuId" value="<%= menu ? menu.id : '' %>">
+      <% if (parentItem) { %>
+        <input type="hidden" name="parentId" value="<%= parentItem.id %>">
+      <% } %>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= editando && item ? item.nome : '' %>" required>
+    </div>
+
+    <% if (!editando) { %>
+    <%# Tipo: auto-seleciona e desabilita quando só uma opção é válida %>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+      <% if (somenteFuncionalidade) { %>
+        <input type="hidden" name="tipo" value="FUNCIONALIDADE">
+        <input type="text" class="form-control form-control-sm" value="FUNCIONALIDADE" disabled>
+      <% } else { %>
+        <select name="tipo" id="pitem-tipo" class="form-select form-select-sm" onchange="onTipoItemChange(this.value)">
+          <option value="FUNCIONALIDADE">FUNCIONALIDADE</option>
+          <option value="SUBMENU">SUBMENU</option>
+        </select>
+      <% } %>
+    </div>
+    <% } %>
+
+    <%# Campos exclusivos de FUNCIONALIDADE %>
+    <div id="pitem-func-fields" <% if (isSubmenu) { %>style="display:none"<% } %>>
+      <% if (!editando || (editando && item && item.tipo === 'FUNCIONALIDADE')) { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Tipo de Funcionalidade <span class="text-danger">*</span></label>
+        <select name="tipoFuncionalidade" class="form-select form-select-sm">
+          <option value="CRUD" <%= editando && item && item.tipoFuncionalidade === 'CRUD' ? 'selected' : '' %>>CRUD</option>
+          <option value="TELA" <%= editando && item && item.tipoFuncionalidade === 'TELA' ? 'selected' : '' %>>TELA</option>
+          <option value="RELATORIO" <%= editando && item && item.tipoFuncionalidade === 'RELATORIO' ? 'selected' : '' %>>RELATÓRIO</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Rota</label>
+        <input type="text" name="rota" class="form-control form-control-sm"
+          value="<%= editando && item ? (item.rota || '') : '' %>"
+          placeholder="ex: /modulo/tela">
+      </div>
+      <% } %>
+    </div>
+
+    <div class="row g-2 mb-3">
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Ícone</label>
+        <input type="text" name="icone" class="form-control form-control-sm"
+          value="<%= editando && item ? (item.icone || '') : '' %>"
+          placeholder="ex: house">
+      </div>
+      <div class="col-6">
+        <label class="form-label small fw-semibold">Ordem</label>
+        <input type="number" name="ordem" class="form-control form-control-sm"
+          value="<%= editando && item ? item.ordem : 0 %>" min="0">
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição</label>
+      <input type="text" name="descricao" class="form-control form-control-sm"
+        value="<%= editando && item ? (item.descricao || '') : '' %>">
+    </div>
+
+    <% if (editando && item) { %>
+    <div class="form-check mb-3">
+      <input type="hidden" name="ativo" id="pitem-ativo-val" value="<%= item.ativo ? 'true' : 'false' %>">
+      <input type="checkbox" class="form-check-input" id="pitem-ativo-chk"
+        <%= item.ativo ? 'checked' : '' %>
+        onchange="document.getElementById('pitem-ativo-val').value = this.checked ? 'true' : 'false'">
+      <label for="pitem-ativo-chk" class="form-check-label small">Item ativo</label>
+    </div>
+    <% } %>
+
+    <div class="d-flex align-items-center gap-2 pt-2 border-top">
+      <button type="submit" class="btn btn-sm btn-secondary">
+        <i class="bi bi-check-lg me-1"></i>Salvar
+      </button>
+      <% if (editando && item && isSubmenu) { %>
+        <button type="button" class="btn btn-sm btn-primary"
+          hx-get="/admin/menus/novo/item?menuId=<%= item.menuId %>&parentId=<%= item.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-plus me-1"></i>Novo Item<% if (profundidade >= 1) { %> (FUNC.)<% } %>
+        </button>
+      <% } %>
+      <% if (editando && item) { %>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+          hx-get="/admin/menus/painel/item/<%= item.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-x me-1"></i>Cancelar
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
+          hx-delete="/admin/menus/item/<%= item.id %>"
+          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          <i class="bi bi-trash"></i>
+        </button>
+      <% } %>
+    </div>
+  </form>
+</div>
+
+<script>
+function onTipoItemChange(tipo) {
+  const funcFields = document.getElementById('pitem-func-fields')
+  if (funcFields) funcFields.style.display = tipo === 'FUNCIONALIDADE' ? '' : 'none'
+}
+</script>

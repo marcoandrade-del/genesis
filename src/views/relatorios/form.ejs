@@ -1,0 +1,85 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-file-earmark-bar-graph me-2 text-primary"></i><%= relatorio ? 'Editar Relatório' : 'Novo Relatório Fixo' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (relatorio) { %>
+    hx-put="/admin/relatorios/<%= relatorio.id %>"
+  <% } else { %>
+    hx-post="/admin/relatorios"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (!relatorio) { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Sistema <span class="text-danger">*</span></label>
+        <input type="hidden" name="sistemaId" id="f-sistemaId" value="">
+        <div class="input-group input-group-sm">
+          <input type="text" id="f-sistemaId-display" class="form-control form-control-sm"
+            placeholder="Selecione um sistema..."
+            readonly>
+          <button type="button" class="btn btn-outline-secondary" title="Consultar sistemas"
+            onclick="abrirLookup('sistemas', function(id, nome) {
+              document.getElementById('f-sistemaId').value = id;
+              document.getElementById('f-sistemaId-display').value = nome;
+            })">
+            <i class="bi bi-search"></i>
+          </button>
+        </div>
+      </div>
+    <% } else { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Sistema</label>
+        <input type="text" class="form-control form-control-sm" value="<%= sistemaNome %>" disabled>
+      </div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= relatorio ? relatorio.nome : '' %>" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Rota <span class="text-danger">*</span></label>
+      <input type="text" name="rota" class="form-control form-control-sm font-monospace"
+        value="<%= relatorio ? relatorio.rota : '' %>"
+        placeholder="/relatorios/nome-do-relatorio"
+        required>
+      <div class="form-text">Caminho da URL que serve este relatório.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição</label>
+      <textarea name="descricao" class="form-control form-control-sm" rows="2"><%= relatorio ? (relatorio.descricao || '') : '' %></textarea>
+    </div>
+
+    <% if (relatorio) { %>
+      <div class="form-check">
+        <input type="hidden" name="ativo" id="rf-ativo-val" value="<%= relatorio.ativo ? 'true' : 'false' %>">
+        <input type="checkbox" class="form-check-input" id="chk-ativo"
+          <%= relatorio.ativo ? 'checked' : '' %>
+          onchange="document.getElementById('rf-ativo-val').value = this.checked ? 'true' : 'false'">
+        <label for="chk-ativo" class="form-check-label small">Relatório ativo</label>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=nome]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

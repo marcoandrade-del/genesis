@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title ?? 'Gênesis Admin' %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    .sidebar { width: 230px; min-height: calc(100vh - 56px); flex-shrink: 0; }
+    .sidebar .nav-link { color: rgba(255,255,255,.65); padding: .4rem .75rem; border-radius: .375rem; }
+    .sidebar .nav-link:hover { color: #fff; background: rgba(255,255,255,.08); }
+    .sidebar .nav-link.active { color: #fff; background: rgba(255,255,255,.15); }
+    .sidebar .nav-link i { width: 18px; }
+    .sidebar .section-label { font-size: .7rem; letter-spacing: .08em; color: rgba(255,255,255,.35); padding: .5rem .75rem .2rem; text-transform: uppercase; }
+    .main-content { min-height: calc(100vh - 56px); }
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline-block; }
+
+
+    /* Offcanvas lookup must float above Bootstrap modal (z-index 1055) */
+    #offcanvas-lookup { z-index: 1060; }
+    .offcanvas-backdrop { z-index: 1059; }
+
+    #bloqueio-overlay {
+      display: none; position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.75); backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+    }
+    #bloqueio-overlay.ativo { display: flex; }
+  </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
+  <a class="navbar-brand fw-bold fs-6" href="/admin">
+    <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis Admin
+  </a>
+  <div class="d-flex align-items-center gap-3">
+    <span class="text-white-50 small d-none d-md-inline" id="nav-user-email"><%= userEmail %></span>
+    <a href="/admin/logout" class="btn btn-sm btn-outline-secondary text-white border-secondary">
+      <i class="bi bi-box-arrow-right me-1"></i>Sair
+    </a>
+  </div>
+</nav>
+
+<div class="d-flex">
+  <nav class="sidebar bg-dark p-2">
+    <ul class="nav flex-column gap-1">
+      <li><a class="nav-link <%= active === 'dashboard' ? 'active' : '' %>" href="/admin">
+        <i class="bi bi-speedometer2 me-2"></i>Dashboard
+      </a></li>
+
+      <li><div class="section-label">Estrutura</div></li>
+      <li><a class="nav-link <%= active === 'sistemas' ? 'active' : '' %>" href="/admin/sistemas">
+        <i class="bi bi-grid-3x3-gap me-2"></i>Sistemas
+      </a></li>
+      <li><a class="nav-link <%= active === 'modulos' ? 'active' : '' %>" href="/admin/modulos">
+        <i class="bi bi-boxes me-2"></i>Módulos
+      </a></li>
+      <li><a class="nav-link <%= active === 'menus' ? 'active' : '' %>" href="/admin/menus">
+        <i class="bi bi-list-nested me-2"></i>Menus &amp; Itens
+      </a></li>
+
+      <li><div class="section-label mt-1">Usuários</div></li>
+      <li><a class="nav-link <%= active === 'usuarios' ? 'active' : '' %>" href="/admin/usuarios">
+        <i class="bi bi-people me-2"></i>Usuários
+      </a></li>
+
+      <li><a class="nav-link <%= active === 'permissoes' ? 'active' : '' %>" href="/admin/permissoes">
+        <i class="bi bi-shield-lock me-2"></i>Permissões
+      </a></li>
+
+      <li><div class="section-label mt-1">Conteúdo</div></li>
+      <li><a class="nav-link <%= active === 'relatorios' ? 'active' : '' %>" href="/admin/relatorios">
+        <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatórios Fixos
+      </a></li>
+
+      <li><div class="section-label mt-1">Sistema</div></li>
+      <li><a class="nav-link <%= active === 'lixeira' ? 'active' : '' %>" href="/admin/lixeira">
+        <i class="bi bi-trash me-2"></i>Lixeira
+      </a></li>
+    </ul>
+  </nav>
+
+  <main class="main-content flex-grow-1 p-4 overflow-auto">
+    <%- body %>
+  </main>
+</div>
+
+<!-- Modal reutilizável para formulários -->
+<div class="modal fade" id="modal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog">
+    <div class="modal-content" style="overflow:hidden">
+      <!-- Aviso de alterações não salvas — aparece dentro do card do modal -->
+      <div id="modal-aviso-dirty" class="bg-warning bg-opacity-25 border-bottom border-warning px-3 py-2 d-flex align-items-center justify-content-between gap-2" style="display:none!important">
+        <span class="small fw-semibold"><i class="bi bi-exclamation-triangle-fill text-warning me-1"></i>Há alterações não salvas.</span>
+        <div class="d-flex gap-1 flex-shrink-0">
+          <button type="button" class="btn btn-sm btn-warning py-0 px-2" onclick="fecharModalForcado()">Fechar sem salvar</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="ocultarAvisoDirty()">Continuar editando</button>
+        </div>
+      </div>
+      <!-- Conteúdo carregado via HTMX -->
+      <div id="modal-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de confirmação global -->
+<div class="modal fade" id="modal-confirmar" tabindex="-1" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title fw-semibold" id="mc-titulo">Confirmar</h6>
+        <button type="button" class="btn-close" id="mc-btn-fechar"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-0" id="mc-mensagem-texto"></p>
+        <p class="mb-0 fw-semibold" id="mc-mensagem-destaque" style="display:none"></p>
+        <p class="mb-0 text-muted small" id="mc-mensagem-detalhe" style="display:none"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-sm btn-secondary" id="mc-btn-cancelar">Cancelar</button>
+        <button type="button" class="btn btn-sm" id="mc-btn-ok">Confirmar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Offcanvas reutilizável para lookups -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvas-lookup" style="width:480px">
+  <div id="offcanvas-lookup-body"></div>
+</div>
+
+<!-- Tela de bloqueio por inatividade -->
+<div id="bloqueio-overlay">
+  <div class="card shadow-lg" style="width:360px">
+    <div class="card-body p-4">
+      <div class="text-center mb-3">
+        <i class="bi bi-lock-fill text-warning" style="font-size:2rem"></i>
+        <h6 class="fw-bold mt-2 mb-0">Sessão bloqueada</h6>
+        <p class="text-muted small mt-1">Informe suas credenciais para continuar.</p>
+      </div>
+      <div id="bloqueio-erro" class="alert alert-danger py-2 small mb-3" style="display:none"></div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">E-mail</label>
+        <input type="email" id="bloqueio-email" class="form-control form-control-sm" readonly>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Senha</label>
+        <input type="password" id="bloqueio-senha" class="form-control form-control-sm" placeholder="Digite sua senha">
+      </div>
+      <button type="button" class="btn btn-primary btn-sm w-100" id="bloqueio-btn-entrar">
+        <i class="bi bi-unlock me-1"></i>Desbloquear
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>
+
+<script>
+// ── Segurança: escape de HTML para conteúdo dinâmico ───────────────────────────
+function escHtml(str) {
+  const d = document.createElement('div')
+  d.appendChild(document.createTextNode(String(str ?? '')))
+  return d.innerHTML
+}
+
+// ── Modal de formulários ────────────────────────────────────────────────────────
+var _modalDirty = false
+
+function ocultarAvisoDirty() {
+  var el = document.getElementById('modal-aviso-dirty')
+  el.style.setProperty('display', 'none', 'important')
+}
+
+function exibirAvisoDirty() {
+  var el = document.getElementById('modal-aviso-dirty')
+  el.style.removeProperty('display')
+  el.style.display = 'flex'
+}
+
+// Fecha o modal sem pedir confirmacao (chamado apos o usuario confirmar descarte)
+function fecharModalForcado() {
+  _modalDirty = false
+  ocultarAvisoDirty()
+  bootstrap.Modal.getInstance(document.getElementById('modal'))?.hide()
+}
+
+// Abre o modal e reseta estado de alteracoes
+function abrirModal() {
+  _modalDirty = false
+  ocultarAvisoDirty()
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('modal')).show()
+}
+
+// Fecha o modal — se ha alteracoes, exibe aviso inline; senao fecha direto
+function fecharModal() {
+  if (_modalDirty) {
+    exibirAvisoDirty()
+    return
+  }
+  fecharModalForcado()
+}
+
+// Reseta dirty quando modal e fechado por qualquer motivo
+document.getElementById('modal').addEventListener('hidden.bs.modal', function() {
+  _modalDirty = false
+  ocultarAvisoDirty()
+})
+
+// Rastreia digitacao em inputs, textareas e selects dentro do modal
+document.getElementById('modal').addEventListener('input', function(e) {
+  if (e.target.matches('input:not([readonly]), textarea, select')) _modalDirty = true
+}, true)
+document.getElementById('modal').addEventListener('change', function(e) {
+  if (e.target.matches('input[type="checkbox"], input[type="radio"]')) _modalDirty = true
+}, true)
+
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  if (e.detail.target.id === 'modal-body') abrirModal()
+  if (e.detail.target.id === 'painel-detalhe') _painelDirty = false
+})
+
+// ── Dirty tracking do painel-detalhe ──────────────────────────────────────────
+var _painelDirty = false
+
+document.body.addEventListener('input', function(e) {
+  if (e.target.closest('#painel-detalhe') &&
+      e.target.matches('input:not([readonly]), textarea, select')) {
+    _painelDirty = true
+  }
+}, true)
+
+document.body.addEventListener('change', function(e) {
+  if (e.target.closest('#painel-detalhe') &&
+      e.target.matches('input[type="checkbox"], input[type="radio"]')) {
+    _painelDirty = true
+  }
+}, true)
+
+// Intercepta navegação que substitui o painel quando há alterações não salvas
+document.body.addEventListener('click', function(e) {
+  if (!_painelDirty) return
+  var el = e.target.closest('[hx-get]')
+  if (!el || el.getAttribute('hx-target') !== '#painel-detalhe') return
+  e.preventDefault()
+  e.stopImmediatePropagation()
+  _mostrarConfirmar({
+    titulo: 'Alterações não salvas',
+    texto: 'Há alterações não salvas no formulário. Deseja sair sem salvar?',
+    tipo: 'warning',
+    okTexto: 'Sair sem salvar',
+  }, function(ok) {
+    if (ok) { _painelDirty = false; el.click() }
+  })
+}, true)
+
+// ── Lookup ──────────────────────────────────────────────────────────────────────
+let _lookupCallback = null
+
+function abrirLookup(tipo, callback, params) {
+  _lookupCallback = callback
+  params = params || {}
+  const qs = Object.keys(params).length ? '?' + new URLSearchParams(params).toString() : ''
+  htmx.ajax('GET', '/admin/lookup/' + tipo + qs, { target: '#offcanvas-lookup-body', swap: 'innerHTML' })
+  bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('offcanvas-lookup')).show()
+}
+
+function selecionarItem(id, nome) {
+  if (_lookupCallback) _lookupCallback(id, nome)
+  // Seleção via lookup conta como alteração no contexto ativo (modal ou painel)
+  if (bootstrap.Modal.getInstance(document.getElementById('modal'))) _modalDirty = true
+  if (document.querySelector('#painel-detalhe form')) _painelDirty = true
+  bootstrap.Offcanvas.getInstance(document.getElementById('offcanvas-lookup')).hide()
+}
+
+// ── Erros HTMX ─────────────────────────────────────────────────────────────────
+document.body.addEventListener('htmx:responseError', function (e) {
+  const msg = e.detail.xhr.responseText || 'Erro ao processar requisição.'
+  _mostrarConfirmar({ titulo: 'Erro', texto: msg, destaque: '', detalhe: '', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+})
+
+// ── Modal de confirmação global ─────────────────────────────────────────────────
+let _confirmarCallback = null
+const _modalConfirmar = new bootstrap.Modal(document.getElementById('modal-confirmar'))
+
+function _mostrarConfirmar(opcoes, callback) {
+  const titulo = opcoes.titulo || 'Confirmar'
+  const tipo = opcoes.tipo || 'primary'
+  const okTexto = opcoes.okTexto || 'Confirmar'
+  const semCancelar = !!opcoes.semCancelar
+
+  document.getElementById('mc-titulo').textContent = titulo
+  document.getElementById('mc-btn-ok').className = 'btn btn-sm btn-' + tipo
+  document.getElementById('mc-btn-ok').textContent = okTexto
+  document.getElementById('mc-btn-cancelar').style.display = semCancelar ? 'none' : ''
+  document.getElementById('mc-btn-fechar').style.display = semCancelar ? 'none' : ''
+
+  const elTexto = document.getElementById('mc-mensagem-texto')
+  const elDestaque = document.getElementById('mc-mensagem-destaque')
+  const elDetalhe = document.getElementById('mc-mensagem-detalhe')
+
+  elTexto.textContent = opcoes.texto || ''
+  if (opcoes.destaque) {
+    elDestaque.textContent = opcoes.destaque
+    elDestaque.style.display = ''
+  } else {
+    elDestaque.style.display = 'none'
+  }
+  if (opcoes.detalhe) {
+    elDetalhe.textContent = opcoes.detalhe
+    elDetalhe.style.display = ''
+  } else {
+    elDetalhe.style.display = 'none'
+  }
+
+  _confirmarCallback = callback
+  _modalConfirmar.show()
+}
+
+document.getElementById('mc-btn-ok').addEventListener('click', function () {
+  _modalConfirmar.hide()
+  if (_confirmarCallback) _confirmarCallback(true)
+})
+document.getElementById('mc-btn-cancelar').addEventListener('click', function () {
+  _modalConfirmar.hide()
+  if (_confirmarCallback) _confirmarCallback(false)
+})
+document.getElementById('mc-btn-fechar').addEventListener('click', function () {
+  _modalConfirmar.hide()
+  if (_confirmarCallback) _confirmarCallback(false)
+})
+
+// Substitui hx-confirm pelo modal customizado
+document.body.addEventListener('htmx:confirm', function (e) {
+  if (!e.detail.question) return
+  e.preventDefault()
+  _mostrarConfirmar({ titulo: 'Confirmar', texto: e.detail.question, tipo: 'primary' }, function(ok) {
+    if (ok) e.detail.issueRequest(true)
+  })
+})
+
+// Confirmação de gravação de formulários
+function confirmarGravacao(form, label) {
+  if (form && !form.reportValidity()) return
+  _mostrarConfirmar({
+    titulo: 'Confirmar Gravação',
+    texto: 'Deseja salvar as alterações?',
+    destaque: label || '',
+    tipo: 'primary',
+  }, function(ok) {
+    if (ok) htmx.trigger(form, 'submit-confirmed')
+  })
+}
+
+// Busca contagem de filhos e abre confirmação
+// opcoes: { url, target, swap } — para sobrescrever os defaults do painel de menus
+async function confirmarExclusaoAsync(tipo, id, nome, opcoes) {
+  try {
+    const resp = await fetch('/admin/menus/contar-filhos/' + tipo + '/' + id)
+    const data = await resp.json()
+    confirmarExclusao(tipo, id, nome, data.count, opcoes)
+  } catch {
+    confirmarExclusao(tipo, id, nome, 0, opcoes)
+  }
+}
+
+// Confirmação de exclusão (simples ou dupla)
+function confirmarExclusao(tipo, id, nome, qtdFilhos, opcoes) {
+  opcoes = opcoes || {}
+  qtdFilhos = parseInt(qtdFilhos) || 0
+  const nomeStr = String(nome)
+  // url pode ser sobrescrita (ex: /admin/sistemas/:id) ou calculada pelo padrão do painel
+  const url    = opcoes.url    || ('/admin/menus/' + tipo + '/' + id)
+  const target = opcoes.target || '#painel-detalhe'
+  const swap   = opcoes.swap   || 'innerHTML'
+
+  function executarExclusao() {
+    _mostrarConfirmar({
+      titulo: 'Confirmar Exclusão',
+      texto: 'A estrutura será movida para a Lixeira e poderá ser recuperada posteriormente.',
+      destaque: 'Excluir: ' + nomeStr,
+      tipo: 'danger',
+      okTexto: 'Excluir',
+    }, function(ok) {
+      if (!ok) return
+      htmx.ajax('DELETE', url, { target: target, swap: swap })
+    })
+  }
+
+  if (qtdFilhos > 0) {
+    _mostrarConfirmar({
+      titulo: 'Atenção — Itens Dependentes',
+      texto: nomeStr + ' possui ' + qtdFilhos + ' item(ns) vinculado(s) que também serão movidos para a lixeira.',
+      detalhe: 'Deseja continuar?',
+      tipo: 'warning',
+      okTexto: 'Continuar',
+    }, function(ok) {
+      if (ok) executarExclusao()
+    })
+  } else {
+    executarExclusao()
+  }
+}
+
+// ── Bloqueio por inatividade (2 minutos) ─────────────────────────────────────
+const TIMEOUT_MS = 2 * 60 * 1000
+let _timerBloqueio = null
+const _overlay = document.getElementById('bloqueio-overlay')
+
+const _userEmail = (document.getElementById('nav-user-email') || {}).textContent || ''
+document.getElementById('bloqueio-email').value = _userEmail.trim()
+
+function resetarTimer() {
+  clearTimeout(_timerBloqueio)
+  _timerBloqueio = setTimeout(bloquearTela, TIMEOUT_MS)
+}
+
+function bloquearTela() {
+  _overlay.classList.add('ativo')
+  document.getElementById('bloqueio-senha').value = ''
+  document.getElementById('bloqueio-erro').style.display = 'none'
+  setTimeout(function() { document.getElementById('bloqueio-senha').focus() }, 100)
+}
+
+;['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(function(ev) {
+  document.addEventListener(ev, resetarTimer, { passive: true })
+})
+resetarTimer()
+
+document.getElementById('bloqueio-btn-entrar').addEventListener('click', async function () {
+  const email = document.getElementById('bloqueio-email').value
+  const senha = document.getElementById('bloqueio-senha').value
+  const erroEl = document.getElementById('bloqueio-erro')
+  erroEl.style.display = 'none'
+  if (!senha) {
+    erroEl.textContent = 'Informe a senha.'
+    erroEl.style.display = ''
+    return
+  }
+  try {
+    const resp = await fetch('/admin/verificar-sessao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ email: email, senha: senha }),
+    })
+    const data = await resp.json()
+    if (data.ok) {
+      _overlay.classList.remove('ativo')
+      resetarTimer()
+    } else {
+      erroEl.textContent = data.erro || 'Credenciais inválidas.'
+      erroEl.style.display = ''
+    }
+  } catch {
+    erroEl.textContent = 'Erro ao verificar credenciais. Tente novamente.'
+    erroEl.style.display = ''
+  }
+})
+
+document.getElementById('bloqueio-senha').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') document.getElementById('bloqueio-btn-entrar').click()
+})
+
+// Fecha o modal após salvar usuário (sem pedir confirmação — acabou de salvar)
+document.body.addEventListener('usuarioSalvo', function () {
+  _modalDirty = false
+  fecharModalForcado()
+})
+
+// ── Formulário de usuário: toggle CPF/ID estrangeiro ─────────────────────────
+function alternarDoc(tipo) {
+  const campoCpf = document.getElementById('campo-cpf')
+  const campoEst = document.getElementById('campo-est')
+  const inputCpf = document.getElementById('f-cpf')
+  const inputEst = document.getElementById('f-idEst')
+  if (!campoCpf || !campoEst) return
+  if (tipo === 'cpf') {
+    campoCpf.style.display = ''
+    campoEst.style.display = 'none'
+    inputCpf.disabled = false
+    inputEst.disabled = true
+    inputEst.value = ''
+  } else {
+    campoCpf.style.display = 'none'
+    campoEst.style.display = ''
+    inputCpf.disabled = true
+    inputEst.disabled = false
+    inputCpf.value = ''
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-grid-3x3-gap me-2 text-primary"></i><%= sistema ? 'Editar Sistema' : 'Novo Sistema' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (sistema) { %>
+    hx-put="/admin/sistemas/<%= sistema.id %>"
+  <% } else { %>
+    hx-post="/admin/sistemas"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= sistema ? sistema.nome : '' %>" required>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição</label>
+      <textarea name="descricao" class="form-control form-control-sm" rows="2"><%= sistema ? (sistema.descricao || '') : '' %></textarea>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Administrador <% if (!sistema) { %><span class="text-danger">*</span><% } %></label>
+      <input type="hidden" name="adminUsuarioId" id="f-adminUsuarioId"
+        value="<%= sistema ? (adminAtual ? adminAtual.id : '') : (adminPadrao ? adminPadrao.id : '') %>">
+      <div class="input-group input-group-sm">
+        <input type="text" id="f-adminUsuarioId-display" class="form-control form-control-sm"
+          value="<%= sistema ? (adminAtual ? adminAtual.nomeCompleto : '') : (adminPadrao ? adminPadrao.nomeCompleto : '') %>"
+          placeholder="Selecione um usuário..."
+          readonly>
+        <button type="button" class="btn btn-outline-secondary" title="Consultar usuários"
+          onclick="abrirLookup('usuarios', function(id, nome) {
+            document.getElementById('f-adminUsuarioId').value = id;
+            document.getElementById('f-adminUsuarioId-display').value = nome;
+          })">
+          <i class="bi bi-search"></i>
+        </button>
+      </div>
+      <% if (!sistema) { %>
+        <div class="form-text">Por padrão preenchido com seu usuário. Clique na lupa para trocar.</div>
+      <% } else { %>
+        <div class="form-text text-warning-emphasis">Alterar substituirá o administrador atual.</div>
+      <% } %>
+    </div>
+
+    <% if (sistema) { %>
+      <div class="form-check">
+        <input type="hidden" name="ativo" id="sf-ativo-val" value="<%= sistema.ativo ? 'true' : 'false' %>">
+        <input type="checkbox" class="form-check-input" id="chk-ativo"
+          <%= sistema.ativo ? 'checked' : '' %>
+          onchange="document.getElementById('sf-ativo-val').value = this.checked ? 'true' : 'false'">
+        <label for="chk-ativo" class="form-check-label small">Sistema ativo</label>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=nome]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

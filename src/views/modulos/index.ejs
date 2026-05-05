@@ -1,0 +1,73 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Módulos</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/modulos/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Novo Módulo
+  </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3">
+    <form method="GET" action="/admin/modulos" class="d-flex align-items-center gap-2">
+      <label class="form-label small fw-semibold mb-0 text-nowrap">Filtrar por Sistema:</label>
+      <select name="sistemaId" class="form-select form-select-sm" style="max-width:220px"
+        onchange="this.form.submit()">
+        <option value="">Todos os sistemas</option>
+        <% sistemas.forEach(function(s) { %>
+          <option value="<%= s.id %>" <%= sistemaId === s.id ? 'selected' : '' %>><%= s.nome %></option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Nome</th>
+          <th>Sistema</th>
+          <th>Descrição</th>
+          <th>Status</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (modulos.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum módulo encontrado.
+          </td></tr>
+        <% } %>
+        <% modulos.forEach(function(m) { %>
+          <tr id="modulo-<%= m.id %>">
+            <td class="ps-3 fw-semibold"><%= m.nome %></td>
+            <td class="small text-muted"><%= m.sistema.nome %></td>
+            <td class="small text-muted"><%= m.descricao || '—' %></td>
+            <td>
+              <span class="badge rounded-pill <%= m.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75">
+                <%= m.ativo ? 'Ativo' : 'Inativo' %>
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/modulos/<%= m.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                onclick="confirmarExclusaoAsync('modulo', '<%= m.id %>', <%- JSON.stringify(m.nome) %>, { url: '/admin/modulos/<%= m.id %>', target: '#modulo-<%= m.id %>', swap: 'outerHTML' })"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

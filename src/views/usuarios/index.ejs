@@ -1,0 +1,58 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Usuários</h2>
+  <div class="d-flex align-items-center gap-2">
+    <span id="total-usuarios" class="text-muted small"><%= total %> usuário(s) cadastrado(s)</span>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/usuarios/form"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Novo Usuário
+    </button>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3">
+    <form method="GET" action="/admin/usuarios" class="d-flex align-items-center gap-2 flex-wrap">
+      <input type="text" name="busca" class="form-control form-control-sm" style="max-width:260px"
+        placeholder="Buscar por nome ou e-mail..." value="<%= busca %>">
+      <select name="status" class="form-select form-select-sm" style="max-width:160px">
+        <option value="">Todos os status</option>
+        <option value="ativo" <%= status === 'ativo' ? 'selected' : '' %>>Ativos</option>
+        <option value="inativo" <%= status === 'inativo' ? 'selected' : '' %>>Inativos</option>
+        <option value="pendente" <%= status === 'pendente' ? 'selected' : '' %>>Pendentes</option>
+      </select>
+      <button type="submit" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-search me-1"></i>Filtrar
+      </button>
+      <% if (busca || status) { %>
+        <a href="/admin/usuarios" class="btn btn-sm btn-link text-muted text-decoration-none">Limpar</a>
+      <% } %>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Nome</th>
+          <th>E-mail</th>
+          <th>Documento</th>
+          <th>Validação</th>
+          <th>Status</th>
+          <th>Admin</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody
+        id="tabela-usuarios-body"
+        hx-get="/admin/usuarios/lista"
+        hx-trigger="usuarioSalvo from:body"
+        hx-swap="innerHTML">
+        <%- include('lista', { usuarios, total }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

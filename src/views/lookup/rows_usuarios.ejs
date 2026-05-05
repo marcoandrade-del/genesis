@@ -1,0 +1,16 @@
+<% if (usuarios.length === 0) { %>
+  <div class="text-center text-muted py-5 small">Nenhum usuário encontrado.</div>
+<% } %>
+<% usuarios.forEach(function(u) { %>
+  <button type="button"
+    class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
+    onclick="selecionarItem('<%= u.id %>', <%- JSON.stringify(u.nomeCompleto) %>)">
+    <div class="fw-semibold small"><%= u.nomeCompleto %></div>
+    <div class="d-flex gap-3 mt-1">
+      <span class="text-muted" style="font-size:.75rem"><%= u.emailPrincipal %></span>
+      <span class="badge rounded-pill <%= u.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75" style="font-size:.65rem">
+        <%= u.ativo ? 'Ativo' : 'Inativo' %>
+      </span>
+    </div>
+  </button>
+<% }) %>
