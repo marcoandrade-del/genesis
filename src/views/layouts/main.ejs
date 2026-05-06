@@ -75,11 +75,17 @@
       <li><a class="nav-link <%= active === 'relatorios' ? 'active' : '' %>" href="/admin/relatorios">
         <i class="bi bi-file-earmark-bar-graph me-2"></i>Relatórios Fixos
       </a></li>
+      <li><a class="nav-link <%= active === 'relatorios-personalizados' ? 'active' : '' %>" href="/admin/relatorios-personalizados">
+        <i class="bi bi-file-earmark-person me-2"></i>Rel. Personalizados
+      </a></li>
       <li><a class="nav-link <%= active === 'favoritos' ? 'active' : '' %>" href="/admin/favoritos">
         <i class="bi bi-star me-2"></i>Favoritos
       </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
+      <li><a class="nav-link" href="/admin/funcionando" target="_blank">
+        <i class="bi bi-play-circle-fill me-2" style="color:#4ade80"></i>Funcionando…
+      </a></li>
       <li><a class="nav-link <%= active === 'lixeira' ? 'active' : '' %>" href="/admin/lixeira">
         <i class="bi bi-trash me-2"></i>Lixeira
       </a></li>

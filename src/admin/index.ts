@@ -9,7 +9,9 @@ import { adminLookupRoutes } from './lookup.js'
 import { adminLixeiraRoutes } from './lixeira.js'
 import { adminPermissoesRoutes } from './permissoes.js'
 import { adminRelatoriosRoutes } from './relatorios.js'
+import { adminRelatoriosPersonalizadosRoutes } from './relatorios-personalizados.js'
 import { adminFavoritosRoutes } from './favoritos.js'
+import { adminFuncionandoRoutes } from './funcionando.js'
 
 async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
@@ -35,7 +37,7 @@ export async function adminRoutes(app: FastifyInstance) {
       if (req.method !== 'GET' || req.headers['hx-request']) return
       const [rawPath = ''] = (req.url ?? '').split('?')
       const segments = rawPath.replace(/^\/admin\/?/, '').split('/').filter(Boolean)
-      if (segments.length >= 2) return reply.redirect('/admin')
+      if (segments.length >= 2 && segments[0] !== 'funcionando') return reply.redirect('/admin')
     })
 
     admin.register(adminDashboardRoutes)
@@ -46,7 +48,9 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminLookupRoutes, { prefix: '/lookup' })
     admin.register(adminPermissoesRoutes, { prefix: '/permissoes' })
     admin.register(adminRelatoriosRoutes, { prefix: '/relatorios' })
+    admin.register(adminRelatoriosPersonalizadosRoutes, { prefix: '/relatorios-personalizados' })
     admin.register(adminFavoritosRoutes, { prefix: '/favoritos' })
     admin.register(adminLixeiraRoutes, { prefix: '/lixeira' })
+    admin.register(adminFuncionandoRoutes, { prefix: '/funcionando' })
   })
 }

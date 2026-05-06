@@ -1,0 +1,73 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Relatórios Personalizados</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/relatorios-personalizados/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Novo Relatório
+  </button>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-2 px-3">
+    <form method="GET" action="/admin/relatorios-personalizados" class="d-flex align-items-center gap-2">
+      <label class="form-label small fw-semibold mb-0 text-nowrap">Filtrar por Usuário:</label>
+      <select name="usuarioId" class="form-select form-select-sm" style="max-width:260px"
+        onchange="this.form.submit()">
+        <option value="">Todos os usuários</option>
+        <% usuarios.forEach(function(u) { %>
+          <option value="<%= u.id %>" <%= usuarioId === u.id ? 'selected' : '' %>><%= u.nomeCompleto %></option>
+        <% }) %>
+      </select>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Nome</th>
+          <th>Usuário</th>
+          <th>Descrição</th>
+          <th>Status</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (relatorios.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted py-5">
+            <i class="bi bi-file-earmark-person fs-4 d-block mb-2"></i>Nenhum relatório personalizado encontrado.
+          </td></tr>
+        <% } %>
+        <% relatorios.forEach(function(r) { %>
+          <tr id="rp-<%= r.id %>">
+            <td class="ps-3 fw-semibold"><%= r.nome %></td>
+            <td class="small text-muted"><%= r.usuario.nomeCompleto %></td>
+            <td class="small text-muted"><%= r.descricao || '—' %></td>
+            <td>
+              <span class="badge rounded-pill <%= r.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75">
+                <%= r.ativo ? 'Ativo' : 'Inativo' %>
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/relatorios-personalizados/<%= r.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                onclick="confirmarExclusao('relatório personalizado', '<%= r.id %>', <%- JSON.stringify(r.nome) %>, 0, { url: '/admin/relatorios-personalizados/<%= r.id %>', target: '#rp-<%= r.id %>', swap: 'outerHTML' })"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
