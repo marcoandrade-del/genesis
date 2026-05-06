@@ -1,5 +1,12 @@
 node_modules
-# Keep environment variables out of version control
+dist/
+
+# Environment
 .env
 
+# Prisma
 /generated/prisma
+
+# Claude Code — configurações e memórias locais
+.claude/
+claude.md.bkp
