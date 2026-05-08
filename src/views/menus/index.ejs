@@ -11,7 +11,7 @@
     color: #6c757d; cursor: pointer; border-radius: 3px; transition: background .1s;
   }
   .tree-toggle:hover { background: rgba(0,0,0,.08); }
-  .tree-actions { opacity: 0; transition: opacity .15s; flex-shrink: 0; }
+  .tree-actions { opacity: 0; transition: opacity .15s; flex-shrink: 0; display: flex; align-items: center; gap: 2px; }
   .tree-row:hover .tree-actions { opacity: 1; }
   .tree-row { display: flex; align-items: center; gap: 2px; padding: 1px 6px; border-radius: 4px; }
   .tree-row:hover { background: rgba(0,0,0,.03); }
@@ -122,7 +122,14 @@
   })
 
   // ── Modal "Mover para..." ────────────────────────────────────────────────────
-  const _modalMoverPara = new bootstrap.Modal(document.getElementById('modal-mover-para'))
+  // Inicialização lazy: o modal HTML está abaixo deste script, então só
+  // instanciamos Bootstrap.Modal na primeira vez que abrirMoverPara é chamada.
+  let _modalMoverPara = null
+  function _getModalMoverPara() {
+    if (!_modalMoverPara) _modalMoverPara = new bootstrap.Modal(document.getElementById('modal-mover-para'))
+    return _modalMoverPara
+  }
+
   let _moverParaItemId = null
   let _moverParaDestino = null
   let _todosDestinos = []
@@ -138,7 +145,7 @@
     loading.className = 'text-center text-muted py-3 small'
     loading.textContent = 'Carregando...'
     lista.appendChild(loading)
-    _modalMoverPara.show()
+    _getModalMoverPara().show()
     try {
       const r = await fetch('/admin/menus/destinos-item/' + itemId)
       const destinos = await r.json()
@@ -189,7 +196,7 @@
 
   async function _executarMoverPara() {
     if (!_moverParaItemId || !_moverParaDestino) return
-    _modalMoverPara.hide()
+    _getModalMoverPara().hide()
     if (window._moverState) _cancelarMover()
     try {
       const r = await fetch('/admin/menus/mover/item', {
@@ -214,11 +221,16 @@
     }
   }
 
-  document.getElementById('mover-para-filtro').addEventListener('input', function() { _filtrarDestinos(this.value) })
-  document.getElementById('mover-para-confirmar').addEventListener('click', _executarMoverPara)
+  // Event delegation: escuta no document para não depender da ordem do DOM
+  document.addEventListener('input', function(e) {
+    if (e.target && e.target.id === 'mover-para-filtro') _filtrarDestinos(e.target.value)
+  })
+  document.addEventListener('click', function(e) {
+    if (e.target && (e.target.id === 'mover-para-confirmar' || e.target.closest('#mover-para-confirmar'))) _executarMoverPara()
+  })
 </script>
 
-<!-- Modal: Mover para... -->
+<!-- Modal: Mover para... (deve vir após o script para que lazy-init funcione) -->
 <div class="modal fade" id="modal-mover-para" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable" style="max-width:480px">
     <div class="modal-content">
