@@ -336,17 +336,28 @@ function _mostrarConfirmar(opcoes, callback) {
   _modalConfirmar.show()
 }
 
+let _confirmarPendente = null
+document.getElementById('modal-confirmar').addEventListener('hidden.bs.modal', function () {
+  if (_confirmarPendente !== null) {
+    const fn = _confirmarCallback
+    const result = _confirmarPendente
+    _confirmarCallback = null
+    _confirmarPendente = null
+    if (fn) fn(result)
+  }
+})
+
 document.getElementById('mc-btn-ok').addEventListener('click', function () {
+  _confirmarPendente = true
   _modalConfirmar.hide()
-  if (_confirmarCallback) _confirmarCallback(true)
 })
 document.getElementById('mc-btn-cancelar').addEventListener('click', function () {
+  _confirmarPendente = false
   _modalConfirmar.hide()
-  if (_confirmarCallback) _confirmarCallback(false)
 })
 document.getElementById('mc-btn-fechar').addEventListener('click', function () {
+  _confirmarPendente = false
   _modalConfirmar.hide()
-  if (_confirmarCallback) _confirmarCallback(false)
 })
 
 // Substitui hx-confirm pelo modal customizado
