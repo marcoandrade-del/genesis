@@ -125,7 +125,7 @@
   <div class="modal-footer">
     <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
     <button type="button" class="btn btn-sm btn-primary"
-      onclick="confirmarGravacao(this.closest('form'), '<%= usuario ? usuario.nomeCompleto : \"Novo Usuário\" %>')">
+      onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="<%= usuario ? usuario.nomeCompleto : 'Novo Usuário' %>">
       <i class="bi bi-check-lg me-1"></i>Salvar
     </button>
   </div>

@@ -69,7 +69,7 @@
 
     <div class="d-flex align-items-center gap-2 pt-2 border-top">
       <button type="button" class="btn btn-sm btn-primary"
-        onclick="confirmarGravacao(this.closest('form'), '<%= sistema ? sistema.nome : \"Novo Sistema\" %>')">
+        onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="<%= sistema ? sistema.nome : 'Novo Sistema' %>">
         <i class="bi bi-check-lg me-1"></i>Salvar
       </button>
       <% if (sistema) { %>

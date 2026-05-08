@@ -80,7 +80,7 @@
 
     <div class="d-flex align-items-center gap-2 pt-2 border-top">
       <button type="button" class="btn btn-sm btn-success"
-        onclick="confirmarGravacao(this.closest('form'), '<%= editando && modulo ? modulo.nome : \"Novo Módulo\" %>')">
+        onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="<%= editando && modulo ? modulo.nome : 'Novo Módulo' %>">
         <i class="bi bi-check-lg me-1"></i>Salvar
       </button>
       <% if (editando && modulo) { %>

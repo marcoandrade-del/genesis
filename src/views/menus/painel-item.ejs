@@ -136,7 +136,7 @@
 
     <div class="d-flex align-items-center gap-2 pt-2 border-top">
       <button type="button" class="btn btn-sm btn-secondary"
-        onclick="confirmarGravacao(this.closest('form'), '<%= editando && item ? item.nome : \"Novo Item\" %>')">
+        onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="<%= editando && item ? item.nome : 'Novo Item' %>">
         <i class="bi bi-check-lg me-1"></i>Salvar
       </button>
       <% if (editando && item && isSubmenu) { %>

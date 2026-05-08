@@ -71,7 +71,7 @@
 
     <div class="d-flex align-items-center gap-2 pt-2 border-top">
       <button type="button" class="btn btn-sm btn-warning text-dark"
-        onclick="confirmarGravacao(this.closest('form'), '<%= editando && menu ? menu.nome : \"Novo Menu\" %>')">
+        onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="<%= editando && menu ? menu.nome : 'Novo Menu' %>">
         <i class="bi bi-check-lg me-1"></i>Salvar
       </button>
       <% if (editando && menu) { %>
