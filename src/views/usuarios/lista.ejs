@@ -51,6 +51,7 @@
         hx-delete="/admin/usuarios/<%= u.id %>"
         hx-target="#usuario-<%= u.id %>"
         hx-swap="outerHTML"
+        hx-confirm="Excluir usuário '<%= u.nomeCompleto %>'?"
         title="Excluir">
         <i class="bi bi-trash"></i>
       </button>

@@ -32,7 +32,7 @@
       hx-post="/admin/menus/novo/menu"
     <% } %>
     hx-target="#painel-detalhe" hx-swap="innerHTML"
-    hx-trigger="submit">
+    hx-trigger="submit-confirmed">
 
     <% if (!editando) { %>
       <input type="hidden" name="moduloId" value="<%= modulo ? modulo.id : '' %>">
@@ -70,7 +70,8 @@
     <% } %>
 
     <div class="d-flex align-items-center gap-2 pt-2 border-top">
-      <button type="submit" class="btn btn-sm btn-warning text-dark">
+      <button type="button" class="btn btn-sm btn-warning text-dark"
+        onclick="confirmarGravacao(this.closest('form'), '<%= editando && menu ? menu.nome : \"Novo Menu\" %>')">
         <i class="bi bi-check-lg me-1"></i>Salvar
       </button>
       <% if (editando && menu) { %>
@@ -85,8 +86,7 @@
           <i class="bi bi-x me-1"></i>Cancelar
         </button>
         <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
-          hx-delete="/admin/menus/menu/<%= menu.id %>"
-          hx-target="#painel-detalhe" hx-swap="innerHTML">
+          onclick="confirmarExclusaoAsync('menu', '<%= menu.id %>', '<%- JSON.stringify(menu.nome) %>')">
           <i class="bi bi-trash"></i>
         </button>
       <% } %>
