@@ -242,7 +242,8 @@ export class LixeiraService {
     })
     const qtdModulos = modulos.length
     const qtdMenus = modulos.reduce((acc, m) => acc + m._count.menus, 0)
-    return { modulos: qtdModulos, menus: qtdMenus }
+    const relatorios = await this.prisma.relatorioFixo.count({ where: { sistemaId } })
+    return { modulos: qtdModulos, menus: qtdMenus, relatorios }
   }
 
   async contarFilhosModulo(moduloId: string) {

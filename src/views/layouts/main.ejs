@@ -377,6 +377,16 @@ async function confirmarExclusaoAsync(tipo, id, nome, opcoes) {
   try {
     const resp = await fetch('/admin/menus/contar-filhos/' + tipo + '/' + id)
     const data = await resp.json()
+    if (data.bloqueado) {
+      _mostrarConfirmar({
+        titulo: 'Exclusão não permitida',
+        texto: data.mensagemBloqueio || 'Não é possível excluir este registro.',
+        tipo: 'danger',
+        semCancelar: true,
+        okTexto: 'Fechar',
+      }, function() {})
+      return
+    }
     confirmarExclusao(tipo, id, nome, data.count, opcoes)
   } catch {
     confirmarExclusao(tipo, id, nome, 0, opcoes)

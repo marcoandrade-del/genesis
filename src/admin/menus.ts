@@ -500,6 +500,13 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       let count = 0
       if (tipo === 'sistema') {
         const r = await lixeiraSvc.contarFilhosSistema(id)
+        if (r.relatorios > 0) {
+          return reply.send({
+            count: 0,
+            bloqueado: true,
+            mensagemBloqueio: `Este sistema possui ${r.relatorios} relatório(s) fixo(s) vinculado(s). Remova-os antes de excluir o sistema.`,
+          })
+        }
         count = r.modulos + r.menus
       } else if (tipo === 'modulo') {
         count = await lixeiraSvc.contarFilhosModulo(id)

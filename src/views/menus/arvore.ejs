@@ -340,6 +340,14 @@ if (!window._moverKeyOk) {
 // ── Drag-and-drop com SortableJS ──────────────────────────────────────────────
 function inicializarSortable() {
   if (typeof Sortable === 'undefined') return
+
+  // Estado compartilhado de um arraste ativo (no máximo 1 por vez)
+  var _ddCanceled = false
+  var _ddOrigInfo = null
+  function _ddEscHandler(e) {
+    if (e.key === 'Escape') _ddCanceled = true
+  }
+
   document.querySelectorAll('[data-sortable]').forEach(function(el) {
     var existing = Sortable.get(el)
     if (existing) existing.destroy()
@@ -376,21 +384,71 @@ function inicializarSortable() {
         }).then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
       }
     } else if (tipo === 'itens') {
-      var depth = el.dataset.parentId ? 'itens-d1' : 'itens-d0'
-      opts.group = { name: depth, pull: depth, put: depth }
+      // Grupo único permite drops entre qualquer nível; validação fica no onMove
+      opts.group = { name: 'itens', pull: 'itens', put: 'itens' }
+
       opts.onMove = function(evt) {
-        // Impede SUBMENU de ser solto em container com parentId (depth > 0)
-        var wrapper = evt.dragged
-        var row = wrapper.querySelector('.tree-row') || wrapper
+        var row = evt.dragged.querySelector('.tree-row') || evt.dragged
+        // SUBMENU não pode entrar em container de profundidade ≥ 1
         if (row.dataset.itemTipo === 'SUBMENU' && evt.to.dataset.parentId) return false
         return true
       }
+
+      opts.onStart = function(evt) {
+        _ddCanceled = false
+        _ddOrigInfo = {
+          from: evt.from,
+          item: evt.item,
+          nextSibling: evt.item.nextSibling || null,
+        }
+        document.addEventListener('keydown', _ddEscHandler)
+      }
+
       opts.onEnd = function(evt) {
+        document.removeEventListener('keydown', _ddEscHandler)
+
+        // Esc pressionado durante o arraste — reverter DOM e abortar
+        if (_ddCanceled) {
+          var orig = _ddOrigInfo
+          _ddOrigInfo = null
+          if (orig) {
+            if (orig.nextSibling) orig.from.insertBefore(orig.item, orig.nextSibling)
+            else orig.from.appendChild(orig.item)
+          }
+          return
+        }
+        _ddOrigInfo = null
+
         var fromEl = evt.from
         var toEl = evt.to
         var sameContainer = fromEl === toEl
         if (sameContainer && evt.oldIndex === evt.newIndex) return
+
         var itemId = evt.item.dataset.id
+        var ctrlHeld = !!(evt.originalEvent && (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey))
+
+        // Ctrl+drag = copiar (somente cross-container faz sentido)
+        if (ctrlHeld && !sameContainer) {
+          var novoParentId = toEl.dataset.parentId || ''
+          var novoMenuId = toEl.dataset.menuId || ''
+          fetch('/admin/menus/copiar/item', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ itemId: itemId, novoParentId: novoParentId, novoMenuId: novoMenuId }),
+          }).then(function(r) {
+            if (r.ok) {
+              htmx.trigger(document.body, 'refresh-tree')
+            } else {
+              r.text().then(function(msg) {
+                _mostrarConfirmar({ titulo: 'Erro ao copiar', texto: msg || 'Não foi possível copiar o item.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+                htmx.trigger(document.body, 'refresh-tree')
+              })
+            }
+          })
+          return
+        }
+
+        // Mover (mesmo nível ou cross-level)
         var ids = Array.from(toEl.children).map(function(c) { return c.dataset.id }).filter(Boolean)
         var params = { itemId: itemId, idsOrdem: JSON.stringify(ids) }
         if (!sameContainer) {
@@ -402,7 +460,14 @@ function inicializarSortable() {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams(params)
-        }).then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
+        }).then(function(r) {
+          if (!r.ok) {
+            r.text().then(function(msg) {
+              _mostrarConfirmar({ titulo: 'Erro ao mover', texto: msg || 'Não foi possível mover o item.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+              htmx.trigger(document.body, 'refresh-tree')
+            })
+          }
+        })
       }
     }
 
