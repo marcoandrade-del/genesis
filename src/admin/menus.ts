@@ -572,59 +572,55 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/destinos-item/:id', async (req, reply) => {
     const item = await app.prisma.itemFuncionalidade.findUnique({
       where: { id: req.params.id },
-      select: { tipo: true, menuId: true, parentId: true },
+      select: { tipo: true, menuId: true, parentId: true, menu: { select: { moduloId: true } } },
     })
     if (!item) return reply.status(404).send({ erro: 'Item não encontrado.' })
 
-    const sistemas = await app.prisma.sistema.findMany({
-      orderBy: { nome: 'asc' },
+    const moduloId = item.menu.moduloId
+
+    // Destinos limitados ao mesmo módulo
+    const modulo = await app.prisma.modulo.findUnique({
+      where: { id: moduloId },
       include: {
-        modulos: {
+        sistema: { select: { nome: true } },
+        menus: {
           orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
           include: {
-            menus: {
+            itens: {
+              where: { tipo: 'SUBMENU', parentId: null },
               orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
               include: {
-                itens: {
-                  where: { tipo: 'SUBMENU', parentId: null },
-                  orderBy: [{ ordem: 'asc' }, { nome: 'asc' }],
-                  include: {
-                    subItens: { where: { tipo: 'SUBMENU' }, orderBy: [{ ordem: 'asc' }, { nome: 'asc' }] },
-                  },
-                },
+                subItens: { where: { tipo: 'SUBMENU' }, orderBy: [{ ordem: 'asc' }, { nome: 'asc' }] },
               },
             },
           },
         },
       },
     })
+    if (!modulo) return reply.status(404).send({ erro: 'Módulo não encontrado.' })
 
     type Destino = { menuId: string; parentId: string | null; label: string }
     const destinos: Destino[] = []
+    const prefixo = `${modulo.sistema.nome} › ${modulo.nome}`
 
-    for (const s of sistemas) {
-      for (const m of s.modulos) {
-        for (const menu of m.menus) {
-          // Raiz do menu (parentId = null) — válido para qualquer tipo
+    // Itera apenas os menus do mesmo módulo
+    for (const menu of modulo.menus) {
           if (!(item.menuId === menu.id && item.parentId === null)) {
-            destinos.push({ menuId: menu.id, parentId: null, label: `${s.nome} › ${m.nome} › ${menu.nome}` })
+            destinos.push({ menuId: menu.id, parentId: null, label: `${prefixo} › ${menu.nome}` })
           }
-          // SUBMENUs como destino — válido apenas para FUNCIONALIDADE
           if (item.tipo === 'FUNCIONALIDADE') {
             for (const sub1 of menu.itens) {
               if (!(item.menuId === menu.id && item.parentId === sub1.id)) {
-                destinos.push({ menuId: menu.id, parentId: sub1.id, label: `${s.nome} › ${m.nome} › ${menu.nome} › ${sub1.nome}` })
+                destinos.push({ menuId: menu.id, parentId: sub1.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome}` })
               }
               for (const sub2 of sub1.subItens) {
                 if (!(item.menuId === menu.id && item.parentId === sub2.id)) {
-                  destinos.push({ menuId: menu.id, parentId: sub2.id, label: `${s.nome} › ${m.nome} › ${menu.nome} › ${sub1.nome} › ${sub2.nome}` })
+                  destinos.push({ menuId: menu.id, parentId: sub2.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome} › ${sub2.nome}` })
                 }
               }
             }
           }
         }
-      }
-    }
 
     return reply.send(destinos)
   })

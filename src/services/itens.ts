@@ -205,10 +205,16 @@ export class ItensService {
       })
       if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
 
-      // Bug 7: validar que o menuId de destino existe (quando muda de menu)
+      // Validar menu de destino e restrição de módulo
       if (menuId && menuId !== item.menuId) {
-        const menuDestino = await tx.menu.findUnique({ where: { id: menuId }, select: { id: true } })
+        const [menuOrigem, menuDestino] = await Promise.all([
+          tx.menu.findUnique({ where: { id: item.menuId }, select: { moduloId: true } }),
+          tx.menu.findUnique({ where: { id: menuId }, select: { moduloId: true } }),
+        ])
         if (!menuDestino) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Menu de destino não encontrado.')
+        if (menuOrigem?.moduloId !== menuDestino.moduloId) {
+          throw new ErroNegocio('REQUISICAO_INVALIDA', 'Não é permitido mover itens entre módulos diferentes.')
+        }
       }
 
       // Bug 3: detectar ciclo (tentar mover item para dentro de seus descendentes)
