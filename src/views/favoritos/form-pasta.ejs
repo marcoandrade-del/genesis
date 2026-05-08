@@ -10,7 +10,8 @@
 
 <form hx-post="/admin/favoritos/<%= usuario.id %>/pasta"
   hx-target="#modal-body"
-  hx-swap="innerHTML">
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
 
   <div class="modal-body">
     <% if (erro) { %>
@@ -42,7 +43,8 @@
       hx-swap="innerHTML">
       <i class="bi bi-arrow-left me-1"></i>Voltar
     </button>
-    <button type="submit" class="btn btn-sm btn-warning">
+    <button type="button" class="btn btn-sm btn-warning"
+      onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="Nova Pasta">
       <i class="bi bi-folder-plus me-1"></i>Criar Pasta
     </button>
   </div>

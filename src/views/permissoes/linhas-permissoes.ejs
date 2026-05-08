@@ -29,6 +29,8 @@
               hx-put="/admin/permissoes/perm/<%= p.id %>"
               hx-target="#perm-linhas"
               hx-swap="innerHTML"
+              hx-trigger="change"
+              hx-confirm="Alterar nível de acesso de '<%= p.item.nome %>'?"
               hx-vals='{"usuarioId": "<%= usuarioId %>"}'>
               <% ['VISUALIZAR','CRIAR','EDITAR','EXCLUIR','TOTAL'].forEach(function(n) { %>
                 <option value="<%= n %>" <%= p.nivel === n ? 'selected' : '' %>><%= n %></option>

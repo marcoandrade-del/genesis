@@ -10,7 +10,8 @@
 
 <form hx-post="/admin/permissoes/<%= usuario.id %>"
   hx-target="#modal-body"
-  hx-swap="innerHTML">
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
 
   <div class="modal-body">
     <% if (erro) { %>
@@ -54,7 +55,8 @@
       hx-swap="innerHTML">
       <i class="bi bi-arrow-left me-1"></i>Voltar
     </button>
-    <button type="submit" class="btn btn-sm btn-primary">
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.dataset.label)" data-label="Conceder Permissão">
       <i class="bi bi-check-lg me-1"></i>Conceder
     </button>
   </div>
