@@ -4,7 +4,8 @@
 <% modulos.forEach(function(m) { %>
   <button type="button"
     class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
-    onclick="selecionarItem('<%= m.id %>', '<%= m.nome.replace(/'/g, `\\'`) %>')">
+    data-id="<%= m.id %>" data-nome="<%= m.nome %>"
+    onclick="selecionarItem(this.dataset.id, this.dataset.nome)">
     <div class="fw-semibold small"><%= m.nome %></div>
     <div class="text-muted" style="font-size:.75rem"><%= m.sistema.nome %></div>
   </button>

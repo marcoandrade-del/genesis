@@ -4,7 +4,8 @@
 <% sistemas.forEach(function(s) { %>
   <button type="button"
     class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
-    onclick="selecionarItem('<%= s.id %>', '<%= s.nome.replace(/'/g, `\\'`) %>')">
+    data-id="<%= s.id %>" data-nome="<%= s.nome %>"
+    onclick="selecionarItem(this.dataset.id, this.dataset.nome)">
     <div class="fw-semibold small"><%= s.nome %></div>
     <% if (s.descricao) { %>
       <div class="text-muted" style="font-size:.75rem"><%= s.descricao %></div>

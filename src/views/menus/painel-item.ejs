@@ -153,7 +153,8 @@
           <i class="bi bi-x me-1"></i>Cancelar
         </button>
         <button type="button" class="btn btn-sm btn-outline-danger ms-auto"
-          onclick="confirmarExclusaoAsync('item', '<%= item.id %>', '<%- JSON.stringify(item.nome) %>')">
+          data-id="<%= item.id %>" data-nome="<%= item.nome %>"
+          onclick="confirmarExclusaoAsync('item', this.dataset.id, this.dataset.nome)">
           <i class="bi bi-trash"></i>
         </button>
       <% } %>

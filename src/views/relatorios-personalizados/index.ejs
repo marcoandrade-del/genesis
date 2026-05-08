@@ -60,7 +60,8 @@
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-sm btn-outline-danger"
-                onclick="confirmarExclusao('relatório personalizado', '<%= r.id %>', <%- JSON.stringify(r.nome) %>, 0, { url: '/admin/relatorios-personalizados/<%= r.id %>', target: '#rp-<%= r.id %>', swap: 'outerHTML' })"
+                data-id="<%= r.id %>" data-nome="<%= r.nome %>"
+                onclick="confirmarExclusao('relatório personalizado', this.dataset.id, this.dataset.nome, 0, { url: '/admin/relatorios-personalizados/' + this.dataset.id, target: '#rp-' + this.dataset.id, swap: 'outerHTML' })"
                 title="Excluir">
                 <i class="bi bi-trash"></i>
               </button>

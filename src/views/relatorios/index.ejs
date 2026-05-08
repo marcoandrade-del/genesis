@@ -62,7 +62,8 @@
                 <i class="bi bi-pencil"></i>
               </button>
               <button class="btn btn-sm btn-outline-danger"
-                onclick="confirmarExclusaoAsync('relatório', '<%= r.id %>', <%- JSON.stringify(r.nome) %>, { url: '/admin/relatorios/<%= r.id %>', target: '#relatorio-<%= r.id %>', swap: 'outerHTML' })"
+                data-id="<%= r.id %>" data-nome="<%= r.nome %>"
+                onclick="confirmarExclusaoAsync('relatório', this.dataset.id, this.dataset.nome, { url: '/admin/relatorios/' + this.dataset.id, target: '#relatorio-' + this.dataset.id, swap: 'outerHTML' })"
                 title="Excluir">
                 <i class="bi bi-trash"></i>
               </button>
