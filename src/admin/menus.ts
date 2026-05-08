@@ -314,6 +314,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       })
       profundidade = parentItem?.parentId !== null ? 2 : 1
     }
+    if (profundidade >= 1 && tipo === 'SUBMENU') {
+      const msg = 'Submenu não pode ter outro submenu como filho. Escolha o tipo FUNCIONALIDADE.'
+      return reply.view('menus/painel-item', { item: null, menu, parentItem, profundidade, editando: false, erro: msg })
+    }
     try {
       const criado = await itensSvc.criar(menuId, {
         nome,

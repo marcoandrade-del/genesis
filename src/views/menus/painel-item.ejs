@@ -1,6 +1,7 @@
 <%
   const isSubmenu = editando && item && item.tipo === 'SUBMENU'
-  const podeSerSubmenu = profundidade < 2
+  // Submenu não pode ter submenu como filho — apenas profundidade 0 (filho direto de menu) permite SUBMENU
+  const podeSerSubmenu = profundidade === 0
   const somenteFuncionalidade = !podeSerSubmenu
 %>
 
@@ -142,7 +143,7 @@
         <button type="button" class="btn btn-sm btn-primary"
           hx-get="/admin/menus/novo/item?menuId=<%= item.menuId %>&parentId=<%= item.id %>"
           hx-target="#painel-detalhe" hx-swap="innerHTML">
-          <i class="bi bi-plus me-1"></i>Novo Item<% if (profundidade >= 1) { %> (FUNC.)<% } %>
+          <i class="bi bi-plus me-1"></i>Novo Item (FUNC.)
         </button>
       <% } %>
       <% if (editando && item) { %>
