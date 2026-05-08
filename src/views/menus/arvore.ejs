@@ -399,7 +399,7 @@ function inicializarSortable() {
         _ddOrigInfo = {
           from: evt.from,
           item: evt.item,
-          nextSibling: evt.item.nextSibling || null,
+          nextSibling: evt.item.nextElementSibling || null,
         }
         document.addEventListener('keydown', _ddEscHandler)
       }

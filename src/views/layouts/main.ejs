@@ -375,7 +375,7 @@ function confirmarGravacao(form, label) {
 // opcoes: { url, target, swap } — para sobrescrever os defaults do painel de menus
 async function confirmarExclusaoAsync(tipo, id, nome, opcoes) {
   try {
-    const resp = await fetch('/admin/menus/contar-filhos/' + tipo + '/' + id)
+    const resp = await fetch('/admin/menus/contar-filhos/' + tipo + '/' + id, { headers: { 'HX-Request': 'true' } })
     const data = await resp.json()
     if (data.bloqueado) {
       _mostrarConfirmar({
