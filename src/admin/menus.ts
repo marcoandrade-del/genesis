@@ -559,15 +559,26 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     }
   })
 
-  // ── Mover item (reparentar) ───────────────────────────────────────────────────
-  app.post<{ Body: { itemId: string; novoParentId?: string } }>('/mover/item', async (req, reply) => {
-    try {
-      const { itemId, novoParentId } = req.body
-      await itensSvc.mover(itemId, novoParentId ?? null)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).send({ ok: true })
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao mover item.'
-      return reply.status(400).send({ ok: false, erro: msg })
+  // ── Mover item (reparentar + reordenar irmãos) ───────────────────────────────
+  app.post<{ Body: { itemId: string; novoParentId?: string; menuId?: string; idsOrdem?: string; mover?: string } }>(
+    '/mover/item',
+    async (req, reply) => {
+      try {
+        const { itemId, novoParentId, menuId, idsOrdem, mover } = req.body
+        if (mover) {
+          await itensSvc.mover(itemId, novoParentId || null, menuId || undefined)
+        }
+        if (idsOrdem) {
+          const ids: string[] = JSON.parse(idsOrdem)
+          await app.prisma.$transaction(
+            ids.map((id, i) => app.prisma.itemFuncionalidade.update({ where: { id }, data: { ordem: i } }))
+          )
+        }
+        return reply.send({ ok: true })
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : 'Erro ao mover item.'
+        return reply.status(400).send({ ok: false, erro: msg })
+      }
     }
-  })
+  )
 }

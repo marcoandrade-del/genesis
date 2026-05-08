@@ -32,7 +32,12 @@
     padding: .6rem 1rem; display: flex; align-items: center; gap: .5rem;
     border-radius: calc(.375rem - 1px) calc(.375rem - 1px) 0 0;
   }
+  .dd-ghost { opacity: .4; background: #cfe2ff !important; border-radius: 4px; }
+  .dd-chosen { background: rgba(13,110,253,.06) !important; border-radius: 4px; }
+  .dd-grip { cursor: grab !important; }
+  .dd-grip:active { cursor: grabbing !important; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
   <h2 class="h5 fw-bold mb-0">
@@ -104,7 +109,7 @@
     }
   }
 
-  // Restaura seleção visual e limpa modo mover após refresh da árvore
+  // Restaura seleção visual, limpa modo mover e re-inicializa Sortable após refresh da árvore
   document.body.addEventListener('htmx:afterSwap', function(e) {
     if (e.detail.target.id === 'arvore-container') {
       if (window._moverState) { window._moverState = null }
@@ -112,6 +117,7 @@
         const el = document.querySelector('[data-node="' + _noSelecionado + '"]')
         if (el) el.classList.add('selecionado')
       }
+      if (typeof inicializarSortable === 'function') inicializarSortable()
     }
   })
 </script>
