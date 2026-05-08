@@ -246,6 +246,12 @@
 </div>
 <% }) %>
 
+<style>
+/* Bug 8: estilos de drag-and-drop */
+.dd-drag { cursor: grabbing !important; }
+.dd-over { outline: 2px dashed var(--bs-primary, #0d6efd); outline-offset: -2px; background: rgba(13, 110, 253, 0.05); }
+</style>
+
 <script>
 // ── Reordenação por teclado ────────────────────────────────────────────────────
 // iniciarMover é global (chamado por onclick inline)
@@ -341,11 +347,12 @@ if (!window._moverKeyOk) {
 function inicializarSortable() {
   if (typeof Sortable === 'undefined') return
 
-  // Estado compartilhado de um arraste ativo (no máximo 1 por vez)
-  var _ddCanceled = false
+  // Estado de um arraste ativo (no máximo 1 por vez)
+  // Bug fix: variável de sessão por drag para evitar race condition com _ddCanceled global
+  var _dragSession = null
   var _ddOrigInfo = null
   function _ddEscHandler(e) {
-    if (e.key === 'Escape') _ddCanceled = true
+    if (e.key === 'Escape' && _dragSession) _dragSession.canceled = true
   }
 
   document.querySelectorAll('[data-sortable]').forEach(function(el) {
@@ -358,6 +365,7 @@ function inicializarSortable() {
       animation: 150,
       ghostClass: 'dd-ghost',
       chosenClass: 'dd-chosen',
+      dragClass: 'dd-drag',
       forceFallback: false,
     }
 
@@ -391,11 +399,15 @@ function inicializarSortable() {
         var row = evt.dragged.querySelector('.tree-row') || evt.dragged
         // SUBMENU não pode entrar em container de profundidade ≥ 1
         if (row.dataset.itemTipo === 'SUBMENU' && evt.to.dataset.parentId) return false
+        // Bug 8: highlight do container destino ao hover durante drag
+        document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(el) { el.classList.remove('dd-over') })
+        if (evt.to !== evt.from) evt.to.classList.add('dd-over')
         return true
       }
 
       opts.onStart = function(evt) {
-        _ddCanceled = false
+        // Bug fix: criar sessão local por drag para isolar o flag de cancelamento
+        _dragSession = { canceled: false }
         _ddOrigInfo = {
           from: evt.from,
           item: evt.item,
@@ -406,9 +418,15 @@ function inicializarSortable() {
 
       opts.onEnd = function(evt) {
         document.removeEventListener('keydown', _ddEscHandler)
+        // Bug 8: remover highlight de drop zone ao soltar
+        document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(el) { el.classList.remove('dd-over') })
+
+        // Bug fix: capturar sessão local antes de zerá-la
+        var session = _dragSession
+        _dragSession = null
 
         // Esc pressionado durante o arraste — reverter DOM e abortar
-        if (_ddCanceled) {
+        if (session && session.canceled) {
           var orig = _ddOrigInfo
           _ddOrigInfo = null
           if (orig) {
@@ -426,9 +444,13 @@ function inicializarSortable() {
 
         var itemId = evt.item.dataset.id
         var ctrlHeld = !!(evt.originalEvent && (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey))
+        // Bug 5: shiftHeld força mover mesmo quando ctrl está pressionado
+        var shiftHeld = !!(evt.originalEvent && evt.originalEvent.shiftKey)
+        // TODO: Alt+drag = atalho (não implementado)
 
         // Ctrl+drag = copiar (somente cross-container faz sentido)
-        if (ctrlHeld && !sameContainer) {
+        // Bug 5: Shift ganha sobre Ctrl — quando shiftHeld, força mover em vez de copiar
+        if (ctrlHeld && !shiftHeld && !sameContainer) {
           var novoParentId = toEl.dataset.parentId || ''
           var novoMenuId = toEl.dataset.menuId || ''
           fetch('/admin/menus/copiar/item', {

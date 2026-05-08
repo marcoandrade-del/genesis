@@ -116,13 +116,16 @@ export class ItensService {
   }
 
   async copiar(itemId: string, novoParentId: string | null, novoMenuId: string) {
+    if (!novoMenuId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Menu de destino é obrigatório.')
+
     const item = await this.prisma.itemFuncionalidade.findUnique({
       where: { id: itemId },
       include: { subItens: { include: { subItens: true } } },
     })
     if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
 
-    const menu = await this.prisma.menu.findUnique({ where: { id: novoMenuId } })
+    // Bug 7: validar que o novoMenuId existe no banco
+    const menu = await this.prisma.menu.findUnique({ where: { id: novoMenuId }, select: { id: true } })
     if (!menu) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Menu de destino não encontrado.')
 
     if (novoParentId) {
@@ -176,36 +179,75 @@ export class ItensService {
     )
   }
 
-  async mover(itemId: string, novoParentId: string | null, menuId?: string) {
-    const item = await this.prisma.itemFuncionalidade.findUnique({
-      where: { id: itemId },
-      include: { subItens: { include: { subItens: true } } },
-    })
-    if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
-
-    if (novoParentId) {
-      const novoParent = await this.prisma.itemFuncionalidade.findUnique({
-        where: { id: novoParentId },
-        include: { parent: true },
-      })
-      if (!novoParent) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Novo pai não encontrado.')
-      if (novoParent.tipo !== 'SUBMENU') throw new ErroNegocio('REQUISICAO_INVALIDA', 'O pai deve ser do tipo SUBMENU.')
-
-      const profundidadeNovoPai = novoParent.parentId ? 1 : 0
-      const profundidadeMaxFilho = item.tipo === 'SUBMENU' && item.subItens.some((s) => s.subItens.length > 0) ? 2 : item.tipo === 'SUBMENU' ? 1 : 0
-
-      if (profundidadeNovoPai + 1 + profundidadeMaxFilho > 2) {
-        throw new ErroNegocio('REQUISICAO_INVALIDA', 'Mover este item extrapolaria o limite de 2 níveis de submenu.')
-      }
-
-      if (item.tipo === 'SUBMENU' && novoParent.parentId !== null) {
-        throw new ErroNegocio('REQUISICAO_INVALIDA', 'Um submenu não pode ser filho de outro submenu que já é filho.')
-      }
+  /**
+   * Verifica se `candidatoId` é descendente de `itemId` na árvore.
+   * Usado para evitar ciclos ao mover um item para dentro de seus próprios filhos.
+   */
+  private async isDescendant(
+    candidatoId: string,
+    itemId: string,
+    tx: Prisma.TransactionClient,
+  ): Promise<boolean> {
+    let cur: string | null = candidatoId
+    while (cur !== null) {
+      if (cur === itemId) return true
+      const found: { parentId: string | null } | null = await tx.itemFuncionalidade.findUnique({ where: { id: cur }, select: { parentId: true } })
+      cur = found?.parentId ?? null
     }
+    return false
+  }
 
-    return this.prisma.itemFuncionalidade.update({
-      where: { id: itemId },
-      data: { parentId: novoParentId, ...(menuId ? { menuId } : {}) },
+  async mover(itemId: string, novoParentId: string | null, menuId?: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const item = await tx.itemFuncionalidade.findUnique({
+        where: { id: itemId },
+        include: { subItens: { include: { subItens: true } } },
+      })
+      if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
+
+      // Bug 7: validar que o menuId de destino existe (quando muda de menu)
+      if (menuId && menuId !== item.menuId) {
+        const menuDestino = await tx.menu.findUnique({ where: { id: menuId }, select: { id: true } })
+        if (!menuDestino) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Menu de destino não encontrado.')
+      }
+
+      // Bug 3: detectar ciclo (tentar mover item para dentro de seus descendentes)
+      if (novoParentId) {
+        const ciclo = await this.isDescendant(novoParentId, itemId, tx)
+        if (ciclo) {
+          throw new ErroNegocio('REQUISICAO_INVALIDA', 'Não é possível mover um item para dentro de seus próprios descendentes.')
+        }
+
+        const novoParent = await tx.itemFuncionalidade.findUnique({
+          where: { id: novoParentId },
+          select: { id: true, tipo: true, parentId: true },
+        })
+        if (!novoParent) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Novo pai não encontrado.')
+        if (novoParent.tipo !== 'SUBMENU') throw new ErroNegocio('REQUISICAO_INVALIDA', 'O pai deve ser do tipo SUBMENU.')
+
+        // Bug 4: profundidade do destino = 0 se raiz do menu, 1 se filho de submenu
+        // profMaxFilhos: quantos níveis abaixo do item existem
+        const profDest = novoParent.parentId ? 1 : 0
+        // profMaxFilhos: 0 se item não tem filhos nem é SUBMENU,
+        //                1 se é SUBMENU sem filhos,
+        //                2 se é SUBMENU com filhos que também têm filhos
+        const profMaxFilhos =
+          item.tipo === 'SUBMENU'
+            ? item.subItens.some((s) => s.subItens.length > 0)
+              ? 2
+              : 1
+            : 0
+        // destino ficará na profDest+1; seus filhos mais profundos estarão em profDest+1+profMaxFilhos
+        // máximo permitido é 2
+        if (profDest + 1 + profMaxFilhos > 2) {
+          throw new ErroNegocio('REQUISICAO_INVALIDA', 'Mover este item extrapolaria o limite de 2 níveis de submenu.')
+        }
+      }
+
+      return tx.itemFuncionalidade.update({
+        where: { id: itemId },
+        data: { parentId: novoParentId, ...(menuId ? { menuId } : {}) },
+      })
     })
   }
 }

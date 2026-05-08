@@ -56,9 +56,11 @@ async function buscarItemCompleto(app: FastifyInstance, id: string) {
   })
 }
 
-function calcProfundidade(item: { parentId: string | null; parent?: { parentId: string | null } | null } | null) {
-  if (!item?.parentId) return 0
-  return item.parent?.parentId !== null ? 2 : 1
+function calcProfundidade(item: { parentId: string | null; parent?: { parentId: string | null; parent?: { parentId: string | null } | null } | null } | null) {
+  let depth = 0
+  let cur: { parentId: string | null; parent?: { parentId: string | null } | null } | null = item
+  while (cur?.parentId) { depth++; cur = cur.parent ?? null }
+  return depth
 }
 
 export async function adminMenusRoutes(app: FastifyInstance) {
