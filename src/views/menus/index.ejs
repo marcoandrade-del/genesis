@@ -120,4 +120,125 @@
       if (typeof inicializarSortable === 'function') inicializarSortable()
     }
   })
+
+  // ── Modal "Mover para..." ────────────────────────────────────────────────────
+  const _modalMoverPara = new bootstrap.Modal(document.getElementById('modal-mover-para'))
+  let _moverParaItemId = null
+  let _moverParaDestino = null
+  let _todosDestinos = []
+
+  async function abrirMoverPara(itemId) {
+    _moverParaItemId = itemId
+    _moverParaDestino = null
+    document.getElementById('mover-para-confirmar').disabled = true
+    document.getElementById('mover-para-filtro').value = ''
+    const lista = document.getElementById('mover-para-lista')
+    lista.textContent = ''
+    const loading = document.createElement('div')
+    loading.className = 'text-center text-muted py-3 small'
+    loading.textContent = 'Carregando...'
+    lista.appendChild(loading)
+    _modalMoverPara.show()
+    try {
+      const r = await fetch('/admin/menus/destinos-item/' + itemId)
+      const destinos = await r.json()
+      _todosDestinos = destinos
+      _filtrarDestinos('')
+    } catch {
+      lista.textContent = ''
+      const err = document.createElement('div')
+      err.className = 'text-center text-danger py-3 small'
+      err.textContent = 'Erro ao carregar destinos.'
+      lista.appendChild(err)
+    }
+  }
+
+  function _filtrarDestinos(filtro) {
+    const lista = document.getElementById('mover-para-lista')
+    lista.textContent = ''
+    const f = filtro.toLowerCase().trim()
+    const filtrados = f ? _todosDestinos.filter(function(d) { return d.label.toLowerCase().includes(f) }) : _todosDestinos
+    if (filtrados.length === 0) {
+      const empty = document.createElement('div')
+      empty.className = 'text-center text-muted py-3 small'
+      empty.textContent = 'Nenhum destino disponível.'
+      lista.appendChild(empty)
+      return
+    }
+    filtrados.forEach(function(d) {
+      const el = document.createElement('div')
+      el.className = 'mover-para-opcao px-3 py-2 border-bottom'
+      el.style.cssText = 'cursor:pointer;font-size:.82rem'
+      el.dataset.menuId = d.menuId
+      el.dataset.parentId = d.parentId || ''
+      const icon = document.createElement('i')
+      icon.className = 'bi bi-folder2 text-warning me-2'
+      icon.style.fontSize = '.75rem'
+      el.appendChild(icon)
+      el.appendChild(document.createTextNode(d.label))
+      el.addEventListener('click', function() {
+        lista.querySelectorAll('.mover-para-opcao').forEach(function(e) { e.classList.remove('bg-primary-subtle') })
+        el.classList.add('bg-primary-subtle')
+        _moverParaDestino = { menuId: el.dataset.menuId, parentId: el.dataset.parentId || null }
+        document.getElementById('mover-para-confirmar').disabled = false
+      })
+      el.addEventListener('dblclick', function() { el.click(); _executarMoverPara() })
+      lista.appendChild(el)
+    })
+  }
+
+  async function _executarMoverPara() {
+    if (!_moverParaItemId || !_moverParaDestino) return
+    _modalMoverPara.hide()
+    if (window._moverState) _cancelarMover()
+    try {
+      const r = await fetch('/admin/menus/mover/item', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          itemId: _moverParaItemId,
+          mover: '1',
+          menuId: _moverParaDestino.menuId,
+          novoParentId: _moverParaDestino.parentId || '',
+          idsOrdem: '[]',
+        }),
+      })
+      if (r.ok) {
+        htmx.trigger(document.body, 'refresh-tree')
+      } else {
+        const data = await r.json().catch(function() { return {} })
+        _mostrarConfirmar({ titulo: 'Erro ao mover', texto: data.erro || 'Não foi possível mover o item.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+      }
+    } catch {
+      _mostrarConfirmar({ titulo: 'Erro', texto: 'Erro de comunicação ao mover o item.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+    }
+  }
+
+  document.getElementById('mover-para-filtro').addEventListener('input', function() { _filtrarDestinos(this.value) })
+  document.getElementById('mover-para-confirmar').addEventListener('click', _executarMoverPara)
 </script>
+
+<!-- Modal: Mover para... -->
+<div class="modal fade" id="modal-mover-para" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable" style="max-width:480px">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h6 class="modal-title fw-semibold mb-0"><i class="bi bi-arrows-move me-2 text-primary"></i>Mover para...</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="px-3 py-2 border-bottom">
+          <input type="text" id="mover-para-filtro" class="form-control form-control-sm" placeholder="Filtrar destinos...">
+        </div>
+        <div id="mover-para-lista" style="max-height:320px;overflow-y:auto"></div>
+      </div>
+      <div class="modal-footer py-2">
+        <small class="text-muted me-auto">Clique duplo para confirmar rapidamente</small>
+        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-sm btn-primary" id="mover-para-confirmar" disabled>
+          <i class="bi bi-check-lg me-1"></i>Mover
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

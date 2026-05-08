@@ -138,8 +138,12 @@
                       <i class="bi bi-plus-lg"></i>
                     </button>
                   <% } %>
+                  <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                    onclick="abrirMoverPara('<%= item.id %>')" title="Mover para...">
+                    <i class="bi bi-arrows-move"></i>
+                  </button>
                   <button class="btn btn-sm btn-outline-secondary py-0 px-1 dd-grip" style="font-size:.7rem; line-height:1.4"
-                    onclick="iniciarMover(this)" title="Arrastar ou ↑↓ Enter / Esc">
+                    onclick="iniciarMover(this)" title="Reordenar ↑↓ Enter / Esc">
                     <i class="bi bi-grip-vertical"></i>
                   </button>
                 </div>
@@ -187,8 +191,12 @@
                           <i class="bi bi-plus-lg"></i>
                         </button>
                       <% } %>
+                      <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                        onclick="abrirMoverPara('<%= sub1.id %>')" title="Mover para...">
+                        <i class="bi bi-arrows-move"></i>
+                      </button>
                       <button class="btn btn-sm btn-outline-secondary py-0 px-1 dd-grip" style="font-size:.7rem; line-height:1.4"
-                        onclick="iniciarMover(this)" title="Arrastar ou ↑↓ Enter / Esc">
+                        onclick="iniciarMover(this)" title="Reordenar ↑↓ Enter / Esc">
                         <i class="bi bi-grip-vertical"></i>
                       </button>
                     </div>
@@ -215,8 +223,12 @@
                         <% if (!sub2.ativo) { %><span class="badge bg-secondary ms-1" style="font-size:.55rem; padding:2px 4px">inativo</span><% } %>
                       </span>
                       <div class="tree-actions">
+                        <button class="btn btn-sm btn-outline-primary py-0 px-1" style="font-size:.7rem; line-height:1.4"
+                          onclick="abrirMoverPara('<%= sub2.id %>')" title="Mover para...">
+                          <i class="bi bi-arrows-move"></i>
+                        </button>
                         <button class="btn btn-sm btn-outline-secondary py-0 px-1 dd-grip" style="font-size:.7rem; line-height:1.4"
-                          onclick="iniciarMover(this)" title="Arrastar ou ↑↓ Enter / Esc">
+                          onclick="iniciarMover(this)" title="Reordenar ↑↓ Enter / Esc">
                           <i class="bi bi-grip-vertical"></i>
                         </button>
                       </div>
