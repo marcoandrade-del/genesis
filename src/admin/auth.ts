@@ -122,7 +122,7 @@ export async function adminAuthRoutes(app: FastifyInstance) {
     const { email, senha } = req.body
 
     const usuario = await app.prisma.usuario.findFirst({
-      where: { emailPrincipal: email, ativo: true },
+      where: { emailPrincipal: email },
     })
 
     const senhaValida = usuario?.senhaHash
@@ -131,6 +131,11 @@ export async function adminAuthRoutes(app: FastifyInstance) {
 
     if (!usuario || !senhaValida) {
       return reply.view('login', { error: 'E-mail ou senha inválidos.', email, ativado: false })
+    }
+
+    if (!usuario.ativo) {
+      const passo = usuario.emailValidado ? 'CELULAR' : 'EMAIL'
+      return reply.redirect(`/admin/ativar/${usuario.id}?passo=${passo}`)
     }
 
     const isAdmin = await app.prisma.adminSistema.findFirst({
