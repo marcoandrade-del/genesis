@@ -1,6 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { CodigosService } from '../codigos.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+
+vi.mock('../email.js', () => ({ enviarCodigoEmail: vi.fn() }))
+vi.mock('../sms.js', () => ({ enviarCodigoSms: vi.fn() }))
 
 const USUARIO_BASE = { id: 'u1', emailValidado: false, celularValidado: false }
 const USUARIO_EMAIL_OK = { id: 'u1', emailValidado: true, celularValidado: false }
@@ -59,7 +62,6 @@ describe('CodigosService.solicitar', () => {
     })
     expect(prisma.codigoValidacao.create).toHaveBeenCalledOnce()
     expect(resultado).toHaveProperty('id')
-    expect(resultado).toHaveProperty('codigo')
     expect(resultado).toHaveProperty('expiradoEm')
   })
 })

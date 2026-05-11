@@ -106,7 +106,6 @@ export class ItensService {
         .then((r) => r.map((i) => i.id))
 
       const allIds = [id, ...subIds, ...subSubIds]
-      await tx.favoritoItem.deleteMany({ where: { itemId: { in: allIds } } })
       await tx.permissaoAcesso.deleteMany({ where: { itemId: { in: allIds } } })
 
       if (subSubIds.length) await tx.itemFuncionalidade.deleteMany({ where: { id: { in: subSubIds } } })

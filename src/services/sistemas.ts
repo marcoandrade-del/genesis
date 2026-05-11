@@ -91,7 +91,6 @@ export class SistemasService {
       const itens = await tx.itemFuncionalidade.findMany({ where: { menuId: { in: menuIds } }, select: { id: true } })
       const itemIds = itens.map((i) => i.id)
 
-      await tx.favoritoItem.deleteMany({ where: { itemId: { in: itemIds } } })
       await tx.permissaoAcesso.deleteMany({ where: { itemId: { in: itemIds } } })
 
       const depth2 = await tx.itemFuncionalidade.findMany({
