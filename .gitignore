@@ -10,3 +10,7 @@ dist/
 # Claude Code — configurações e memórias locais
 .claude/
 claude.md.bkp
+
+# Documentos de requisitos / melhorias (fora do versionamento)
+*.pdf
+/Regras*
