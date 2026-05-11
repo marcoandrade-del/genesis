@@ -11,7 +11,8 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "Marco Andrade",
@@ -37,6 +38,7 @@
     "@types/node": "^25.6.0",
     "@types/nodemailer": "^8.0.0",
     "@types/pg": "^8.20.0",
+    "@vitest/coverage-v8": "^4.1.6",
     "dotenv": "^17.4.2",
     "prisma": "^7.7.0",
     "tsx": "^4.21.0",
