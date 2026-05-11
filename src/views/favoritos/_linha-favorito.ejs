@@ -25,7 +25,11 @@
         hx-delete="/admin/favoritos/fav/<%= f.id %>?usuarioId=<%= usuario.id %>"
         hx-target="#modal-body"
         hx-swap="innerHTML"
-        hx-confirm="Remover '<%= nomeRel %>' dos favoritos?"
+        hx-confirm="O favorito será removido da pasta."
+        data-confirm-titulo="Remover Favorito"
+        data-confirm-tipo="danger"
+        data-confirm-ok="Remover"
+        data-confirm-destaque="Remover: <%= nomeRel %>"
         title="Remover favorito"
         style="flex-shrink:0">
         <i class="bi bi-x-lg" style="font-size:.75rem"></i>

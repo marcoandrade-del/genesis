@@ -40,7 +40,11 @@
             hx-delete="/admin/favoritos/pasta/<%= pasta.id %>?usuarioId=<%= usuario.id %>"
             hx-target="#modal-body"
             hx-swap="innerHTML"
-            hx-confirm="Excluir pasta '<%= pasta.nome %>'? Esta ação não pode ser desfeita."
+            hx-confirm="A pasta vazia será excluída. Esta ação não pode ser desfeita."
+            data-confirm-titulo="Excluir Pasta"
+            data-confirm-tipo="danger"
+            data-confirm-ok="Excluir"
+            data-confirm-destaque="Excluir: <%= pasta.nome %>"
             title="Excluir pasta">
             <i class="bi bi-trash" style="font-size:.75rem"></i>
           </button>
@@ -67,7 +71,11 @@
                 hx-delete="/admin/favoritos/pasta/<%= sub.id %>?usuarioId=<%= usuario.id %>"
                 hx-target="#modal-body"
                 hx-swap="innerHTML"
-                hx-confirm="Excluir subpasta '<%= sub.nome %>'?"
+                hx-confirm="A subpasta vazia será excluída. Esta ação não pode ser desfeita."
+                data-confirm-titulo="Excluir Subpasta"
+                data-confirm-tipo="danger"
+                data-confirm-ok="Excluir"
+                data-confirm-destaque="Excluir: <%= pasta.nome %> / <%= sub.nome %>"
                 title="Excluir subpasta">
                 <i class="bi bi-trash" style="font-size:.75rem"></i>
               </button>

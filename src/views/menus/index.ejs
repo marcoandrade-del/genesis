@@ -36,6 +36,19 @@
   .dd-chosen { background: rgba(13,110,253,.06) !important; border-radius: 4px; }
   .dd-grip { cursor: grab !important; }
   .dd-grip:active { cursor: grabbing !important; }
+  /* Cursor durante drag: padrão = mover; com Ctrl = copiar */
+  body.dd-active, body.dd-active * { cursor: move !important; }
+  body.dd-active.dd-copy, body.dd-active.dd-copy * { cursor: copy !important; }
+  /* Indicador flutuante do modo de arraste */
+  #dd-modo-indicador {
+    position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
+    background: rgba(33,37,41,.92); color: #fff; padding: 6px 14px;
+    border-radius: 999px; font-size: .8rem; font-weight: 600;
+    z-index: 10000; pointer-events: none; display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+  }
+  #dd-modo-indicador.ativo { display: block; }
+  #dd-modo-indicador.copiar { background: rgba(13,110,253,.92); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 
@@ -117,8 +130,23 @@
 
     var _dragSession = null
     var _ddOrigInfo = null
-    function _ddEscHandler(e) {
-      if (e.key === 'Escape' && _dragSession) _dragSession.canceled = true
+    var _ddCtrlAtivo = false
+    var _ddIndicador = document.getElementById('dd-modo-indicador') || (function() {
+      var el = document.createElement('div')
+      el.id = 'dd-modo-indicador'
+      document.body.appendChild(el)
+      return el
+    })()
+    function _ddAtualizarModo(copiando) {
+      _ddCtrlAtivo = copiando
+      document.body.classList.toggle('dd-copy', copiando)
+      _ddIndicador.textContent = copiando ? '📋 Copiar' : '↗ Mover'
+      _ddIndicador.classList.toggle('copiar', copiando)
+    }
+    function _ddKeyHandler(e) {
+      if (!_dragSession) return
+      if (e.key === 'Escape') { _dragSession.canceled = true; return }
+      _ddAtualizarModo(e.ctrlKey || e.metaKey)
     }
 
     document.querySelectorAll('[data-sortable]').forEach(function(el) {
@@ -171,11 +199,19 @@
         opts.onStart = function(evt) {
           _dragSession = { canceled: false }
           _ddOrigInfo = { from: evt.from, item: evt.item, nextSibling: evt.item.nextElementSibling || null }
-          document.addEventListener('keydown', _ddEscHandler)
+          var ctrlInicial = !!(evt.originalEvent && (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey))
+          document.body.classList.add('dd-active')
+          _ddIndicador.classList.add('ativo')
+          _ddAtualizarModo(ctrlInicial)
+          document.addEventListener('keydown', _ddKeyHandler)
+          document.addEventListener('keyup', _ddKeyHandler)
         }
 
         opts.onEnd = function(evt) {
-          document.removeEventListener('keydown', _ddEscHandler)
+          document.removeEventListener('keydown', _ddKeyHandler)
+          document.removeEventListener('keyup', _ddKeyHandler)
+          document.body.classList.remove('dd-active', 'dd-copy')
+          _ddIndicador.classList.remove('ativo', 'copiar')
           document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(e2) { e2.classList.remove('dd-over') })
 
           var session = _dragSession
@@ -198,10 +234,10 @@
           if (sameContainer && evt.oldIndex === evt.newIndex) return
 
           var itemId = evt.item.dataset.id
-          var ctrlHeld = !!(evt.originalEvent && (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey))
-          var shiftHeld = !!(evt.originalEvent && evt.originalEvent.shiftKey)
+          // Lê do estado rastreado por keydown/keyup — confiável com forceFallback
+          var ctrlHeld = _ddCtrlAtivo
 
-          if (ctrlHeld && !shiftHeld && !sameContainer) {
+          if (ctrlHeld) {
             var novoParentId = toEl.dataset.parentId || ''
             var novoMenuId = toEl.dataset.menuId || ''
             fetch('/admin/menus/copiar/item', {

@@ -361,10 +361,20 @@ document.getElementById('mc-btn-fechar').addEventListener('click', function () {
 })
 
 // Substitui hx-confirm pelo modal customizado
+// Suporta data-confirm-{titulo,tipo,ok,destaque,detalhe} no elemento para personalizar o modal.
 document.body.addEventListener('htmx:confirm', function (e) {
   if (!e.detail.question) return
   e.preventDefault()
-  _mostrarConfirmar({ titulo: 'Confirmar', texto: e.detail.question, tipo: 'primary' }, function(ok) {
+  const elt = e.detail.elt
+  const ds = (elt && elt.dataset) || {}
+  _mostrarConfirmar({
+    titulo: ds.confirmTitulo || 'Confirmar',
+    texto: e.detail.question,
+    tipo: ds.confirmTipo || 'primary',
+    okTexto: ds.confirmOk || 'Confirmar',
+    destaque: ds.confirmDestaque || '',
+    detalhe: ds.confirmDetalhe || '',
+  }, function(ok) {
     if (ok) e.detail.issueRequest(true)
   })
 })

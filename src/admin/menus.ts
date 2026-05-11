@@ -560,7 +560,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.post<{ Body: { itemId: string; novoParentId?: string; novoMenuId: string } }>('/copiar/item', async (req, reply) => {
     try {
       const { itemId, novoParentId, novoMenuId } = req.body
-      await itensSvc.copiar(itemId, novoParentId ?? null, novoMenuId)
+      await itensSvc.copiar(itemId, novoParentId || null, novoMenuId)
       return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).send({ ok: true })
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao copiar item.'

@@ -30,7 +30,11 @@
               hx-target="#perm-linhas"
               hx-swap="innerHTML"
               hx-trigger="change"
-              hx-confirm="Alterar nível de acesso de '<%= p.item.nome %>'?"
+              hx-confirm="O nível de acesso do usuário a este item será alterado."
+              data-confirm-titulo="Alterar Nível de Acesso"
+              data-confirm-tipo="primary"
+              data-confirm-ok="Alterar"
+              data-confirm-destaque="Item: <%= p.item.nome %>"
               hx-vals='{"usuarioId": "<%= usuarioId %>"}'>
               <% ['VISUALIZAR','CRIAR','EDITAR','EXCLUIR','TOTAL'].forEach(function(n) { %>
                 <option value="<%= n %>" <%= p.nivel === n ? 'selected' : '' %>><%= n %></option>
@@ -42,7 +46,11 @@
               hx-delete="/admin/permissoes/perm/<%= p.id %>?usuarioId=<%= usuarioId %>"
               hx-target="#perm-linhas"
               hx-swap="innerHTML"
-              hx-confirm="Revogar permissão de '<%= p.item.nome %>'?"
+              hx-confirm="A permissão será removida e o usuário perderá acesso ao item."
+              data-confirm-titulo="Revogar Permissão"
+              data-confirm-tipo="danger"
+              data-confirm-ok="Revogar"
+              data-confirm-destaque="Item: <%= p.item.nome %>"
               title="Revogar">
               <i class="bi bi-trash" style="font-size:.8rem"></i>
             </button>

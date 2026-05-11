@@ -36,14 +36,23 @@
               hx-post="/admin/lixeira/<%= item.id %>/restaurar"
               hx-target="#lixeira-tabela"
               hx-swap="innerHTML"
-              hx-confirm="Restaurar '<%= item.nome %>'? A estrutura será recriada no banco de dados.">
+              hx-confirm="A estrutura será recriada no banco de dados."
+              data-confirm-titulo="Restaurar Item"
+              data-confirm-tipo="success"
+              data-confirm-ok="Restaurar"
+              data-confirm-destaque="Restaurar: <%= item.nome %>">
               <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar
             </button>
             <button class="btn btn-sm btn-outline-danger"
               hx-delete="/admin/lixeira/<%= item.id %>"
               hx-target="#lixeira-tabela"
               hx-swap="innerHTML"
-              hx-confirm="Excluir permanentemente '<%= item.nome %>'? Esta ação não pode ser desfeita.">
+              hx-confirm="O item será apagado definitivamente do banco de dados."
+              data-confirm-titulo="Apagar Permanentemente"
+              data-confirm-tipo="danger"
+              data-confirm-ok="Apagar"
+              data-confirm-destaque="Apagar: <%= item.nome %>"
+              data-confirm-detalhe="Esta ação NÃO pode ser desfeita.">
               <i class="bi bi-trash3 me-1"></i>Apagar
             </button>
           </td>
