@@ -57,9 +57,12 @@
             style="font-size:1.5rem;letter-spacing:8px" maxlength="6" pattern="\d{6}"
             autocomplete="one-time-code" autofocus required>
         </div>
-        <div class="d-grid mb-3">
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check2-circle me-2"></i>Verificar código
+        <div class="d-flex gap-2 mb-3">
+          <a href="/admin/login" class="btn btn-outline-secondary flex-fill">
+            <i class="bi bi-x-circle me-2"></i>Cancelar
+          </a>
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi bi-check2-circle me-2"></i>Confirmar
           </button>
         </div>
       </form>

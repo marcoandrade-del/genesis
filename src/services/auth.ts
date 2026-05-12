@@ -87,7 +87,7 @@ export class AuthService {
     // Busca sem select para ter acesso a senhaHash (nunca retornado ao cliente)
     const usuario = await this.prisma.usuario.findUnique({
       where: { emailPrincipal: email },
-      select: { id: true, emailPrincipal: true, senhaHash: true, ativo: true },
+      select: { id: true, emailPrincipal: true, senhaHash: true, emailValidado: true, ativo: true },
     })
 
     // Mesma mensagem para email e senha — não revelar qual está errado
@@ -97,8 +97,11 @@ export class AuthService {
     const senhaCorreta = await verify(usuario.senhaHash, senha)
     if (!senhaCorreta) throw erroCredenciais
 
+    if (!usuario.emailValidado) {
+      throw new ErroNegocio('CONFLITO', 'E-mail não validado. Confirme seu e-mail antes de acessar.')
+    }
     if (!usuario.ativo) {
-      throw new ErroNegocio('CONFLITO', 'Conta não ativada. Valide seu e-mail e celular primeiro.')
+      throw new ErroNegocio('CONFLITO', 'Conta não ativada. Valide seu celular para continuar.')
     }
 
     return { sub: usuario.id, email: usuario.emailPrincipal }

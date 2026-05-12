@@ -133,9 +133,11 @@ export async function adminAuthRoutes(app: FastifyInstance) {
       return reply.view('login', { error: 'E-mail ou senha inválidos.', email, ativado: false })
     }
 
+    if (!usuario.emailValidado) {
+      return reply.redirect(`/admin/ativar/${usuario.id}?passo=EMAIL`)
+    }
     if (!usuario.ativo) {
-      const passo = usuario.emailValidado ? 'CELULAR' : 'EMAIL'
-      return reply.redirect(`/admin/ativar/${usuario.id}?passo=${passo}`)
+      return reply.redirect(`/admin/ativar/${usuario.id}?passo=CELULAR`)
     }
 
     const isAdmin = await app.prisma.adminSistema.findFirst({
@@ -162,7 +164,9 @@ export async function adminAuthRoutes(app: FastifyInstance) {
 
   app.post<{ Body: { email: string; senha: string } }>('/verificar-sessao', async (req, reply) => {
     const { email, senha } = req.body
-    const usuario = await app.prisma.usuario.findFirst({ where: { emailPrincipal: email, ativo: true } })
+    const usuario = await app.prisma.usuario.findFirst({
+      where: { emailPrincipal: email, emailValidado: true, ativo: true },
+    })
     const senhaValida = usuario?.senhaHash ? await argon2.verify(usuario.senhaHash, senha) : false
     if (!usuario || !senhaValida) return reply.status(401).send({ ok: false, erro: 'Credenciais inválidas.' })
     return reply.send({ ok: true })

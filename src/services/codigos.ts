@@ -33,7 +33,9 @@ export class CodigosService {
     })
 
     if (tipo === 'EMAIL') {
-      await enviarCodigoEmail(usuario.emailPrincipal, codigo, EXPIRACAO_MINUTOS)
+      const base = (process.env['BASE_URL'] ?? 'http://localhost:3000').replace(/\/$/, '')
+      const link = `${base}/admin/ativar/${usuarioId}?passo=EMAIL`
+      await enviarCodigoEmail(usuario.emailPrincipal, codigo, EXPIRACAO_MINUTOS, link)
     } else {
       await enviarCodigoSms(usuario.telefonePrincipal, codigo, EXPIRACAO_MINUTOS)
     }

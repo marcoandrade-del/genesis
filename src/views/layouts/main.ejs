@@ -534,6 +534,18 @@ document.body.addEventListener('usuarioSalvo', function () {
   fecharModalForcado()
 })
 
+// Toast de informação disparado via HX-Trigger { mostrarInfo: { titulo, texto } }
+document.body.addEventListener('mostrarInfo', function (e) {
+  const d = (e.detail && e.detail.value) || e.detail || {}
+  _mostrarConfirmar({
+    titulo: d.titulo || 'Informação',
+    texto: d.texto || '',
+    tipo: 'primary',
+    semCancelar: true,
+    okTexto: 'OK',
+  }, function () {})
+})
+
 // ── Formulário de usuário: toggle CPF/ID estrangeiro ─────────────────────────
 function alternarDoc(tipo) {
   const campoCpf = document.getElementById('campo-cpf')

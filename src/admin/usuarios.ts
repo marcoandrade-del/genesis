@@ -1,10 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import type { Prisma } from '@prisma/client'
 import { UsuariosService } from '../services/usuarios.js'
+import { CodigosService } from '../services/codigos.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 export async function adminUsuariosRoutes(app: FastifyInstance) {
   const service = new UsuariosService(app.prisma)
+  const codigos = new CodigosService(app.prisma)
 
   app.get<{ Querystring: { busca?: string; status?: string } }>('/', async (req, reply) => {
     const { busca = '', status = '' } = req.query
@@ -118,6 +120,30 @@ export async function adminUsuariosRoutes(app: FastifyInstance) {
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Erro ao atualizar usuário.'
       return reply.view('usuarios/form', { usuario, erro: msg })
+    }
+  })
+
+  // Dispara envio de código de validação. NUNCA marca emailValidado/celularValidado
+  // manualmente — só o fluxo de validação por código (rota /admin/ativar) altera o estado.
+  app.post<{ Params: { id: string } }>('/:id/enviar-codigo-email', async (req, reply) => {
+    try {
+      await codigos.solicitar(req.params.id, 'EMAIL')
+      const trigger = JSON.stringify({ mostrarInfo: { titulo: 'E-mail enviado', texto: 'Um e-mail com link e código de verificação foi enviado ao usuário.' } })
+      return reply.header('HX-Trigger', trigger).status(204).send()
+    } catch (e) {
+      if (e instanceof ErroNegocio) return reply.status(statusDeErro(e.code)).send(e.message)
+      return reply.status(500).send('Erro ao enviar e-mail de validação.')
+    }
+  })
+
+  app.post<{ Params: { id: string } }>('/:id/enviar-codigo-celular', async (req, reply) => {
+    try {
+      await codigos.solicitar(req.params.id, 'CELULAR')
+      const trigger = JSON.stringify({ mostrarInfo: { titulo: 'SMS enviado', texto: 'Um SMS com código de verificação foi enviado ao usuário.' } })
+      return reply.header('HX-Trigger', trigger).status(204).send()
+    } catch (e) {
+      if (e instanceof ErroNegocio) return reply.status(statusDeErro(e.code)).send(e.message)
+      return reply.status(500).send('Erro ao enviar SMS de validação.')
     }
   })
 

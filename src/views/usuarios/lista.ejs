@@ -14,12 +14,42 @@
       <%= u.cpf ? u.cpf : (u.idEstrangeiro || '—') %>
     </td>
     <td>
-      <span title="E-mail" class="me-1">
-        <i class="bi bi-envelope-fill <%= u.emailValidado ? 'text-success' : 'text-secondary' %>" style="font-size:.85rem"></i>
-      </span>
-      <span title="Celular">
-        <i class="bi bi-phone-fill <%= u.celularValidado ? 'text-success' : 'text-secondary' %>" style="font-size:.85rem"></i>
-      </span>
+      <div class="d-flex flex-column gap-1">
+        <% if (u.emailValidado) { %>
+          <span class="small text-success" title="E-mail validado">
+            <i class="bi bi-envelope-check-fill me-1"></i>E-mail validado
+          </span>
+        <% } else { %>
+          <button class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:.75rem"
+            hx-post="/admin/usuarios/<%= u.id %>/enviar-codigo-email"
+            hx-swap="none"
+            hx-confirm="Enviar e-mail com link e código de validação para este usuário?"
+            data-confirm-titulo="Enviar E-mail de Validação"
+            data-confirm-tipo="primary"
+            data-confirm-destaque="Usuário: <%= u.nomeCompleto %>"
+            data-confirm-detalhe="O usuário receberá um link e um código de 6 dígitos. A validação só ocorre quando o usuário informar o código."
+            data-confirm-ok="Enviar">
+            <i class="bi bi-envelope-exclamation me-1"></i>Enviar e-mail de validação
+          </button>
+        <% } %>
+        <% if (u.celularValidado) { %>
+          <span class="small text-success" title="Celular validado">
+            <i class="bi bi-phone-vibrate-fill me-1"></i>Celular validado
+          </span>
+        <% } else { %>
+          <button class="btn btn-sm btn-outline-warning py-0 px-2" style="font-size:.75rem"
+            hx-post="/admin/usuarios/<%= u.id %>/enviar-codigo-celular"
+            hx-swap="none"
+            hx-confirm="Enviar SMS com código de validação para este usuário?"
+            data-confirm-titulo="Enviar SMS de Validação"
+            data-confirm-tipo="primary"
+            data-confirm-destaque="Usuário: <%= u.nomeCompleto %>"
+            data-confirm-detalhe="O usuário receberá um código de 6 dígitos por SMS. A validação só ocorre quando o usuário informar o código."
+            data-confirm-ok="Enviar">
+            <i class="bi bi-phone-flip me-1"></i>Enviar SMS de validação
+          </button>
+        <% } %>
+      </div>
     </td>
     <td>
       <% if (u.ativo) { %>

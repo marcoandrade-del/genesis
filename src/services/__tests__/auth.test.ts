@@ -43,6 +43,7 @@ const USUARIO_LOGIN_DB = {
   id: 'u1',
   emailPrincipal: 'joao@exemplo.com',
   senhaHash: '$argon2id$hash',
+  emailValidado: true,
   ativo: true,
 }
 
@@ -138,8 +139,15 @@ describe('AuthService.login', () => {
       .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
   })
 
-  it('lança CONFLITO quando conta não está ativada', async () => {
-    prisma.usuario.findUnique.mockResolvedValue({ ...USUARIO_LOGIN_DB, ativo: false })
+  it('lança CONFLITO quando e-mail não foi validado (mesmo com ativo=true)', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ ...USUARIO_LOGIN_DB, emailValidado: false })
+
+    await expect(service.login('joao@exemplo.com', 'senha123'))
+      .rejects.toMatchObject({ code: 'CONFLITO' })
+  })
+
+  it('lança CONFLITO quando celular ainda não foi validado (ativo=false após e-mail ok)', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ ...USUARIO_LOGIN_DB, emailValidado: true, ativo: false })
 
     await expect(service.login('joao@exemplo.com', 'senha123'))
       .rejects.toMatchObject({ code: 'CONFLITO' })
