@@ -172,6 +172,43 @@ export class ItensService {
     return novo
   }
 
+  async criarAtalho(itemId: string, novoParentId: string | null, novoMenuId: string) {
+    if (!novoMenuId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Menu de destino é obrigatório.')
+
+    const item = await this.prisma.itemFuncionalidade.findUnique({ where: { id: itemId } })
+    if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
+    if (item.referenciaId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Não é permitido criar atalho de um atalho.')
+
+    const menu = await this.prisma.menu.findUnique({ where: { id: novoMenuId }, select: { id: true } })
+    if (!menu) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Menu de destino não encontrado.')
+
+    if (novoParentId) {
+      const novoParent = await this.prisma.itemFuncionalidade.findUnique({
+        where: { id: novoParentId },
+        select: { tipo: true, menuId: true },
+      })
+      if (!novoParent) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Pai de destino não encontrado.')
+      if (novoParent.tipo !== 'SUBMENU') throw new ErroNegocio('REQUISICAO_INVALIDA', 'O pai deve ser do tipo SUBMENU.')
+      if (novoParent.menuId !== novoMenuId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'O pai deve pertencer ao menu de destino.')
+    }
+
+    return this.prisma.itemFuncionalidade.create({
+      data: {
+        nome: item.nome,
+        descricao: item.descricao,
+        tipo: item.tipo,
+        tipoFuncionalidade: item.tipoFuncionalidade,
+        rota: item.rota,
+        icone: item.icone,
+        ordem: item.ordem,
+        ativo: item.ativo,
+        menuId: novoMenuId,
+        parentId: novoParentId,
+        referenciaId: itemId,
+      },
+    })
+  }
+
   async reordenar(ids: string[]) {
     await this.prisma.$transaction(
       ids.map((id, i) => this.prisma.itemFuncionalidade.update({ where: { id }, data: { ordem: i } })),

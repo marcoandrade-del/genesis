@@ -240,6 +240,81 @@ describe('ItensService.copiar', () => {
   })
 })
 
+describe('ItensService.criarAtalho', () => {
+  let prisma: PrismaMock
+  let service: ItensService
+
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    service = new ItensService(prisma as never)
+  })
+
+  it('exige menu de destino', async () => {
+    await expect(service.criarAtalho('it1', null, ''))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
+  it('lança RECURSO_NAO_ENCONTRADO quando item de origem não existe', async () => {
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(null)
+
+    await expect(service.criarAtalho('it-x', null, 'me1'))
+      .rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+
+  it('proíbe atalho de atalho', async () => {
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue({ ...ITEM_FUNC, referenciaId: 'it0' })
+
+    await expect(service.criarAtalho('it1', null, 'me1'))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
+  it('lança RECURSO_NAO_ENCONTRADO quando menu de destino não existe', async () => {
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue({ ...ITEM_FUNC, referenciaId: null })
+    prisma.menu.findUnique.mockResolvedValue(null)
+
+    await expect(service.criarAtalho('it1', null, 'me-inexistente'))
+      .rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+
+  it('cria atalho com referenciaId apontando para o item original (sem sufixo no nome)', async () => {
+    prisma.itemFuncionalidade.findUnique
+      .mockResolvedValueOnce({ ...ITEM_FUNC, referenciaId: null })
+    prisma.menu.findUnique.mockResolvedValue({ id: 'me1' })
+    prisma.itemFuncionalidade.create.mockResolvedValue({ ...ITEM_FUNC, id: 'it-atalho', referenciaId: 'it1' })
+
+    await service.criarAtalho('it1', null, 'me1')
+
+    expect(prisma.itemFuncionalidade.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        nome: 'Listar',
+        menuId: 'me1',
+        parentId: null,
+        referenciaId: 'it1',
+      }),
+    })
+  })
+
+  it('valida que parent de destino pertence ao menu de destino', async () => {
+    prisma.itemFuncionalidade.findUnique
+      .mockResolvedValueOnce({ ...ITEM_FUNC, referenciaId: null })
+      .mockResolvedValueOnce({ tipo: 'SUBMENU', menuId: 'outro-menu' })
+    prisma.menu.findUnique.mockResolvedValue({ id: 'me1' })
+
+    await expect(service.criarAtalho('it1', 'sub-fora', 'me1'))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
+  it('exige que parent seja do tipo SUBMENU', async () => {
+    prisma.itemFuncionalidade.findUnique
+      .mockResolvedValueOnce({ ...ITEM_FUNC, referenciaId: null })
+      .mockResolvedValueOnce({ tipo: 'FUNCIONALIDADE', menuId: 'me1' })
+    prisma.menu.findUnique.mockResolvedValue({ id: 'me1' })
+
+    await expect(service.criarAtalho('it1', 'it-func', 'me1'))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+})
+
 describe('ItensService.mover', () => {
   let prisma: PrismaMock
   let service: ItensService

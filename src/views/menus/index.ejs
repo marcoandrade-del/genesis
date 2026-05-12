@@ -36,9 +36,10 @@
   .dd-chosen { background: rgba(13,110,253,.06) !important; border-radius: 4px; }
   .dd-grip { cursor: grab !important; }
   .dd-grip:active { cursor: grabbing !important; }
-  /* Cursor durante drag: padrão = mover; com Ctrl = copiar */
+  /* Cursor durante drag: padrão = mover; Ctrl = copiar; Alt = alias (atalho) */
   body.dd-active, body.dd-active * { cursor: move !important; }
   body.dd-active.dd-copy, body.dd-active.dd-copy * { cursor: copy !important; }
+  body.dd-active.dd-atalho, body.dd-active.dd-atalho * { cursor: alias !important; }
   /* Indicador flutuante do modo de arraste */
   #dd-modo-indicador {
     position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -49,6 +50,7 @@
   }
   #dd-modo-indicador.ativo { display: block; }
   #dd-modo-indicador.copiar { background: rgba(13,110,253,.92); }
+  #dd-modo-indicador.atalho { background: rgba(102,16,242,.92); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 
@@ -130,23 +132,32 @@
 
     var _dragSession = null
     var _ddOrigInfo = null
-    var _ddCtrlAtivo = false
+    var _ddModo = 'mover' // 'mover' | 'copiar' | 'atalho'
     var _ddIndicador = document.getElementById('dd-modo-indicador') || (function() {
       var el = document.createElement('div')
       el.id = 'dd-modo-indicador'
       document.body.appendChild(el)
       return el
     })()
-    function _ddAtualizarModo(copiando) {
-      _ddCtrlAtivo = copiando
-      document.body.classList.toggle('dd-copy', copiando)
-      _ddIndicador.textContent = copiando ? '📋 Copiar' : '↗ Mover'
-      _ddIndicador.classList.toggle('copiar', copiando)
+    // Prioridade: Shift > Alt > Ctrl > padrão (mover)
+    function _ddCalcularModo(ev) {
+      if (ev.shiftKey) return 'mover'
+      if (ev.altKey) return 'atalho'
+      if (ev.ctrlKey || ev.metaKey) return 'copiar'
+      return 'mover'
+    }
+    function _ddAtualizarModo(modo) {
+      _ddModo = modo
+      document.body.classList.toggle('dd-copy', modo === 'copiar')
+      document.body.classList.toggle('dd-atalho', modo === 'atalho')
+      _ddIndicador.textContent = modo === 'copiar' ? '📋 Copiar' : modo === 'atalho' ? '🔗 Atalho' : '↗ Mover'
+      _ddIndicador.classList.toggle('copiar', modo === 'copiar')
+      _ddIndicador.classList.toggle('atalho', modo === 'atalho')
     }
     function _ddKeyHandler(e) {
       if (!_dragSession) return
       if (e.key === 'Escape') { _dragSession.canceled = true; return }
-      _ddAtualizarModo(e.ctrlKey || e.metaKey)
+      _ddAtualizarModo(_ddCalcularModo(e))
     }
 
     document.querySelectorAll('[data-sortable]').forEach(function(el) {
@@ -199,10 +210,10 @@
         opts.onStart = function(evt) {
           _dragSession = { canceled: false }
           _ddOrigInfo = { from: evt.from, item: evt.item, nextSibling: evt.item.nextElementSibling || null }
-          var ctrlInicial = !!(evt.originalEvent && (evt.originalEvent.ctrlKey || evt.originalEvent.metaKey))
+          var orig = evt.originalEvent || {}
           document.body.classList.add('dd-active')
           _ddIndicador.classList.add('ativo')
-          _ddAtualizarModo(ctrlInicial)
+          _ddAtualizarModo(_ddCalcularModo(orig))
           document.addEventListener('keydown', _ddKeyHandler)
           document.addEventListener('keyup', _ddKeyHandler)
         }
@@ -210,8 +221,8 @@
         opts.onEnd = function(evt) {
           document.removeEventListener('keydown', _ddKeyHandler)
           document.removeEventListener('keyup', _ddKeyHandler)
-          document.body.classList.remove('dd-active', 'dd-copy')
-          _ddIndicador.classList.remove('ativo', 'copiar')
+          document.body.classList.remove('dd-active', 'dd-copy', 'dd-atalho')
+          _ddIndicador.classList.remove('ativo', 'copiar', 'atalho')
           document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(e2) { e2.classList.remove('dd-over') })
 
           var session = _dragSession
@@ -231,16 +242,19 @@
           var fromEl = evt.from
           var toEl = evt.to
           var sameContainer = fromEl === toEl
-          if (sameContainer && evt.oldIndex === evt.newIndex) return
+          if (sameContainer && evt.oldIndex === evt.newIndex && _ddModo === 'mover') return
 
           var itemId = evt.item.dataset.id
           // Lê do estado rastreado por keydown/keyup — confiável com forceFallback
-          var ctrlHeld = _ddCtrlAtivo
+          var modo = _ddModo
 
-          if (ctrlHeld) {
+          if (modo === 'copiar' || modo === 'atalho') {
             var novoParentId = toEl.dataset.parentId || ''
             var novoMenuId = toEl.dataset.menuId || ''
-            fetch('/admin/menus/copiar/item', {
+            var url = modo === 'copiar' ? '/admin/menus/copiar/item' : '/admin/menus/atalho/item'
+            var labelErro = modo === 'copiar' ? 'Erro ao copiar' : 'Erro ao criar atalho'
+            var textoErro = modo === 'copiar' ? 'Não foi possível copiar o item.' : 'Não foi possível criar o atalho.'
+            fetch(url, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: new URLSearchParams({ itemId: itemId, novoParentId: novoParentId, novoMenuId: novoMenuId }),
@@ -249,7 +263,7 @@
                 htmx.trigger(document.body, 'refresh-tree')
               } else {
                 r.json().then(function(data) {
-                  _mostrarConfirmar({ titulo: 'Erro ao copiar', texto: data.erro || 'Não foi possível copiar o item.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
+                  _mostrarConfirmar({ titulo: labelErro, texto: data.erro || textoErro, tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function() {})
                   htmx.trigger(document.body, 'refresh-tree')
                 })
               }

@@ -68,9 +68,12 @@ model ItemFuncionalidade {
   atualizadoEm       DateTime             @updatedAt
   menuId             String
   parentId           String?
+  referenciaId       String?
   menu               Menu                 @relation(fields: [menuId], references: [id])
   parent             ItemFuncionalidade?  @relation("SubItens", fields: [parentId], references: [id])
   subItens           ItemFuncionalidade[] @relation("SubItens")
+  referencia         ItemFuncionalidade?  @relation("Atalhos", fields: [referenciaId], references: [id])
+  atalhos            ItemFuncionalidade[] @relation("Atalhos")
   permissoes         PermissaoAcesso[]
 
   @@map("itens_funcionalidade")

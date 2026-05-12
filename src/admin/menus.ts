@@ -568,6 +568,18 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     }
   })
 
+  // ── Criar atalho (referência) para item ──────────────────────────────────────
+  app.post<{ Body: { itemId: string; novoParentId?: string; novoMenuId: string } }>('/atalho/item', async (req, reply) => {
+    try {
+      const { itemId, novoParentId, novoMenuId } = req.body
+      await itensSvc.criarAtalho(itemId, novoParentId || null, novoMenuId)
+      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).send({ ok: true })
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao criar atalho.'
+      return reply.status(400).send({ ok: false, erro: msg })
+    }
+  })
+
   // ── Destinos disponíveis para mover um item ──────────────────────────────────
   app.get<{ Params: { id: string } }>('/destinos-item/:id', async (req, reply) => {
     const item = await app.prisma.itemFuncionalidade.findUnique({
