@@ -6,6 +6,7 @@ export function criarPrismaMock() {
   const mock = {
     usuario: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       findMany: vi.fn(),
