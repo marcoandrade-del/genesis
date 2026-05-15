@@ -18,6 +18,7 @@ export function statusDeErro(code: string): number {
     case 'CONFLITO': return 409
     case 'REQUISICAO_INVALIDA': return 400
     case 'ENTIDADE_NAO_PROCESSAVEL': return 422
+    case 'NAO_AUTORIZADO': return 403
     default: return 500
   }
 }

@@ -49,7 +49,7 @@ export async function sistemasRoutes(app: FastifyInstance) {
     const sistema = await service.buscarPorId(req.params.id)
     if (!sistema) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Sistema não encontrado.'))
     try {
-      await service.excluir(req.params.id)
+      await service.excluir(req.params.id, req.user.sub)
       return reply.status(204).send()
     } catch (e) {
       return tratarErro(e, reply)

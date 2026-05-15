@@ -56,7 +56,7 @@ export async function modulosRoutes(app: FastifyInstance) {
     const modulo = await service.buscarPorId(req.params.id)
     if (!modulo) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Módulo não encontrado.'))
     try {
-      await service.excluir(req.params.id)
+      await service.excluir(req.params.id, req.user.sub)
       return reply.status(204).send()
     } catch (e) {
       return tratarErro(e, reply)

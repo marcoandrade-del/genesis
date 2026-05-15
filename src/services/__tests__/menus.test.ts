@@ -137,16 +137,28 @@ describe('MenusService.excluir', () => {
   it('lança RECURSO_NAO_ENCONTRADO quando menu não existe', async () => {
     prisma.menu.findUnique.mockResolvedValue(null)
 
-    await expect(service.excluir('me-inexistente'))
+    await expect(service.excluir('me-inexistente', 'u1'))
       .rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
-  it('inicia transação para excluir em cascata quando menu existe', async () => {
+  it('lança NAO_AUTORIZADO quando usuário não é admin do módulo pai', async () => {
     prisma.menu.findUnique.mockResolvedValue(MENU)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue(MODULO_ATIVO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+
+    await expect(service.excluir('me1', 'u-outro'))
+      .rejects.toMatchObject({ code: 'NAO_AUTORIZADO' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('inicia transação para excluir em cascata quando menu existe e usuário é admin', async () => {
+    prisma.menu.findUnique.mockResolvedValue(MENU)
+    prisma.adminModulo.findUnique.mockResolvedValue({ ativo: true })
     prisma.itemFuncionalidade.findMany.mockResolvedValue([])
 
-    await service.excluir('me1')
+    await service.excluir('me1', 'u1')
 
     expect(prisma.$transaction).toHaveBeenCalledOnce()
     expect(prisma.menu.delete).toHaveBeenCalledWith({ where: { id: 'me1' } })

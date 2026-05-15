@@ -56,7 +56,7 @@ export async function menusRoutes(app: FastifyInstance) {
     const menu = await service.buscarPorId(req.params.id)
     if (!menu) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Menu não encontrado.'))
     try {
-      await service.excluir(req.params.id)
+      await service.excluir(req.params.id, req.user.sub)
       return reply.status(204).send()
     } catch (e) {
       return tratarErro(e, reply)

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { assertAdminSistema } from './autorizacao.js'
 
 export class SistemasService {
   constructor(private prisma: PrismaClient) {}
@@ -73,15 +74,17 @@ export class SistemasService {
     }
   }
 
-  async excluir(id: string, usuarioId?: string, lixeiraService?: import('./lixeira.js').LixeiraService) {
+  async excluir(id: string, usuarioId: string, lixeiraService?: import('./lixeira.js').LixeiraService) {
     const sistema = await this.prisma.sistema.findUnique({ where: { id } })
     if (!sistema) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Sistema não encontrado.')
+
+    await assertAdminSistema(this.prisma, usuarioId, id)
 
     const relatorios = await this.prisma.relatorioFixo.count({ where: { sistemaId: id } })
     if (relatorios > 0) throw new ErroNegocio('CONFLITO', 'Não é possível excluir um sistema com relatórios vinculados.')
 
     await this.prisma.$transaction(async (tx) => {
-      if (lixeiraService && usuarioId) await lixeiraService.salvarSistema(id, usuarioId, tx)
+      if (lixeiraService) await lixeiraService.salvarSistema(id, usuarioId, tx)
       const modulos = await tx.modulo.findMany({ where: { sistemaId: id }, select: { id: true } })
       const moduloIds = modulos.map((m) => m.id)
 

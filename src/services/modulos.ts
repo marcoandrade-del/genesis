@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { assertAdminModulo } from './autorizacao.js'
 
 export class ModulosService {
   constructor(private prisma: PrismaClient) {}
@@ -54,12 +55,14 @@ export class ModulosService {
     }
   }
 
-  async excluir(id: string, usuarioId?: string, lixeiraService?: import('./lixeira.js').LixeiraService) {
+  async excluir(id: string, usuarioId: string, lixeiraService?: import('./lixeira.js').LixeiraService) {
     const modulo = await this.prisma.modulo.findUnique({ where: { id } })
     if (!modulo) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Módulo não encontrado.')
 
+    await assertAdminModulo(this.prisma, usuarioId, id)
+
     await this.prisma.$transaction(async (tx) => {
-      if (lixeiraService && usuarioId) await lixeiraService.salvarModulo(id, usuarioId, tx)
+      if (lixeiraService) await lixeiraService.salvarModulo(id, usuarioId, tx)
       const menus = await tx.menu.findMany({ where: { moduloId: id }, select: { id: true } })
       const menuIds = menus.map((m) => m.id)
 

@@ -86,6 +86,7 @@ describe('sistemasRoutes', () => {
 
   it('DELETE /sistemas/:id retorna 204 com sucesso', async () => {
     prisma.sistema.findUnique.mockResolvedValue(SISTEMA)
+    prisma.adminSistema.findUnique.mockResolvedValue({ ativo: true })
     prisma.relatorioFixo.count.mockResolvedValue(0)
     const res = await app.inject({ method: 'DELETE', url: '/sistemas/s1', headers: auth })
     expect(res.statusCode).toBe(204)
@@ -93,8 +94,16 @@ describe('sistemasRoutes', () => {
 
   it('DELETE /sistemas/:id retorna 409 quando há relatórios vinculados', async () => {
     prisma.sistema.findUnique.mockResolvedValue(SISTEMA)
+    prisma.adminSistema.findUnique.mockResolvedValue({ ativo: true })
     prisma.relatorioFixo.count.mockResolvedValue(3)
     const res = await app.inject({ method: 'DELETE', url: '/sistemas/s1', headers: auth })
     expect(res.statusCode).toBe(409)
+  })
+
+  it('DELETE /sistemas/:id retorna 403 quando usuário não é admin do sistema', async () => {
+    prisma.sistema.findUnique.mockResolvedValue(SISTEMA)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'DELETE', url: '/sistemas/s1', headers: auth })
+    expect(res.statusCode).toBe(403)
   })
 })

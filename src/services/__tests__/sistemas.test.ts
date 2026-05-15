@@ -75,22 +75,32 @@ describe('SistemasService.excluir', () => {
   it('lança RECURSO_NAO_ENCONTRADO quando sistema não existe', async () => {
     prisma.sistema.findUnique.mockResolvedValue(null)
 
-    await expect(service.excluir('s-inexistente')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+    await expect(service.excluir('s-inexistente', 'u1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+
+  it('lança NAO_AUTORIZADO quando usuário não é admin do sistema', async () => {
+    prisma.sistema.findUnique.mockResolvedValue(SISTEMA_CRIADO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+
+    await expect(service.excluir('s1', 'u-outro')).rejects.toMatchObject({ code: 'NAO_AUTORIZADO' })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('lança CONFLITO quando há relatórios fixos vinculados', async () => {
     prisma.sistema.findUnique.mockResolvedValue(SISTEMA_CRIADO)
+    prisma.adminSistema.findUnique.mockResolvedValue({ ativo: true })
     prisma.relatorioFixo.count.mockResolvedValue(3)
 
-    await expect(service.excluir('s1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    await expect(service.excluir('s1', 'u1')).rejects.toMatchObject({ code: 'CONFLITO' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   it('inicia transação para excluir em cascata quando não há relatórios', async () => {
     prisma.sistema.findUnique.mockResolvedValue(SISTEMA_CRIADO)
+    prisma.adminSistema.findUnique.mockResolvedValue({ ativo: true })
     prisma.relatorioFixo.count.mockResolvedValue(0)
 
-    await service.excluir('s1')
+    await service.excluir('s1', 'u1')
 
     expect(prisma.$transaction).toHaveBeenCalledOnce()
   })
