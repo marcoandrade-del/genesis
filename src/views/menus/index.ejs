@@ -36,10 +36,11 @@
   .dd-chosen { background: rgba(13,110,253,.06) !important; border-radius: 4px; }
   .dd-grip { cursor: grab !important; }
   .dd-grip:active { cursor: grabbing !important; }
-  /* Cursor durante drag: padrão = mover; Ctrl = copiar; Alt = alias (atalho) */
+  /* Cursor durante drag: padrão = mover; Ctrl = copiar; Alt = alias (atalho); bloqueio prevalece */
   body.dd-active, body.dd-active * { cursor: move !important; }
   body.dd-active.dd-copy, body.dd-active.dd-copy * { cursor: copy !important; }
   body.dd-active.dd-atalho, body.dd-active.dd-atalho * { cursor: alias !important; }
+  body.dd-active.dd-bloqueado, body.dd-active.dd-bloqueado * { cursor: not-allowed !important; }
   /* Indicador flutuante do modo de arraste */
   #dd-modo-indicador {
     position: fixed; top: 70px; left: 50%; transform: translateX(-50%);
@@ -51,6 +52,7 @@
   #dd-modo-indicador.ativo { display: block; }
   #dd-modo-indicador.copiar { background: rgba(13,110,253,.92); }
   #dd-modo-indicador.atalho { background: rgba(102,16,242,.92); }
+  #dd-modo-indicador.bloqueado { background: rgba(220,53,69,.92); }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 
@@ -146,13 +148,28 @@
       if (ev.ctrlKey || ev.metaKey) return 'copiar'
       return 'mover'
     }
+    var _ddBloqueado = false
+    function _ddAtualizarIndicador() {
+      if (_ddBloqueado) {
+        _ddIndicador.textContent = '🚫 Bloqueado'
+      } else {
+        _ddIndicador.textContent = _ddModo === 'copiar' ? '📋 Copiar' : _ddModo === 'atalho' ? '🔗 Atalho' : '↗ Mover'
+      }
+      _ddIndicador.classList.toggle('copiar', !_ddBloqueado && _ddModo === 'copiar')
+      _ddIndicador.classList.toggle('atalho', !_ddBloqueado && _ddModo === 'atalho')
+      _ddIndicador.classList.toggle('bloqueado', _ddBloqueado)
+    }
     function _ddAtualizarModo(modo) {
       _ddModo = modo
       document.body.classList.toggle('dd-copy', modo === 'copiar')
       document.body.classList.toggle('dd-atalho', modo === 'atalho')
-      _ddIndicador.textContent = modo === 'copiar' ? '📋 Copiar' : modo === 'atalho' ? '🔗 Atalho' : '↗ Mover'
-      _ddIndicador.classList.toggle('copiar', modo === 'copiar')
-      _ddIndicador.classList.toggle('atalho', modo === 'atalho')
+      _ddAtualizarIndicador()
+    }
+    function _ddAtualizarBloqueio(bloqueado) {
+      if (_ddBloqueado === bloqueado) return
+      _ddBloqueado = bloqueado
+      document.body.classList.toggle('dd-bloqueado', bloqueado)
+      _ddAtualizarIndicador()
     }
     function _ddKeyHandler(e) {
       if (!_dragSession) return
@@ -201,7 +218,9 @@
 
         opts.onMove = function(evt) {
           var row = evt.dragged.querySelector('.tree-row') || evt.dragged
-          if (row.dataset.itemTipo === 'SUBMENU' && evt.to.dataset.parentId) return false
+          var valido = !(row.dataset.itemTipo === 'SUBMENU' && evt.to.dataset.parentId)
+          _ddAtualizarBloqueio(!valido)
+          if (!valido) return false
           document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(e2) { e2.classList.remove('dd-over') })
           if (evt.to !== evt.from) evt.to.classList.add('dd-over')
           return true
@@ -221,8 +240,9 @@
         opts.onEnd = function(evt) {
           document.removeEventListener('keydown', _ddKeyHandler)
           document.removeEventListener('keyup', _ddKeyHandler)
-          document.body.classList.remove('dd-active', 'dd-copy', 'dd-atalho')
-          _ddIndicador.classList.remove('ativo', 'copiar', 'atalho')
+          document.body.classList.remove('dd-active', 'dd-copy', 'dd-atalho', 'dd-bloqueado')
+          _ddBloqueado = false
+          _ddIndicador.classList.remove('ativo', 'copiar', 'atalho', 'bloqueado')
           document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(e2) { e2.classList.remove('dd-over') })
 
           var session = _dragSession
