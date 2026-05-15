@@ -240,6 +240,15 @@
       transition: background .12s, color .12s;
     }
     .sub-item-row:hover { background: rgba(13,110,253,.08); color: #0a58ca; }
+
+    /* Breadcrumb levels clicáveis */
+    .bc-link { cursor: pointer; transition: color .12s; }
+    .bc-link:hover { color: #fff !important; text-decoration: underline; }
+    .bc-link:focus-visible {
+      outline: 2px solid rgba(255,255,255,.4);
+      outline-offset: 2px;
+      border-radius: 2px;
+    }
   </style>
 </head>
 <body>
@@ -249,10 +258,26 @@
     <nav aria-label="breadcrumb" style="display:flex;align-items:center">
       <ol class="breadcrumb mb-0 small"
           style="--bs-breadcrumb-divider-color: rgba(255,255,255,.4); --bs-breadcrumb-item-padding-x: .35rem">
-        <li class="breadcrumb-item text-white fw-semibold"><%= modulo.sistema.nome %></li>
-        <li class="breadcrumb-item text-white-50" id="bc-modulo"><%= modulo.nome %></li>
-        <li class="breadcrumb-item text-white-50" id="bc-menu" style="display:none"></li>
-        <li class="breadcrumb-item text-white-50" id="bc-item" style="display:none"></li>
+        <li class="breadcrumb-item text-white fw-semibold bc-link"
+            onclick="bcVoltarSistema(event)"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bcVoltarSistema(event)}"
+            role="link" tabindex="0"
+            title="Fechar módulo"><%= modulo.sistema.nome %></li>
+        <li class="breadcrumb-item text-white-50 bc-link" id="bc-modulo"
+            onclick="bcVoltarModulo(event)"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bcVoltarModulo(event)}"
+            role="link" tabindex="0"
+            title="Voltar à tela inicial do módulo"><%= modulo.nome %></li>
+        <li class="breadcrumb-item text-white-50 bc-link" id="bc-menu" style="display:none"
+            onclick="bcVoltarMenu(event)"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bcVoltarMenu(event)}"
+            role="link" tabindex="0"
+            title="Voltar ao menu"></li>
+        <li class="breadcrumb-item text-white-50 bc-link" id="bc-item" style="display:none"
+            onclick="bcVoltarItem(event)"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();bcVoltarItem(event)}"
+            role="link" tabindex="0"
+            title="Voltar à funcionalidade"></li>
         <li class="breadcrumb-item text-white" id="bc-subitem" style="display:none" aria-current="page"></li>
       </ol>
     </nav>
@@ -466,6 +491,7 @@
       const bc = document.getElementById('bc-menu')
       if (!nameEl) return
       bc.textContent = nameEl.dataset.orig
+      bc.dataset.menuId = menuId
       bc.style.display = ''
     }
     function _bcSetItem(name) {
@@ -487,6 +513,35 @@
       const bc = document.getElementById('bc-subitem')
       bc.textContent = ''
       bc.style.display = 'none'
+    }
+
+    // ── Navegação pelo breadcrumb ─────────────────────────────────────────
+    function bcVoltarSistema(e) {
+      e.preventDefault()
+      if (window.parent && window.parent.fecharModal) window.parent.fecharModal()
+    }
+    function bcVoltarModulo(e) {
+      e.preventDefault()
+      document.querySelectorAll('.lb-entry').forEach(en => en.classList.remove('active'))
+      document.querySelectorAll('[id^="painel-menu-"]').forEach(p => p.style.display = 'none')
+      document.getElementById('bem-vindo').style.display = ''
+      const bcMenu = document.getElementById('bc-menu')
+      bcMenu.style.display = 'none'
+      bcMenu.textContent = ''
+      delete bcMenu.dataset.menuId
+      _bcClearItem()
+      _bcClearSubItem()
+    }
+    function bcVoltarMenu(e) {
+      e.preventDefault()
+      const menuId = document.getElementById('bc-menu').dataset.menuId
+      if (!menuId) return
+      const menuEl = document.querySelector('.lb-menu[data-menu-id="' + menuId + '"]')
+      ativarMenu(menuId, menuEl)
+    }
+    function bcVoltarItem(e) {
+      e.preventDefault()
+      _bcClearSubItem()
     }
 
     // ── Navegação de menus ────────────────────────────────────────────────
