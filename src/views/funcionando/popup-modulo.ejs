@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= modulo.sistema.nome %> — <%= modulo.nome %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; border-radius: 14px; }
+    body { display: flex; flex-direction: column; background: #f8f9fa; border-radius: 14px; }
+
+    .top-bar {
+      height: 48px;
+      flex-shrink: 0;
+      background: #212529;
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      gap: .5rem;
+      border-radius: 14px 14px 0 0;
+    }
+
+    /* Sidebar dividida: busca fixa + área scrollável */
+    .sidebar-popup {
+      width: 260px;
+      flex-shrink: 0;
+      background: #212529;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .sidebar-search {
+      flex-shrink: 0;
+      padding: .6rem .5rem .4rem;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .sidebar-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: .25rem .25rem .5rem;
+    }
+
+    /* Campo de busca */
+    .lb-search-wrap {
+      position: relative;
+    }
+    .lb-search-wrap .bi-search {
+      position: absolute;
+      left: .6rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: rgba(255,255,255,.35);
+      font-size: .8rem;
+      pointer-events: none;
+    }
+    .lb-input {
+      width: 100%;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: .375rem;
+      color: #fff;
+      padding: .35rem .6rem .35rem 1.8rem;
+      font-size: .82rem;
+      outline: none;
+      transition: border-color .15s, background .15s;
+    }
+    .lb-input:focus {
+      border-color: rgba(255,255,255,.3);
+      background: rgba(255,255,255,.12);
+    }
+    .lb-input::placeholder { color: rgba(255,255,255,.3); }
+    .lb-clear {
+      position: absolute;
+      right: .5rem;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: rgba(255,255,255,.4);
+      cursor: pointer;
+      font-size: .75rem;
+      padding: 0;
+      display: none;
+      line-height: 1;
+    }
+    .lb-clear:hover { color: rgba(255,255,255,.8); }
+
+    /* Section labels */
+    .section-label {
+      font-size: .65rem;
+      letter-spacing: .08em;
+      color: rgba(255,255,255,.3);
+      padding: .6rem .6rem .2rem;
+      text-transform: uppercase;
+    }
+
+    /* Listbox */
+    .lb-listbox { padding: 0 .15rem; }
+
+    .lb-entry {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .32rem .55rem;
+      border-radius: .3rem;
+      cursor: pointer;
+      user-select: none;
+      outline: none;
+      transition: background .1s;
+    }
+    .lb-entry:hover  { background: rgba(255,255,255,.08); }
+    .lb-entry:focus  { background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 1px rgba(255,255,255,.2); }
+    .lb-entry.active { background: rgba(255,255,255,.14); }
+
+    /* Menu header entries */
+    .lb-menu {
+      color: rgba(255,255,255,.85);
+      font-size: .845rem;
+      font-weight: 500;
+    }
+    .lb-menu i { font-size: .85rem; width: 16px; color: rgba(255,255,255,.55); }
+
+    /* Item entries (indented) */
+    .lb-item {
+      color: rgba(255,255,255,.6);
+      font-size: .8rem;
+      padding-left: 1.4rem;
+    }
+    .lb-item i { font-size: .78rem; width: 14px; color: rgba(255,255,255,.35); }
+
+    /* "Sem resultado" */
+    .lb-no-result {
+      display: none;
+      color: rgba(255,255,255,.3);
+      font-size: .8rem;
+      padding: .4rem .6rem;
+      font-style: italic;
+    }
+
+    /* Highlight de texto no match */
+    .lb-name mark {
+      background: #ffc107;
+      color: #212529;
+      border-radius: 2px;
+      padding: 0 1px;
+      font-style: normal;
+    }
+
+    /* Favoritos na sidebar */
+    .fav-divider { border-top: 1px solid rgba(255,255,255,.07); margin: .4rem .4rem; }
+
+    .fav-pasta {
+      color: rgba(255,255,255,.5);
+      padding: .28rem .55rem .1rem;
+      font-size: .78rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .fav-pasta i { color: #ffc107; font-size: .78rem; }
+
+    .fav-item {
+      color: rgba(255,255,255,.5);
+      padding: .22rem .55rem;
+      font-size: .78rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .fav-item.indented     { padding-left: 1.6rem; }
+    .fav-item.deep-indented{ padding-left: 2.3rem; }
+    .fav-item i.fav-icon   { font-size: .72rem; color: #0d6efd; }
+    .fav-empty { color: rgba(255,255,255,.28); font-size: .78rem; padding: .22rem .55rem; }
+
+    /* Área de conteúdo */
+    .content-area { flex: 1; overflow-y: auto; background: #f8f9fa; }
+
+    /* Cards de item */
+    .item-card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: box-shadow .15s; }
+    .item-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.12); }
+    .tipo-badge { font-size: .7rem; padding: .15rem .4rem; }
+
+    /* Flash ao navegar pelo listbox para um item */
+    @keyframes card-flash {
+      0%   { box-shadow: 0 0 0 3px rgba(255,193,7,.7); }
+      70%  { box-shadow: 0 0 0 3px rgba(255,193,7,.2); }
+      100% { box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    }
+    .item-card.flash { animation: card-flash .7s ease forwards; }
+  </style>
+</head>
+<body>
+  <!-- Barra superior -->
+  <div class="top-bar">
+    <i class="bi bi-heptagon-fill text-primary"></i>
+    <span class="text-white fw-semibold small"><%= modulo.sistema.nome %></span>
+    <i class="bi bi-chevron-right" style="font-size:.7rem;color:rgba(255,255,255,.4)"></i>
+    <span class="text-white-50 small"><%= modulo.nome %></span>
+    <% if (semUsuario) { %>
+      <span class="ms-auto badge bg-warning text-dark" style="font-size:.65rem">
+        <i class="bi bi-exclamation-triangle me-1"></i>Favoritos indisponíveis
+      </span>
+    <% } %>
+  </div>
+
+  <div class="d-flex flex-grow-1" style="overflow:hidden">
+
+    <!-- ── Sidebar ─────────────────────────────────────────────────────── -->
+    <nav class="sidebar-popup">
+
+      <!-- Busca (fixa no topo) -->
+      <div class="sidebar-search">
+        <div class="lb-search-wrap">
+          <i class="bi bi-search"></i>
+          <input id="lb-input" class="lb-input" type="text"
+                 placeholder="Buscar menus e itens…"
+                 autocomplete="off"
+                 oninput="filtrarListbox(this.value)"
+                 onkeydown="navegarListbox(event)">
+          <button class="lb-clear" id="lb-clear" onclick="limparBusca()" title="Limpar">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Área scrollável: listbox + favoritos -->
+      <div class="sidebar-scroll">
+
+        <div class="section-label" style="padding-top:.4rem">Menus &amp; Itens</div>
+
+        <!-- Listbox -->
+        <div class="lb-listbox" role="listbox" aria-label="Menus e itens do módulo" id="lb-listbox">
+          <% if (modulo.menus.length === 0) { %>
+            <div class="fav-empty">Nenhum menu cadastrado</div>
+          <% } else { %>
+            <% modulo.menus.forEach(function(menu) { %>
+              <%
+                const menuNomeLower = menu.nome.toLowerCase()
+              %>
+              <!-- Menu header -->
+              <div class="lb-entry lb-menu"
+                   role="option"
+                   tabindex="0"
+                   data-type="menu"
+                   data-menu-id="<%= menu.id %>"
+                   data-name="<%= menuNomeLower %>"
+                   onclick="ativarMenu('<%= menu.id %>', this)"
+                   onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();ativarMenu('<%= menu.id %>',this)}">
+                <i class="bi bi-<%= menu.icone || 'layout-text-sidebar' %>"></i>
+                <span class="lb-name" data-orig="<%= menu.nome %>"><%= menu.nome %></span>
+              </div>
+
+              <!-- Items do menu -->
+              <% menu.itens.forEach(function(item) { %>
+                <%
+                  const itemNomeLower = item.nome.toLowerCase()
+                %>
+                <div class="lb-entry lb-item"
+                     role="option"
+                     tabindex="0"
+                     data-type="item"
+                     data-menu-id="<%= menu.id %>"
+                     data-item-id="<%= item.id %>"
+                     data-name="<%= itemNomeLower %>"
+                     onclick="ativarItem('<%= menu.id %>', '<%= item.id %>', this)"
+                     onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();ativarItem('<%= menu.id %>','<%= item.id %>',this)}">
+                  <i class="bi bi-<%= item.icone || 'dot' %>"></i>
+                  <span class="lb-name" data-orig="<%= item.nome %>"><%= item.nome %></span>
+                </div>
+              <% }) %>
+            <% }) %>
+          <% } %>
+        </div>
+
+        <!-- Sem resultado -->
+        <div class="lb-no-result" id="lb-no-result">Nenhum resultado encontrado.</div>
+
+        <!-- Favoritos: relatórios -->
+        <% if (pastas.length > 0 || favoritosRaiz.length > 0) { %>
+          <div class="fav-divider mt-1"></div>
+          <div class="section-label">Relatórios Favoritos</div>
+          <% favoritosRaiz.forEach(function(fav) { %>
+            <div class="fav-item">
+              <i class="bi bi-bookmark-fill fav-icon"></i>
+              <%= fav.relatorioFixo ? fav.relatorioFixo.nome : (fav.relatorioPersonalizado ? fav.relatorioPersonalizado.nome : '—') %>
+            </div>
+          <% }) %>
+          <% pastas.forEach(function(pasta) { %>
+            <div class="fav-pasta"><i class="bi bi-folder-fill"></i><%= pasta.nome %></div>
+            <% pasta.favoritos.forEach(function(fav) { %>
+              <div class="fav-item indented">
+                <i class="bi bi-bookmark-fill fav-icon"></i>
+                <%= fav.relatorioFixo ? fav.relatorioFixo.nome : (fav.relatorioPersonalizado ? fav.relatorioPersonalizado.nome : '—') %>
+              </div>
+            <% }) %>
+            <% if (pasta.subPastas) { pasta.subPastas.forEach(function(sub) { %>
+              <div class="fav-pasta" style="padding-left:1.5rem"><i class="bi bi-folder-fill"></i><%= sub.nome %></div>
+              <% sub.favoritos.forEach(function(fav) { %>
+                <div class="fav-item deep-indented">
+                  <i class="bi bi-bookmark-fill fav-icon"></i>
+                  <%= fav.relatorioFixo ? fav.relatorioFixo.nome : (fav.relatorioPersonalizado ? fav.relatorioPersonalizado.nome : '—') %>
+                </div>
+              <% }) %>
+            <% }) } %>
+          <% }) %>
+        <% } %>
+
+      </div><!-- /sidebar-scroll -->
+    </nav>
+
+    <!-- ── Área de conteúdo ───────────────────────────────────────────── -->
+    <main class="content-area p-4">
+
+      <div id="bem-vindo" class="text-center pt-4 mt-2">
+        <i class="bi bi-menu-button-wide text-secondary" style="font-size:3.5rem;opacity:.25"></i>
+        <p class="text-muted mt-3 small">Selecione um menu no painel à esquerda.</p>
+      </div>
+
+      <% modulo.menus.forEach(function(menu) { %>
+        <div id="painel-menu-<%= menu.id %>" style="display:none">
+          <h6 class="fw-semibold mb-3 d-flex align-items-center gap-2">
+            <i class="bi bi-<%= menu.icone || 'list' %> text-primary"></i>
+            <%= menu.nome %>
+          </h6>
+
+          <% if (menu.itens.length === 0) { %>
+            <p class="text-muted small">Nenhum item cadastrado neste menu.</p>
+          <% } else { %>
+            <div class="row g-3">
+              <% menu.itens.forEach(function(item) { %>
+                <div class="col-sm-6 col-lg-4">
+                  <div class="card item-card h-100" data-card-item-id="<%= item.id %>">
+                    <div class="card-body p-3">
+                      <div class="d-flex align-items-start gap-2 mb-2">
+                        <div class="rounded p-1 flex-shrink-0" style="background:#e7f1ff">
+                          <i class="bi bi-<%= item.icone || 'grid' %> text-primary" style="font-size:.9rem"></i>
+                        </div>
+                        <span class="fw-semibold small lh-tight flex-grow-1"><%= item.nome %></span>
+                      </div>
+                      <% if (item.descricao) { %>
+                        <p class="text-muted mb-2" style="font-size:.78rem"><%= item.descricao %></p>
+                      <% } %>
+                      <div class="d-flex align-items-center gap-1 flex-wrap">
+                        <span class="badge bg-secondary bg-opacity-50 tipo-badge"><%= item.tipo %></span>
+                        <% if (item.tipoFuncionalidade) { %>
+                          <span class="badge bg-primary bg-opacity-25 text-primary tipo-badge"><%= item.tipoFuncionalidade %></span>
+                        <% } %>
+                      </div>
+                      <% if (item.subItens && item.subItens.length > 0) { %>
+                        <ul class="list-unstyled mt-2 mb-0">
+                          <% item.subItens.forEach(function(sub) { %>
+                            <li class="d-flex align-items-center gap-1" style="font-size:.78rem;color:#6c757d">
+                              <i class="bi bi-arrow-return-right"></i><%= sub.nome %>
+                            </li>
+                          <% }) %>
+                        </ul>
+                      <% } %>
+                    </div>
+                  </div>
+                </div>
+              <% }) %>
+            </div>
+          <% } %>
+        </div>
+      <% }) %>
+
+    </main>
+  </div>
+
+  <script>
+    // ── Navegação de menus ────────────────────────────────────────────────
+    function ativarMenu(menuId, el) {
+      document.querySelectorAll('.lb-entry').forEach(e => e.classList.remove('active'))
+      if (el) el.classList.add('active')
+      document.getElementById('bem-vindo').style.display = 'none'
+      document.querySelectorAll('[id^="painel-menu-"]').forEach(p => p.style.display = 'none')
+      document.getElementById('painel-menu-' + menuId).style.display = ''
+    }
+
+    function ativarItem(menuId, itemId, el) {
+      ativarMenu(menuId, el)
+      // Scroll + flash no card
+      const card = document.querySelector('[data-card-item-id="' + itemId + '"]')
+      if (!card) return
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      card.classList.remove('flash')
+      // Força reflow para reiniciar a animação
+      void card.offsetWidth
+      card.classList.add('flash')
+      setTimeout(() => card.classList.remove('flash'), 750)
+    }
+
+    // ── Busca no listbox ──────────────────────────────────────────────────
+    function filtrarListbox(valor) {
+      const q = valor.trim().toLowerCase()
+      const clearBtn = document.getElementById('lb-clear')
+      clearBtn.style.display = q ? '' : 'none'
+
+      const entries = document.querySelectorAll('.lb-entry')
+
+      if (!q) {
+        entries.forEach(e => {
+          e.style.display = ''
+          const ns = e.querySelector('.lb-name')
+          if (ns) ns.textContent = ns.dataset.orig
+        })
+        document.getElementById('lb-no-result').style.display = 'none'
+        return
+      }
+
+      // Quais menus têm ao menos um item filho com match
+      const menusComFilho = new Set()
+      document.querySelectorAll('.lb-entry[data-type="item"]').forEach(e => {
+        if ((e.dataset.name || '').includes(q)) menusComFilho.add(e.dataset.menuId)
+      })
+
+      let algum = false
+      entries.forEach(e => {
+        const name = e.dataset.name || ''
+        const match = name.includes(q)
+        const isMenuAncestor = e.dataset.type === 'menu' && menusComFilho.has(e.dataset.menuId)
+        const visivel = match || isMenuAncestor
+
+        e.style.display = visivel ? '' : 'none'
+        if (visivel) {
+          algum = true
+          const ns = e.querySelector('.lb-name')
+          if (ns) {
+            if (match) renderHighlight(ns, ns.dataset.orig, q)
+            else ns.textContent = ns.dataset.orig
+          }
+        }
+      })
+
+      document.getElementById('lb-no-result').style.display = algum ? 'none' : ''
+    }
+
+    function limparBusca() {
+      const input = document.getElementById('lb-input')
+      input.value = ''
+      filtrarListbox('')
+      input.focus()
+    }
+
+    // ── Navegação por teclado no listbox ─────────────────────────────────
+    function navegarListbox(e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      e.preventDefault()
+      const visiveis = [...document.querySelectorAll('.lb-entry')].filter(el => el.style.display !== 'none')
+      if (!visiveis.length) return
+      // Foca o primeiro entry ao pressionar ArrowDown no input
+      visiveis[0].focus()
+    }
+
+    document.getElementById('lb-listbox').addEventListener('keydown', function(e) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      e.preventDefault()
+      const visiveis = [...document.querySelectorAll('.lb-entry')].filter(el => el.style.display !== 'none')
+      const idx = visiveis.indexOf(document.activeElement)
+      const proximo = visiveis[idx + (e.key === 'ArrowDown' ? 1 : -1)]
+      if (proximo) proximo.focus()
+      else if (e.key === 'ArrowUp' && idx === 0) document.getElementById('lb-input').focus()
+    })
+
+    // ── Highlight de texto ────────────────────────────────────────────────
+    function renderHighlight(span, texto, query) {
+      const idx = texto.toLowerCase().indexOf(query.toLowerCase())
+      while (span.firstChild) span.removeChild(span.firstChild)
+      if (idx === -1) {
+        span.appendChild(document.createTextNode(texto))
+        return
+      }
+      span.appendChild(document.createTextNode(texto.slice(0, idx)))
+      const mark = document.createElement('mark')
+      mark.textContent = texto.slice(idx, idx + query.length)
+      span.appendChild(mark)
+      span.appendChild(document.createTextNode(texto.slice(idx + query.length)))
+    }
+  </script>
+</body>
+</html>
