@@ -75,6 +75,7 @@ model ItemFuncionalidade {
   referencia         ItemFuncionalidade?  @relation("Atalhos", fields: [referenciaId], references: [id])
   atalhos            ItemFuncionalidade[] @relation("Atalhos")
   permissoes         PermissaoAcesso[]
+  favoritos          FavoritoItem[]
 
   @@map("itens_funcionalidade")
 }
@@ -100,6 +101,7 @@ model Usuario {
   adminSistemas            AdminSistema[]
   codigosValidacao         CodigoValidacao[]
   favoritos                FavoritoRelatorio[]
+  favoritosItem            FavoritoItem[]
   lixeira                  Lixeira[]
   pastas                   PastaFavorito[]
   permissoes               PermissaoAcesso[]
@@ -216,6 +218,18 @@ model PastaFavorito {
   usuario   Usuario             @relation(fields: [usuarioId], references: [id])
 
   @@map("pastas_favorito")
+}
+
+model FavoritoItem {
+  id        String             @id @default(uuid())
+  criadoEm  DateTime           @default(now())
+  usuarioId String
+  itemId    String
+  item      ItemFuncionalidade @relation(fields: [itemId], references: [id])
+  usuario   Usuario            @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, itemId])
+  @@map("favoritos_item")
 }
 
 model FavoritoRelatorio {

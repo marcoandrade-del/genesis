@@ -50,7 +50,7 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
       relatorioPersonalizado: { select: { nome: true } },
     }
 
-    const [pastas, favoritosRaiz] = await (usuario
+    const [pastas, favoritosRaiz, favItemRows] = await (usuario
       ? Promise.all([
           app.prisma.pastaFavorito.findMany({
             where: { usuarioId: usuario.id, parentId: null },
@@ -68,14 +68,64 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
             include: relFav,
             orderBy: { ordem: 'asc' },
           }),
+          app.prisma.favoritoItem.findMany({
+            where: {
+              usuarioId: usuario.id,
+              item: { menu: { moduloId: modulo.id } },
+            },
+            select: {
+              itemId: true,
+              item: {
+                select: {
+                  id: true,
+                  nome: true,
+                  icone: true,
+                  menu: { select: { nome: true } },
+                },
+              },
+            },
+            orderBy: { criadoEm: 'asc' },
+          }),
         ])
-      : Promise.resolve([[], []]))
+      : Promise.resolve([[], [], []]))
+
+    const favItemIds = favItemRows.map((f) => f.itemId)
+    const favItens = favItemRows.map((f) => ({
+      id: f.item.id,
+      nome: f.item.nome,
+      icone: f.item.icone,
+      menuNome: f.item.menu.nome,
+    }))
 
     return reply.view('funcionando/popup-modulo', {
       modulo,
       pastas,
       favoritosRaiz,
+      favItemIds,
+      favItens,
       semUsuario: !usuario,
     })
+  })
+
+  // Toggle favorito de item — retorna JSON { favoritado, itemId }
+  app.post<{ Params: { itemId: string } }>('/favorito/:itemId/toggle', async (req, reply) => {
+    const usuario = await app.prisma.usuario.findUnique({
+      where: { emailPrincipal: req.user.email },
+      select: { id: true },
+    })
+    if (!usuario) return reply.status(403).send({ erro: 'Usuário não vinculado a este sistema.' })
+
+    const where = { usuarioId_itemId: { usuarioId: usuario.id, itemId: req.params.itemId } }
+    const existing = await app.prisma.favoritoItem.findUnique({ where })
+
+    if (existing) {
+      await app.prisma.favoritoItem.delete({ where })
+      return reply.send({ favoritado: false, itemId: req.params.itemId })
+    }
+
+    await app.prisma.favoritoItem.create({
+      data: { usuarioId: usuario.id, itemId: req.params.itemId },
+    })
+    return reply.send({ favoritado: true, itemId: req.params.itemId })
   })
 }

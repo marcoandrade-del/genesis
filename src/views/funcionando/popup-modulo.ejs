@@ -173,8 +173,49 @@
     .fav-item i.fav-icon   { font-size: .72rem; color: #0d6efd; }
     .fav-empty { color: rgba(255,255,255,.28); font-size: .78rem; padding: .22rem .55rem; }
 
+    .fav-item-sidebar {
+      color: rgba(255,255,255,.6);
+      padding: .22rem .55rem;
+      font-size: .78rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .fav-item-sidebar .menu-label {
+      font-size: .65rem;
+      color: rgba(255,255,255,.28);
+      margin-left: auto;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 65px;
+    }
+    #lista-fav-itens:empty::after {
+      content: 'Nenhum item favoritado';
+      display: block;
+      color: rgba(255,255,255,.28);
+      font-size: .78rem;
+      padding: .22rem .55rem;
+    }
+
     /* Área de conteúdo */
     .content-area { flex: 1; overflow-y: auto; background: #f8f9fa; }
+
+    /* Estrela de favorito nos cards */
+    .btn-star {
+      background: none;
+      border: none;
+      padding: 2px 4px;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      color: #adb5bd;
+      transition: color .15s, transform .1s;
+      flex-shrink: 0;
+    }
+    .btn-star:hover        { color: #ffc107; transform: scale(1.15); }
+    .btn-star.favoritado   { color: #ffc107; }
+    .btn-star.loading      { pointer-events: none; opacity: .5; }
 
     /* Cards de item */
     .item-card { border: 0; box-shadow: 0 1px 3px rgba(0,0,0,.08); transition: box-shadow .15s; }
@@ -194,9 +235,15 @@
   <!-- Barra superior -->
   <div class="top-bar">
     <i class="bi bi-heptagon-fill text-primary"></i>
-    <span class="text-white fw-semibold small"><%= modulo.sistema.nome %></span>
-    <i class="bi bi-chevron-right" style="font-size:.7rem;color:rgba(255,255,255,.4)"></i>
-    <span class="text-white-50 small"><%= modulo.nome %></span>
+    <nav aria-label="breadcrumb" style="display:flex;align-items:center">
+      <ol class="breadcrumb mb-0 small"
+          style="--bs-breadcrumb-divider-color: rgba(255,255,255,.4); --bs-breadcrumb-item-padding-x: .35rem">
+        <li class="breadcrumb-item text-white fw-semibold"><%= modulo.sistema.nome %></li>
+        <li class="breadcrumb-item text-white-50" id="bc-modulo"><%= modulo.nome %></li>
+        <li class="breadcrumb-item text-white-50" id="bc-menu" style="display:none"></li>
+        <li class="breadcrumb-item text-white" id="bc-item" style="display:none" aria-current="page"></li>
+      </ol>
+    </nav>
     <% if (semUsuario) { %>
       <span class="ms-auto badge bg-warning text-dark" style="font-size:.65rem">
         <i class="bi bi-exclamation-triangle me-1"></i>Favoritos indisponíveis
@@ -276,6 +323,21 @@
         <!-- Sem resultado -->
         <div class="lb-no-result" id="lb-no-result">Nenhum resultado encontrado.</div>
 
+        <!-- Favoritos: itens -->
+        <div class="fav-divider mt-1"></div>
+        <div class="section-label">
+          <i class="bi bi-star-fill me-1" style="color:#ffc107;font-size:.65rem"></i>Itens Favoritos
+        </div>
+        <div id="lista-fav-itens">
+          <% favItens.forEach(function(fi) { %>
+            <div class="fav-item-sidebar" id="sidebar-fav-<%= fi.id %>">
+              <i class="bi bi-<%= fi.icone || 'grid' %>" style="font-size:.78rem;color:#ffc107;flex-shrink:0"></i>
+              <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= fi.nome %></span>
+              <span class="menu-label" title="<%= fi.menuNome %>"><%= fi.menuNome %></span>
+            </div>
+          <% }) %>
+        </div>
+
         <!-- Favoritos: relatórios -->
         <% if (pastas.length > 0 || favoritosRaiz.length > 0) { %>
           <div class="fav-divider mt-1"></div>
@@ -337,6 +399,18 @@
                           <i class="bi bi-<%= item.icone || 'grid' %> text-primary" style="font-size:.9rem"></i>
                         </div>
                         <span class="fw-semibold small lh-tight flex-grow-1"><%= item.nome %></span>
+                        <% if (!semUsuario) { %>
+                          <button
+                            class="btn-star<%= favItemIds.includes(item.id) ? ' favoritado' : '' %>"
+                            data-item-id="<%= item.id %>"
+                            data-item-nome="<%= item.nome %>"
+                            data-item-icone="<%= item.icone || '' %>"
+                            data-menu-nome="<%= menu.nome %>"
+                            onclick="toggleFavorito(this)"
+                            title="<%= favItemIds.includes(item.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos' %>">
+                            <i class="bi bi-<%= favItemIds.includes(item.id) ? 'star-fill' : 'star' %>"></i>
+                          </button>
+                        <% } %>
                       </div>
                       <% if (item.descricao) { %>
                         <p class="text-muted mb-2" style="font-size:.78rem"><%= item.descricao %></p>
@@ -369,6 +443,25 @@
   </div>
 
   <script>
+    // ── Breadcrumb dinâmico ───────────────────────────────────────────────
+    function _bcSetMenu(menuId) {
+      const nameEl = document.querySelector('.lb-menu[data-menu-id="' + menuId + '"] .lb-name')
+      const bc = document.getElementById('bc-menu')
+      if (!nameEl) return
+      bc.textContent = nameEl.dataset.orig
+      bc.style.display = ''
+    }
+    function _bcSetItem(name) {
+      const bc = document.getElementById('bc-item')
+      bc.textContent = name
+      bc.style.display = ''
+    }
+    function _bcClearItem() {
+      const bc = document.getElementById('bc-item')
+      bc.textContent = ''
+      bc.style.display = 'none'
+    }
+
     // ── Navegação de menus ────────────────────────────────────────────────
     function ativarMenu(menuId, el) {
       document.querySelectorAll('.lb-entry').forEach(e => e.classList.remove('active'))
@@ -376,10 +469,14 @@
       document.getElementById('bem-vindo').style.display = 'none'
       document.querySelectorAll('[id^="painel-menu-"]').forEach(p => p.style.display = 'none')
       document.getElementById('painel-menu-' + menuId).style.display = ''
+      _bcSetMenu(menuId)
+      _bcClearItem()
     }
 
     function ativarItem(menuId, itemId, el) {
       ativarMenu(menuId, el)
+      const nameEl = el && el.querySelector('.lb-name')
+      if (nameEl) _bcSetItem(nameEl.dataset.orig)
       // Scroll + flash no card
       const card = document.querySelector('[data-card-item-id="' + itemId + '"]')
       if (!card) return
@@ -476,6 +573,58 @@
       mark.textContent = texto.slice(idx, idx + query.length)
       span.appendChild(mark)
       span.appendChild(document.createTextNode(texto.slice(idx + query.length)))
+    }
+
+    // ── Favorito de item ──────────────────────────────────────────────────
+    async function toggleFavorito(btn) {
+      btn.classList.add('loading')
+      const itemId   = btn.dataset.itemId
+      const itemNome = btn.dataset.itemNome
+      const icone    = btn.dataset.itemIcone || 'grid'
+      const menuNome = btn.dataset.menuNome
+
+      try {
+        const res = await fetch('/admin/funcionando/favorito/' + itemId + '/toggle', { method: 'POST' })
+        if (!res.ok) throw new Error()
+        const { favoritado } = await res.json()
+
+        btn.classList.toggle('favoritado', favoritado)
+        btn.querySelector('i').className = favoritado ? 'bi bi-star-fill' : 'bi bi-star'
+        btn.title = favoritado ? 'Remover dos favoritos' : 'Adicionar aos favoritos'
+
+        const lista    = document.getElementById('lista-fav-itens')
+        const existing = document.getElementById('sidebar-fav-' + itemId)
+
+        if (favoritado && !existing) {
+          const row = document.createElement('div')
+          row.className = 'fav-item-sidebar'
+          row.id = 'sidebar-fav-' + itemId
+
+          const ico = document.createElement('i')
+          ico.className = 'bi bi-' + icone
+          ico.style.cssText = 'font-size:.78rem;color:#ffc107;flex-shrink:0'
+
+          const label = document.createElement('span')
+          label.style.cssText = 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap'
+          label.textContent = itemNome
+
+          const tag = document.createElement('span')
+          tag.className = 'menu-label'
+          tag.title = menuNome
+          tag.textContent = menuNome
+
+          row.appendChild(ico)
+          row.appendChild(label)
+          row.appendChild(tag)
+          lista.appendChild(row)
+        } else if (!favoritado && existing) {
+          existing.remove()
+        }
+      } catch {
+        alert('Erro ao atualizar favorito. Tente novamente.')
+      } finally {
+        btn.classList.remove('loading')
+      }
     }
   </script>
 </body>

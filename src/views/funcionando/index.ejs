@@ -122,11 +122,16 @@
 <body>
   <!-- Navbar -->
   <nav class="navbar navbar-dark bg-dark px-3 py-0 flex-shrink-0" style="height:56px">
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-3">
       <a class="navbar-brand fw-bold fs-6 mb-0" href="/admin">
         <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
       </a>
-      <span class="text-white-50 small">/ Funcionamento</span>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0 small" style="--bs-breadcrumb-divider-color: rgba(255,255,255,.35)">
+          <li class="breadcrumb-item"><a href="/admin" class="text-white-50 text-decoration-none">Admin</a></li>
+          <li class="breadcrumb-item active text-white" aria-current="page">Funcionamento</li>
+        </ol>
+      </nav>
     </div>
     <div class="d-flex align-items-center gap-3">
       <span class="text-white-50 small d-none d-md-inline"><%= userEmail %></span>
