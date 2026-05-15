@@ -93,6 +93,27 @@
   </nav>
 
   <main class="main-content flex-grow-1 p-4 overflow-auto">
+    <%
+      const _bcLabels = {
+        sistemas: 'Sistemas',
+        modulos: 'Módulos',
+        menus: 'Menus & Itens',
+        usuarios: 'Usuários',
+        permissoes: 'Permissões',
+        relatorios: 'Relatórios Fixos',
+        'relatorios-personalizados': 'Relatórios Personalizados',
+        favoritos: 'Favoritos',
+        lixeira: 'Lixeira',
+      }
+    %>
+    <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb small">
+          <li class="breadcrumb-item"><a href="/admin" class="text-decoration-none">Admin</a></li>
+          <li class="breadcrumb-item active" aria-current="page"><%= _bcLabels[active] %></li>
+        </ol>
+      </nav>
+    <% } %>
     <%- body %>
   </main>
 </div>

@@ -229,6 +229,17 @@
       100% { box-shadow: 0 1px 3px rgba(0,0,0,.08); }
     }
     .item-card.flash { animation: card-flash .7s ease forwards; }
+
+    /* Sub-itens dentro do card — clicáveis */
+    .sub-item-row {
+      font-size: .78rem;
+      color: #6c757d;
+      padding: .15rem .35rem;
+      border-radius: .25rem;
+      cursor: pointer;
+      transition: background .12s, color .12s;
+    }
+    .sub-item-row:hover { background: rgba(13,110,253,.08); color: #0a58ca; }
   </style>
 </head>
 <body>
@@ -241,7 +252,8 @@
         <li class="breadcrumb-item text-white fw-semibold"><%= modulo.sistema.nome %></li>
         <li class="breadcrumb-item text-white-50" id="bc-modulo"><%= modulo.nome %></li>
         <li class="breadcrumb-item text-white-50" id="bc-menu" style="display:none"></li>
-        <li class="breadcrumb-item text-white" id="bc-item" style="display:none" aria-current="page"></li>
+        <li class="breadcrumb-item text-white-50" id="bc-item" style="display:none"></li>
+        <li class="breadcrumb-item text-white" id="bc-subitem" style="display:none" aria-current="page"></li>
       </ol>
     </nav>
     <% if (semUsuario) { %>
@@ -424,7 +436,12 @@
                       <% if (item.subItens && item.subItens.length > 0) { %>
                         <ul class="list-unstyled mt-2 mb-0">
                           <% item.subItens.forEach(function(sub) { %>
-                            <li class="d-flex align-items-center gap-1" style="font-size:.78rem;color:#6c757d">
+                            <li class="sub-item-row d-flex align-items-center gap-1"
+                                data-menu-id="<%= menu.id %>"
+                                data-parent-id="<%= item.id %>"
+                                data-parent-nome="<%= item.nome %>"
+                                data-sub-nome="<%= sub.nome %>"
+                                onclick="ativarSubItemDataset(this)">
                               <i class="bi bi-arrow-return-right"></i><%= sub.nome %>
                             </li>
                           <% }) %>
@@ -461,6 +478,16 @@
       bc.textContent = ''
       bc.style.display = 'none'
     }
+    function _bcSetSubItem(name) {
+      const bc = document.getElementById('bc-subitem')
+      bc.textContent = name
+      bc.style.display = ''
+    }
+    function _bcClearSubItem() {
+      const bc = document.getElementById('bc-subitem')
+      bc.textContent = ''
+      bc.style.display = 'none'
+    }
 
     // ── Navegação de menus ────────────────────────────────────────────────
     function ativarMenu(menuId, el) {
@@ -471,6 +498,7 @@
       document.getElementById('painel-menu-' + menuId).style.display = ''
       _bcSetMenu(menuId)
       _bcClearItem()
+      _bcClearSubItem()
     }
 
     function ativarItem(menuId, itemId, el) {
@@ -486,6 +514,15 @@
       void card.offsetWidth
       card.classList.add('flash')
       setTimeout(() => card.classList.remove('flash'), 750)
+    }
+
+    function ativarSubItemDataset(li) {
+      const d = li.dataset
+      ativarMenu(d.menuId, null)
+      _bcSetItem(d.parentNome)
+      _bcSetSubItem(d.subNome)
+      const card = document.querySelector('[data-card-item-id="' + d.parentId + '"]')
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
 
     // ── Busca no listbox ──────────────────────────────────────────────────
