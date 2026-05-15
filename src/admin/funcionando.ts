@@ -71,7 +71,7 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
           app.prisma.favoritoItem.findMany({
             where: {
               usuarioId: usuario.id,
-              item: { menu: { moduloId: modulo.id } },
+              item: { menu: { modulo: { sistemaId: modulo.sistemaId } } },
             },
             select: {
               itemId: true,
@@ -80,7 +80,12 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
                   id: true,
                   nome: true,
                   icone: true,
-                  menu: { select: { nome: true } },
+                  menu: {
+                    select: {
+                      nome: true,
+                      modulo: { select: { nome: true } },
+                    },
+                  },
                 },
               },
             },
@@ -95,6 +100,7 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
       nome: f.item.nome,
       icone: f.item.icone,
       menuNome: f.item.menu.nome,
+      moduloNome: f.item.menu.modulo.nome,
     }))
 
     return reply.view('funcionando/popup-modulo', {

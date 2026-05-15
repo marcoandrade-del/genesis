@@ -370,7 +370,7 @@
             <div class="fav-item-sidebar" id="sidebar-fav-<%= fi.id %>">
               <i class="bi bi-<%= fi.icone || 'grid' %>" style="font-size:.78rem;color:#ffc107;flex-shrink:0"></i>
               <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= fi.nome %></span>
-              <span class="menu-label" title="<%= fi.menuNome %>"><%= fi.menuNome %></span>
+              <span class="menu-label" title="<%= fi.moduloNome %> › <%= fi.menuNome %>"><%= fi.moduloNome %></span>
             </div>
           <% }) %>
         </div>
@@ -443,6 +443,7 @@
                             data-item-nome="<%= item.nome %>"
                             data-item-icone="<%= item.icone || '' %>"
                             data-menu-nome="<%= menu.nome %>"
+                            data-modulo-nome="<%= modulo.nome %>"
                             onclick="toggleFavorito(this)"
                             title="<%= favItemIds.includes(item.id) ? 'Remover dos favoritos' : 'Adicionar aos favoritos' %>">
                             <i class="bi bi-<%= favItemIds.includes(item.id) ? 'star-fill' : 'star' %>"></i>
@@ -670,10 +671,11 @@
     // ── Favorito de item ──────────────────────────────────────────────────
     async function toggleFavorito(btn) {
       btn.classList.add('loading')
-      const itemId   = btn.dataset.itemId
-      const itemNome = btn.dataset.itemNome
-      const icone    = btn.dataset.itemIcone || 'grid'
-      const menuNome = btn.dataset.menuNome
+      const itemId     = btn.dataset.itemId
+      const itemNome   = btn.dataset.itemNome
+      const icone      = btn.dataset.itemIcone || 'grid'
+      const menuNome   = btn.dataset.menuNome
+      const moduloNome = btn.dataset.moduloNome
 
       try {
         const res = await fetch('/admin/funcionando/favorito/' + itemId + '/toggle', { method: 'POST' })
@@ -702,8 +704,8 @@
 
           const tag = document.createElement('span')
           tag.className = 'menu-label'
-          tag.title = menuNome
-          tag.textContent = menuNome
+          tag.title = moduloNome + ' › ' + menuNome
+          tag.textContent = moduloNome
 
           row.appendChild(ico)
           row.appendChild(label)
