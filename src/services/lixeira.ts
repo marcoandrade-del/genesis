@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
+import type { TipoItem, TipoFuncionalidade } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
 type AdminSnapshot = {
@@ -85,10 +86,10 @@ export class LixeiraService {
     })
   }
 
-  private async _restaurarSistema(tx: any, s: SistemaSnapshot) {
+  private async _restaurarSistema(tx: Prisma.TransactionClient, s: SistemaSnapshot) {
     const existe = await tx.sistema.findUnique({ where: { id: s.id } })
     if (existe) throw new ErroNegocio('CONFLITO', `Sistema "${s.nome}" já existe. Renomeie antes de restaurar.`)
-    await tx.sistema.create({ data: { id: s.id, nome: s.nome, descricao: s.descricao, ativo: s.ativo } })
+    await tx.sistema.create({ data: { id: s.id, nome: s.nome, descricao: s.descricao ?? null, ativo: s.ativo } })
     for (const a of s.admins ?? []) {
       const usuario = await tx.usuario.findUnique({ where: { id: a.usuarioId }, select: { id: true } })
       if (usuario) {
@@ -102,12 +103,12 @@ export class LixeiraService {
     for (const m of s.modulos) await this._restaurarModulo(tx, m)
   }
 
-  private async _restaurarModulo(tx: any, m: ModuloSnapshot) {
+  private async _restaurarModulo(tx: Prisma.TransactionClient, m: ModuloSnapshot) {
     const sistema = await tx.sistema.findUnique({ where: { id: m.sistemaId } })
     if (!sistema) throw new ErroNegocio('CONFLITO', `Sistema pai não encontrado. Restaure o sistema "${m.sistemaId}" primeiro.`)
     const existe = await tx.modulo.findUnique({ where: { id: m.id } })
     if (existe) throw new ErroNegocio('CONFLITO', `Módulo "${m.nome}" já existe.`)
-    await tx.modulo.create({ data: { id: m.id, nome: m.nome, descricao: m.descricao, ativo: m.ativo, ordem: m.ordem, sistemaId: m.sistemaId } })
+    await tx.modulo.create({ data: { id: m.id, nome: m.nome, descricao: m.descricao ?? null, ativo: m.ativo, ordem: m.ordem, sistemaId: m.sistemaId } })
     for (const a of m.admins ?? []) {
       const usuario = await tx.usuario.findUnique({ where: { id: a.usuarioId }, select: { id: true } })
       if (usuario) {
@@ -121,16 +122,16 @@ export class LixeiraService {
     for (const menu of m.menus) await this._restaurarMenu(tx, menu)
   }
 
-  private async _restaurarMenu(tx: any, menu: MenuSnapshot) {
+  private async _restaurarMenu(tx: Prisma.TransactionClient, menu: MenuSnapshot) {
     const modulo = await tx.modulo.findUnique({ where: { id: menu.moduloId } })
     if (!modulo) throw new ErroNegocio('CONFLITO', `Módulo pai não encontrado. Restaure o módulo primeiro.`)
     const existe = await tx.menu.findUnique({ where: { id: menu.id } })
     if (existe) throw new ErroNegocio('CONFLITO', `Menu "${menu.nome}" já existe.`)
-    await tx.menu.create({ data: { id: menu.id, nome: menu.nome, icone: menu.icone, ordem: menu.ordem, ativo: menu.ativo, moduloId: menu.moduloId } })
+    await tx.menu.create({ data: { id: menu.id, nome: menu.nome, icone: menu.icone ?? null, ordem: menu.ordem, ativo: menu.ativo, moduloId: menu.moduloId } })
     for (const item of menu.itens) await this._restaurarItemRecursivo(tx, item)
   }
 
-  private async _restaurarItem(tx: any, item: ItemSnapshot) {
+  private async _restaurarItem(tx: Prisma.TransactionClient, item: ItemSnapshot) {
     const menu = await tx.menu.findUnique({ where: { id: item.menuId } })
     if (!menu) throw new ErroNegocio('CONFLITO', 'Menu pai não encontrado. Restaure o menu primeiro.')
     if (item.parentId) {
@@ -140,14 +141,22 @@ export class LixeiraService {
     await this._restaurarItemRecursivo(tx, item)
   }
 
-  private async _restaurarItemRecursivo(tx: any, item: ItemSnapshot) {
+  private async _restaurarItemRecursivo(tx: Prisma.TransactionClient, item: ItemSnapshot) {
     const existe = await tx.itemFuncionalidade.findUnique({ where: { id: item.id } })
     if (!existe) {
+      if (item.tipo !== 'FUNCIONALIDADE' && item.tipo !== 'SUBMENU') {
+        throw new ErroNegocio('CONFLITO', `Snapshot inválido: tipo="${item.tipo}" não reconhecido.`)
+      }
+      const tipoFunc = item.tipoFuncionalidade ?? null
+      if (tipoFunc !== null && tipoFunc !== 'CRUD' && tipoFunc !== 'TELA' && tipoFunc !== 'RELATORIO') {
+        throw new ErroNegocio('CONFLITO', `Snapshot inválido: tipoFuncionalidade="${tipoFunc}" não reconhecido.`)
+      }
       await tx.itemFuncionalidade.create({
         data: {
-          id: item.id, nome: item.nome, descricao: item.descricao, tipo: item.tipo as any,
-          tipoFuncionalidade: item.tipoFuncionalidade as any ?? null,
-          rota: item.rota, icone: item.icone, ordem: item.ordem, ativo: item.ativo,
+          id: item.id, nome: item.nome, descricao: item.descricao ?? null,
+          tipo: item.tipo as TipoItem,
+          tipoFuncionalidade: tipoFunc as TipoFuncionalidade | null,
+          rota: item.rota ?? null, icone: item.icone ?? null, ordem: item.ordem, ativo: item.ativo,
           menuId: item.menuId, parentId: item.parentId ?? null,
         },
       })
@@ -155,7 +164,7 @@ export class LixeiraService {
     for (const sub of item.subItens ?? []) await this._restaurarItemRecursivo(tx, sub)
   }
 
-  async salvarSistema(sistemaId: string, usuarioId: string, tx?: any) {
+  async salvarSistema(sistemaId: string, usuarioId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma
     const sistema = await db.sistema.findUnique({
       where: { id: sistemaId },
@@ -184,7 +193,7 @@ export class LixeiraService {
     })
   }
 
-  async salvarModulo(moduloId: string, usuarioId: string, tx?: any) {
+  async salvarModulo(moduloId: string, usuarioId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma
     const modulo = await db.modulo.findUnique({
       where: { id: moduloId },
@@ -206,7 +215,7 @@ export class LixeiraService {
     })
   }
 
-  async salvarMenu(menuId: string, usuarioId: string, tx?: any) {
+  async salvarMenu(menuId: string, usuarioId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma
     const menu = await db.menu.findUnique({
       where: { id: menuId },
@@ -223,7 +232,7 @@ export class LixeiraService {
     })
   }
 
-  async salvarItem(itemId: string, usuarioId: string, tx?: any) {
+  async salvarItem(itemId: string, usuarioId: string, tx?: Prisma.TransactionClient) {
     const db = tx ?? this.prisma
     const item = await db.itemFuncionalidade.findUnique({
       where: { id: itemId },
