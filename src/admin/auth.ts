@@ -151,10 +151,16 @@ export async function adminAuthRoutes(app: FastifyInstance) {
       })
     }
 
-    const token = app.jwt.sign({ sub: usuario.id, email: usuario.emailPrincipal })
+    const token = app.jwt.sign({ sub: usuario.id, email: usuario.emailPrincipal }, { expiresIn: '8h' })
 
     return reply
-      .cookie('genesis_admin_token', token, { httpOnly: true, path: '/', maxAge: 60 * 60 * 8 })
+      .cookie('genesis_admin_token', token, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 60 * 8,
+        sameSite: 'strict',
+        secure: process.env['NODE_ENV'] === 'production',
+      })
       .redirect('/admin')
   })
 
