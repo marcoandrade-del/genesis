@@ -35,7 +35,10 @@ export async function authRoutes(app: FastifyInstance) {
 
   app.post<{ Body: { email: string; senha: string } }>(
     '/auth/login',
-    { schema: sLogin },
+    {
+      schema: sLogin,
+      config: { rateLimit: { max: 10, timeWindow: '5 minutes' } },
+    },
     async (req, reply) => {
       try {
         const payload = await authService.login(req.body.email, req.body.senha)

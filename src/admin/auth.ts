@@ -118,7 +118,10 @@ export async function adminAuthRoutes(app: FastifyInstance) {
     return reply.view('login', { error: null, email: null, ativado: req.query.ativado === '1' })
   })
 
-  app.post<{ Body: { email: string; senha: string } }>('/login', async (req, reply) => {
+  app.post<{ Body: { email: string; senha: string } }>(
+    '/login',
+    { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
+    async (req, reply) => {
     const { email, senha } = req.body
 
     const usuario = await app.prisma.usuario.findFirst({

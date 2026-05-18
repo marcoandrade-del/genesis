@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import rateLimitPlugin from '@fastify/rate-limit'
 import prismaPlugin from './plugins/prisma.js'
 import jwtPlugin from './plugins/jwt.js'
 import cookiePlugin from './plugins/cookie.js'
@@ -24,6 +25,7 @@ app.register(jwtPlugin)
 app.register(cookiePlugin)
 app.register(formbodyPlugin)
 app.register(viewPlugin)
+app.register(rateLimitPlugin, { global: false })
 
 app.get('/health', async () => ({ status: 'ok', system: 'Gênesis' }))
 
