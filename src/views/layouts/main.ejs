@@ -416,9 +416,19 @@ function confirmarGravacao(form, label) {
 // Busca contagem de filhos e abre confirmação
 // opcoes: { url, target, swap } — para sobrescrever os defaults do painel de menus
 async function confirmarExclusaoAsync(tipo, id, nome, opcoes) {
+  function falhouContagem() {
+    _mostrarConfirmar({
+      titulo: 'Não foi possível verificar dependências',
+      texto: 'Não conseguimos contar os itens vinculados. Tente novamente em instantes.',
+      tipo: 'danger',
+      semCancelar: true,
+      okTexto: 'Fechar',
+    }, function() {})
+  }
   try {
     const resp = await fetch('/admin/menus/contar-filhos/' + tipo + '/' + id, { headers: { 'HX-Request': 'true' } })
-    const data = await resp.json()
+    const data = await resp.json().catch(function() { return null })
+    if (!resp.ok || !data || data.erro) { falhouContagem(); return }
     if (data.bloqueado) {
       _mostrarConfirmar({
         titulo: 'Exclusão não permitida',
@@ -431,7 +441,7 @@ async function confirmarExclusaoAsync(tipo, id, nome, opcoes) {
     }
     confirmarExclusao(tipo, id, nome, data.count, opcoes)
   } catch {
-    confirmarExclusao(tipo, id, nome, 0, opcoes)
+    falhouContagem()
   }
 }
 
