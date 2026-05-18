@@ -200,7 +200,9 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ ids: JSON.stringify(ids) })
-          }).then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
+          })
+            .then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
+            .catch(function() { htmx.trigger(document.body, 'refresh-tree') })
         }
       } else if (tipo === 'menus') {
         opts.group = 'men-' + (el.dataset.moduloId || 'x')
@@ -211,7 +213,9 @@
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ ids: JSON.stringify(ids) })
-          }).then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
+          })
+            .then(function(r) { if (!r.ok) htmx.trigger(document.body, 'refresh-tree') })
+            .catch(function() { htmx.trigger(document.body, 'refresh-tree') })
         }
       } else if (tipo === 'itens') {
         opts.group = { name: 'itens', pull: 'itens', put: 'itens' }

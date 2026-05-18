@@ -508,7 +508,8 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       const ids: string[] = JSON.parse(req.body.ids)
       await modulosSvc.reordenar(ids)
       return reply.send({ ok: true })
-    } catch {
+    } catch (e) {
+      req.log.error(e, 'reordenar/modulos falhou')
       return reply.status(400).send({ ok: false })
     }
   })
@@ -519,7 +520,8 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       const ids: string[] = JSON.parse(req.body.ids)
       await menusSvc.reordenar(ids)
       return reply.send({ ok: true })
-    } catch {
+    } catch (e) {
+      req.log.error(e, 'reordenar/menus falhou')
       return reply.status(400).send({ ok: false })
     }
   })
@@ -530,7 +532,8 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       const ids: string[] = JSON.parse(req.body.ids)
       await itensSvc.reordenar(ids)
       return reply.send({ ok: true })
-    } catch {
+    } catch (e) {
+      req.log.error(e, 'reordenar/itens falhou')
       return reply.status(400).send({ ok: false })
     }
   })

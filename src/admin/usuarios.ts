@@ -132,6 +132,7 @@ export async function adminUsuariosRoutes(app: FastifyInstance) {
       return reply.header('HX-Trigger', trigger).status(204).send()
     } catch (e) {
       if (e instanceof ErroNegocio) return reply.status(statusDeErro(e.code)).send(e.message)
+      req.log.error(e, 'enviar-codigo-email falhou')
       return reply.status(500).send('Erro ao enviar e-mail de validação.')
     }
   })
@@ -143,6 +144,7 @@ export async function adminUsuariosRoutes(app: FastifyInstance) {
       return reply.header('HX-Trigger', trigger).status(204).send()
     } catch (e) {
       if (e instanceof ErroNegocio) return reply.status(statusDeErro(e.code)).send(e.message)
+      req.log.error(e, 'enviar-codigo-celular falhou')
       return reply.status(500).send('Erro ao enviar SMS de validação.')
     }
   })
@@ -155,6 +157,7 @@ export async function adminUsuariosRoutes(app: FastifyInstance) {
       if (e instanceof ErroNegocio) {
         return reply.status(statusDeErro(e.code)).send(e.message)
       }
+      req.log.error(e, 'excluir-usuario falhou')
       return reply.status(500).send('Erro ao excluir usuário.')
     }
   })

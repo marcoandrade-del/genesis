@@ -326,9 +326,17 @@ function _confirmarMover() {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ ids: JSON.stringify(ids) }),
-  }).then(function(r) {
-    if (!r.ok) _mostrarConfirmar({ titulo: 'Erro', texto: 'Erro ao salvar ordem.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function(){})
   })
+    .then(function(r) {
+      if (!r.ok) {
+        _mostrarConfirmar({ titulo: 'Erro', texto: 'Erro ao salvar ordem.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function(){})
+        htmx.trigger(document.body, 'refresh-tree')
+      }
+    })
+    .catch(function() {
+      _mostrarConfirmar({ titulo: 'Erro', texto: 'Erro ao salvar ordem.', tipo: 'danger', semCancelar: true, okTexto: 'Fechar' }, function(){})
+      htmx.trigger(document.body, 'refresh-tree')
+    })
 }
 
 function _cancelarMover() {
