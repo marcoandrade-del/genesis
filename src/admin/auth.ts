@@ -171,13 +171,17 @@ export async function adminAuthRoutes(app: FastifyInstance) {
     return reply.clearCookie('genesis_admin_token', { path: '/' }).redirect('/admin/login')
   })
 
-  app.post<{ Body: { email: string; senha: string } }>('/verificar-sessao', async (req, reply) => {
-    const { email, senha } = req.body
-    const usuario = await app.prisma.usuario.findFirst({
-      where: { emailPrincipal: email, emailValidado: true, ativo: true },
-    })
-    const senhaValida = usuario?.senhaHash ? await argon2.verify(usuario.senhaHash, senha) : false
-    if (!usuario || !senhaValida) return reply.status(401).send({ ok: false, erro: 'Credenciais inválidas.' })
-    return reply.send({ ok: true })
-  })
+  app.post<{ Body: { email: string; senha: string } }>(
+    '/verificar-sessao',
+    { config: { rateLimit: { max: 10, timeWindow: '5 minutes' } } },
+    async (req, reply) => {
+      const { email, senha } = req.body
+      const usuario = await app.prisma.usuario.findFirst({
+        where: { emailPrincipal: email, emailValidado: true, ativo: true },
+      })
+      const senhaValida = usuario?.senhaHash ? await argon2.verify(usuario.senhaHash, senha) : false
+      if (!usuario || !senhaValida) return reply.status(401).send({ ok: false, erro: 'Credenciais inválidas.' })
+      return reply.send({ ok: true })
+    },
+  )
 }
