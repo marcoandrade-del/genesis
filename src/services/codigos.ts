@@ -5,6 +5,7 @@ import { enviarCodigoEmail } from './email.js'
 import { enviarCodigoSms } from './sms.js'
 
 const EXPIRACAO_MINUTOS = 15
+const MAX_TENTATIVAS = 5
 
 export class CodigosService {
   constructor(private prisma: PrismaClient) {}
@@ -47,17 +48,34 @@ export class CodigosService {
     const usuario = await this.prisma.usuario.findUnique({ where: { id: usuarioId } })
     if (!usuario) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Usuário não encontrado.')
 
+    // Busca o código ativo sem filtrar por valor — comparação separada para
+    // permitir contar tentativas falhas e bloquear brute-force.
     const registro = await this.prisma.codigoValidacao.findFirst({
       where: {
         usuarioId,
         tipo,
-        codigo,
         usadoEm: null,
         expiradoEm: { gt: new Date() },
       },
     })
 
     if (!registro) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Código inválido ou expirado.')
+    }
+
+    if (registro.codigo !== codigo) {
+      const novasTentativas = registro.tentativas + 1
+      if (novasTentativas >= MAX_TENTATIVAS) {
+        await this.prisma.codigoValidacao.update({
+          where: { id: registro.id },
+          data: { tentativas: novasTentativas, usadoEm: new Date() },
+        })
+        throw new ErroNegocio('REQUISICAO_INVALIDA', 'Código inválido. Limite de tentativas atingido — solicite um novo código.')
+      }
+      await this.prisma.codigoValidacao.update({
+        where: { id: registro.id },
+        data: { tentativas: novasTentativas },
+      })
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Código inválido ou expirado.')
     }
 

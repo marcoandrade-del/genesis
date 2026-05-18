@@ -16,6 +16,7 @@ const CODIGO_DB = {
   codigo: '123456',
   expiradoEm: new Date(Date.now() + 10 * 60 * 1000),
   usadoEm: null,
+  tentativas: 0,
 }
 
 describe('CodigosService.solicitar', () => {
@@ -122,5 +123,34 @@ describe('CodigosService.validar', () => {
 
     // $transaction foi chamado com array (não callback) — verifica que foi chamado
     expect(prisma.$transaction).toHaveBeenCalledOnce()
+  })
+
+  it('incrementa tentativas e lança REQUISICAO_INVALIDA quando código errado', async () => {
+    prisma.usuario.findUnique.mockResolvedValue(USUARIO_BASE)
+    prisma.codigoValidacao.findFirst.mockResolvedValue({ ...CODIGO_DB, tentativas: 2 })
+    prisma.codigoValidacao.update.mockResolvedValue({})
+
+    await expect(service.validar('u1', 'EMAIL', '000000'))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+
+    expect(prisma.codigoValidacao.update).toHaveBeenCalledWith({
+      where: { id: 'c1' },
+      data: { tentativas: 3 },
+    })
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('invalida código (usadoEm) ao atingir MAX_TENTATIVAS', async () => {
+    prisma.usuario.findUnique.mockResolvedValue(USUARIO_BASE)
+    prisma.codigoValidacao.findFirst.mockResolvedValue({ ...CODIGO_DB, tentativas: 4 })
+    prisma.codigoValidacao.update.mockResolvedValue({})
+
+    await expect(service.validar('u1', 'EMAIL', '000000'))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+
+    const chamada = prisma.codigoValidacao.update.mock.calls[0]?.[0]
+    expect(chamada?.where).toEqual({ id: 'c1' })
+    expect(chamada?.data.tentativas).toBe(5)
+    expect(chamada?.data.usadoEm).toBeInstanceOf(Date)
   })
 })
