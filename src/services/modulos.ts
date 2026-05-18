@@ -43,6 +43,12 @@ export class ModulosService {
     }
   }
 
+  async reordenar(ids: string[]) {
+    await this.prisma.$transaction(
+      ids.map((id, i) => this.prisma.modulo.update({ where: { id }, data: { ordem: i } })),
+    )
+  }
+
   async atualizar(id: string, dados: { nome?: string; descricao?: string; ativo?: boolean }) {
     try {
       return await this.prisma.modulo.update({ where: { id }, data: dados })

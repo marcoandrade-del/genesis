@@ -1,9 +1,13 @@
 import type { FastifyInstance } from 'fastify'
+import type { TipoItem, TipoFuncionalidade } from '@prisma/client'
 import { SistemasService } from '../services/sistemas.js'
 import { MenusService } from '../services/menus.js'
 import { ItensService } from '../services/itens.js'
 import { ModulosService } from '../services/modulos.js'
 import { LixeiraService } from '../services/lixeira.js'
+
+const HX_REFRESH_TREE = JSON.stringify({ 'refresh-tree': true })
+const errMsg = (e: unknown, fallback: string) => (e instanceof Error ? e.message : fallback)
 
 async function carregarArvore(app: FastifyInstance) {
   return app.prisma.sistema.findMany({
@@ -69,6 +73,37 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   const menusSvc = new MenusService(app.prisma)
   const itensSvc = new ItensService(app.prisma)
   const lixeiraSvc = new LixeiraService(app.prisma)
+
+  // ── Helpers de re-render (edição) ─────────────────────────────────────────────
+  async function renderSistemaEdit(reply: any, id: string, erro: string | null) {
+    const sistema = await sistemasSvc.buscarComAdmins(id)
+    const adminAtual = sistema?.admins[0]?.usuario ?? null
+    return reply.view('menus/painel-sistema-form', { sistema, adminPadrao: null, adminAtual, erro })
+  }
+
+  async function renderModuloEdit(reply: any, id: string, erro: string | null) {
+    const modulo = await app.prisma.modulo.findUnique({
+      where: { id },
+      include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
+    })
+    return reply.view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro })
+  }
+
+  async function renderMenuEdit(reply: any, id: string, erro: string | null) {
+    const menu = await app.prisma.menu.findUnique({
+      where: { id },
+      include: { modulo: { select: { nome: true } } },
+    })
+    return reply.view('menus/painel-menu', { menu, modulo: null, editando: true, erro })
+  }
+
+  async function renderItemEdit(reply: any, id: string, erro: string | null) {
+    const item = await buscarItemCompleto(app, id)
+    return reply.view('menus/painel-item', {
+      item, menu: null, parentItem: null,
+      profundidade: calcProfundidade(item), editando: true, erro,
+    })
+  }
 
   // ── Página principal ──────────────────────────────────────────────────────────
   app.get('/', async (req, reply) => {
@@ -192,11 +227,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
         const criado = await sistemasSvc.criar({ nome, adminUsuarioId, ...(descricao ? { descricao } : {}) })
         const sistema = await buscarSistemaCompleto(app, criado.id)
         return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
+          .header('HX-Trigger', HX_REFRESH_TREE)
           .view('menus/painel-sistema', { sistema })
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Erro ao criar sistema.'
-        return reply.view('menus/painel-sistema-form', { sistema: null, adminPadrao, adminAtual: null, erro: msg })
+        return reply.view('menus/painel-sistema-form', { sistema: null, adminPadrao, adminAtual: null, erro: errMsg(e, 'Erro ao criar sistema.') })
       }
     },
   )
@@ -206,11 +240,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     '/sistema/:id',
     async (req, reply) => {
       const { nome, descricao, ativo, adminUsuarioId } = req.body
-      if (!nome?.trim()) {
-        const sistema = await sistemasSvc.buscarComAdmins(req.params.id)
-        const adminAtual = sistema?.admins[0]?.usuario ?? null
-        return reply.view('menus/painel-sistema-form', { sistema, adminPadrao: null, adminAtual, erro: 'O nome é obrigatório.' })
-      }
+      if (!nome?.trim()) return renderSistemaEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await sistemasSvc.atualizar(req.params.id, {
           ...(nome ? { nome } : {}),
@@ -220,13 +250,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
         if (adminUsuarioId) await sistemasSvc.trocarAdmin(req.params.id, adminUsuarioId)
         const sistema = await buscarSistemaCompleto(app, req.params.id)
         return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
+          .header('HX-Trigger', HX_REFRESH_TREE)
           .view('menus/painel-sistema', { sistema })
       } catch (e: unknown) {
-        const sistema = await sistemasSvc.buscarComAdmins(req.params.id)
-        const adminAtual = sistema?.admins[0]?.usuario ?? null
-        const msg = e instanceof Error ? e.message : 'Erro ao atualizar sistema.'
-        return reply.view('menus/painel-sistema-form', { sistema, adminPadrao: null, adminAtual, erro: msg })
+        return renderSistemaEdit(reply, req.params.id, errMsg(e, 'Erro ao atualizar sistema.'))
       }
     },
   )
@@ -256,11 +283,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
           include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
         })
         return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
+          .header('HX-Trigger', HX_REFRESH_TREE)
           .view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro: null })
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Erro ao criar módulo.'
-        return reply.view('menus/painel-modulo', { modulo: null, sistema, adminPadrao, editando: false, erro: msg })
+        return reply.view('menus/painel-modulo', { modulo: null, sistema, adminPadrao, editando: false, erro: errMsg(e, 'Erro ao criar módulo.') })
       }
     },
   )
@@ -289,11 +315,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
           include: { modulo: { select: { nome: true } } },
         })
         return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
+          .header('HX-Trigger', HX_REFRESH_TREE)
           .view('menus/painel-menu', { menu, modulo: null, editando: true, erro: null })
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Erro ao criar menu.'
-        return reply.view('menus/painel-menu', { menu: null, modulo, editando: false, erro: msg })
+        return reply.view('menus/painel-menu', { menu: null, modulo, editando: false, erro: errMsg(e, 'Erro ao criar menu.') })
       }
     },
   )
@@ -323,8 +348,8 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     try {
       const criado = await itensSvc.criar(menuId, {
         nome,
-        tipo: tipo as any,
-        ...(tipoFuncionalidade ? { tipoFuncionalidade: tipoFuncionalidade as any } : {}),
+        tipo: tipo as TipoItem,
+        ...(tipoFuncionalidade ? { tipoFuncionalidade: tipoFuncionalidade as TipoFuncionalidade } : {}),
         ...(rota ? { rota } : {}),
         ...(icone ? { icone } : {}),
         ...(ordem ? { ordem: parseInt(ordem) } : {}),
@@ -333,14 +358,13 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       })
       const item = await buscarItemCompleto(app, criado.id)
       return reply
-        .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
+        .header('HX-Trigger', HX_REFRESH_TREE)
         .view('menus/painel-item', {
           item, menu: null, parentItem: null,
           profundidade: calcProfundidade(item), editando: true, erro: null,
         })
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao criar item.'
-      return reply.view('menus/painel-item', { item: null, menu, parentItem, profundidade, editando: false, erro: msg })
+      return reply.view('menus/painel-item', { item: null, menu, parentItem, profundidade, editando: false, erro: errMsg(e, 'Erro ao criar item.') })
     }
   })
 
@@ -349,33 +373,17 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     '/modulo/:id',
     async (req, reply) => {
       const { nome, descricao, ativo } = req.body
-      if (!nome?.trim()) {
-        const modulo = await app.prisma.modulo.findUnique({
-          where: { id: req.params.id },
-          include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
-        })
-        return reply.view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro: 'O nome é obrigatório.' })
-      }
+      if (!nome?.trim()) return renderModuloEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await modulosSvc.atualizar(req.params.id, {
           ...(nome ? { nome } : {}),
           ...(descricao !== undefined ? { descricao } : {}),
           ativo: ativo === 'true',
         })
-        const modulo = await app.prisma.modulo.findUnique({
-          where: { id: req.params.id },
-          include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
-        })
-        return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
-          .view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro: null })
+        reply.header('HX-Trigger', HX_REFRESH_TREE)
+        return renderModuloEdit(reply, req.params.id, null)
       } catch (e: unknown) {
-        const modulo = await app.prisma.modulo.findUnique({
-          where: { id: req.params.id },
-          include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
-        })
-        const msg = e instanceof Error ? e.message : 'Erro ao atualizar módulo.'
-        return reply.view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro: msg })
+        return renderModuloEdit(reply, req.params.id, errMsg(e, 'Erro ao atualizar módulo.'))
       }
     },
   )
@@ -385,10 +393,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     '/menu/:id',
     async (req, reply) => {
       const { nome, icone, ordem, ativo } = req.body
-      if (!nome?.trim()) {
-        const menu = await app.prisma.menu.findUnique({ where: { id: req.params.id }, include: { modulo: { select: { nome: true } } } })
-        return reply.view('menus/painel-menu', { menu, modulo: null, editando: true, erro: 'O nome é obrigatório.' })
-      }
+      if (!nome?.trim()) return renderMenuEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await menusSvc.atualizar(req.params.id, {
           ...(nome ? { nome } : {}),
@@ -396,20 +401,10 @@ export async function adminMenusRoutes(app: FastifyInstance) {
           ...(ordem ? { ordem: parseInt(ordem) } : {}),
           ativo: ativo === 'true',
         })
-        const menu = await app.prisma.menu.findUnique({
-          where: { id: req.params.id },
-          include: { modulo: { select: { nome: true } } },
-        })
-        return reply
-          .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
-          .view('menus/painel-menu', { menu, modulo: null, editando: true, erro: null })
+        reply.header('HX-Trigger', HX_REFRESH_TREE)
+        return renderMenuEdit(reply, req.params.id, null)
       } catch (e: unknown) {
-        const menu = await app.prisma.menu.findUnique({
-          where: { id: req.params.id },
-          include: { modulo: { select: { nome: true } } },
-        })
-        const msg = e instanceof Error ? e.message : 'Erro ao atualizar menu.'
-        return reply.view('menus/painel-menu', { menu, modulo: null, editando: true, erro: msg })
+        return renderMenuEdit(reply, req.params.id, errMsg(e, 'Erro ao atualizar menu.'))
       }
     },
   )
@@ -420,34 +415,21 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     Body: { nome: string; descricao?: string; tipoFuncionalidade?: string; rota?: string; icone?: string; ordem?: string; ativo: string }
   }>('/item/:id', async (req, reply) => {
     const { nome, descricao, tipoFuncionalidade, rota, icone, ordem, ativo } = req.body
-    if (!nome?.trim()) {
-      const item = await buscarItemCompleto(app, req.params.id)
-      return reply.view('menus/painel-item', { item, menu: null, parentItem: null, profundidade: calcProfundidade(item), editando: true, erro: 'O nome é obrigatório.' })
-    }
+    if (!nome?.trim()) return renderItemEdit(reply, req.params.id, 'O nome é obrigatório.')
     try {
       await itensSvc.atualizar(req.params.id, {
         ...(nome ? { nome } : {}),
         ...(descricao !== undefined ? { descricao } : {}),
-        ...(tipoFuncionalidade ? { tipoFuncionalidade: tipoFuncionalidade as any } : {}),
+        ...(tipoFuncionalidade ? { tipoFuncionalidade: tipoFuncionalidade as TipoFuncionalidade } : {}),
         ...(rota !== undefined ? { rota } : {}),
         ...(icone !== undefined ? { icone } : {}),
         ...(ordem ? { ordem: parseInt(ordem) } : {}),
         ativo: ativo === 'true',
       })
-      const item = await buscarItemCompleto(app, req.params.id)
-      return reply
-        .header('HX-Trigger', JSON.stringify({ 'refresh-tree': true }))
-        .view('menus/painel-item', {
-          item, menu: null, parentItem: null,
-          profundidade: calcProfundidade(item), editando: true, erro: null,
-        })
+      reply.header('HX-Trigger', HX_REFRESH_TREE)
+      return renderItemEdit(reply, req.params.id, null)
     } catch (e: unknown) {
-      const item = await buscarItemCompleto(app, req.params.id)
-      const msg = e instanceof Error ? e.message : 'Erro ao atualizar item.'
-      return reply.view('menus/painel-item', {
-        item, menu: null, parentItem: null,
-        profundidade: calcProfundidade(item), editando: true, erro: msg,
-      })
+      return renderItemEdit(reply, req.params.id, errMsg(e, 'Erro ao atualizar item.'))
     }
   })
 
@@ -455,10 +437,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/sistema/:id', async (req, reply) => {
     try {
       await sistemasSvc.excluir(req.params.id, req.user.sub, lixeiraSvc)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).view('menus/painel-vazio', {})
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).view('menus/painel-vazio', {})
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao excluir sistema.'
-      return reply.status(400).send(msg)
+      return reply.status(400).send(errMsg(e, 'Erro ao excluir sistema.'))
     }
   })
 
@@ -466,10 +447,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/modulo/:id', async (req, reply) => {
     try {
       await modulosSvc.excluir(req.params.id, req.user.sub, lixeiraSvc)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).view('menus/painel-vazio', {})
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).view('menus/painel-vazio', {})
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao excluir módulo.'
-      return reply.status(400).send(msg)
+      return reply.status(400).send(errMsg(e, 'Erro ao excluir módulo.'))
     }
   })
 
@@ -477,10 +457,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/menu/:id', async (req, reply) => {
     try {
       await menusSvc.excluir(req.params.id, req.user.sub, lixeiraSvc)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).view('menus/painel-vazio', {})
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).view('menus/painel-vazio', {})
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao excluir menu.'
-      return reply.status(400).send(msg)
+      return reply.status(400).send(errMsg(e, 'Erro ao excluir menu.'))
     }
   })
 
@@ -488,10 +467,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/item/:id', async (req, reply) => {
     try {
       await itensSvc.excluir(req.params.id, req.user.sub, lixeiraSvc)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).view('menus/painel-vazio', {})
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).view('menus/painel-vazio', {})
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao excluir item.'
-      return reply.status(400).send(msg)
+      return reply.status(400).send(errMsg(e, 'Erro ao excluir item.'))
     }
   })
 
@@ -518,8 +496,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
         count = await lixeiraSvc.contarFilhosItem(id)
       }
       return reply.send({ count })
-    } catch {
-      return reply.send({ count: 0 })
+    } catch (e) {
+      req.log.error(e, 'contar-filhos falhou')
+      return reply.status(500).send({ count: 0, erro: 'Falha ao contar dependentes.' })
     }
   })
 
@@ -527,7 +506,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   app.post<{ Body: { ids: string } }>('/reordenar/modulos', async (req, reply) => {
     try {
       const ids: string[] = JSON.parse(req.body.ids)
-      await app.prisma.$transaction(ids.map((id, i) => app.prisma.modulo.update({ where: { id }, data: { ordem: i } })))
+      await modulosSvc.reordenar(ids)
       return reply.send({ ok: true })
     } catch {
       return reply.status(400).send({ ok: false })
@@ -561,10 +540,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     try {
       const { itemId, novoParentId, novoMenuId } = req.body
       await itensSvc.copiar(itemId, novoParentId || null, novoMenuId)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).send({ ok: true })
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).send({ ok: true })
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao copiar item.'
-      return reply.status(400).send({ ok: false, erro: msg })
+      return reply.status(400).send({ ok: false, erro: errMsg(e, 'Erro ao copiar item.') })
     }
   })
 
@@ -573,10 +551,9 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     try {
       const { itemId, novoParentId, novoMenuId } = req.body
       await itensSvc.criarAtalho(itemId, novoParentId || null, novoMenuId)
-      return reply.header('HX-Trigger', JSON.stringify({ 'refresh-tree': true })).send({ ok: true })
+      return reply.header('HX-Trigger', HX_REFRESH_TREE).send({ ok: true })
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Erro ao criar atalho.'
-      return reply.status(400).send({ ok: false, erro: msg })
+      return reply.status(400).send({ ok: false, erro: errMsg(e, 'Erro ao criar atalho.') })
     }
   })
 
@@ -617,22 +594,22 @@ export async function adminMenusRoutes(app: FastifyInstance) {
 
     // Itera apenas os menus do mesmo módulo
     for (const menu of modulo.menus) {
-          if (!(item.menuId === menu.id && item.parentId === null)) {
-            destinos.push({ menuId: menu.id, parentId: null, label: `${prefixo} › ${menu.nome}` })
+      if (!(item.menuId === menu.id && item.parentId === null)) {
+        destinos.push({ menuId: menu.id, parentId: null, label: `${prefixo} › ${menu.nome}` })
+      }
+      if (item.tipo === 'FUNCIONALIDADE') {
+        for (const sub1 of menu.itens) {
+          if (!(item.menuId === menu.id && item.parentId === sub1.id)) {
+            destinos.push({ menuId: menu.id, parentId: sub1.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome}` })
           }
-          if (item.tipo === 'FUNCIONALIDADE') {
-            for (const sub1 of menu.itens) {
-              if (!(item.menuId === menu.id && item.parentId === sub1.id)) {
-                destinos.push({ menuId: menu.id, parentId: sub1.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome}` })
-              }
-              for (const sub2 of sub1.subItens) {
-                if (!(item.menuId === menu.id && item.parentId === sub2.id)) {
-                  destinos.push({ menuId: menu.id, parentId: sub2.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome} › ${sub2.nome}` })
-                }
-              }
+          for (const sub2 of sub1.subItens) {
+            if (!(item.menuId === menu.id && item.parentId === sub2.id)) {
+              destinos.push({ menuId: menu.id, parentId: sub2.id, label: `${prefixo} › ${menu.nome} › ${sub1.nome} › ${sub2.nome}` })
             }
           }
         }
+      }
+    }
 
     return reply.send(destinos)
   })
@@ -654,8 +631,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
         }
         return reply.send({ ok: true })
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : 'Erro ao mover item.'
-        return reply.status(400).send({ ok: false, erro: msg })
+        return reply.status(400).send({ ok: false, erro: errMsg(e, 'Erro ao mover item.') })
       }
     }
   )
