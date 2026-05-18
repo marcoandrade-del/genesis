@@ -1,4 +1,4 @@
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { TipoItem, TipoFuncionalidade } from '@prisma/client'
 import { SistemasService } from '../services/sistemas.js'
 import { MenusService } from '../services/menus.js'
@@ -75,13 +75,13 @@ export async function adminMenusRoutes(app: FastifyInstance) {
   const lixeiraSvc = new LixeiraService(app.prisma)
 
   // ── Helpers de re-render (edição) ─────────────────────────────────────────────
-  async function renderSistemaEdit(reply: any, id: string, erro: string | null) {
+  async function renderSistemaEdit(reply: FastifyReply, id: string, erro: string | null) {
     const sistema = await sistemasSvc.buscarComAdmins(id)
     const adminAtual = sistema?.admins[0]?.usuario ?? null
     return reply.view('menus/painel-sistema-form', { sistema, adminPadrao: null, adminAtual, erro })
   }
 
-  async function renderModuloEdit(reply: any, id: string, erro: string | null) {
+  async function renderModuloEdit(reply: FastifyReply, id: string, erro: string | null) {
     const modulo = await app.prisma.modulo.findUnique({
       where: { id },
       include: { sistema: { select: { nome: true } }, _count: { select: { menus: true } } },
@@ -89,7 +89,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     return reply.view('menus/painel-modulo', { modulo, sistema: null, adminPadrao: null, editando: true, erro })
   }
 
-  async function renderMenuEdit(reply: any, id: string, erro: string | null) {
+  async function renderMenuEdit(reply: FastifyReply, id: string, erro: string | null) {
     const menu = await app.prisma.menu.findUnique({
       where: { id },
       include: { modulo: { select: { nome: true } } },
@@ -97,7 +97,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     return reply.view('menus/painel-menu', { menu, modulo: null, editando: true, erro })
   }
 
-  async function renderItemEdit(reply: any, id: string, erro: string | null) {
+  async function renderItemEdit(reply: FastifyReply, id: string, erro: string | null) {
     const item = await buscarItemCompleto(app, id)
     return reply.view('menus/painel-item', {
       item, menu: null, parentItem: null,
