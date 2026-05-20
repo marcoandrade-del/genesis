@@ -180,4 +180,60 @@ describe('favoritosRoutes', () => {
     const res = await app.inject({ method: 'DELETE', url: '/favoritos/fa1', headers: auth })
     expect(res.statusCode).toBe(204)
   })
+
+  it('GET /usuarios/:usuarioId/pastas retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({ method: 'GET', url: '/usuarios/outro/pastas', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('POST /usuarios/:usuarioId/pastas retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/usuarios/outro/pastas', headers: auth,
+      payload: { nome: 'Pasta' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /pastas/:id retorna 403 quando pasta é de outro usuário', async () => {
+    prisma.pastaFavorito.findUnique.mockResolvedValue({ ...PASTA, usuarioId: 'outro' })
+    const res = await app.inject({
+      method: 'PUT', url: '/pastas/pa1', headers: auth,
+      payload: { nome: 'Nova' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('DELETE /pastas/:id retorna 403 quando pasta é de outro usuário', async () => {
+    prisma.pastaFavorito.findUnique.mockResolvedValue({ ...PASTA, usuarioId: 'outro' })
+    const res = await app.inject({ method: 'DELETE', url: '/pastas/pa1', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('GET /usuarios/:usuarioId/favoritos retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({ method: 'GET', url: '/usuarios/outro/favoritos', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('POST /usuarios/:usuarioId/favoritos retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/usuarios/outro/favoritos', headers: auth,
+      payload: { relatorioFixoId: UUID_RF },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /favoritos/:id retorna 403 quando favorito é de outro usuário', async () => {
+    prisma.favoritoRelatorio.findUnique.mockResolvedValue({ ...FAVORITO, usuarioId: 'outro' })
+    const res = await app.inject({
+      method: 'PUT', url: '/favoritos/fa1', headers: auth,
+      payload: { pastaId: 'pa2' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('DELETE /favoritos/:id retorna 403 quando favorito é de outro usuário', async () => {
+    prisma.favoritoRelatorio.findUnique.mockResolvedValue({ ...FAVORITO, usuarioId: 'outro' })
+    const res = await app.inject({ method: 'DELETE', url: '/favoritos/fa1', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
 })
