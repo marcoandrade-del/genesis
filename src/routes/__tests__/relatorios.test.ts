@@ -17,6 +17,7 @@ describe('relatoriosRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: relatoriosRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    prisma.adminSistema.findUnique.mockResolvedValue({ id: 'as0', ativo: true })
   })
 
   it('GET /sistemas/:sistemaId/relatorios exige auth', async () => {
@@ -137,5 +138,59 @@ describe('relatoriosRoutes', () => {
     prisma.relatorioPersonalizado.delete.mockResolvedValue(PERSONALIZADO)
     const res = await app.inject({ method: 'DELETE', url: '/relatorios-personalizados/rp1', headers: auth })
     expect(res.statusCode).toBe(204)
+  })
+
+  it('POST /sistemas/:sistemaId/relatorios retorna 403 quando não-admin', async () => {
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'POST', url: '/sistemas/s1/relatorios', headers: auth,
+      payload: { nome: 'R', rota: '/r' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /relatorios/:id retorna 403 quando não-admin', async () => {
+    prisma.relatorioFixo.findUnique.mockResolvedValue(FIXO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'PUT', url: '/relatorios/rf1', headers: auth,
+      payload: { nome: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('DELETE /relatorios/:id retorna 403 quando não-admin', async () => {
+    prisma.relatorioFixo.findUnique.mockResolvedValue(FIXO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'DELETE', url: '/relatorios/rf1', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('GET /usuarios/:usuarioId/relatorios-personalizados retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({ method: 'GET', url: '/usuarios/outro/relatorios-personalizados', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('POST /usuarios/:usuarioId/relatorios-personalizados retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/usuarios/outro/relatorios-personalizados', headers: auth,
+      payload: { nome: 'P', configuracao: {} },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /relatorios-personalizados/:id retorna 403 quando dono ≠ self', async () => {
+    prisma.relatorioPersonalizado.findUnique.mockResolvedValue({ ...PERSONALIZADO, usuarioId: 'outro' })
+    const res = await app.inject({
+      method: 'PUT', url: '/relatorios-personalizados/rp1', headers: auth,
+      payload: { nome: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('DELETE /relatorios-personalizados/:id retorna 403 quando dono ≠ self', async () => {
+    prisma.relatorioPersonalizado.findUnique.mockResolvedValue({ ...PERSONALIZADO, usuarioId: 'outro' })
+    const res = await app.inject({ method: 'DELETE', url: '/relatorios-personalizados/rp1', headers: auth })
+    expect(res.statusCode).toBe(403)
   })
 })

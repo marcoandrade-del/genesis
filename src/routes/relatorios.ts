@@ -7,6 +7,7 @@ import {
   sCriarRelatorioPersonalizado,
   sAtualizarRelatorioPersonalizado,
 } from '../schemas.js'
+import { assertAdminSistema } from '../services/autorizacao.js'
 
 export async function relatoriosRoutes(app: FastifyInstance) {
   const service = new RelatoriosService(app.prisma)
@@ -30,6 +31,7 @@ export async function relatoriosRoutes(app: FastifyInstance) {
     { schema: sCriarRelatorioFixo },
     async (req, reply) => {
       try {
+        await assertAdminSistema(app.prisma, req.user.sub, req.params.sistemaId)
         const data = await service.criarFixo(req.params.sistemaId, req.body)
         return reply.status(201).send({ data })
       } catch (e) {
@@ -45,6 +47,7 @@ export async function relatoriosRoutes(app: FastifyInstance) {
       const relatorio = await service.buscarFixoPorId(req.params.id)
       if (!relatorio) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.'))
       try {
+        await assertAdminSistema(app.prisma, req.user.sub, relatorio.sistemaId)
         const data = await service.atualizarFixo(req.params.id, req.body)
         return { data }
       } catch (e) {
@@ -57,6 +60,7 @@ export async function relatoriosRoutes(app: FastifyInstance) {
     const relatorio = await service.buscarFixoPorId(req.params.id)
     if (!relatorio) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.'))
     try {
+      await assertAdminSistema(app.prisma, req.user.sub, relatorio.sistemaId)
       await service.excluirFixo(req.params.id)
       return reply.status(204).send()
     } catch (e) {
@@ -69,6 +73,9 @@ export async function relatoriosRoutes(app: FastifyInstance) {
   app.get<{ Params: { usuarioId: string } }>(
     '/usuarios/:usuarioId/relatorios-personalizados',
     async (req, reply) => {
+      if (req.params.usuarioId !== req.user.sub) {
+        return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode acessar seus próprios relatórios personalizados.'))
+      }
       try {
         const data = await service.listarPersonalizados(req.params.usuarioId)
         return { data }
@@ -82,6 +89,9 @@ export async function relatoriosRoutes(app: FastifyInstance) {
     '/usuarios/:usuarioId/relatorios-personalizados',
     { schema: sCriarRelatorioPersonalizado },
     async (req, reply) => {
+      if (req.params.usuarioId !== req.user.sub) {
+        return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode criar relatórios personalizados na sua própria conta.'))
+      }
       try {
         const data = await service.criarPersonalizado(req.params.usuarioId, req.body)
         return reply.status(201).send({ data })
@@ -97,6 +107,9 @@ export async function relatoriosRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const relatorio = await service.buscarPersonalizadoPorId(req.params.id)
       if (!relatorio) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.'))
+      if (relatorio.usuarioId !== req.user.sub) {
+        return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode alterar seus próprios relatórios personalizados.'))
+      }
       try {
         const data = await service.atualizarPersonalizado(req.params.id, req.body)
         return { data }
@@ -109,6 +122,9 @@ export async function relatoriosRoutes(app: FastifyInstance) {
   app.delete<{ Params: { id: string } }>('/relatorios-personalizados/:id', async (req, reply) => {
     const relatorio = await service.buscarPersonalizadoPorId(req.params.id)
     if (!relatorio) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.'))
+    if (relatorio.usuarioId !== req.user.sub) {
+      return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode excluir seus próprios relatórios personalizados.'))
+    }
     try {
       await service.excluirPersonalizado(req.params.id)
       return reply.status(204).send()
