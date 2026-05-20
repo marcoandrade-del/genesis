@@ -366,11 +366,13 @@
           <i class="bi bi-star-fill me-1" style="color:#ffc107;font-size:.65rem"></i>Itens Favoritos
         </div>
         <div id="lista-fav-itens">
-          <% favItens.forEach(function(fi) { %>
+          <% favItens.forEach(function(fi) {
+               const caminho = fi.moduloNome + ' › ' + fi.menuNome + (fi.submenuNome ? ' › ' + fi.submenuNome : '')
+          %>
             <div class="fav-item-sidebar" id="sidebar-fav-<%= fi.id %>">
               <i class="bi bi-<%= fi.icone || 'grid' %>" style="font-size:.78rem;color:#ffc107;flex-shrink:0"></i>
               <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><%= fi.nome %></span>
-              <span class="menu-label" title="<%= fi.moduloNome %> › <%= fi.menuNome %>"><%= fi.moduloNome %></span>
+              <span class="menu-label" title="<%= caminho %>"><%= fi.submenuNome || fi.menuNome %></span>
             </div>
           <% }) %>
         </div>

@@ -80,6 +80,7 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
                   id: true,
                   nome: true,
                   icone: true,
+                  parent: { select: { nome: true } },
                   menu: {
                     select: {
                       nome: true,
@@ -89,7 +90,12 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
                 },
               },
             },
-            orderBy: { criadoEm: 'asc' },
+            orderBy: [
+              { item: { menu: { modulo: { nome: 'asc' } } } },
+              { item: { menu: { nome: 'asc' } } },
+              { item: { parent: { nome: 'asc' } } },
+              { item: { nome: 'asc' } },
+            ],
           }),
         ])
       : Promise.resolve([[], [], []]))
@@ -101,6 +107,7 @@ export async function adminFuncionandoRoutes(app: FastifyInstance) {
       icone: f.item.icone,
       menuNome: f.item.menu.nome,
       moduloNome: f.item.menu.modulo.nome,
+      submenuNome: f.item.parent?.nome ?? null,
     }))
 
     return reply.view('funcionando/popup-modulo', {
