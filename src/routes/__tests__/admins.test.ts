@@ -17,6 +17,9 @@ describe('adminsRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: adminsRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    // Por padrão, simular usuário autenticado como admin do sistema/modulo testado
+    prisma.adminSistema.findUnique.mockResolvedValue({ id: 'as0', ativo: true })
+    prisma.adminModulo.findUnique.mockResolvedValue({ id: 'am0', ativo: true })
   })
 
   it('GET /sistemas/:sistemaId/admins exige auth', async () => {
@@ -24,10 +27,25 @@ describe('adminsRoutes', () => {
     expect(res.statusCode).toBe(401)
   })
 
+  it('GET /sistemas/:sistemaId/admins retorna 403 quando usuário não é admin do sistema', async () => {
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/sistemas/s1/admins', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
   it('GET /sistemas/:sistemaId/admins retorna 404 quando sistema não existe', async () => {
     prisma.sistema.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/sistemas/s1/admins', headers: auth })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('POST /sistemas/:sistemaId/admins retorna 403 quando usuário não é admin do sistema', async () => {
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'POST', url: '/sistemas/s1/admins', headers: auth,
+      payload: { usuarioId: '00000000-0000-0000-0000-000000000001' },
+    })
+    expect(res.statusCode).toBe(403)
   })
 
   it('POST /sistemas/:sistemaId/admins retorna 201', async () => {
@@ -54,6 +72,12 @@ describe('adminsRoutes', () => {
     expect(res.statusCode).toBe(409)
   })
 
+  it('DELETE /sistemas/:sistemaId/admins/:usuarioId retorna 403 quando usuário não é admin do sistema', async () => {
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'DELETE', url: '/sistemas/s1/admins/u1', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
   it('DELETE /sistemas/:sistemaId/admins/:usuarioId retorna 204 quando bem-sucedido', async () => {
     prisma.adminSistema.findUnique.mockResolvedValue({ id: 'as1', ativo: true })
     prisma.adminSistema.count.mockResolvedValue(2)
@@ -67,6 +91,14 @@ describe('adminsRoutes', () => {
     prisma.adminSistema.count.mockResolvedValue(1)
     const res = await app.inject({ method: 'DELETE', url: '/sistemas/s1/admins/u1', headers: auth })
     expect(res.statusCode).toBe(409)
+  })
+
+  it('GET /modulos/:moduloId/admins retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue(MODULO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/modulos/m1/admins', headers: auth })
+    expect(res.statusCode).toBe(403)
   })
 
   it('GET /modulos/:moduloId/admins retorna 404 quando módulo não existe', async () => {
