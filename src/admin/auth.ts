@@ -19,7 +19,7 @@ export async function adminAuthRoutes(app: FastifyInstance) {
       dataNascimento: string; emailPrincipal: string; telefonePrincipal: string
       senha: string; confirmarSenha: string
     }
-  }>('/registro', async (req, reply) => {
+  }>('/registro', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (req, reply) => {
     const { confirmarSenha, ...corpo } = req.body
     const dados = { ...corpo, nomeSocial: corpo.nomeSocial ?? corpo.nomeCompleto }
 
@@ -87,6 +87,15 @@ export async function adminAuthRoutes(app: FastifyInstance) {
 
   app.post<{ Params: { usuarioId: string }; Body: { passo: string } }>(
     '/reenviar/:usuarioId',
+    {
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: '15 minutes',
+          keyGenerator: (req) => (req.params as { usuarioId: string }).usuarioId,
+        },
+      },
+    },
     async (req, reply) => {
       const { usuarioId } = req.params
       const tipo = req.body.passo === 'CELULAR' ? 'CELULAR' : 'EMAIL'

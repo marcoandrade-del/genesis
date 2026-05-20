@@ -24,7 +24,10 @@ export async function authRoutes(app: FastifyInstance) {
       telefoneAlternativo?: string
       senha: string
     }
-  }>('/auth/registro', { schema: sRegistro }, async (req, reply) => {
+  }>(
+    '/auth/registro',
+    { schema: sRegistro, config: { rateLimit: { max: 5, timeWindow: '1 hour' } } },
+    async (req, reply) => {
     try {
       const data = await authService.registrar(req.body)
       return reply.status(201).send({ data })
@@ -53,7 +56,16 @@ export async function authRoutes(app: FastifyInstance) {
   // Ativação de conta — pública porque o usuário ainda não tem token
   app.post<{ Params: { usuarioId: string }; Body: { tipo: TipoValidacao } }>(
     '/auth/solicitar-validacao/:usuarioId',
-    { schema: sSolicitarValidacao },
+    {
+      schema: sSolicitarValidacao,
+      config: {
+        rateLimit: {
+          max: 3,
+          timeWindow: '15 minutes',
+          keyGenerator: (req) => (req.params as { usuarioId: string }).usuarioId,
+        },
+      },
+    },
     async (req, reply) => {
       try {
         const data = await codigosService.solicitar(req.params.usuarioId, req.body.tipo)
