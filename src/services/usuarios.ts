@@ -98,23 +98,24 @@ export class UsuariosService {
     const usuario = await this.prisma.usuario.findUnique({ where: { id } })
     if (!usuario) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Usuário não encontrado.')
 
-    const [admSistemas, admModulos, permissoes, relatorios, pastas, favoritos] =
-      await Promise.all([
-        this.prisma.adminSistema.count({ where: { usuarioId: id } }),
-        this.prisma.adminModulo.count({ where: { usuarioId: id } }),
-        this.prisma.permissaoAcesso.count({ where: { usuarioId: id } }),
-        this.prisma.relatorioPersonalizado.count({ where: { usuarioId: id } }),
-        this.prisma.pastaFavorito.count({ where: { usuarioId: id } }),
-        this.prisma.favoritoRelatorio.count({ where: { usuarioId: id } }),
-      ] as const)
+    const [admSistemas, admModulos, permissoes, relatorios] = await Promise.all([
+      this.prisma.adminSistema.count({ where: { usuarioId: id } }),
+      this.prisma.adminModulo.count({ where: { usuarioId: id } }),
+      this.prisma.permissaoAcesso.count({ where: { usuarioId: id } }),
+      this.prisma.relatorioPersonalizado.count({ where: { usuarioId: id } }),
+    ] as const)
 
     if (admSistemas > 0) throw new ErroNegocio('CONFLITO', 'Usuário é administrador de um ou mais sistemas.')
     if (admModulos > 0) throw new ErroNegocio('CONFLITO', 'Usuário é administrador de um ou mais módulos.')
     if (permissoes > 0) throw new ErroNegocio('CONFLITO', 'Usuário possui permissões de acesso vinculadas.')
     if (relatorios > 0) throw new ErroNegocio('CONFLITO', 'Usuário possui relatórios personalizados vinculados.')
-    if (pastas > 0) throw new ErroNegocio('CONFLITO', 'Usuário possui pastas de favoritos vinculadas.')
-    if (favoritos > 0) throw new ErroNegocio('CONFLITO', 'Usuário possui favoritos vinculados.')
 
-    return this.prisma.usuario.delete({ where: { id } })
+    return this.prisma.$transaction(async (tx) => {
+      await tx.favoritoRelatorio.deleteMany({ where: { usuarioId: id } })
+      await tx.favoritoItem.deleteMany({ where: { usuarioId: id } })
+      await tx.pastaFavorito.deleteMany({ where: { usuarioId: id, parentId: { not: null } } })
+      await tx.pastaFavorito.deleteMany({ where: { usuarioId: id } })
+      return tx.usuario.delete({ where: { id } })
+    })
   }
 }

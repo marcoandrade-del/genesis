@@ -114,6 +114,7 @@ export function criarPrismaMock() {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn(),
     },
     favoritoRelatorio: {
@@ -123,6 +124,7 @@ export function criarPrismaMock() {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn(),
     },
     favoritoItem: {
@@ -131,6 +133,7 @@ export function criarPrismaMock() {
       findFirst: vi.fn(),
       create: vi.fn(),
       delete: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn(),
     },
     $transaction: vi.fn(),

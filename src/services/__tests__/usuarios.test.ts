@@ -111,26 +111,16 @@ describe('UsuariosService.excluir', () => {
     await expect(service.excluir('u1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
 
-  it('lança CONFLITO quando usuário tem pastas de favoritos', async () => {
-    prisma.usuario.findUnique.mockResolvedValue(USUARIO)
-    prisma.pastaFavorito.count.mockResolvedValue(1)
-
-    await expect(service.excluir('u1')).rejects.toMatchObject({ code: 'CONFLITO' })
-  })
-
-  it('lança CONFLITO quando usuário tem favoritos vinculados', async () => {
-    prisma.usuario.findUnique.mockResolvedValue(USUARIO)
-    prisma.favoritoRelatorio.count.mockResolvedValue(1)
-
-    await expect(service.excluir('u1')).rejects.toMatchObject({ code: 'CONFLITO' })
-  })
-
-  it('exclui usuário quando todos os counts são zero', async () => {
+  it('exclui usuário cascateando favoritos e pastas vinculados', async () => {
     prisma.usuario.findUnique.mockResolvedValue(USUARIO)
     prisma.usuario.delete.mockResolvedValue(USUARIO)
 
     const resultado = await service.excluir('u1')
 
+    expect(prisma.favoritoRelatorio.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
+    expect(prisma.favoritoItem.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
+    expect(prisma.pastaFavorito.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1', parentId: { not: null } } })
+    expect(prisma.pastaFavorito.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
     expect(prisma.usuario.delete).toHaveBeenCalledWith({ where: { id: 'u1' } })
     expect(resultado).toEqual(USUARIO)
   })

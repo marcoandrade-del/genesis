@@ -81,7 +81,7 @@
         hx-delete="/admin/usuarios/<%= u.id %>"
         hx-target="#usuario-<%= u.id %>"
         hx-swap="outerHTML"
-        hx-confirm="O usuário será movido para a Lixeira."
+        hx-confirm="O usuário será movido para a Lixeira. Favoritos e pastas vinculados também serão removidos."
         data-confirm-titulo="Confirmar Exclusão"
         data-confirm-tipo="danger"
         data-confirm-ok="Excluir"
