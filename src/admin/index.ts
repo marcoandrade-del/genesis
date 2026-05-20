@@ -13,7 +13,7 @@ import { adminRelatoriosPersonalizadosRoutes } from './relatorios-personalizados
 import { adminFavoritosRoutes } from './favoritos.js'
 import { adminFuncionandoRoutes } from './funcionando.js'
 
-async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
+export async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
   if (!token) return reply.redirect('/admin/login')
 
@@ -24,13 +24,25 @@ async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
     return reply.clearCookie('genesis_admin_token', { path: '/' }).redirect('/admin/login')
   }
 
-  // Re-verifica acesso: se o vínculo AdminSistema foi desativado, revoga sessão.
-  const aindaAdmin = await req.server.prisma.adminSistema.findFirst({
+  // Re-verifica acesso a cada request: vínculo AdminSistema ativo + e-mail/celular
+  // ainda validados. Se o estado da conta regrediu (admin removeu vínculo, e-mail
+  // foi desvalidado, etc.), a sessão é revogada imediatamente.
+  const vinculo = await req.server.prisma.adminSistema.findFirst({
     where: { usuarioId: payload.sub, ativo: true },
-    select: { id: true },
+    select: { usuario: { select: { emailValidado: true, ativo: true } } },
   })
-  if (!aindaAdmin) {
+  if (!vinculo) {
     return reply.clearCookie('genesis_admin_token', { path: '/' }).redirect('/admin/login')
+  }
+  if (!vinculo.usuario.emailValidado) {
+    return reply
+      .clearCookie('genesis_admin_token', { path: '/' })
+      .redirect(`/admin/ativar/${payload.sub}?passo=EMAIL`)
+  }
+  if (!vinculo.usuario.ativo) {
+    return reply
+      .clearCookie('genesis_admin_token', { path: '/' })
+      .redirect(`/admin/ativar/${payload.sub}?passo=CELULAR`)
   }
 
   req.user = payload
