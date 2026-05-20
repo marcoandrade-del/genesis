@@ -9,6 +9,8 @@ const ITEM = {
   id: 'i1', menuId: 'me1', parentId: null, nome: 'Item', descricao: null,
   tipo: 'FUNCIONALIDADE', tipoFuncionalidade: 'CRUD', rota: '/x', icone: null, ordem: 0,
   ativo: true, criadoEm: new Date(), atualizadoEm: new Date(),
+  // Necessário para assertAdminItem resolver item→menu→modulo
+  menu: { moduloId: 'm1' },
 }
 const PERMISSAO = { id: 'p1', usuarioId: 'u1', itemId: 'i1', nivel: 'VISUALIZAR', criadoEm: new Date() }
 const ITEM_UUID = '00000000-0000-0000-0000-000000000abc'
@@ -21,6 +23,8 @@ describe('permissoesRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: permissoesRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    // Default: usuário é admin do módulo, permite todas as mutações
+    prisma.adminModulo.findUnique.mockResolvedValue({ id: 'am0', ativo: true })
   })
 
   it('GET /usuarios/:usuarioId/permissoes exige auth', async () => {
@@ -42,10 +46,24 @@ describe('permissoesRoutes', () => {
     expect(res.json().data).toHaveLength(1)
   })
 
+  it('GET /usuarios/:usuarioId/permissoes retorna 403 quando usuarioId ≠ self', async () => {
+    const res = await app.inject({ method: 'GET', url: '/usuarios/u2/permissoes', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
+
   it('GET /itens/:itemId/permissoes retorna 404 quando item não existe', async () => {
     prisma.itemFuncionalidade.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/itens/i1/permissoes', headers: auth })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('GET /itens/:itemId/permissoes retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(ITEM)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue({ id: 'm1', sistemaId: 's1' })
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/itens/i1/permissoes', headers: auth })
+    expect(res.statusCode).toBe(403)
   })
 
   it('POST /usuarios/:usuarioId/permissoes retorna 201', async () => {
@@ -88,6 +106,7 @@ describe('permissoesRoutes', () => {
 
   it('PUT /permissoes/:id atualiza com sucesso', async () => {
     prisma.permissaoAcesso.findUnique.mockResolvedValue(PERMISSAO)
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(ITEM)
     prisma.permissaoAcesso.update.mockResolvedValue({ ...PERMISSAO, nivel: 'EDITAR' })
     const res = await app.inject({
       method: 'PUT', url: '/permissoes/p1', headers: auth,
@@ -96,8 +115,22 @@ describe('permissoesRoutes', () => {
     expect(res.statusCode).toBe(200)
   })
 
+  it('PUT /permissoes/:id retorna 403 quando usuário não é admin do item', async () => {
+    prisma.permissaoAcesso.findUnique.mockResolvedValue(PERMISSAO)
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(ITEM)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue({ id: 'm1', sistemaId: 's1' })
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'PUT', url: '/permissoes/p1', headers: auth,
+      payload: { nivel: 'EDITAR' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
   it('DELETE /permissoes/:id retorna 204', async () => {
     prisma.permissaoAcesso.findUnique.mockResolvedValue(PERMISSAO)
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(ITEM)
     prisma.permissaoAcesso.delete.mockResolvedValue(PERMISSAO)
     const res = await app.inject({ method: 'DELETE', url: '/permissoes/p1', headers: auth })
     expect(res.statusCode).toBe(204)

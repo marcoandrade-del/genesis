@@ -54,3 +54,17 @@ export async function assertAdminModulo(
     throw new ErroNegocio('NAO_AUTORIZADO', MSG)
   }
 }
+
+// Resolve item → menu → moduloId, então delega para assertAdminModulo.
+export async function assertAdminItem(
+  prisma: TxOrClient,
+  usuarioId: string,
+  itemId: string,
+): Promise<void> {
+  const item = await prisma.itemFuncionalidade.findUnique({
+    where: { id: itemId },
+    select: { menu: { select: { moduloId: true } } },
+  })
+  if (!item) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.')
+  await assertAdminModulo(prisma, usuarioId, item.menu.moduloId)
+}
