@@ -125,6 +125,14 @@ export function criarPrismaMock() {
       delete: vi.fn(),
       count: vi.fn(),
     },
+    favoritoItem: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
     $transaction: vi.fn(),
   }
 
