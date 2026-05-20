@@ -43,7 +43,7 @@ describe('UsuariosService.atualizar', () => {
 
     await service.atualizar('u1', { dataNascimento: '1990-05-10' })
 
-    const chamada = prisma.usuario.update.mock.calls[0][0]
+    const chamada = prisma.usuario.update.mock.calls[0]![0]
     expect(chamada.data.dataNascimento).toBeInstanceOf(Date)
     expect(chamada.where).toEqual({ id: 'u1' })
   })
@@ -53,7 +53,7 @@ describe('UsuariosService.atualizar', () => {
 
     await service.atualizar('u1', { senha: 'senhaSegura1' })
 
-    const chamada = prisma.usuario.update.mock.calls[0][0]
+    const chamada = prisma.usuario.update.mock.calls[0]![0]
     expect(chamada.data.senhaHash).toBe('hashed:senhaSegura1')
     expect(chamada.data.senha).toBeUndefined()
   })
