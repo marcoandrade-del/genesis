@@ -136,4 +136,17 @@ describe('usuariosRoutes (autenticadas via Bearer JWT)', () => {
     expect(res.statusCode).toBe(409)
     expect(res.json().error.code).toBe('CONFLITO')
   })
+
+  it('PUT /usuarios/:id retorna 403 quando id ≠ sub do token (IDOR)', async () => {
+    const res = await app.inject({
+      method: 'PUT', url: '/usuarios/u2', headers: auth,
+      payload: { nomeCompleto: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('DELETE /usuarios/:id retorna 403 quando id ≠ sub do token (IDOR)', async () => {
+    const res = await app.inject({ method: 'DELETE', url: '/usuarios/u2', headers: auth })
+    expect(res.statusCode).toBe(403)
+  })
 })

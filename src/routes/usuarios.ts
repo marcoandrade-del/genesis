@@ -29,6 +29,9 @@ export async function usuariosRoutes(app: FastifyInstance) {
       telefoneAlternativo?: string
     }
   }>('/usuarios/:id', { schema: sAtualizarUsuario }, async (req, reply) => {
+    if (req.params.id !== req.user.sub) {
+      return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode editar sua própria conta.'))
+    }
     const usuario = await service.buscarPorId(req.params.id)
     if (!usuario) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Usuário não encontrado.'))
     try {
@@ -40,6 +43,9 @@ export async function usuariosRoutes(app: FastifyInstance) {
   })
 
   app.delete<{ Params: { id: string } }>('/usuarios/:id', async (req, reply) => {
+    if (req.params.id !== req.user.sub) {
+      return reply.status(403).send(erroHttp('NAO_AUTORIZADO', 'Você só pode excluir sua própria conta.'))
+    }
     const usuario = await service.buscarPorId(req.params.id)
     if (!usuario) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Usuário não encontrado.'))
     try {
