@@ -16,11 +16,24 @@ import { adminFuncionandoRoutes } from './funcionando.js'
 async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
   if (!token) return reply.redirect('/admin/login')
+
+  let payload: { sub: string; email: string }
   try {
-    req.user = req.server.jwt.verify(token)
+    payload = req.server.jwt.verify(token)
   } catch {
     return reply.clearCookie('genesis_admin_token', { path: '/' }).redirect('/admin/login')
   }
+
+  // Re-verifica acesso: se o vínculo AdminSistema foi desativado, revoga sessão.
+  const aindaAdmin = await req.server.prisma.adminSistema.findFirst({
+    where: { usuarioId: payload.sub, ativo: true },
+    select: { id: true },
+  })
+  if (!aindaAdmin) {
+    return reply.clearCookie('genesis_admin_token', { path: '/' }).redirect('/admin/login')
+  }
+
+  req.user = payload
 }
 
 export async function adminRoutes(app: FastifyInstance) {

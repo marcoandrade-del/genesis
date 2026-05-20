@@ -37,17 +37,21 @@ export class AdminsService {
   }
 
   async removerAdminSistema(sistemaId: string, usuarioId: string) {
-    const admin = await this.prisma.adminSistema.findUnique({
-      where: { usuarioId_sistemaId: { usuarioId, sistemaId } },
-    })
-    if (!admin) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Administrador não encontrado.')
+    // Serializable: protege a invariante "ao menos 1 admin ativo" contra
+    // remoções concorrentes que veriam count > 1 e ambas deletariam.
+    return this.prisma.$transaction(async (tx) => {
+      const admin = await tx.adminSistema.findUnique({
+        where: { usuarioId_sistemaId: { usuarioId, sistemaId } },
+      })
+      if (!admin) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Administrador não encontrado.')
 
-    const ativos = await this.prisma.adminSistema.count({ where: { sistemaId, ativo: true } })
-    if (ativos <= 1 && admin.ativo) {
-      throw new ErroNegocio('CONFLITO', 'O sistema deve ter pelo menos um administrador ativo.')
-    }
+      const ativos = await tx.adminSistema.count({ where: { sistemaId, ativo: true } })
+      if (ativos <= 1 && admin.ativo) {
+        throw new ErroNegocio('CONFLITO', 'O sistema deve ter pelo menos um administrador ativo.')
+      }
 
-    return this.prisma.adminSistema.delete({ where: { usuarioId_sistemaId: { usuarioId, sistemaId } } })
+      return tx.adminSistema.delete({ where: { usuarioId_sistemaId: { usuarioId, sistemaId } } })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   }
 
   // ── AdminModulo ───────────────────────────────────────────────
@@ -83,16 +87,18 @@ export class AdminsService {
   }
 
   async removerAdminModulo(moduloId: string, usuarioId: string) {
-    const admin = await this.prisma.adminModulo.findUnique({
-      where: { usuarioId_moduloId: { usuarioId, moduloId } },
-    })
-    if (!admin) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Administrador não encontrado.')
+    return this.prisma.$transaction(async (tx) => {
+      const admin = await tx.adminModulo.findUnique({
+        where: { usuarioId_moduloId: { usuarioId, moduloId } },
+      })
+      if (!admin) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Administrador não encontrado.')
 
-    const ativos = await this.prisma.adminModulo.count({ where: { moduloId, ativo: true } })
-    if (ativos <= 1 && admin.ativo) {
-      throw new ErroNegocio('CONFLITO', 'O módulo deve ter pelo menos um administrador ativo.')
-    }
+      const ativos = await tx.adminModulo.count({ where: { moduloId, ativo: true } })
+      if (ativos <= 1 && admin.ativo) {
+        throw new ErroNegocio('CONFLITO', 'O módulo deve ter pelo menos um administrador ativo.')
+      }
 
-    return this.prisma.adminModulo.delete({ where: { usuarioId_moduloId: { usuarioId, moduloId } } })
+      return tx.adminModulo.delete({ where: { usuarioId_moduloId: { usuarioId, moduloId } } })
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })
   }
 }
