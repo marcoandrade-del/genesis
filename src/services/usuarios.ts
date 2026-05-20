@@ -115,6 +115,7 @@ export class UsuariosService {
       await tx.favoritoItem.deleteMany({ where: { usuarioId: id } })
       await tx.pastaFavorito.deleteMany({ where: { usuarioId: id, parentId: { not: null } } })
       await tx.pastaFavorito.deleteMany({ where: { usuarioId: id } })
+      await tx.codigoValidacao.deleteMany({ where: { usuarioId: id } })
       return tx.usuario.delete({ where: { id } })
     })
   }

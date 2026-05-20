@@ -121,6 +121,7 @@ describe('UsuariosService.excluir', () => {
     expect(prisma.favoritoItem.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
     expect(prisma.pastaFavorito.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1', parentId: { not: null } } })
     expect(prisma.pastaFavorito.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
+    expect(prisma.codigoValidacao.deleteMany).toHaveBeenCalledWith({ where: { usuarioId: 'u1' } })
     expect(prisma.usuario.delete).toHaveBeenCalledWith({ where: { id: 'u1' } })
     expect(resultado).toEqual(USUARIO)
   })
