@@ -15,6 +15,7 @@ describe('menusRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: menusRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    prisma.adminModulo.findUnique.mockResolvedValue({ id: 'am0', ativo: true })
   })
 
   it('GET /modulos/:moduloId/menus exige auth', async () => {
@@ -75,5 +76,28 @@ describe('menusRoutes', () => {
     prisma.menu.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'DELETE', url: '/menus/me1', headers: auth })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('POST /modulos/:moduloId/menus retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue(MODULO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'POST', url: '/modulos/mo1/menus', headers: auth,
+      payload: { nome: 'Menu' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /menus/:id retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.menu.findUnique.mockResolvedValue(MENU)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue(MODULO)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'PUT', url: '/menus/me1', headers: auth,
+      payload: { nome: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
   })
 })

@@ -3,6 +3,7 @@ import type { TipoItem, TipoFuncionalidade } from '@prisma/client'
 import { ItensService } from '../services/itens.js'
 import { erroHttp, tratarErro } from '../errors.js'
 import { sCriarItem, sAtualizarItem } from '../schemas.js'
+import { assertAdminMenu, assertAdminItem } from '../services/autorizacao.js'
 
 type CriarBody = {
   nome: string
@@ -51,6 +52,7 @@ export async function itensRoutes(app: FastifyInstance) {
     { schema: sCriarItem },
     async (req, reply) => {
       try {
+        await assertAdminMenu(app.prisma, req.user.sub, req.params.menuId)
         const item = await service.criar(req.params.menuId, req.body)
         return reply.status(201).send({ data: item })
       } catch (e) {
@@ -66,6 +68,7 @@ export async function itensRoutes(app: FastifyInstance) {
       const item = await service.buscarPorId(req.params.id)
       if (!item) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.'))
       try {
+        await assertAdminItem(app.prisma, req.user.sub, req.params.id)
         const atualizado = await service.atualizar(req.params.id, req.body)
         return { data: atualizado }
       } catch (e) {
@@ -78,6 +81,7 @@ export async function itensRoutes(app: FastifyInstance) {
     const item = await service.buscarPorId(req.params.id)
     if (!item) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Item não encontrado.'))
     try {
+      await assertAdminItem(app.prisma, req.user.sub, req.params.id)
       await service.excluir(req.params.id)
       return reply.status(204).send()
     } catch (e) {

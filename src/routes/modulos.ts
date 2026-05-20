@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { ModulosService } from '../services/modulos.js'
 import { erroHttp, tratarErro } from '../errors.js'
 import { sCriarModulo, sAtualizarModulo } from '../schemas.js'
+import { assertAdminSistema, assertAdminModulo } from '../services/autorizacao.js'
 
 export async function modulosRoutes(app: FastifyInstance) {
   const service = new ModulosService(app.prisma)
@@ -29,6 +30,7 @@ export async function modulosRoutes(app: FastifyInstance) {
     { schema: sCriarModulo },
     async (req, reply) => {
       try {
+        await assertAdminSistema(app.prisma, req.user.sub, req.params.sistemaId)
         const modulo = await service.criar(req.params.sistemaId, req.body)
         return reply.status(201).send({ data: modulo })
       } catch (e) {
@@ -44,6 +46,7 @@ export async function modulosRoutes(app: FastifyInstance) {
       const modulo = await service.buscarPorId(req.params.id)
       if (!modulo) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Módulo não encontrado.'))
       try {
+        await assertAdminModulo(app.prisma, req.user.sub, req.params.id)
         const atualizado = await service.atualizar(req.params.id, req.body)
         return { data: atualizado }
       } catch (e) {

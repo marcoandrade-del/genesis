@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { MenusService } from '../services/menus.js'
 import { erroHttp, tratarErro } from '../errors.js'
 import { sCriarMenu, sAtualizarMenu } from '../schemas.js'
+import { assertAdminModulo } from '../services/autorizacao.js'
 
 export async function menusRoutes(app: FastifyInstance) {
   const service = new MenusService(app.prisma)
@@ -29,6 +30,7 @@ export async function menusRoutes(app: FastifyInstance) {
     { schema: sCriarMenu },
     async (req, reply) => {
       try {
+        await assertAdminModulo(app.prisma, req.user.sub, req.params.moduloId)
         const menu = await service.criar(req.params.moduloId, req.body)
         return reply.status(201).send({ data: menu })
       } catch (e) {
@@ -44,6 +46,7 @@ export async function menusRoutes(app: FastifyInstance) {
       const menu = await service.buscarPorId(req.params.id)
       if (!menu) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Menu não encontrado.'))
       try {
+        await assertAdminModulo(app.prisma, req.user.sub, menu.moduloId)
         const atualizado = await service.atualizar(req.params.id, req.body)
         return { data: atualizado }
       } catch (e) {

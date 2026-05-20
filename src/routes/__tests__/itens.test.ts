@@ -9,6 +9,7 @@ const ITEM = {
   id: 'i1', menuId: 'me1', parentId: null, nome: 'Item', descricao: null,
   tipo: 'FUNCIONALIDADE', tipoFuncionalidade: 'CRUD', rota: '/x', icone: null, ordem: 0,
   ativo: true, criadoEm: new Date(), atualizadoEm: new Date(),
+  menu: { moduloId: 'mo1' },
 }
 
 describe('itensRoutes', () => {
@@ -19,6 +20,7 @@ describe('itensRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: itensRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    prisma.adminModulo.findUnique.mockResolvedValue({ id: 'am0', ativo: true })
   })
 
   it('GET /menus/:menuId/itens exige auth', async () => {
@@ -83,5 +85,29 @@ describe('itensRoutes', () => {
     prisma.itemFuncionalidade.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'DELETE', url: '/itens/i1', headers: auth })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('POST /menus/:menuId/itens retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.menu.findUnique.mockResolvedValue(MENU)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue({ id: 'mo1', sistemaId: 's1' })
+    const res = await app.inject({
+      method: 'POST', url: '/menus/me1/itens', headers: auth,
+      payload: { nome: 'Item', tipo: 'FUNCIONALIDADE', tipoFuncionalidade: 'CRUD' },
+    })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('PUT /itens/:id retorna 403 quando usuário não é admin do módulo', async () => {
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(ITEM)
+    prisma.adminModulo.findUnique.mockResolvedValue(null)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    prisma.modulo.findUnique.mockResolvedValue({ id: 'mo1', sistemaId: 's1' })
+    const res = await app.inject({
+      method: 'PUT', url: '/itens/i1', headers: auth,
+      payload: { nome: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
   })
 })

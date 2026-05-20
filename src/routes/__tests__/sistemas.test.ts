@@ -15,6 +15,7 @@ describe('sistemasRoutes', () => {
   beforeEach(async () => {
     ({ app, prisma } = await criarApp({ registrar: sistemasRoutes, proteger: true }))
     auth = { authorization: `Bearer ${tokenJwt(app, { sub: 'u1', email: 'a@b.com' })}` }
+    prisma.adminSistema.findUnique.mockResolvedValue({ id: 'as0', ativo: true })
   })
 
   it('GET /sistemas exige autenticação', async () => {
@@ -82,6 +83,16 @@ describe('sistemasRoutes', () => {
     })
     expect(res.statusCode).toBe(200)
     expect(res.json().data.nome).toBe('Novo')
+  })
+
+  it('PUT /sistemas/:id retorna 403 quando usuário não é admin do sistema', async () => {
+    prisma.sistema.findUnique.mockResolvedValue(SISTEMA)
+    prisma.adminSistema.findUnique.mockResolvedValue(null)
+    const res = await app.inject({
+      method: 'PUT', url: '/sistemas/s1', headers: auth,
+      payload: { nome: 'Novo' },
+    })
+    expect(res.statusCode).toBe(403)
   })
 
   it('DELETE /sistemas/:id retorna 204 com sucesso', async () => {

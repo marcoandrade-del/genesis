@@ -55,6 +55,20 @@ export async function assertAdminModulo(
   }
 }
 
+// Resolve menu → moduloId, então delega para assertAdminModulo.
+export async function assertAdminMenu(
+  prisma: TxOrClient,
+  usuarioId: string,
+  menuId: string,
+): Promise<void> {
+  const menu = await prisma.menu.findUnique({
+    where: { id: menuId },
+    select: { moduloId: true },
+  })
+  if (!menu) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Menu não encontrado.')
+  await assertAdminModulo(prisma, usuarioId, menu.moduloId)
+}
+
 // Resolve item → menu → moduloId, então delega para assertAdminModulo.
 export async function assertAdminItem(
   prisma: TxOrClient,

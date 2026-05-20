@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { SistemasService } from '../services/sistemas.js'
 import { erroHttp, tratarErro } from '../errors.js'
 import { sCriarSistema, sAtualizarSistema } from '../schemas.js'
+import { assertAdminSistema } from '../services/autorizacao.js'
 
 export async function sistemasRoutes(app: FastifyInstance) {
   const service = new SistemasService(app.prisma)
@@ -22,7 +23,9 @@ export async function sistemasRoutes(app: FastifyInstance) {
     { schema: sCriarSistema },
     async (req, reply) => {
       try {
-        const sistema = await service.criar(req.body)
+        // Força o criador como admin inicial — impede que um usuário designe outra
+        // pessoa como admin do sistema novo, eliminando vetor de escalation.
+        const sistema = await service.criar({ ...req.body, adminUsuarioId: req.user.sub })
         return reply.status(201).send({ data: sistema })
       } catch (e) {
         return tratarErro(e, reply)
@@ -37,6 +40,7 @@ export async function sistemasRoutes(app: FastifyInstance) {
       const sistema = await service.buscarPorId(req.params.id)
       if (!sistema) return reply.status(404).send(erroHttp('RECURSO_NAO_ENCONTRADO', 'Sistema não encontrado.'))
       try {
+        await assertAdminSistema(app.prisma, req.user.sub, req.params.id)
         const atualizado = await service.atualizar(req.params.id, req.body)
         return { data: atualizado }
       } catch (e) {
