@@ -203,4 +203,37 @@ describe('adminUsuariosRoutes — branches restantes', () => {
       expect(res.body).toContain('excluir')
     })
   })
+
+  // Line 99 — POST / catch com erro não-Error
+  describe('POST / — fallback', () => {
+    it('usa mensagem fallback quando criar lança valor não-Error', async () => {
+      prisma.usuario.create.mockRejectedValue('string crua')
+      const res = await app.inject({
+        method: 'POST', url: '/',
+        payload: new URLSearchParams({
+          nomeCompleto: 'X', nomeSocial: 'X', dataNascimento: '1990-01-15',
+          emailPrincipal: 'a@b.com', telefonePrincipal: '44999990000',
+          senha: 'senha1234', cpf: '529.982.247-25',
+        }).toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      })
+      expect(res.body).toContain('Erro ao criar usuário.')
+    })
+  })
+
+  // Line 121 — PUT /:id catch com erro não-Error
+  describe('PUT /:id — fallback', () => {
+    it('usa mensagem fallback quando atualizar lança valor não-Error', async () => {
+      prisma.usuario.findUnique.mockResolvedValue({ ...USUARIO_DB })
+      prisma.usuario.update.mockRejectedValue('string crua')
+      const res = await app.inject({
+        method: 'PUT', url: '/u1',
+        payload: new URLSearchParams({
+          nomeCompleto: 'Y', telefonePrincipal: '44999990000', ativo: 'true',
+        }).toString(),
+        headers: { 'content-type': 'application/x-www-form-urlencoded' },
+      })
+      expect(res.body).toContain('Erro ao atualizar usuário.')
+    })
+  })
 })
