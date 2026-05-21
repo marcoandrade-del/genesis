@@ -190,3 +190,22 @@ describe('SistemasService.excluir — cascata na transação', () => {
     expect(prisma.sistema.delete).toHaveBeenCalledWith({ where: { id: 's1' } })
   })
 })
+
+describe('SistemasService.criar — repropagação de erros não-P2002', () => {
+  let prisma: PrismaMock
+  let service: SistemasService
+
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    service = new SistemasService(prisma as never)
+  })
+
+  // Lines 30 i=1 + 33 — propaga erro não-P2002 do $transaction
+  it('repassa o erro original quando $transaction lança algo que não é P2002', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'u1', ativo: true })
+    prisma.sistema.create.mockRejectedValue(new Error('boom'))
+
+    await expect(service.criar({ nome: 'X', adminUsuarioId: 'u1' }))
+      .rejects.toThrow('boom')
+  })
+})
