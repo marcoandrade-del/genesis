@@ -176,6 +176,40 @@ describe('ItensService.copiar — novoParentId branches', () => {
 
     expect(prisma.itemFuncionalidade.create).toHaveBeenCalledTimes(3)
   })
+
+  // Line 137 i=1 — copiar com novoParent.parentId null (SUBMENU raiz), item FUNCIONALIDADE
+  it('copia FUNCIONALIDADE para dentro de SUBMENU raiz (parentId null)', async () => {
+    prisma.itemFuncionalidade.findUnique
+      .mockResolvedValueOnce({ ...ITEM_FUNC, subItens: [] })
+      .mockResolvedValueOnce({ tipo: 'SUBMENU', parentId: null })
+    prisma.menu.findUnique.mockResolvedValue({ id: 'me1' })
+    prisma.itemFuncionalidade.create.mockResolvedValue({ ...ITEM_FUNC, id: 'novo' })
+
+    await service.copiar('it1', 'pai-raiz', 'me1')
+
+    expect(prisma.itemFuncionalidade.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ parentId: 'pai-raiz' }) }),
+    )
+  })
+
+  // Line 169 i=1 — _copiarRecursivo com sub-item sem campo subItens
+  it('copia recursivamente quando sub-item não traz campo subItens (usa fallback ?? [])', async () => {
+    const submenu = {
+      ...ITEM_SUBMENU,
+      subItens: [
+        // sub sem subItens — força o fallback `?? []` no `_copiarRecursivo`
+        { ...ITEM_FUNC, id: 'f1' },
+      ],
+    }
+    delete (submenu.subItens[0] as { subItens?: unknown[] }).subItens
+    prisma.itemFuncionalidade.findUnique.mockResolvedValue(submenu)
+    prisma.menu.findUnique.mockResolvedValue({ id: 'me1' })
+    prisma.itemFuncionalidade.create.mockResolvedValue({ ...ITEM_SUBMENU, id: 'novo' })
+
+    await service.copiar('it2', null, 'me1')
+
+    expect(prisma.itemFuncionalidade.create).toHaveBeenCalledTimes(2)
+  })
 })
 
 describe('ItensService.criarAtalho — branches restantes', () => {
@@ -261,6 +295,21 @@ describe('ItensService.mover — branches restantes', () => {
 
     expect(prisma.itemFuncionalidade.update).toHaveBeenCalledWith({
       where: { id: 'it2' },
+      data: { parentId: 'novo-pai' },
+    })
+  })
+
+  // Line 272 i=0 — mover sob novoParent com parentId truthy (profDest=1)
+  it('permite mover FUNCIONALIDADE sob SUBMENU filho (novoParent.parentId truthy)', async () => {
+    prisma.itemFuncionalidade.findUnique
+      .mockResolvedValueOnce({ ...ITEM_FUNC, subItens: [] })
+      .mockResolvedValueOnce({ parentId: null })
+      .mockResolvedValueOnce({ id: 'novo-pai', tipo: 'SUBMENU', parentId: 'avo' })
+
+    await service.mover('it1', 'novo-pai')
+
+    expect(prisma.itemFuncionalidade.update).toHaveBeenCalledWith({
+      where: { id: 'it1' },
       data: { parentId: 'novo-pai' },
     })
   })
