@@ -426,6 +426,17 @@ export const sAtualizarPlanoDeContas = {
   },
 } as const
 
+export const sImportarPlanoDeContas = {
+  body: {
+    type: 'object',
+    required: ['csv'],
+    additionalProperties: false,
+    properties: {
+      csv: { type: 'string', minLength: 1 },
+    },
+  },
+} as const
+
 // ── Contábil — Contas ────────────────────────────────────────────────────────
 
 export const sCriarConta = {

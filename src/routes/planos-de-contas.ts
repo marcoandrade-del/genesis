@@ -1,10 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 import { PlanosDeContasService } from '../services/planos-de-contas.js'
+import { ImportadorPlanoContasService } from '../services/importador-plano-contas.js'
 import { erroHttp, tratarErro } from '../errors.js'
-import { sCriarPlanoDeContas, sAtualizarPlanoDeContas } from '../schemas.js'
+import {
+  sCriarPlanoDeContas,
+  sAtualizarPlanoDeContas,
+  sImportarPlanoDeContas,
+} from '../schemas.js'
+
+// PCASP Estendido oficial ocupa ~640 KB; folga de ~8× para crescimento.
+const LIMITE_CSV_IMPORTACAO = 5 * 1024 * 1024
 
 export async function planosDeContasRoutes(app: FastifyInstance) {
   const service = new PlanosDeContasService(app.prisma)
+  const importador = new ImportadorPlanoContasService(app.prisma)
 
   app.get<{ Querystring: { modeloContabilId?: string } }>('/planos-de-contas', async (req) => {
     const data = await service.listar(req.query.modeloContabilId)
@@ -53,4 +62,17 @@ export async function planosDeContasRoutes(app: FastifyInstance) {
       return tratarErro(e, reply)
     }
   })
+
+  app.post<{ Params: { id: string }; Body: { csv: string } }>(
+    '/planos-de-contas/:id/importar',
+    { schema: sImportarPlanoDeContas, bodyLimit: LIMITE_CSV_IMPORTACAO },
+    async (req, reply) => {
+      try {
+        const resultado = await importador.importar(req.params.id, req.body.csv)
+        return reply.status(201).send({ data: resultado })
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
 }
