@@ -464,3 +464,34 @@ export const sImportarPlanoContas = {
     },
   },
 } as const
+
+// ── Contábil — Lançamentos ───────────────────────────────────────────────────
+
+const valorMonetario = { type: 'string', pattern: '^\\d+(\\.\\d{1,2})?$' } as const
+const tipoLancamento = { type: 'string', enum: ['DEBITO', 'CREDITO'] } as const
+
+export const sCriarLancamento = {
+  body: {
+    type: 'object',
+    required: ['data', 'historico', 'itens'],
+    additionalProperties: false,
+    properties: {
+      data: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$' },
+      historico: { type: 'string', minLength: 1 },
+      itens: {
+        type: 'array',
+        minItems: 2,
+        items: {
+          type: 'object',
+          required: ['contaId', 'tipo', 'valor'],
+          additionalProperties: false,
+          properties: {
+            contaId: { type: 'string', format: 'uuid' },
+            tipo: tipoLancamento,
+            valor: valorMonetario,
+          },
+        },
+      },
+    },
+  },
+} as const
