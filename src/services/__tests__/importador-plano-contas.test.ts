@@ -152,8 +152,19 @@ describe('validar', () => {
     expect(() => validar(linhas)).toThrow(/Ciclo na hierarquia/)
   })
 
-  it('lança CONFLITO quando profundidade > 6', () => {
-    // 7 níveis: 1 → 1.1 → ... → 1.1.1.1.1.1.1
+  it('lança CONFLITO quando profundidade > 7', () => {
+    // 8 níveis: 1 → 1.1 → ... → 1.1.1.1.1.1.1.1
+    const linhas: { codigo: string; descricao: string; codigoPai: string | null; admiteMovimento: boolean }[] = []
+    let pai: string | null = null
+    for (let i = 1; i <= 8; i++) {
+      const codigo = Array(i).fill('1').join('.')
+      linhas.push({ codigo, descricao: `N${i}`, codigoPai: pai, admiteMovimento: false })
+      pai = codigo
+    }
+    expect(() => validar(linhas)).toThrow(/profundidade máxima de 7/)
+  })
+
+  it('aceita exatamente 7 níveis', () => {
     const linhas: { codigo: string; descricao: string; codigoPai: string | null; admiteMovimento: boolean }[] = []
     let pai: string | null = null
     for (let i = 1; i <= 7; i++) {
@@ -161,19 +172,8 @@ describe('validar', () => {
       linhas.push({ codigo, descricao: `N${i}`, codigoPai: pai, admiteMovimento: false })
       pai = codigo
     }
-    expect(() => validar(linhas)).toThrow(/profundidade máxima de 6/)
-  })
-
-  it('aceita exatamente 6 níveis', () => {
-    const linhas: { codigo: string; descricao: string; codigoPai: string | null; admiteMovimento: boolean }[] = []
-    let pai: string | null = null
-    for (let i = 1; i <= 6; i++) {
-      const codigo = Array(i).fill('1').join('.')
-      linhas.push({ codigo, descricao: `N${i}`, codigoPai: pai, admiteMovimento: false })
-      pai = codigo
-    }
     const niveis = validar(linhas)
-    expect(niveis.get('1.1.1.1.1.1')).toBe(6)
+    expect(niveis.get('1.1.1.1.1.1.1')).toBe(7)
   })
 
   it('lança CONFLITO quando conta admite movimento mas tem filho', () => {

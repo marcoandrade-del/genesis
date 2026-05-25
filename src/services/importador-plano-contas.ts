@@ -17,7 +17,7 @@ const COLUNAS_OBRIGATORIAS = ['codigo', 'descricao', 'codigoPai', 'admiteMovimen
  *
  * O CSV é validado integralmente em memória antes de qualquer escrita:
  *  - header com as 4 colunas, códigos únicos no arquivo, parents resolvíveis,
- *    sem ciclos, profundidade ≤ 6, admiteMovimento apenas em folhas.
+ *    sem ciclos, profundidade ≤ NIVEL_MAX, admiteMovimento apenas em folhas.
  *
  * A inserção usa `createMany` em uma só chamada: o Postgres difere a checagem
  * de FK até o fim do statement, então a auto-referência parent → filho é
