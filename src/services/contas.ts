@@ -1,7 +1,9 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
-export const NIVEL_MAX = 6
+// PCASP Estendido oficial chega a 7 níveis (Classe→Grupo→SubGrupo→Título→
+// SubTítulo→Ítem→SubÍtem); valor casado com a importação do plano oficial.
+export const NIVEL_MAX = 7
 
 export type DadosCriarConta = {
   planoId: string
