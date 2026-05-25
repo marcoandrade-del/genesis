@@ -115,9 +115,9 @@ model Lixeira {
   tipo          String
   nome          String
   estrutura     Json
-  excluidoEm   DateTime @default(now())
+  excluidoEm    DateTime @default(now())
   excluidoPorId String
-  excluidoPor  Usuario  @relation(fields: [excluidoPorId], references: [id])
+  excluidoPor   Usuario  @relation(fields: [excluidoPorId], references: [id])
 
   @@map("lixeira")
 }
@@ -271,4 +271,149 @@ enum NivelAcesso {
   EDITAR
   EXCLUIR
   TOTAL
+}
+
+// ─────────────────────────────────────────────────────────────
+// Módulo Contábil
+// Estado/Município → ModeloContabil → PlanoDeContas (1/ano) → Conta (árvore 6 níveis)
+// Lançamento (partida dobrada, por município) → ResumoMensalConta (agregado)
+// SaldoInicialAno é populado por procedimento de virada de ano (fase posterior).
+// ─────────────────────────────────────────────────────────────
+
+model ModeloContabil {
+  id           String          @id @default(uuid())
+  descricao    String          @unique
+  ativo        Boolean         @default(true)
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+  planos       PlanoDeContas[]
+  estados      Estado[]
+  municipios   Municipio[]
+
+  @@map("modelos_contabeis")
+}
+
+model Estado {
+  id               String          @id @default(uuid())
+  nome             String          @unique
+  sigla            String          @unique @db.Char(2)
+  modeloContabilId String?
+  criadoEm         DateTime        @default(now())
+  atualizadoEm     DateTime        @updatedAt
+  modeloContabil   ModeloContabil? @relation(fields: [modeloContabilId], references: [id])
+  municipios       Municipio[]
+
+  @@map("estados")
+}
+
+model Municipio {
+  id               String              @id @default(uuid())
+  nome             String
+  estadoId         String
+  modeloContabilId String?
+  criadoEm         DateTime            @default(now())
+  atualizadoEm     DateTime            @updatedAt
+  estado           Estado              @relation(fields: [estadoId], references: [id])
+  modeloContabil   ModeloContabil?     @relation(fields: [modeloContabilId], references: [id])
+  lancamentos      Lancamento[]
+  resumos          ResumoMensalConta[]
+  saldosIniciais   SaldoInicialAno[]
+
+  @@unique([nome, estadoId])
+  @@map("municipios")
+}
+
+model PlanoDeContas {
+  id               String         @id @default(uuid())
+  descricao        String
+  ano              Int
+  modeloContabilId String
+  criadoEm         DateTime       @default(now())
+  atualizadoEm     DateTime       @updatedAt
+  modeloContabil   ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+  contas           Conta[]
+
+  @@unique([modeloContabilId, ano])
+  @@map("planos_de_contas")
+}
+
+model Conta {
+  id              String              @id @default(uuid())
+  codigo          String
+  descricao       String
+  nivel           Int // 1..6
+  admiteMovimento Boolean             @default(false)
+  planoId         String
+  parentId        String?
+  criadoEm        DateTime            @default(now())
+  atualizadoEm    DateTime            @updatedAt
+  plano           PlanoDeContas       @relation(fields: [planoId], references: [id])
+  parent          Conta?              @relation("Subcontas", fields: [parentId], references: [id])
+  filhos          Conta[]             @relation("Subcontas")
+  lancamentoItens LancamentoItem[]
+  resumos         ResumoMensalConta[]
+  saldosIniciais  SaldoInicialAno[]
+
+  @@unique([planoId, codigo])
+  @@index([planoId, parentId])
+  @@map("contas")
+}
+
+model Lancamento {
+  id          String           @id @default(uuid())
+  municipioId String
+  data        DateTime         @db.Date
+  historico   String
+  valor       Decimal          @db.Decimal(18, 2) // soma dos itens; invariante D = C
+  criadoEm    DateTime         @default(now())
+  criadoPorId String
+  municipio   Municipio        @relation(fields: [municipioId], references: [id])
+  itens       LancamentoItem[]
+
+  @@index([municipioId, data])
+  @@map("lancamentos")
+}
+
+model LancamentoItem {
+  id           String         @id @default(uuid())
+  lancamentoId String
+  contaId      String
+  tipo         TipoLancamento
+  valor        Decimal        @db.Decimal(18, 2)
+  lancamento   Lancamento     @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+  conta        Conta          @relation(fields: [contaId], references: [id])
+
+  @@index([contaId])
+  @@map("lancamento_itens")
+}
+
+model ResumoMensalConta {
+  municipioId  String
+  contaId      String
+  ano          Int
+  mes          Int // 1..12
+  totalDebito  Decimal   @default(0) @db.Decimal(18, 2)
+  totalCredito Decimal   @default(0) @db.Decimal(18, 2)
+  municipio    Municipio @relation(fields: [municipioId], references: [id])
+  conta        Conta     @relation(fields: [contaId], references: [id])
+
+  @@id([municipioId, contaId, ano, mes])
+  @@map("resumos_mensais_conta")
+}
+
+model SaldoInicialAno {
+  municipioId String
+  contaId     String
+  ano         Int
+  valor       Decimal   @default(0) @db.Decimal(18, 2)
+  municipio   Municipio @relation(fields: [municipioId], references: [id])
+  conta       Conta     @relation(fields: [contaId], references: [id])
+
+  @@id([municipioId, contaId, ano])
+  @@map("saldos_iniciais_ano")
+}
+
+enum TipoLancamento {
+  DEBITO
+  CREDITO
 }
