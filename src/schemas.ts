@@ -336,3 +336,120 @@ export const sMoverFavorito = {
     },
   },
 } as const
+
+// ── Contábil — Modelos ───────────────────────────────────────────────────────
+
+export const sCriarModeloContabil = {
+  body: {
+    type: 'object',
+    required: ['descricao'],
+    additionalProperties: false,
+    properties: {
+      descricao: str,
+      ativo: boolOpt,
+    },
+  },
+} as const
+
+export const sAtualizarModeloContabil = {
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      descricao: strOpt,
+      ativo: boolOpt,
+    },
+  },
+} as const
+
+// ── Contábil — Estados ───────────────────────────────────────────────────────
+
+export const sAtualizarEstado = {
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      modeloContabilId: { type: ['string', 'null'], format: 'uuid' },
+    },
+  },
+} as const
+
+// ── Contábil — Municípios ────────────────────────────────────────────────────
+
+export const sCriarMunicipio = {
+  body: {
+    type: 'object',
+    required: ['nome', 'estadoId'],
+    additionalProperties: false,
+    properties: {
+      nome: str,
+      estadoId: { type: 'string', format: 'uuid' },
+      modeloContabilId: uuidOpt,
+    },
+  },
+} as const
+
+export const sAtualizarMunicipio = {
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      nome: strOpt,
+      modeloContabilId: { type: ['string', 'null'], format: 'uuid' },
+    },
+  },
+} as const
+
+// ── Contábil — Plano de Contas ──────────────────────────────────────────────
+
+export const sCriarPlanoDeContas = {
+  body: {
+    type: 'object',
+    required: ['descricao', 'ano', 'modeloContabilId'],
+    additionalProperties: false,
+    properties: {
+      descricao: str,
+      ano: { type: 'integer', minimum: 1900, maximum: 9999 },
+      modeloContabilId: { type: 'string', format: 'uuid' },
+    },
+  },
+} as const
+
+export const sAtualizarPlanoDeContas = {
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      descricao: strOpt,
+      ano: { type: 'integer', minimum: 1900, maximum: 9999 },
+    },
+  },
+} as const
+
+// ── Contábil — Contas ────────────────────────────────────────────────────────
+
+export const sCriarConta = {
+  body: {
+    type: 'object',
+    required: ['codigo', 'descricao'],
+    additionalProperties: false,
+    properties: {
+      codigo: str,
+      descricao: str,
+      parentId: uuidOpt,
+      admiteMovimento: boolOpt,
+    },
+  },
+} as const
+
+export const sAtualizarConta = {
+  body: {
+    type: 'object',
+    additionalProperties: false,
+    properties: {
+      codigo: strOpt,
+      descricao: strOpt,
+      admiteMovimento: boolOpt,
+    },
+  },
+} as const

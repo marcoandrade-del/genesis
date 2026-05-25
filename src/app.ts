@@ -17,6 +17,11 @@ import { adminsRoutes } from './routes/admins.js'
 import { permissoesRoutes } from './routes/permissoes.js'
 import { relatoriosRoutes } from './routes/relatorios.js'
 import { favoritosRoutes } from './routes/favoritos.js'
+import { modelosContabeisRoutes } from './routes/modelos-contabeis.js'
+import { estadosRoutes } from './routes/estados.js'
+import { municipiosRoutes } from './routes/municipios.js'
+import { planosDeContasRoutes } from './routes/planos-de-contas.js'
+import { contasRoutes } from './routes/contas.js'
 
 export const app = Fastify({ logger: true })
 
@@ -49,4 +54,9 @@ app.register(async (api) => {
   api.register(permissoesRoutes)
   api.register(relatoriosRoutes)
   api.register(favoritosRoutes)
+  api.register(modelosContabeisRoutes)
+  api.register(estadosRoutes)
+  api.register(municipiosRoutes)
+  api.register(planosDeContasRoutes)
+  api.register(contasRoutes)
 })
