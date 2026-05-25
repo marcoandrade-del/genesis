@@ -120,4 +120,61 @@ describe('planosDeContasRoutes', () => {
     const res = await app.inject({ method: 'DELETE', url: '/planos-de-contas/p1', headers: auth })
     expect(res.statusCode).toBe(409)
   })
+
+  describe('POST /:id/importar', () => {
+    const csvMinimo = 'codigo,descricao,codigoPai,admiteMovimento\n1,Ativo,,false\n1.1,Circulante,1,true'
+
+    it('exige autenticação', async () => {
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', payload: { csv: csvMinimo },
+      })
+      expect(res.statusCode).toBe(401)
+    })
+
+    it('400 quando campo csv ausente', async () => {
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', headers: auth, payload: {},
+      })
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('404 quando plano inexistente', async () => {
+      prisma.planoDeContas.findUnique.mockResolvedValue(null)
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', headers: auth, payload: { csv: csvMinimo },
+      })
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('201 retorna contagem de contas criadas', async () => {
+      prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+      prisma.conta.createMany.mockResolvedValue({ count: 2 })
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', headers: auth, payload: { csv: csvMinimo },
+      })
+      expect(res.statusCode).toBe(201)
+      expect(res.json()).toEqual({ data: { criadas: 2 } })
+    })
+
+    it('409 quando createMany detecta código duplicado (P2002)', async () => {
+      prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+      const { Prisma } = await import('@prisma/client')
+      prisma.conta.createMany.mockRejectedValue(
+        new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: '7.0.0' }),
+      )
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', headers: auth, payload: { csv: csvMinimo },
+      })
+      expect(res.statusCode).toBe(409)
+    })
+
+    it('400 quando CSV malformado (coluna ausente)', async () => {
+      prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+      const csvSemColuna = 'codigo,descricao\n1,Ativo'
+      const res = await app.inject({
+        method: 'POST', url: '/planos-de-contas/p1/importar', headers: auth, payload: { csv: csvSemColuna },
+      })
+      expect(res.statusCode).toBe(400)
+    })
+  })
 })
