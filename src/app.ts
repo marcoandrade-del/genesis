@@ -22,6 +22,7 @@ import { estadosRoutes } from './routes/estados.js'
 import { municipiosRoutes } from './routes/municipios.js'
 import { planosDeContasRoutes } from './routes/planos-de-contas.js'
 import { contasRoutes } from './routes/contas.js'
+import { lancamentosRoutes } from './routes/lancamentos.js'
 
 export const app = Fastify({ logger: true })
 
@@ -59,4 +60,5 @@ app.register(async (api) => {
   api.register(municipiosRoutes)
   api.register(planosDeContasRoutes)
   api.register(contasRoutes)
+  api.register(lancamentosRoutes)
 })

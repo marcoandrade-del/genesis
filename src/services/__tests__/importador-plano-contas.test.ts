@@ -108,6 +108,18 @@ describe('parseCSV', () => {
     const csv = `codigo,descricao,codigoPai,admiteMovimento\n1`
     expect(() => parseCSV(csv)).toThrow(/Linha 2: descrição vazia/)
   })
+
+  it('aceita header em ordem diferente; linha curta faz codigo cair no fallback', () => {
+    // idx.codigo=1; partes=['Ativo'] → partes[1] é undefined.
+    const csv = `descricao,codigo,codigoPai,admiteMovimento\nAtivo`
+    expect(() => parseCSV(csv)).toThrow(/código vazio/)
+  })
+
+  it('aceita CSV sem colunas opcionais trailing — codigoPai e admiteMovimento implícitos', () => {
+    const csv = `codigo,descricao,codigoPai,admiteMovimento\n1,Ativo`
+    const r = parseCSV(csv)
+    expect(r).toEqual([{ codigo: '1', descricao: 'Ativo', codigoPai: null, admiteMovimento: false }])
+  })
 })
 
 describe('validar', () => {
