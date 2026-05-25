@@ -1,14 +1,10 @@
 import type { FastifyInstance } from 'fastify'
 import { ContasService } from '../services/contas.js'
-import { ImportadorPlanoContasService } from '../services/importador-plano-contas.js'
 import { erroHttp, tratarErro } from '../errors.js'
-import { sCriarConta, sAtualizarConta, sImportarPlanoContas } from '../schemas.js'
-
-const LIMITE_CSV_BYTES = 10 * 1024 * 1024 // 10 MB; PCASP típico tem <100 KB
+import { sCriarConta, sAtualizarConta } from '../schemas.js'
 
 export async function contasRoutes(app: FastifyInstance) {
   const service = new ContasService(app.prisma)
-  const importador = new ImportadorPlanoContasService(app.prisma)
 
   app.get<{ Params: { planoId: string } }>(
     '/planos-de-contas/:planoId/contas',
@@ -61,17 +57,4 @@ export async function contasRoutes(app: FastifyInstance) {
       return tratarErro(e, reply)
     }
   })
-
-  app.post<{ Params: { planoId: string }; Body: { csv: string } }>(
-    '/planos-de-contas/:planoId/contas/importar',
-    { schema: sImportarPlanoContas, bodyLimit: LIMITE_CSV_BYTES },
-    async (req, reply) => {
-      try {
-        const r = await importador.importar(req.params.planoId, req.body.csv)
-        return reply.status(201).send({ data: r })
-      } catch (e) {
-        return tratarErro(e, reply)
-      }
-    },
-  )
 }

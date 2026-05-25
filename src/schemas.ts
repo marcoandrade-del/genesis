@@ -465,17 +465,6 @@ export const sAtualizarConta = {
   },
 } as const
 
-export const sImportarPlanoContas = {
-  body: {
-    type: 'object',
-    required: ['csv'],
-    additionalProperties: false,
-    properties: {
-      csv: { type: 'string', minLength: 1 },
-    },
-  },
-} as const
-
 // ── Contábil — Lançamentos ───────────────────────────────────────────────────
 
 const valorMonetario = { type: 'string', pattern: '^\\d+(\\.\\d{1,2})?$' } as const
