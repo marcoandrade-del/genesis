@@ -179,6 +179,7 @@ export function criarPrismaMock() {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
+      groupBy: vi.fn().mockResolvedValue([]),
     },
     lancamento: {
       findUnique: vi.fn(),

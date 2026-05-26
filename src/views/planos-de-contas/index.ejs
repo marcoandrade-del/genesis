@@ -47,6 +47,11 @@
             <td class="text-center"><span class="badge bg-light text-dark fw-semibold"><%= p.ano %></span></td>
             <td class="text-center text-muted small"><%= p._count.contas %></td>
             <td class="text-end pe-3">
+              <a class="btn btn-sm btn-outline-primary me-1"
+                href="/admin/contas?planoId=<%= p.id %>"
+                title="Ver árvore de contas">
+                <i class="bi bi-diagram-3"></i>
+              </a>
               <button class="btn btn-sm btn-outline-success me-1"
                 hx-get="/admin/planos-de-contas/<%= p.id %>/importar"
                 hx-target="#modal-body"
