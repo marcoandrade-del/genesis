@@ -12,6 +12,7 @@ import { adminRelatoriosRoutes } from './relatorios.js'
 import { adminRelatoriosPersonalizadosRoutes } from './relatorios-personalizados.js'
 import { adminFavoritosRoutes } from './favoritos.js'
 import { adminFuncionandoRoutes } from './funcionando.js'
+import { adminModelosContabeisRoutes } from './modelos-contabeis.js'
 
 export async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
@@ -77,5 +78,6 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminFavoritosRoutes, { prefix: '/favoritos' })
     admin.register(adminLixeiraRoutes, { prefix: '/lixeira' })
     admin.register(adminFuncionandoRoutes, { prefix: '/funcionando' })
+    admin.register(adminModelosContabeisRoutes, { prefix: '/modelos-contabeis' })
   })
 }
