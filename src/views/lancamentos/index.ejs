@@ -1,0 +1,110 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Lançamentos</h2>
+  <% if (municipio) { %>
+    <button class="btn btn-primary btn-sm" disabled
+      title="Criação de lançamento — em PR separada">
+      <i class="bi bi-plus-lg me-1"></i>Novo Lançamento
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/lancamentos">
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>>
+          <%= e.sigla %> — <%= e.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm"
+      <%= estadoSelecionadoId ? '' : 'disabled' %>
+      onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= municipio && m.id === municipio.id ? 'selected' : '' %>>
+          <%= m.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small fw-semibold mb-1">Data início</label>
+    <input type="date" name="dataInicio" value="<%= dataInicio %>" class="form-control form-control-sm">
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small fw-semibold mb-1">Data fim</label>
+    <input type="date" name="dataFim" value="<%= dataFim %>" class="form-control form-control-sm">
+  </div>
+  <div class="col-md-2">
+    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+      <i class="bi bi-funnel me-1"></i>Aplicar
+    </button>
+  </div>
+</form>
+
+<% if (!municipio) { %>
+  <div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>Selecione um estado e município para listar lançamentos.
+  </div>
+<% } else { %>
+  <div class="small text-muted mb-2">
+    <strong><%= municipio.estado.sigla %> · <%= municipio.nome %></strong> —
+    <%= lancamentos.length %> lançamento(s)<% if (lancamentos.length >= limite) { %>
+      <span class="text-warning">(limite <%= limite %> atingido — refine o período)</span>
+    <% } %>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3" style="width:140px">Data</th>
+            <th>Histórico</th>
+            <th class="text-end" style="width:160px">Valor (R$)</th>
+            <th class="text-end pe-3" style="width:140px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (lancamentos.length === 0) { %>
+            <tr><td colspan="4" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum lançamento no período.
+            </td></tr>
+          <% } %>
+          <% lancamentos.forEach(function(l) { %>
+            <tr id="lancamento-<%= l.id %>">
+              <td class="ps-3 font-monospace small">
+                <%= new Date(l.data).toISOString().slice(0, 10) %>
+              </td>
+              <td><%= l.historico %></td>
+              <td class="text-end font-monospace">
+                <%= Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+              </td>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary me-1"
+                  hx-get="/admin/lancamentos/<%= l.id %>/detalhe"
+                  hx-target="#modal-body"
+                  hx-swap="innerHTML"
+                  title="Ver detalhes">
+                  <i class="bi bi-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                  data-id="<%= l.id %>" data-nome="<%= new Date(l.data).toISOString().slice(0,10) %> — <%= l.historico %>"
+                  onclick="confirmarExclusaoAsync('lançamento', this.dataset.id, this.dataset.nome, { url: '/admin/lancamentos/' + this.dataset.id, target: '#lancamento-' + this.dataset.id, swap: 'outerHTML' })"
+                  title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

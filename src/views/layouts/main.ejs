@@ -98,6 +98,9 @@
       <li><a class="nav-link <%= active === 'contas' ? 'active' : '' %>" href="/admin/contas">
         <i class="bi bi-diagram-3 me-2"></i>Contas
       </a></li>
+      <li><a class="nav-link <%= active === 'lancamentos' ? 'active' : '' %>" href="/admin/lancamentos">
+        <i class="bi bi-receipt me-2"></i>Lançamentos
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -126,6 +129,7 @@
         municipios: 'Municípios',
         'planos-de-contas': 'Planos de Contas',
         contas: 'Contas',
+        lancamentos: 'Lançamentos',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>

@@ -1,0 +1,79 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-receipt me-2 text-primary"></i>Lançamento
+    <span class="text-muted small ms-1">— <%= new Date(lanc.data).toISOString().slice(0, 10) %></span>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <div class="small text-muted">Município</div>
+      <div class="fw-semibold">
+        <% if (municipio) { %>
+          <%= municipio.estado.sigla %> · <%= municipio.nome %>
+        <% } else { %>
+          <span class="text-muted">—</span>
+        <% } %>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="small text-muted">Data</div>
+      <div class="font-monospace"><%= new Date(lanc.data).toISOString().slice(0, 10) %></div>
+    </div>
+    <div class="col-md-3">
+      <div class="small text-muted">Valor total</div>
+      <div class="fw-semibold font-monospace">
+        R$ <%= Number(lanc.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <div class="small text-muted">Histórico</div>
+    <div><%= lanc.historico %></div>
+  </div>
+
+  <div class="card border-0 bg-light">
+    <div class="card-body p-0">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th class="ps-3" style="width:90px">Tipo</th>
+            <th style="width:160px">Código</th>
+            <th>Descrição</th>
+            <th class="text-end pe-3" style="width:160px">Valor (R$)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% lanc.itens.forEach(function(it) { %>
+            <% const c = contasPorId.get(it.contaId) %>
+            <tr>
+              <td class="ps-3">
+                <% if (it.tipo === 'DEBITO') { %>
+                  <span class="badge bg-danger bg-opacity-75">Débito</span>
+                <% } else { %>
+                  <span class="badge bg-success bg-opacity-75">Crédito</span>
+                <% } %>
+              </td>
+              <td class="font-monospace small"><%= c ? c.codigo : '—' %></td>
+              <td><%= c ? c.descricao : '<conta removida>' %></td>
+              <td class="text-end pe-3 font-monospace">
+                <%= Number(it.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="form-text mt-2">
+    Lançamentos são imutáveis. Para corrigir, registre um contra-lançamento.
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Fechar</button>
+</div>
