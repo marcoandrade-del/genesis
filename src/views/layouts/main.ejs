@@ -95,6 +95,9 @@
       <li><a class="nav-link <%= active === 'planos-de-contas' ? 'active' : '' %>" href="/admin/planos-de-contas">
         <i class="bi bi-journal-bookmark me-2"></i>Planos de Contas
       </a></li>
+      <li><a class="nav-link <%= active === 'contas' ? 'active' : '' %>" href="/admin/contas">
+        <i class="bi bi-diagram-3 me-2"></i>Contas
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -122,6 +125,7 @@
         estados: 'Estados',
         municipios: 'Municípios',
         'planos-de-contas': 'Planos de Contas',
+        contas: 'Contas',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
