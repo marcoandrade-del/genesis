@@ -15,3 +15,13 @@ claude.md.bkp
 # Documentos de requisitos / melhorias (fora do versionamento)
 *.pdf
 /Regras*
+
+# Python (scripts auxiliares: extração de PDF, etc.)
+.venv/
+__pycache__/
+*.pyc
+
+# Artefatos gerados pelos scripts (regeneráveis via scripts/*.py / pdftotext)
+PCASP.txt
+pcasp_*.xlsx
+pcasp_*.csv
