@@ -1,0 +1,73 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-pin-map me-2 text-primary"></i><%= municipio ? 'Editar Município' : 'Novo Município' %>
+    <% if (estado) { %>
+      <span class="text-muted small ms-1">— <%= estado.sigla %></span>
+    <% } %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (municipio) { %>
+    hx-put="/admin/municipios/<%= municipio.id %>"
+  <% } else { %>
+    hx-post="/admin/municipios"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <% if (!municipio && estado) { %>
+    <input type="hidden" name="estadoId" value="<%= estado.id %>">
+  <% } %>
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= municipio ? municipio.nome : '' %>"
+        placeholder="ex.: Belo Horizonte"
+        required maxlength="200">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Estado</label>
+      <input type="text" class="form-control form-control-sm" readonly
+        value="<%= estado ? estado.sigla + ' — ' + estado.nome : '' %>">
+      <% if (!municipio) { %>
+        <div class="form-text">Para criar em outro estado, troque o filtro na listagem.</div>
+      <% } %>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Modelo Contábil</label>
+      <select name="modeloContabilId" class="form-select form-select-sm">
+        <option value="">
+          — Herdar do estado
+          <% if (estado && estado.modeloContabil) { %>(<%= estado.modeloContabil.descricao %>)<% } else { %>(nenhum atribuído)<% } %>
+          —
+        </option>
+        <% modelos.forEach(function(m) { %>
+          <option value="<%= m.id %>"
+            <%= municipio && municipio.modeloContabilId === m.id ? 'selected' : '' %>>
+            <%= m.descricao %>
+          </option>
+        <% }) %>
+      </select>
+      <div class="form-text">Sem modelo próprio, o município herda o do estado (incluindo mudanças futuras).</div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=nome]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

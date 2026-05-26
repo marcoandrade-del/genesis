@@ -1,0 +1,88 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Municípios</h2>
+  <% if (estadoSelecionado) { %>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/municipios/form?estadoId=<%= estadoSelecionado.id %>"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Novo Município
+    </button>
+  <% } %>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <label class="form-label small fw-semibold mb-1">Selecione o estado</label>
+    <select class="form-select form-select-sm"
+      onchange="window.location.href = this.value ? '/admin/municipios?estadoId=' + this.value : '/admin/municipios'">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= estadoSelecionado && estadoSelecionado.id === e.id ? 'selected' : '' %>>
+          <%= e.sigla %> — <%= e.nome %>
+          <% if (e.modeloContabil) { %> (modelo: <%= e.modeloContabil.descricao %>)<% } %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</div>
+
+<% if (!estadoSelecionado) { %>
+  <div class="text-center text-muted py-5">
+    <i class="bi bi-arrow-up fs-4 d-block mb-2"></i>
+    Selecione um estado acima para listar seus municípios.
+  </div>
+<% } else { %>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Nome</th>
+            <th>Modelo Contábil</th>
+            <th class="text-end pe-3" style="width: 100px;">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (municipios.length === 0) { %>
+            <tr><td colspan="3" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum município cadastrado em <%= estadoSelecionado.nome %>.
+            </td></tr>
+          <% } %>
+          <% municipios.forEach(function(m) { %>
+            <tr id="municipio-<%= m.id %>">
+              <td class="ps-3 fw-semibold"><%= m.nome %></td>
+              <td>
+                <% if (m.modeloContabil) { %>
+                  <span class="badge bg-primary bg-opacity-10 text-primary"><%= m.modeloContabil.descricao %></span>
+                <% } else if (estadoSelecionado.modeloContabil) { %>
+                  <span class="text-muted small">
+                    <i class="bi bi-link-45deg"></i>
+                    <span class="fst-italic">Herdado de <%= estadoSelecionado.sigla %>:</span>
+                    <%= estadoSelecionado.modeloContabil.descricao %>
+                  </span>
+                <% } else { %>
+                  <span class="text-muted small fst-italic">Não atribuído</span>
+                <% } %>
+              </td>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary me-1"
+                  hx-get="/admin/municipios/<%= m.id %>/form"
+                  hx-target="#modal-body"
+                  hx-swap="innerHTML"
+                  title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                  data-id="<%= m.id %>" data-nome="<%= m.nome %>"
+                  onclick="confirmarExclusaoAsync('município', this.dataset.id, this.dataset.nome, { url: '/admin/municipios/' + this.dataset.id, target: '#municipio-' + this.dataset.id, swap: 'outerHTML' })"
+                  title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
