@@ -15,6 +15,16 @@ claude.md.bkp
 # Documentos de requisitos / melhorias (fora do versionamento)
 *.pdf
 /Regras*
+/Requisitos*
+/Spec*
+
+# Saídas locais de testes e cobertura (geradas, não versionar)
+coverage-tmp/
+test-results/
+test-reporter/
+
+# Rascunhos experimentais pessoais
+/wise/
 
 # Python (scripts auxiliares: extração de PDF, etc.)
 .venv/
