@@ -15,6 +15,7 @@ import { adminFuncionandoRoutes } from './funcionando.js'
 import { adminModelosContabeisRoutes } from './modelos-contabeis.js'
 import { adminEstadosRoutes } from './estados.js'
 import { adminMunicipiosRoutes } from './municipios.js'
+import { adminPlanosDeContasRoutes } from './planos-de-contas.js'
 
 export async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
@@ -84,5 +85,6 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminModelosContabeisRoutes, { prefix: '/modelos-contabeis' })
     admin.register(adminEstadosRoutes, { prefix: '/estados' })
     admin.register(adminMunicipiosRoutes, { prefix: '/municipios' })
+    admin.register(adminPlanosDeContasRoutes, { prefix: '/planos-de-contas' })
   })
 }
