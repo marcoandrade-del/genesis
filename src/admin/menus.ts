@@ -243,7 +243,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       if (!nome?.trim()) return renderSistemaEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await sistemasSvc.atualizar(req.params.id, {
-          ...(nome ? { nome } : {}),
+          nome,
           ...(descricao !== undefined ? { descricao } : {}),
           ativo: ativo === 'true',
         })
@@ -376,7 +376,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       if (!nome?.trim()) return renderModuloEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await modulosSvc.atualizar(req.params.id, {
-          ...(nome ? { nome } : {}),
+          nome,
           ...(descricao !== undefined ? { descricao } : {}),
           ativo: ativo === 'true',
         })
@@ -396,7 +396,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
       if (!nome?.trim()) return renderMenuEdit(reply, req.params.id, 'O nome é obrigatório.')
       try {
         await menusSvc.atualizar(req.params.id, {
-          ...(nome ? { nome } : {}),
+          nome,
           ...(icone !== undefined ? { icone } : {}),
           ...(ordem ? { ordem: parseInt(ordem) } : {}),
           ativo: ativo === 'true',
@@ -418,7 +418,7 @@ export async function adminMenusRoutes(app: FastifyInstance) {
     if (!nome?.trim()) return renderItemEdit(reply, req.params.id, 'O nome é obrigatório.')
     try {
       await itensSvc.atualizar(req.params.id, {
-        ...(nome ? { nome } : {}),
+        nome,
         ...(descricao !== undefined ? { descricao } : {}),
         ...(tipoFuncionalidade ? { tipoFuncionalidade: tipoFuncionalidade as TipoFuncionalidade } : {}),
         ...(rota !== undefined ? { rota } : {}),

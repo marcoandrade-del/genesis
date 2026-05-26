@@ -63,7 +63,8 @@ export async function adminRoutes(app: FastifyInstance) {
     // Se não vier de uma requisição HTMX, redireciona para o dashboard.
     admin.addHook('onRequest', async (req, reply) => {
       if (req.method !== 'GET' || req.headers['hx-request']) return
-      const [rawPath = ''] = (req.url ?? '').split('?')
+      // req.url é sempre definido em Fastify; split('?') sempre retorna ≥ 1 elemento.
+      const rawPath = req.url.split('?')[0]!
       const segments = rawPath.replace(/^\/admin\/?/, '').split('/').filter(Boolean)
       if (segments.length >= 2 && segments[0] !== 'funcionando') return reply.redirect('/admin')
     })

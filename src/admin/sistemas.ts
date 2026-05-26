@@ -79,7 +79,7 @@ export async function adminSistemasRoutes(app: FastifyInstance) {
     }
     try {
       await service.atualizar(req.params.id, {
-        ...(nome ? { nome } : {}),
+        nome,
         ...(descricao ? { descricao } : {}),
         ...(ativo !== undefined ? { ativo: ativo === 'true' } : {}),
       })

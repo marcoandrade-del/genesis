@@ -111,7 +111,7 @@ export async function adminRelatoriosPersonalizadosRoutes(app: FastifyInstance) 
 
     try {
       await service.atualizarPersonalizado(req.params.id, {
-        ...(nome ? { nome } : {}),
+        nome,
         ...(descricao ? { descricao } : {}),
         ...(configObj !== undefined ? { configuracao: configObj } : {}),
         ...(ativo !== undefined ? { ativo: ativo === 'true' } : {}),

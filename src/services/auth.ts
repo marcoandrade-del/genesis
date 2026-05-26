@@ -5,13 +5,15 @@ import { ErroNegocio } from '../errors.js'
 function validarCpf(cpf: string): boolean {
   const d = cpf.replace(/\D/g, '')
   if (d.length !== 11 || /^(\d)\1+$/.test(d)) return false
+  // Após o guard de length === 11, todo d[i] com i < 11 é definido;
+  // o non-null satisfaz noUncheckedIndexedAccess sem fallback morto.
   const calc = (n: number) => {
     let s = 0
-    for (let i = 0; i < n; i++) s += Number(d[i] ?? '0') * (n + 1 - i)
+    for (let i = 0; i < n; i++) s += Number(d[i]!) * (n + 1 - i)
     const r = 11 - (s % 11)
     return r >= 10 ? 0 : r
   }
-  return calc(9) === Number(d[9] ?? '') && calc(10) === Number(d[10] ?? '')
+  return calc(9) === Number(d[9]!) && calc(10) === Number(d[10]!)
 }
 
 type RegistrarDados = {
