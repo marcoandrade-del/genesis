@@ -1,0 +1,48 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Estados</h2>
+  <div class="text-muted small">
+    <i class="bi bi-info-circle me-1"></i>
+    27 UFs do Brasil. Atribuir um modelo propaga automaticamente para os municípios.
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width: 80px;">Sigla</th>
+          <th>Nome</th>
+          <th>Modelo Contábil</th>
+          <th class="text-end" style="width: 120px;">Municípios</th>
+          <th class="text-end pe-3" style="width: 100px;">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% estados.forEach(function(e) { %>
+          <tr>
+            <td class="ps-3 fw-semibold font-monospace"><%= e.sigla %></td>
+            <td><%= e.nome %></td>
+            <td>
+              <% if (e.modeloContabil) { %>
+                <span class="badge bg-primary bg-opacity-10 text-primary"><%= e.modeloContabil.descricao %></span>
+              <% } else { %>
+                <span class="text-muted small fst-italic">Não atribuído</span>
+              <% } %>
+            </td>
+            <td class="text-end text-muted small"><%= e._count.municipios %></td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary"
+                hx-get="/admin/estados/<%= e.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Atribuir modelo contábil">
+                <i class="bi bi-pencil"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

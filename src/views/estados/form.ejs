@@ -1,0 +1,52 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-geo-alt me-2 text-primary"></i>Modelo Contábil — <%= estado.nome %> (<%= estado.sigla %>)
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  hx-put="/admin/estados/<%= estado.id %>"
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (estado._count.municipios > 0) { %>
+      <div class="alert alert-warning py-2 small mb-3">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        <strong>Atenção:</strong> alterar o modelo deste estado vai sobrescrever o modelo de
+        <strong><%= estado._count.municipios %></strong> município(s), inclusive os que foram customizados.
+      </div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Modelo Contábil</label>
+      <select name="modeloContabilId" class="form-select form-select-sm">
+        <option value="">— Nenhum (limpar) —</option>
+        <% modelos.forEach(function(m) { %>
+          <option value="<%= m.id %>" <%= estado.modeloContabilId === m.id ? 'selected' : '' %>>
+            <%= m.descricao %>
+          </option>
+        <% }) %>
+      </select>
+      <% if (modelos.length === 0) { %>
+        <div class="form-text text-warning-emphasis">
+          Não há modelos contábeis cadastrados. <a href="/admin/modelos-contabeis">Cadastre um modelo</a> antes.
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), '<%= estado.sigla %>')">
+      <i class="bi bi-check-lg me-1"></i>Aplicar
+    </button>
+  </div>
+</form>
