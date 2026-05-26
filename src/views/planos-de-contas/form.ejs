@@ -1,0 +1,63 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-journal-bookmark me-2 text-primary"></i><%= plano ? 'Editar Plano de Contas' : 'Novo Plano de Contas' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (plano) { %>
+    hx-put="/admin/planos-de-contas/<%= plano.id %>"
+  <% } else { %>
+    hx-post="/admin/planos-de-contas"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição <span class="text-danger">*</span></label>
+      <input type="text" name="descricao" class="form-control form-control-sm"
+        value="<%= plano ? plano.descricao : '' %>"
+        placeholder="ex.: PCASP — 2026"
+        required maxlength="200">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Ano <span class="text-danger">*</span></label>
+      <input type="number" name="ano" class="form-control form-control-sm"
+        value="<%= plano ? plano.ano : new Date().getFullYear() %>"
+        min="1900" max="9999" required>
+      <div class="form-text">Cada modelo contábil só admite um plano por ano.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Modelo Contábil <span class="text-danger">*</span></label>
+      <% if (plano) { %>
+        <input type="text" class="form-control form-control-sm" readonly
+          value="<%= plano.modeloContabil.descricao %>">
+        <div class="form-text">O modelo é definido na criação e não pode ser alterado.</div>
+      <% } else { %>
+        <select name="modeloContabilId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% modelos.forEach(function(m) { %>
+            <option value="<%= m.id %>"><%= m.descricao %></option>
+          <% }) %>
+        </select>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=descricao]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>
