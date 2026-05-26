@@ -82,6 +82,20 @@
         <i class="bi bi-star me-2"></i>Favoritos
       </a></li>
 
+      <li><div class="section-label mt-1">Contábil</div></li>
+      <li><a class="nav-link <%= active === 'modelos-contabeis' ? 'active' : '' %>" href="/admin/modelos-contabeis">
+        <i class="bi bi-journal-text me-2"></i>Modelos
+      </a></li>
+      <li><a class="nav-link <%= active === 'estados' ? 'active' : '' %>" href="/admin/estados">
+        <i class="bi bi-map me-2"></i>Estados
+      </a></li>
+      <li><a class="nav-link <%= active === 'municipios' ? 'active' : '' %>" href="/admin/municipios">
+        <i class="bi bi-pin-map me-2"></i>Municípios
+      </a></li>
+      <li><a class="nav-link <%= active === 'planos-de-contas' ? 'active' : '' %>" href="/admin/planos-de-contas">
+        <i class="bi bi-journal-bookmark me-2"></i>Planos de Contas
+      </a></li>
+
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
         <i class="bi bi-play-circle-fill me-2" style="color:#4ade80"></i>Funcionando…
@@ -104,6 +118,10 @@
         'relatorios-personalizados': 'Relatórios Personalizados',
         favoritos: 'Favoritos',
         lixeira: 'Lixeira',
+        'modelos-contabeis': 'Modelos Contábeis',
+        estados: 'Estados',
+        municipios: 'Municípios',
+        'planos-de-contas': 'Planos de Contas',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
