@@ -34,7 +34,8 @@ export async function adminModelosContabeisRoutes(app: FastifyInstance) {
       return reply.view('modelos-contabeis/form', { modelo: null, erro: 'A descrição é obrigatória.' })
     }
     try {
-      await service.criar({ descricao: descricao.trim(), ativo: ativo === 'true' })
+      // Novo modelo nasce ativo por default — UI de criação nem mostra o toggle.
+      await service.criar({ descricao: descricao.trim(), ativo: ativo !== 'false' })
       return reply.header('HX-Redirect', '/admin/modelos-contabeis').status(204).send()
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao criar modelo contábil.'
