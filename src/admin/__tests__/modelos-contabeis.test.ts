@@ -94,7 +94,7 @@ describe('adminModelosContabeisRoutes', () => {
       const res = await app.inject({ method: 'POST', url: '/', ...form({ descricao: 'PCASP' }) })
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/modelos-contabeis')
-      expect(criarMock).toHaveBeenCalledWith({ descricao: 'PCASP', ativo: false })
+      expect(criarMock).toHaveBeenCalledWith({ descricao: 'PCASP', ativo: true })
     })
 
     it('re-renderiza form com erro quando descrição vazia', async () => {
