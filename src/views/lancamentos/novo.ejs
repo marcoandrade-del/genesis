@@ -92,6 +92,9 @@
                   onclick="abrirContaPickerLinha(this)">
                   <span class="conta-label text-muted"><%= it.contaId ? '(conta selecionada)' : 'Selecionar conta…' %></span>
                 </button>
+                <small class="duplicado-aviso text-warning d-none mt-1 d-block">
+                  <i class="bi bi-exclamation-triangle me-1"></i>Conta repetida em outra linha
+                </small>
               </td>
               <td class="text-end">
                 <input type="number" name="valor" value="<%= it.valor %>" step="0.01" min="0.01"
@@ -149,6 +152,9 @@
         onclick="abrirContaPickerLinha(this)">
         <span class="conta-label text-muted">Selecionar conta…</span>
       </button>
+      <small class="duplicado-aviso text-warning d-none mt-1 d-block">
+        <i class="bi bi-exclamation-triangle me-1"></i>Conta repetida em outra linha
+      </small>
     </td>
     <td class="text-end">
       <input type="number" name="valor" step="0.01" min="0.01"
@@ -180,6 +186,27 @@ function adicionarItem(tipo) {
 function removerItem(btn) {
   btn.closest('tr').remove()
   atualizarTotais()
+  verificarDuplicatas()
+}
+
+// Mesma contaId em 2+ linhas (qualquer tipo) é raro e quase sempre erro de
+// digitação. Avisamos visualmente sem bloquear: o service agrega corretamente
+// em lançamentos compostos legítimos.
+function verificarDuplicatas() {
+  const linhas = Array.from(document.querySelectorAll('#itens-tbody tr'))
+  const contagem = new Map()
+  linhas.forEach(function(tr) {
+    const id = tr.querySelector('input[name="contaId"]').value
+    if (!id) return
+    contagem.set(id, (contagem.get(id) || 0) + 1)
+  })
+  linhas.forEach(function(tr) {
+    const id = tr.querySelector('input[name="contaId"]').value
+    const repetida = !!id && contagem.get(id) > 1
+    tr.classList.toggle('table-warning', repetida)
+    const aviso = tr.querySelector('.duplicado-aviso')
+    if (aviso) aviso.classList.toggle('d-none', !repetida)
+  })
 }
 
 // Picker abre offcanvas com planoId atual; callback preenche hidden + label.
@@ -200,6 +227,7 @@ function abrirContaPickerLinha(btn) {
     hidden.value = id
     label.textContent = nome
     label.classList.remove('text-muted')
+    verificarDuplicatas()
   }, { planoId: planoId })
 }
 
@@ -222,4 +250,5 @@ function atualizarTotais() {
 }
 
 atualizarTotais()
+verificarDuplicatas()
 </script>
