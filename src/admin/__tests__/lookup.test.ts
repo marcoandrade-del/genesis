@@ -124,6 +124,63 @@ describe('adminLookupRoutes', () => {
     })
   })
 
+  describe('GET /contas', () => {
+    it('sem planoId não consulta e renderiza casca vazia', async () => {
+      const res = await app.inject({ method: 'GET', url: '/contas' })
+      expect(res.statusCode).toBe(200)
+      expect(prisma.conta.findMany).not.toHaveBeenCalled()
+    })
+
+    it('sem planoId com HX-Target também não consulta', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/contas',
+        headers: { 'hx-target': 'lookup-rows-contas' },
+      })
+      expect(res.statusCode).toBe(200)
+      expect(prisma.conta.findMany).not.toHaveBeenCalled()
+    })
+
+    it('com planoId filtra por plano e admiteMovimento=true', async () => {
+      prisma.conta.findMany.mockResolvedValue([])
+      await app.inject({ method: 'GET', url: '/contas?planoId=p1' })
+      expect(prisma.conta.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { planoId: 'p1', admiteMovimento: true },
+          orderBy: { codigo: 'asc' },
+          take: 50,
+        }),
+      )
+    })
+
+    it('com q aplica OR em codigo e descricao', async () => {
+      prisma.conta.findMany.mockResolvedValue([])
+      await app.inject({ method: 'GET', url: '/contas?planoId=p1&q=caixa' })
+      expect(prisma.conta.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            planoId: 'p1',
+            admiteMovimento: true,
+            OR: [
+              { codigo: { contains: 'caixa', mode: 'insensitive' } },
+              { descricao: { contains: 'caixa', mode: 'insensitive' } },
+            ],
+          },
+        }),
+      )
+    })
+
+    it('HX-Target renderiza partial', async () => {
+      prisma.conta.findMany.mockResolvedValue([])
+      const res = await app.inject({
+        method: 'GET',
+        url: '/contas?planoId=p1',
+        headers: { 'hx-target': 'lookup-rows-contas' },
+      })
+      expect(res.statusCode).toBe(200)
+    })
+  })
+
   describe('GET /itens', () => {
     it('filtra por tipo=FUNCIONALIDADE e ativo=true', async () => {
       prisma.itemFuncionalidade.findMany.mockResolvedValue([])
