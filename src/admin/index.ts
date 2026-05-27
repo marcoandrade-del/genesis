@@ -19,6 +19,10 @@ import { adminPlanosDeContasRoutes } from './planos-de-contas.js'
 import { adminContasRoutes } from './contas.js'
 import { adminLancamentosRoutes } from './lancamentos.js'
 
+export function adminNotFoundHandler(req: FastifyRequest, reply: FastifyReply) {
+  return reply.status(404).view('404', { caminho: req.url })
+}
+
 export async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyReply) {
   const token = req.cookies['genesis_admin_token']
   if (!token) return reply.redirect('/admin/login')
@@ -55,6 +59,10 @@ export async function adminAuthMiddleware(req: FastifyRequest, reply: FastifyRep
 }
 
 export async function adminRoutes(app: FastifyInstance) {
+  // 404 do escopo /admin: HTML com layout Wise + link de volta.
+  // Escopo encapsulado garante que API segue retornando JSON default.
+  app.setNotFoundHandler(adminNotFoundHandler)
+
   // Rotas públicas do admin (login/logout)
   app.register(adminAuthRoutes)
 
