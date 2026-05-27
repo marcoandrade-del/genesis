@@ -1,0 +1,225 @@
+<%# Form de criação de lançamento. Lista de itens é dinâmica (JS no client),
+   cada linha submete 3 campos paralelos: tipo, contaId, valor. O server zipa
+   pela ordem. Picker de contas usa #planoId (resolvido via HTMX ao trocar data). %>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">Novo Lançamento</h2>
+    <div class="small text-muted">
+      <%= municipio.estado.sigla %> · <%= municipio.nome %>
+    </div>
+  </div>
+  <a href="/admin/lancamentos?municipioId=<%= municipio.id %>" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<% if (erro) { %>
+  <div class="alert alert-danger py-2 small"><%= erro %></div>
+<% } %>
+
+<form id="form-lancamento" method="post" action="/admin/lancamentos"
+  hx-post="/admin/lancamentos" hx-target="body" hx-swap="outerHTML">
+
+  <input type="hidden" name="municipioId" value="<%= municipio.id %>">
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Data <span class="text-danger">*</span></label>
+          <input type="date" name="data" value="<%= dataPadrao %>" required
+            class="form-control form-control-sm"
+            hx-get="/admin/lancamentos/plano-vigente"
+            hx-trigger="change"
+            hx-include="[name='municipioId']"
+            hx-target="#plano-vigente-slot"
+            hx-swap="innerHTML">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label small fw-semibold mb-1">Plano contábil vigente</label>
+          <div id="plano-vigente-slot">
+            <%- include('_plano_vigente', { plano: plano, ano: ano }) %>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3">
+        <label class="form-label small fw-semibold mb-1">Histórico <span class="text-danger">*</span></label>
+        <input type="text" name="historico" class="form-control form-control-sm"
+          value="<%= historicoPreenchido %>"
+          placeholder="ex.: Pagamento de fornecedor"
+          required maxlength="500">
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong class="small">Itens (partida dobrada)</strong>
+      <div>
+        <button type="button" class="btn btn-sm btn-outline-danger me-1" onclick="adicionarItem('DEBITO')">
+          <i class="bi bi-plus-lg me-1"></i>Débito
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-success" onclick="adicionarItem('CREDITO')">
+          <i class="bi bi-plus-lg me-1"></i>Crédito
+        </button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light small">
+          <tr>
+            <th class="ps-3" style="width:90px">Tipo</th>
+            <th>Conta</th>
+            <th class="text-end" style="width:160px">Valor (R$)</th>
+            <th class="pe-3" style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="itens-tbody">
+          <% (itensPreenchidos ?? []).forEach(function(it) { %>
+            <tr data-tipo="<%= it.tipo %>">
+              <td class="ps-3">
+                <input type="hidden" name="tipo" value="<%= it.tipo %>">
+                <% if (it.tipo === 'DEBITO') { %>
+                  <span class="badge bg-danger bg-opacity-75">Débito</span>
+                <% } else { %>
+                  <span class="badge bg-success bg-opacity-75">Crédito</span>
+                <% } %>
+              </td>
+              <td>
+                <input type="hidden" name="contaId" value="<%= it.contaId %>">
+                <button type="button" class="btn btn-sm btn-outline-secondary text-start w-100"
+                  onclick="abrirContaPickerLinha(this)">
+                  <span class="conta-label text-muted"><%= it.contaId ? '(conta selecionada)' : 'Selecionar conta…' %></span>
+                </button>
+              </td>
+              <td class="text-end">
+                <input type="number" name="valor" value="<%= it.valor %>" step="0.01" min="0.01"
+                  class="form-control form-control-sm text-end font-monospace valor-input"
+                  oninput="atualizarTotais()" required>
+              </td>
+              <td class="pe-3 text-end">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(this)" title="Remover">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+        <tfoot class="table-light small fw-semibold">
+          <tr>
+            <td colspan="2" class="text-end">Total débitos</td>
+            <td class="text-end font-monospace" id="total-debito">0,00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-end">Total créditos</td>
+            <td class="text-end font-monospace" id="total-credito">0,00</td>
+            <td></td>
+          </tr>
+          <tr>
+            <td colspan="2" class="text-end">Diferença</td>
+            <td class="text-end font-monospace" id="total-diff">0,00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2">
+    <a href="/admin/lancamentos?municipioId=<%= municipio.id %>" class="btn btn-sm btn-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-sm btn-primary" id="btn-salvar">
+      <i class="bi bi-check-lg me-1"></i>Salvar Lançamento
+    </button>
+  </div>
+</form>
+
+<%# Template clonado para cada nova linha. Tipo é setado no JS por dataset
+   + texto do badge — sem string templating, evita warning de XSS no DOM. %>
+<template id="tpl-item">
+  <tr data-tipo="">
+    <td class="ps-3">
+      <input type="hidden" name="tipo" value="">
+      <span class="badge"></span>
+    </td>
+    <td>
+      <input type="hidden" name="contaId" value="">
+      <button type="button" class="btn btn-sm btn-outline-secondary text-start w-100"
+        onclick="abrirContaPickerLinha(this)">
+        <span class="conta-label text-muted">Selecionar conta…</span>
+      </button>
+    </td>
+    <td class="text-end">
+      <input type="number" name="valor" step="0.01" min="0.01"
+        class="form-control form-control-sm text-end font-monospace valor-input"
+        oninput="atualizarTotais()" required>
+    </td>
+    <td class="pe-3 text-end">
+      <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerItem(this)" title="Remover">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<script>
+function adicionarItem(tipo) {
+  const tpl = document.getElementById('tpl-item')
+  const frag = tpl.content.cloneNode(true)
+  const tr = frag.querySelector('tr')
+  tr.dataset.tipo = tipo
+  tr.querySelector('input[name="tipo"]').value = tipo
+  const badge = tr.querySelector('.badge')
+  if (tipo === 'DEBITO') { badge.classList.add('bg-danger', 'bg-opacity-75'); badge.textContent = 'Débito' }
+  else { badge.classList.add('bg-success', 'bg-opacity-75'); badge.textContent = 'Crédito' }
+  document.getElementById('itens-tbody').appendChild(frag)
+  atualizarTotais()
+}
+
+function removerItem(btn) {
+  btn.closest('tr').remove()
+  atualizarTotais()
+}
+
+// Picker abre offcanvas com planoId atual; callback preenche hidden + label.
+function abrirContaPickerLinha(btn) {
+  const planoId = document.getElementById('planoId')?.value
+  if (!planoId) {
+    _mostrarConfirmar({
+      titulo: 'Plano contábil',
+      texto: 'Defina uma data com plano vigente antes de selecionar contas.',
+      tipo: 'warning', semCancelar: true, okTexto: 'Entendi',
+    }, function() {})
+    return
+  }
+  const tr = btn.closest('tr')
+  const hidden = tr.querySelector('input[name="contaId"]')
+  const label = tr.querySelector('.conta-label')
+  abrirLookup('contas', function(id, nome) {
+    hidden.value = id
+    label.textContent = nome
+    label.classList.remove('text-muted')
+  }, { planoId: planoId })
+}
+
+// Soma totais em pt-BR. Mostra diferença em vermelho quando ≠ 0.
+function atualizarTotais() {
+  let d = 0, c = 0
+  document.querySelectorAll('#itens-tbody tr').forEach(function(tr) {
+    const v = parseFloat(tr.querySelector('.valor-input').value) || 0
+    if (tr.dataset.tipo === 'DEBITO') d += v
+    else c += v
+  })
+  const fmt = function(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  document.getElementById('total-debito').textContent = fmt(d)
+  document.getElementById('total-credito').textContent = fmt(c)
+  const diff = Math.abs(d - c)
+  const diffEl = document.getElementById('total-diff')
+  diffEl.textContent = fmt(diff)
+  diffEl.classList.toggle('text-danger', diff > 0.001)
+  diffEl.classList.toggle('text-success', diff <= 0.001 && d > 0)
+}
+
+atualizarTotais()
+</script>
