@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gênesis — Design System (Wise)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Manrope 800/900 substitui Wise Sans (DESIGN.md §Font Substitutes); Inter para o resto -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Tokens 1:1 com DESIGN.md ─────────────────────────────────────────── */
+  :root {
+    /* Brand & Accent */
+    --primary: #9fe870;
+    --primary-active: #cdffad;
+    --primary-neutral: #c5edab;
+    --primary-pale: #e2f6d5;
+    --on-primary: #0e0f0c;
+
+    /* Surface */
+    --canvas: #ffffff;
+    --canvas-soft: #e8ebe6;
+
+    /* Text */
+    --ink: #0e0f0c;
+    --ink-deep: #163300;
+    --body: #454745;
+    --mute: #868685;
+
+    /* Semantic */
+    --positive: #2ead4b;
+    --positive-deep: #054d28;
+    --warning: #ffd11a;
+    --warning-deep: #b86700;
+    --warning-content: #4a3b1c;
+    --negative: #d03238;
+    --negative-deep: #a72027;
+    --negative-darkest: #a7000d;
+    --negative-bg: #320707;
+
+    /* Tertiary accents */
+    --accent-orange: #ffc091;
+    --accent-cyan: #38c8ff;
+
+    /* Spacing (4px base) */
+    --xxs: 2px;  --xs: 4px;  --sm: 8px;  --md: 12px;
+    --lg: 16px;  --xl: 24px; --2xl: 32px; --3xl: 48px;
+
+    /* Radius */
+    --r-none: 0; --r-sm: 8px; --r-md: 12px; --r-lg: 16px;
+    --r-xl: 24px; --r-pill: 9999px; --r-full: 9999px;
+
+    /* Type families */
+    --font-display: 'Manrope', system-ui, sans-serif;
+    --font-body: 'Inter', system-ui, sans-serif;
+  }
+
+  /* ── Reset leve ───────────────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--canvas-soft);
+    color: var(--ink);
+    font-feature-settings: "calt";
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Typography hierarchy ─────────────────────────────────────────────── */
+  .t-display-mega    { font-family: var(--font-display); font-weight: 900; font-size: 126px; line-height: 107.1px; letter-spacing: 0; }
+  .t-display-xxl     { font-family: var(--font-display); font-weight: 900; font-size: 96px;  line-height: 81.6px;  letter-spacing: 0; }
+  .t-display-xl      { font-family: var(--font-display); font-weight: 900; font-size: 64px;  line-height: 54.4px;  letter-spacing: 0; }
+  .t-display-lg      { font-family: var(--font-body);    font-weight: 400; font-size: 47px;  line-height: 70.5px;  letter-spacing: -0.108px; }
+  .t-display-md      { font-family: var(--font-display); font-weight: 900; font-size: 40px;  line-height: 34px;    letter-spacing: 0; }
+  .t-display-sm      { font-family: var(--font-body);    font-weight: 600; font-size: 32px;  line-height: 38.4px;  letter-spacing: -0.96px; }
+  .t-display-xs      { font-family: var(--font-body);    font-weight: 600; font-size: 24px;  line-height: 31.2px;  letter-spacing: -0.48px; }
+  .t-body-lg         { font-family: var(--font-body);    font-weight: 400; font-size: 20px;  line-height: 30px; }
+  .t-body-md         { font-family: var(--font-body);    font-weight: 400; font-size: 16px;  line-height: 24px; }
+  .t-body-md-strong  { font-family: var(--font-body);    font-weight: 600; font-size: 16px;  line-height: 24px; }
+  .t-body-sm         { font-family: var(--font-body);    font-weight: 400; font-size: 14px;  line-height: 20px; }
+  .t-body-sm-strong  { font-family: var(--font-body);    font-weight: 600; font-size: 14px;  line-height: 20px; }
+  .t-caption         { font-family: var(--font-body);    font-weight: 400; font-size: 12px;  line-height: 16px; }
+  .t-button          { font-family: var(--font-body);    font-weight: 600; font-size: 16px;  line-height: 24px; }
+
+  /* ── Layout ───────────────────────────────────────────────────────────── */
+  .container { max-width: 1200px; margin: 0 auto; padding: 0 var(--xl); }
+  .band { padding: var(--3xl) var(--xl); }
+
+  /* ── Nav ──────────────────────────────────────────────────────────────── */
+  .nav-bar {
+    background: var(--canvas);
+    color: var(--ink);
+    padding: var(--md) var(--xl);
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+  }
+  .nav-brand {
+    font-family: var(--font-display); font-weight: 900; font-size: 22px;
+    display: inline-flex; align-items: center; gap: var(--sm);
+  }
+  .nav-brand-mark {
+    width: 28px; height: 28px; background: var(--primary); border-radius: var(--r-full);
+  }
+  .nav-links { display: flex; gap: var(--xl); }
+  .nav-link {
+    font-family: var(--font-body); font-weight: 600; font-size: 14px;
+    color: var(--ink); text-decoration: none;
+  }
+  .nav-link:hover { opacity: 0.7; }
+
+  /* ── Buttons ──────────────────────────────────────────────────────────── */
+  .btn {
+    font-family: var(--font-body); font-weight: 600; font-size: 16px; line-height: 24px;
+    padding: var(--md) var(--xl);
+    border-radius: var(--r-xl);
+    border: 0; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: var(--sm);
+    transition: background 120ms;
+  }
+  .btn-primary    { background: var(--primary);     color: var(--on-primary); }
+  .btn-primary:hover  { background: var(--primary-active); }
+  .btn-secondary  { background: var(--canvas-soft); color: var(--ink); }
+  .btn-secondary:hover { background: #d8dcd5; }
+  .btn-tertiary   { background: var(--canvas);      color: var(--ink); border: 1px solid var(--ink); }
+  .btn-tertiary:hover  { background: #f5f5f5; }
+  .btn-icon       {
+    width: 48px; height: 48px; padding: 0;
+    background: var(--canvas); color: var(--ink);
+    border-radius: var(--r-full);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+
+  /* ── Cards ────────────────────────────────────────────────────────────── */
+  .card {
+    border-radius: var(--r-xl);
+    padding: var(--xl);
+  }
+  .card-content       { background: var(--canvas);      color: var(--ink); }
+  .card-feature-sage  { background: var(--canvas-soft); color: var(--ink); }
+  .card-feature-green { background: var(--primary-pale);color: var(--ink); }
+  .card-feature-dark  { background: var(--ink);         color: var(--primary); }
+  .card-converter     {
+    background: var(--canvas); color: var(--ink);
+    border: 1px solid var(--ink); padding: var(--xl); border-radius: var(--r-xl);
+  }
+
+  /* ── Inputs ───────────────────────────────────────────────────────────── */
+  .text-input {
+    background: var(--canvas); color: var(--ink);
+    border: 1px solid var(--ink); border-radius: var(--r-md);
+    padding: var(--md) var(--lg);
+    font-family: var(--font-body); font-size: 16px; line-height: 24px;
+    width: 100%;
+  }
+  .text-input::placeholder { color: var(--mute); }
+
+  /* ── Badges ───────────────────────────────────────────────────────────── */
+  .badge {
+    display: inline-flex; align-items: center; gap: var(--xs);
+    padding: var(--xs) var(--md);
+    border-radius: var(--r-pill);
+    font-family: var(--font-body); font-size: 14px; font-weight: 600;
+  }
+  .badge-positive { background: var(--primary-pale); color: var(--positive-deep); }
+  .badge-warning  { background: #fff3c2;             color: var(--warning-content); }
+  .badge-negative { background: var(--negative-bg);  color: white; }
+
+  /* ── Hero ─────────────────────────────────────────────────────────────── */
+  .hero-band {
+    background: var(--canvas-soft); color: var(--ink);
+    padding: var(--3xl) var(--xl);
+  }
+  .hero-band-dark {
+    background: var(--ink); color: var(--primary);
+    padding: var(--3xl) var(--xl);
+  }
+  .hero-grid {
+    display: grid; grid-template-columns: 1.4fr 1fr; gap: var(--3xl);
+    align-items: center;
+  }
+  .hero-headline { font-size: 96px; line-height: 0.92; letter-spacing: -0.02em; margin: 0 0 var(--xl) 0; }
+  .hero-sub      { font-size: 20px; line-height: 30px; color: var(--body); max-width: 560px; margin-bottom: var(--xl); }
+
+  /* ── Currency-converter card (signature) ──────────────────────────────── */
+  .conv-card { display: grid; gap: var(--lg); }
+  .conv-row {
+    display: grid; grid-template-columns: 1fr auto; gap: var(--md);
+    padding: var(--lg); border: 1px solid var(--ink); border-radius: var(--r-lg);
+    background: var(--canvas);
+  }
+  .conv-row label { font-size: 12px; color: var(--mute); display: block; }
+  .conv-row .amount {
+    font-family: var(--font-display); font-weight: 800; font-size: 32px; border: 0; outline: none; width: 100%; background: transparent;
+  }
+  .conv-pill {
+    display: inline-flex; align-items: center; gap: var(--sm);
+    padding: var(--sm) var(--md); border-radius: var(--r-pill);
+    background: var(--canvas-soft); font-weight: 600; font-size: 14px;
+  }
+  .flag { width: 24px; height: 24px; border-radius: var(--r-full); display: inline-block; }
+  .flag-br { background: linear-gradient(180deg, #009c3b 50%, #ffdf00 50%); }
+  .flag-us { background: linear-gradient(180deg, #b22234 50%, #fff 50%); }
+  .conv-rate { color: var(--body); font-size: 14px; text-align: center; }
+
+  /* ── Color palette swatches ───────────────────────────────────────────── */
+  .palette { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: var(--lg); }
+  .swatch {
+    border-radius: var(--r-lg); overflow: hidden;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.04);
+  }
+  .swatch-color { height: 80px; }
+  .swatch-meta  { padding: var(--md) var(--lg); background: var(--canvas); }
+  .swatch-name  { font-size: 13px; font-weight: 600; color: var(--ink); }
+  .swatch-hex   { font-size: 12px; color: var(--mute); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ── Section heading ──────────────────────────────────────────────────── */
+  .section-title { font-family: var(--font-display); font-weight: 900; font-size: 40px; line-height: 1; margin: 0 0 var(--xs) 0; }
+  .section-sub   { font-family: var(--font-body); font-size: 14px; color: var(--body); margin-bottom: var(--2xl); }
+
+  /* ── Footer ───────────────────────────────────────────────────────────── */
+  .footer {
+    background: var(--ink); color: var(--canvas-soft);
+    padding: var(--3xl) var(--xl);
+    font-size: 14px;
+  }
+  .footer a { color: var(--primary); text-decoration: none; }
+
+  /* ── Grids ────────────────────────────────────────────────────────────── */
+  .grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--xl); }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--xl); }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--xl); }
+
+  .stack { display: grid; gap: var(--md); }
+  .row   { display: flex; gap: var(--lg); flex-wrap: wrap; align-items: center; }
+
+  /* ── Tipografia: linha por tamanho ────────────────────────────────────── */
+  .type-row { display: grid; grid-template-columns: 220px 1fr; align-items: baseline; padding: var(--md) 0; border-top: 1px solid rgba(0,0,0,0.06); }
+  .type-meta { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: var(--mute); }
+
+  @media (max-width: 900px) {
+    .hero-grid, .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    .hero-headline { font-size: 56px; line-height: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── NAV ───────────────────────────────────────────────────────────────── -->
+<nav class="nav-bar">
+  <div class="nav-brand">
+    <span class="nav-brand-mark"></span>
+    <span>Gênesis</span>
+  </div>
+  <div class="nav-links">
+    <a href="#" class="nav-link">Sistemas</a>
+    <a href="#" class="nav-link">Contábil</a>
+    <a href="#" class="nav-link">Relatórios</a>
+    <a href="#" class="nav-link">Usuários</a>
+  </div>
+  <div class="row">
+    <a href="#" class="btn btn-tertiary">Entrar</a>
+    <a href="#" class="btn btn-primary">Começar</a>
+  </div>
+</nav>
+
+<!-- ── HERO ──────────────────────────────────────────────────────────────── -->
+<section class="hero-band">
+  <div class="container hero-grid">
+    <div>
+      <h1 class="hero-headline">Infraestrutura<br>que <span style="background:var(--primary); padding: 0 12px; border-radius: 12px;">simplesmente funciona</span>.</h1>
+      <p class="hero-sub">Menus, permissões, hierarquia de sistemas — um framework
+        pensado pra você focar no que importa: o que seu satélite faz.</p>
+      <div class="row">
+        <a href="#" class="btn btn-primary">Criar sistema →</a>
+        <a href="#" class="btn btn-tertiary">Documentação</a>
+      </div>
+    </div>
+
+    <!-- Currency converter card (assinatura visual — re-uso como "criador de sistema") -->
+    <div class="card-converter conv-card">
+      <div style="font-size:18px; font-weight:600;">Cadastrar Sistema</div>
+
+      <div class="conv-row">
+        <div>
+          <label>Nome do sistema</label>
+          <input class="amount" type="text" value="Folha 2026" style="font-size:24px;">
+        </div>
+        <div class="conv-pill">
+          <span class="flag flag-br"></span>BR
+        </div>
+      </div>
+
+      <div class="conv-row">
+        <div>
+          <label>Administrador inicial</label>
+          <input class="amount" type="text" value="marco@elotech.com.br" style="font-size:20px;">
+        </div>
+        <div class="conv-pill">CPF</div>
+      </div>
+
+      <div class="conv-rate">Validação dupla (e-mail + SMS) será disparada</div>
+      <a href="#" class="btn btn-primary" style="width:100%;">Criar — leva 30 segundos</a>
+    </div>
+  </div>
+</section>
+
+<!-- ── COLORS ────────────────────────────────────────────────────────────── -->
+<section class="band">
+  <div class="container">
+    <h2 class="section-title">Paleta</h2>
+    <p class="section-sub">Verde-lima é o único acento de marca. Sage como mood, ink como texto, paleta semântica para in-product.</p>
+
+    <h3 class="t-body-md-strong" style="margin: var(--xl) 0 var(--md);">Brand & Accent</h3>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-color" style="background:var(--primary);"></div><div class="swatch-meta"><div class="swatch-name">Wise Green</div><div class="swatch-hex">#9fe870 · primary</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--primary-active);"></div><div class="swatch-meta"><div class="swatch-name">Green Hover</div><div class="swatch-hex">#cdffad</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--primary-neutral);"></div><div class="swatch-meta"><div class="swatch-name">Green Neutral</div><div class="swatch-hex">#c5edab</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--primary-pale);"></div><div class="swatch-meta"><div class="swatch-name">Green Pale</div><div class="swatch-hex">#e2f6d5</div></div></div>
+    </div>
+
+    <h3 class="t-body-md-strong" style="margin: var(--xl) 0 var(--md);">Surface & Text</h3>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-color" style="background:var(--canvas); box-shadow:inset 0 0 0 1px rgba(0,0,0,.06);"></div><div class="swatch-meta"><div class="swatch-name">Canvas</div><div class="swatch-hex">#ffffff</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--canvas-soft);"></div><div class="swatch-meta"><div class="swatch-name">Canvas Soft</div><div class="swatch-hex">#e8ebe6 · sage</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ink);"></div><div class="swatch-meta"><div class="swatch-name">Ink</div><div class="swatch-hex">#0e0f0c</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--ink-deep);"></div><div class="swatch-meta"><div class="swatch-name">Ink Deep</div><div class="swatch-hex">#163300</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--body);"></div><div class="swatch-meta"><div class="swatch-name">Body</div><div class="swatch-hex">#454745</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--mute);"></div><div class="swatch-meta"><div class="swatch-name">Mute</div><div class="swatch-hex">#868685</div></div></div>
+    </div>
+
+    <h3 class="t-body-md-strong" style="margin: var(--xl) 0 var(--md);">Semantic + Tertiary</h3>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-color" style="background:var(--positive);"></div><div class="swatch-meta"><div class="swatch-name">Positive</div><div class="swatch-hex">#2ead4b</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--warning);"></div><div class="swatch-meta"><div class="swatch-name">Warning</div><div class="swatch-hex">#ffd11a</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--negative);"></div><div class="swatch-meta"><div class="swatch-name">Negative</div><div class="swatch-hex">#d03238</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--accent-orange);"></div><div class="swatch-meta"><div class="swatch-name">Accent Orange</div><div class="swatch-hex">#ffc091</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:var(--accent-cyan);"></div><div class="swatch-meta"><div class="swatch-name">Accent Cyan</div><div class="swatch-hex">#38c8ff</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── TYPOGRAPHY ────────────────────────────────────────────────────────── -->
+<section class="band" style="background: var(--canvas);">
+  <div class="container">
+    <h2 class="section-title">Tipografia</h2>
+    <p class="section-sub">Manrope 900 substitui Wise Sans no hero; Inter 400/600 carrega o resto.</p>
+
+    <div>
+      <div class="type-row"><div class="type-meta">display-mega · 126/900</div><div class="t-display-mega">Aa</div></div>
+      <div class="type-row"><div class="type-meta">display-xxl · 96/900</div><div class="t-display-xxl">Sistemas</div></div>
+      <div class="type-row"><div class="type-meta">display-xl · 64/900</div><div class="t-display-xl">Cadastro completo</div></div>
+      <div class="type-row"><div class="type-meta">display-lg · 47/400</div><div class="t-display-lg">Subtítulo aerado, Inter regular</div></div>
+      <div class="type-row"><div class="type-meta">display-md · 40/900</div><div class="t-display-md">Section heading</div></div>
+      <div class="type-row"><div class="type-meta">display-sm · 32/600</div><div class="t-display-sm">Inter semibold display</div></div>
+      <div class="type-row"><div class="type-meta">display-xs · 24/600</div><div class="t-display-xs">Sub-section</div></div>
+      <div class="type-row"><div class="type-meta">body-lg · 20/400</div><div class="t-body-lg">Lead paragraph — Inter regular 20.</div></div>
+      <div class="type-row"><div class="type-meta">body-md · 16/400</div><div class="t-body-md">Texto padrão de body. Inter 16/24.</div></div>
+      <div class="type-row"><div class="type-meta">body-md-strong · 16/600</div><div class="t-body-md-strong">Negrito inline.</div></div>
+      <div class="type-row"><div class="type-meta">body-sm · 14/400</div><div class="t-body-sm">Texto secundário.</div></div>
+      <div class="type-row"><div class="type-meta">caption · 12/400</div><div class="t-caption">Fine print, legendas.</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ── BUTTONS ───────────────────────────────────────────────────────────── -->
+<section class="band">
+  <div class="container">
+    <h2 class="section-title">Botões</h2>
+    <p class="section-sub">Pill 24px sempre. Verde-lima reservado para a CTA primária.</p>
+
+    <div class="row" style="margin-bottom: var(--xl);">
+      <button class="btn btn-primary">Criar sistema</button>
+      <button class="btn btn-secondary">Configurar</button>
+      <button class="btn btn-tertiary">Documentação</button>
+      <button class="btn btn-icon" aria-label="Mais">+</button>
+    </div>
+
+    <div class="card card-content" style="margin-top: var(--lg);">
+      <div class="t-body-md-strong" style="margin-bottom: var(--md);">Estados</div>
+      <div class="row">
+        <button class="btn btn-primary">Default</button>
+        <button class="btn btn-primary" style="background: var(--primary-active);">Hover</button>
+        <button class="btn btn-primary" style="background: var(--primary-neutral);">Active</button>
+        <button class="btn btn-primary" disabled style="opacity:.4; cursor:not-allowed;">Disabled</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CARDS ─────────────────────────────────────────────────────────────── -->
+<section class="band" style="background: var(--canvas);">
+  <div class="container">
+    <h2 class="section-title">Cards</h2>
+    <p class="section-sub">Surface contrast carrega elevação — branco sobre sage, dark para promoção.</p>
+
+    <div class="grid-3">
+      <div class="card card-content">
+        <div class="t-display-xs" style="margin-bottom: var(--sm);">card-content</div>
+        <p class="t-body-md" style="margin: 0;">Branco padrão sobre sage. Sem sombra — o contraste de superfície é a elevação.</p>
+      </div>
+      <div class="card card-feature-sage">
+        <div class="t-display-xs" style="margin-bottom: var(--sm);">card-feature-sage</div>
+        <p class="t-body-md" style="margin: 0;">Sage sobre branco — inverte a polaridade para destacar.</p>
+      </div>
+      <div class="card card-feature-green">
+        <div class="t-display-xs" style="margin-bottom: var(--sm);">card-feature-green</div>
+        <p class="t-body-md" style="margin: 0;">Verde-pálido para mood positivo / marketing leve.</p>
+      </div>
+      <div class="card card-feature-dark">
+        <div class="t-display-xs" style="margin-bottom: var(--sm); color: var(--primary);">card-feature-dark</div>
+        <p class="t-body-md" style="margin: 0; color: var(--canvas-soft);">Ink + Wise green — momento promocional. A combinação assinatura.</p>
+      </div>
+      <div class="card-converter">
+        <div class="t-display-xs" style="margin-bottom: var(--sm);">currency-converter-card</div>
+        <p class="t-body-md" style="margin: 0;">Card interativo assinatura — borda 1px ink, branco interno.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── INPUTS + BADGES ──────────────────────────────────────────────────── -->
+<section class="band">
+  <div class="container">
+    <div class="grid-2">
+      <div>
+        <h2 class="section-title">Inputs</h2>
+        <p class="section-sub">Borda 1px ink, radius 12px, Inter 16/24.</p>
+        <div class="stack" style="max-width: 460px;">
+          <label class="t-body-sm-strong">Email</label>
+          <input class="text-input" type="email" placeholder="você@empresa.com">
+          <label class="t-body-sm-strong">Senha</label>
+          <input class="text-input" type="password" placeholder="••••••••">
+        </div>
+      </div>
+      <div>
+        <h2 class="section-title">Badges</h2>
+        <p class="section-sub">Pills semânticos — positive / warning / negative.</p>
+        <div class="row">
+          <span class="badge badge-positive">● Ativo</span>
+          <span class="badge badge-warning">⚠ Pendente</span>
+          <span class="badge badge-negative">✕ Bloqueado</span>
+        </div>
+
+        <div style="margin-top: var(--xl);">
+          <h3 class="t-body-md-strong" style="margin: 0 0 var(--md);">In-product (admin)</h3>
+          <div class="row">
+            <span class="badge" style="background: var(--canvas-soft); color: var(--ink);">Rascunho</span>
+            <span class="badge badge-positive">Validado</span>
+            <span class="badge" style="background: var(--accent-orange); color: var(--ink);">Importação</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── DARK HERO (polarity flip) ─────────────────────────────────────────── -->
+<section class="hero-band-dark">
+  <div class="container">
+    <h2 class="t-display-xxl" style="margin: 0 0 var(--lg); max-width: 900px;">Verde sobre ink — o flip que vira chamada de marca.</h2>
+    <p class="t-body-lg" style="color: var(--canvas-soft); max-width: 700px; margin-bottom: var(--xl);">
+      Use para chamadas promocionais e bandas de destaque. Mantém o pill primário visível porque verde é o único acento.
+    </p>
+    <a href="#" class="btn btn-primary">Ver planos →</a>
+  </div>
+</section>
+
+<!-- ── FOOTER ────────────────────────────────────────────────────────────── -->
+<footer class="footer">
+  <div class="container">
+    <div class="grid-4" style="margin-bottom: var(--2xl);">
+      <div>
+        <div class="nav-brand" style="color: var(--canvas-soft); margin-bottom: var(--md);">
+          <span class="nav-brand-mark"></span>Gênesis
+        </div>
+        <p class="t-body-sm" style="color: var(--mute); margin: 0;">Infraestrutura provedora para sistemas satélites.</p>
+      </div>
+      <div>
+        <div class="t-body-sm-strong" style="color: var(--canvas-soft); margin-bottom: var(--sm);">Produto</div>
+        <div class="stack" style="gap: var(--xs);">
+          <a class="t-body-sm" href="#">Sistemas</a>
+          <a class="t-body-sm" href="#">Permissões</a>
+          <a class="t-body-sm" href="#">Relatórios</a>
+        </div>
+      </div>
+      <div>
+        <div class="t-body-sm-strong" style="color: var(--canvas-soft); margin-bottom: var(--sm);">Contábil</div>
+        <div class="stack" style="gap: var(--xs);">
+          <a class="t-body-sm" href="#">Plano de Contas</a>
+          <a class="t-body-sm" href="#">Lançamentos</a>
+          <a class="t-body-sm" href="#">PCASP</a>
+        </div>
+      </div>
+      <div>
+        <div class="t-body-sm-strong" style="color: var(--canvas-soft); margin-bottom: var(--sm);">Sobre</div>
+        <div class="stack" style="gap: var(--xs);">
+          <a class="t-body-sm" href="#">Equipe</a>
+          <a class="t-body-sm" href="#">Documentação</a>
+          <a class="t-body-sm" href="#">Status</a>
+        </div>
+      </div>
+    </div>
+    <div class="t-caption" style="color: var(--mute);">© 2026 Gênesis · feito com Wise design tokens</div>
+  </div>
+</footer>
+
+</body>
+</html>

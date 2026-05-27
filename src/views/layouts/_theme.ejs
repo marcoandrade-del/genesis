@@ -1,0 +1,204 @@
+<%# Wise design system — override CSS sobre Bootstrap 5.
+   Tokens 1:1 com DESIGN.md. Carregar SEMPRE após o link do Bootstrap.
+   Mudanças aqui afetam todas as telas que incluem o partial. %>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ── Tokens ─────────────────────────────────────────────────────────── */
+  :root {
+    --primary: #9fe870; --primary-active: #cdffad;
+    --primary-neutral: #c5edab; --primary-pale: #e2f6d5;
+    --canvas: #ffffff; --canvas-soft: #e8ebe6;
+    --ink: #0e0f0c; --ink-deep: #163300; --body: #454745; --mute: #868685;
+    --positive: #2ead4b; --positive-deep: #054d28;
+    --warning: #ffd11a; --warning-deep: #b86700; --warning-content: #4a3b1c;
+    --negative: #d03238; --negative-deep: #a72027; --negative-darkest: #a7000d;
+    --negative-bg: #320707;
+    --accent-orange: #ffc091; --accent-cyan: #38c8ff;
+
+    /* Bootstrap remapping — token → --bs-* */
+    --bs-primary: var(--primary); --bs-primary-rgb: 159, 232, 112;
+    --bs-secondary: var(--canvas-soft); --bs-secondary-rgb: 232, 235, 230;
+    --bs-success: var(--positive); --bs-success-rgb: 46, 173, 75;
+    --bs-warning: var(--warning); --bs-warning-rgb: 255, 209, 26;
+    --bs-danger: var(--negative); --bs-danger-rgb: 208, 50, 56;
+    --bs-info: var(--accent-cyan); --bs-info-rgb: 56, 200, 255;
+    --bs-light: var(--canvas-soft); --bs-light-rgb: 232, 235, 230;
+    --bs-dark: var(--ink); --bs-dark-rgb: 14, 15, 12;
+    --bs-body-bg: var(--canvas-soft);
+    --bs-body-color: var(--ink);
+    --bs-body-font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    --bs-border-radius: 12px;
+    --bs-border-radius-sm: 8px;
+    --bs-border-radius-lg: 16px;
+    --bs-border-radius-xl: 24px;
+    --bs-border-radius-pill: 9999px;
+    --bs-border-color: rgba(14, 15, 12, .08);
+    --bs-link-color: var(--ink-deep);
+    --bs-link-hover-color: var(--ink);
+  }
+
+  /* ── Body & typography ─────────────────────────────────────────────── */
+  body {
+    background: var(--canvas-soft);
+    color: var(--ink);
+    font-family: var(--bs-body-font-family);
+    font-feature-settings: "calt";
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, .h1, .h2, .h3, .display-1, .display-2, .display-3, .display-4, .display-5, .display-6 {
+    font-family: 'Manrope', 'Inter', system-ui, sans-serif;
+    font-weight: 800;
+    letter-spacing: -0.015em;
+  }
+  .navbar-brand, .modal-title { font-family: 'Manrope', sans-serif; font-weight: 800; }
+  .font-monospace { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  /* ── Buttons — pill 24px, Wise green primary ───────────────────────── */
+  .btn { border-radius: 24px; font-weight: 600; }
+  .btn-sm { border-radius: 16px; }
+  .btn-lg { border-radius: 24px; }
+  .btn-primary, .btn-primary:focus-visible {
+    background-color: var(--primary); border-color: var(--primary); color: var(--ink);
+  }
+  .btn-primary:hover { background-color: var(--primary-active); border-color: var(--primary-active); color: var(--ink); }
+  .btn-primary:active, .btn-primary.active, .btn-check:checked + .btn-primary {
+    background-color: var(--primary-neutral) !important; border-color: var(--primary-neutral) !important; color: var(--ink) !important;
+  }
+  .btn-primary:focus { box-shadow: 0 0 0 .2rem rgba(159, 232, 112, .35); }
+  .btn-primary:disabled, .btn-primary.disabled {
+    background-color: var(--primary); border-color: var(--primary); color: var(--ink); opacity: .4;
+  }
+
+  .btn-outline-primary { color: var(--ink); border-color: var(--ink); background: transparent; }
+  .btn-outline-primary:hover { background: var(--primary); border-color: var(--primary); color: var(--ink); }
+
+  .btn-secondary { background-color: var(--canvas-soft); border-color: var(--canvas-soft); color: var(--ink); }
+  .btn-secondary:hover { background-color: #d8dcd5; border-color: #d8dcd5; color: var(--ink); }
+
+  .btn-outline-secondary { color: var(--ink); border-color: rgba(14, 15, 12, .2); }
+  .btn-outline-secondary:hover { background: var(--canvas-soft); border-color: var(--ink); color: var(--ink); }
+
+  .btn-danger { background-color: var(--negative); border-color: var(--negative); }
+  .btn-danger:hover { background-color: var(--negative-deep); border-color: var(--negative-deep); }
+  .btn-outline-danger { color: var(--negative); border-color: var(--negative); }
+  .btn-outline-danger:hover { background: var(--negative); color: white; border-color: var(--negative); }
+
+  .btn-success { background-color: var(--positive); border-color: var(--positive); color: white; }
+  .btn-warning { background-color: var(--warning); border-color: var(--warning); color: var(--warning-content); }
+
+  .btn-link { color: var(--ink-deep); text-decoration: underline; text-underline-offset: 3px; }
+  .btn-link:hover { color: var(--ink); }
+
+  /* ── Cards ────────────────────────────────────────────────────────── */
+  .card { border-radius: 24px; border: 0; background: var(--canvas); }
+  .card .card-header { background: transparent; border-bottom: 1px solid var(--bs-border-color); }
+  .card .card-footer { background: transparent; border-top: 1px solid var(--bs-border-color); }
+  .shadow-sm { box-shadow: 0 1px 2px rgba(14, 15, 12, .04), 0 4px 12px rgba(14, 15, 12, .04) !important; }
+
+  /* ── Forms ────────────────────────────────────────────────────────── */
+  .form-control, .form-select {
+    border-radius: 12px; border-color: rgba(14, 15, 12, .15); color: var(--ink); background-color: var(--canvas);
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: var(--ink); box-shadow: 0 0 0 .2rem rgba(159, 232, 112, .25); color: var(--ink);
+  }
+  .form-control-sm, .form-select-sm { border-radius: 8px; }
+  .form-control::placeholder { color: var(--mute); }
+  .form-check-input:checked { background-color: var(--primary); border-color: var(--primary); }
+  .form-check-input:focus { border-color: var(--ink); box-shadow: 0 0 0 .25rem rgba(159, 232, 112, .25); }
+  .form-text { color: var(--body); }
+  .form-label { color: var(--ink); }
+  .input-group-text { background: var(--canvas-soft); border-color: rgba(14, 15, 12, .15); color: var(--ink); }
+
+  /* ── Alerts ───────────────────────────────────────────────────────── */
+  .alert { border-radius: 16px; border: 0; }
+  .alert-primary { background-color: var(--primary-pale); color: var(--ink-deep); }
+  .alert-success { background-color: var(--primary-pale); color: var(--positive-deep); }
+  .alert-warning { background-color: #fff3c2; color: var(--warning-content); }
+  .alert-danger  { background-color: #ffe1e3; color: var(--negative-darkest); }
+  .alert-info    { background-color: #d4ecff; color: #0a3a66; }
+
+  /* ── Badges ───────────────────────────────────────────────────────── */
+  .badge { border-radius: 9999px; font-weight: 600; padding: .35em .75em; }
+  .badge.bg-primary { background-color: var(--primary) !important; color: var(--ink) !important; }
+  .badge.bg-secondary { background-color: var(--canvas-soft) !important; color: var(--ink) !important; }
+  .badge.bg-success { background-color: var(--primary-pale) !important; color: var(--positive-deep) !important; }
+  .badge.bg-danger { background-color: var(--negative-bg) !important; color: white !important; }
+  .badge.bg-warning { background-color: #fff3c2 !important; color: var(--warning-content) !important; }
+  .badge.bg-info { background-color: #d4ecff !important; color: #0a3a66 !important; }
+  .badge.bg-light { background-color: var(--canvas-soft) !important; color: var(--ink) !important; }
+  .badge.bg-dark { background-color: var(--ink) !important; color: var(--canvas-soft) !important; }
+  /* Padrões com bg-opacity-75 já em uso (status débito/crédito) — força contraste */
+  .bg-danger.bg-opacity-75 { color: white !important; }
+  .bg-success.bg-opacity-75 { color: white !important; }
+
+  /* ── bg utilities ─────────────────────────────────────────────────── */
+  .bg-light { background-color: var(--canvas-soft) !important; }
+  .bg-dark  { background-color: var(--ink) !important; color: var(--canvas-soft); }
+  .bg-white { background-color: var(--canvas) !important; }
+  .bg-success-subtle { background-color: var(--primary-pale) !important; }
+  .bg-danger-subtle { background-color: #ffe1e3 !important; }
+  .bg-warning-subtle { background-color: #fff3c2 !important; }
+  .bg-secondary-subtle { background-color: var(--canvas-soft) !important; }
+  .text-success { color: var(--positive-deep) !important; }
+  .text-danger  { color: var(--negative-darkest) !important; }
+  .text-warning { color: var(--warning-deep) !important; }
+  .text-muted   { color: var(--mute) !important; }
+  .text-primary { color: var(--ink) !important; }     /* TEXTO da marca é ink — verde é só para CTA */
+  .text-dark    { color: var(--ink) !important; }
+  .text-white-50 { color: rgba(232, 235, 230, .55) !important; }
+
+  /* ── Navbar (topo do admin) ───────────────────────────────────────── */
+  .navbar.bg-dark { background-color: var(--ink) !important; }
+  .navbar-dark .navbar-brand, .navbar-dark .navbar-brand i { color: var(--canvas-soft) !important; }
+  .navbar-dark .navbar-brand .text-primary { color: var(--primary) !important; }
+
+  /* ── Sidebar (admin) ──────────────────────────────────────────────── */
+  .sidebar { background-color: var(--ink) !important; }
+  .sidebar .nav-link { color: rgba(232, 235, 230, .7); font-family: 'Inter', sans-serif; font-weight: 500; }
+  .sidebar .nav-link:hover { color: var(--canvas-soft); background: rgba(255, 255, 255, .04); }
+  .sidebar .nav-link.active {
+    color: var(--primary) !important;
+    background: rgba(159, 232, 112, .12) !important;
+    font-weight: 600;
+  }
+  .sidebar .section-label { color: rgba(232, 235, 230, .4); font-weight: 600; }
+
+  /* ── Tables ───────────────────────────────────────────────────────── */
+  .table { color: var(--ink); --bs-table-bg: transparent; }
+  .table > thead { font-family: 'Inter', sans-serif; font-weight: 600; }
+  .table-light, .table-light > th, .table-light > td {
+    background-color: var(--canvas-soft) !important; color: var(--ink);
+  }
+  .table-hover > tbody > tr:hover > * {
+    background-color: rgba(159, 232, 112, .08); color: var(--ink);
+  }
+  .table-warning, .table-warning > th, .table-warning > td {
+    background-color: #fff3c2 !important; color: var(--warning-content);
+  }
+
+  /* ── Modal + Offcanvas ────────────────────────────────────────────── */
+  .modal-content { border-radius: 24px; border: 0; }
+  .modal-header, .modal-footer { border-color: var(--bs-border-color); }
+  .offcanvas { border: 0; }
+
+  /* ── Dropdown ─────────────────────────────────────────────────────── */
+  .dropdown-menu { border-radius: 16px; border: 0; box-shadow: 0 8px 24px rgba(14, 15, 12, .08); padding: .5rem; }
+  .dropdown-item { border-radius: 8px; }
+  .dropdown-item:hover, .dropdown-item:focus { background: var(--canvas-soft); color: var(--ink); }
+  .dropdown-item:active, .dropdown-item.active { background: var(--primary); color: var(--ink); }
+
+  /* ── List group ───────────────────────────────────────────────────── */
+  .list-group-item { border-color: var(--bs-border-color); }
+  .list-group-item-action:hover { background: var(--canvas-soft); color: var(--ink); }
+  .list-group-item-action:active, .list-group-item.active {
+    background: var(--primary-pale); color: var(--ink-deep); border-color: var(--primary-pale);
+  }
+
+  /* ── Auth screens (login/registro/ativar) ─────────────────────────── */
+  /* Card central das telas de auth fica branco sobre sage, com radius 24. */
+  body.auth-page { background: var(--canvas-soft); }
+  body.auth-page .card { background: var(--canvas); }
+</style>
