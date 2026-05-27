@@ -130,9 +130,10 @@
     </div>
   </div>
 
-  <div class="d-flex justify-content-end gap-2">
+  <div class="d-flex justify-content-end align-items-center gap-3">
+    <small class="text-warning" id="motivo-bloqueio"></small>
     <a href="/admin/lancamentos?municipioId=<%= municipio.id %>" class="btn btn-sm btn-secondary">Cancelar</a>
-    <button type="submit" class="btn btn-sm btn-primary" id="btn-salvar">
+    <button type="submit" class="btn btn-sm btn-primary" id="btn-salvar" disabled>
       <i class="bi bi-check-lg me-1"></i>Salvar Lançamento
     </button>
   </div>
@@ -228,16 +229,22 @@ function abrirContaPickerLinha(btn) {
     label.textContent = nome
     label.classList.remove('text-muted')
     verificarDuplicatas()
+    atualizarTotais()
   }, { planoId: planoId })
 }
 
-// Soma totais em pt-BR. Mostra diferença em vermelho quando ≠ 0.
+// Soma totais em pt-BR + decide se pode salvar. Mesmas regras que o service
+// (∑D=∑C, total>0, ≥1 D e ≥1 C, todas contas selecionadas) — mas aqui só
+// para feedback imediato; server revalida no submit.
 function atualizarTotais() {
   let d = 0, c = 0
-  document.querySelectorAll('#itens-tbody tr').forEach(function(tr) {
+  let temDebito = false, temCredito = false, todasContas = true
+  const linhas = document.querySelectorAll('#itens-tbody tr')
+  linhas.forEach(function(tr) {
     const v = parseFloat(tr.querySelector('.valor-input').value) || 0
-    if (tr.dataset.tipo === 'DEBITO') d += v
-    else c += v
+    if (tr.dataset.tipo === 'DEBITO') { d += v; temDebito = true }
+    else { c += v; temCredito = true }
+    if (!tr.querySelector('input[name="contaId"]').value) todasContas = false
   })
   const fmt = function(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
   document.getElementById('total-debito').textContent = fmt(d)
@@ -247,6 +254,17 @@ function atualizarTotais() {
   diffEl.textContent = fmt(diff)
   diffEl.classList.toggle('text-danger', diff > 0.001)
   diffEl.classList.toggle('text-success', diff <= 0.001 && d > 0)
+
+  // Determina motivo de bloqueio (primeiro que aplica). Sem motivo = pode salvar.
+  let motivo = ''
+  if (linhas.length === 0) motivo = 'Adicione ao menos 1 débito e 1 crédito.'
+  else if (!temDebito) motivo = 'Falta ao menos 1 linha de débito.'
+  else if (!temCredito) motivo = 'Falta ao menos 1 linha de crédito.'
+  else if (!todasContas) motivo = 'Selecione a conta de todas as linhas.'
+  else if (d === 0) motivo = 'Valor total não pode ser zero.'
+  else if (diff > 0.001) motivo = 'Débitos e créditos não se equilibram.'
+  document.getElementById('motivo-bloqueio').textContent = motivo
+  document.getElementById('btn-salvar').disabled = motivo !== ''
 }
 
 atualizarTotais()
