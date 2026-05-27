@@ -1,0 +1,12 @@
+<% if (contas.length === 0) { %>
+  <div class="text-center text-muted py-5 small">Nenhuma conta encontrada.</div>
+<% } %>
+<% contas.forEach(function(c) { %>
+  <button type="button"
+    class="list-group-item list-group-item-action px-3 py-2 border-0 border-bottom"
+    data-id="<%= c.id %>" data-nome="<%= c.codigo %> — <%= c.descricao %>"
+    onclick="selecionarItem(this.dataset.id, this.dataset.nome)">
+    <div class="font-monospace small fw-semibold"><%= c.codigo %></div>
+    <div class="text-muted" style="font-size:.75rem"><%= c.descricao %></div>
+  </button>
+<% }) %>

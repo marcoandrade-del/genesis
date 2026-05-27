@@ -57,6 +57,42 @@ export async function adminLookupRoutes(app: FastifyInstance) {
     return reply.view('lookup/modulos', { modulos, q })
   })
 
+  // Contas que admitem movimento de um plano específico — usado como picker
+  // no form de lançamentos. planoId é obrigatório (contas só existem em
+  // contexto de plano); filtro por código OU descrição.
+  app.get<{ Querystring: { q?: string; planoId?: string } }>('/contas', async (req, reply) => {
+    const q = (req.query.q ?? '').trim()
+    const planoId = (req.query.planoId ?? '').trim()
+    const isHtmx = req.headers['hx-target'] === 'lookup-rows-contas'
+
+    if (!planoId) {
+      // Sem plano não há resultados possíveis; renderiza a casca vazia.
+      if (isHtmx) return reply.view('lookup/rows_contas', { contas: [] })
+      return reply.view('lookup/contas', { contas: [], q, planoId: '' })
+    }
+
+    const contas = await app.prisma.conta.findMany({
+      where: {
+        planoId,
+        admiteMovimento: true,
+        ...(q
+          ? {
+              OR: [
+                { codigo: { contains: q, mode: 'insensitive' } },
+                { descricao: { contains: q, mode: 'insensitive' } },
+              ],
+            }
+          : {}),
+      },
+      orderBy: { codigo: 'asc' },
+      take: 50,
+      select: { id: true, codigo: true, descricao: true },
+    })
+
+    if (isHtmx) return reply.view('lookup/rows_contas', { contas })
+    return reply.view('lookup/contas', { contas, q, planoId })
+  })
+
   app.get<{ Querystring: { q?: string } }>('/itens', async (req, reply) => {
     const q = req.query.q ?? ''
     const isHtmx = req.headers['hx-target'] === 'lookup-rows-itens'
