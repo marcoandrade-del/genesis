@@ -18,18 +18,18 @@ describe('adminLookupRoutes', () => {
   })
 
   describe('GET /usuarios', () => {
-    it('sem query renderiza view completa, sem filtro where', async () => {
+    it('sem query renderiza view completa, filtrando apenas ativos', async () => {
       prisma.usuario.findMany.mockResolvedValue([])
 
       const res = await app.inject({ method: 'GET', url: '/usuarios' })
 
       expect(res.statusCode).toBe(200)
       expect(prisma.usuario.findMany).toHaveBeenCalledWith(
-        expect.not.objectContaining({ where: expect.anything() }),
+        expect.objectContaining({ where: { ativo: true } }),
       )
     })
 
-    it('com q aplica filtro OR em nomeCompleto e emailPrincipal', async () => {
+    it('com q aplica filtro OR em nomeCompleto e emailPrincipal, mantendo ativo:true', async () => {
       prisma.usuario.findMany.mockResolvedValue([])
 
       await app.inject({ method: 'GET', url: '/usuarios?q=joao' })
@@ -37,6 +37,7 @@ describe('adminLookupRoutes', () => {
       expect(prisma.usuario.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            ativo: true,
             OR: [
               { nomeCompleto: { contains: 'joao', mode: 'insensitive' } },
               { emailPrincipal: { contains: 'joao', mode: 'insensitive' } },

@@ -9,9 +9,6 @@
     <div class="fw-semibold small"><%= u.nomeCompleto %></div>
     <div class="d-flex gap-3 mt-1">
       <span class="text-muted" style="font-size:.75rem"><%= u.emailPrincipal %></span>
-      <span class="badge rounded-pill <%= u.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75" style="font-size:.65rem">
-        <%= u.ativo ? 'Ativo' : 'Inativo' %>
-      </span>
     </div>
   </button>
 <% }) %>

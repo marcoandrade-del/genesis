@@ -19,6 +19,12 @@ import { adminPlanosDeContasRoutes } from './planos-de-contas.js'
 import { adminContasRoutes } from './contas.js'
 import { adminLancamentosRoutes } from './lancamentos.js'
 
+// Caminhos profundos (≥2 segmentos) que são páginas completas, abertas por
+// navegação direta do browser via <a href> (não por HTMX). Todo o resto sob
+// ≥2 segmentos é fragmento (modal, partial de árvore/lookup) e só pode ser
+// servido dentro de uma requisição HTMX.
+const PAGINAS_COMPLETAS_PROFUNDAS = new Set(['lancamentos/novo'])
+
 export function adminNotFoundHandler(req: FastifyRequest, reply: FastifyReply) {
   return reply.status(404).view('404', { caminho: req.url })
 }
@@ -71,13 +77,17 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.addHook('onRequest', adminAuthMiddleware)
 
     // Rotas parciais (fragmentos HTMX) não podem ser acessadas diretamente pelo browser.
-    // Se não vier de uma requisição HTMX, redireciona para o dashboard.
+    // Se não vier de uma requisição HTMX, redireciona para o dashboard. Exceções:
+    // o escopo `funcionando` e páginas completas (renderizadas com layout) que
+    // vivem sob caminhos de ≥2 segmentos — ver PAGINAS_COMPLETAS_PROFUNDAS.
     admin.addHook('onRequest', async (req, reply) => {
       if (req.method !== 'GET' || req.headers['hx-request']) return
       // req.url é sempre definido em Fastify; split('?') sempre retorna ≥ 1 elemento.
       const rawPath = req.url.split('?')[0]!
       const segments = rawPath.replace(/^\/admin\/?/, '').split('/').filter(Boolean)
-      if (segments.length >= 2 && segments[0] !== 'funcionando') return reply.redirect('/admin')
+      if (segments.length < 2 || segments[0] === 'funcionando') return
+      if (PAGINAS_COMPLETAS_PROFUNDAS.has(segments.join('/'))) return
+      return reply.redirect('/admin')
     })
 
     admin.register(adminDashboardRoutes)
