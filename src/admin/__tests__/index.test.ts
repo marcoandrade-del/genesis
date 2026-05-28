@@ -4,7 +4,7 @@ import cookie from '@fastify/cookie'
 import fastifyJwt from '@fastify/jwt'
 import { criarPrismaMock, type PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
 
-const { rotaVazia, rotaRaiz, rotaSistemas, rotaFuncionando } = vi.hoisted(() => ({
+const { rotaVazia, rotaRaiz, rotaSistemas, rotaFuncionando, rotaLancamentos } = vi.hoisted(() => ({
   rotaVazia: vi.fn<FastifyPluginAsync>(async () => {}),
   rotaRaiz: vi.fn<FastifyPluginAsync>(async (app) => {
     app.get('/login', async () => ({ login: true }))
@@ -15,6 +15,10 @@ const { rotaVazia, rotaRaiz, rotaSistemas, rotaFuncionando } = vi.hoisted(() => 
   }),
   rotaFuncionando: vi.fn<FastifyPluginAsync>(async (app) => {
     app.get('/sub', async () => ({ sub: true }))
+  }),
+  rotaLancamentos: vi.fn<FastifyPluginAsync>(async (app) => {
+    app.get('/novo', async () => ({ novo: true }))
+    app.get('/:id/detalhe', async () => ({ detalhe: true }))
   }),
 }))
 
@@ -31,6 +35,7 @@ vi.mock('../relatorios.js', () => ({ adminRelatoriosRoutes: rotaVazia }))
 vi.mock('../relatorios-personalizados.js', () => ({ adminRelatoriosPersonalizadosRoutes: rotaVazia }))
 vi.mock('../favoritos.js', () => ({ adminFavoritosRoutes: rotaVazia }))
 vi.mock('../funcionando.js', () => ({ adminFuncionandoRoutes: rotaFuncionando }))
+vi.mock('../lancamentos.js', () => ({ adminLancamentosRoutes: rotaLancamentos }))
 
 const { adminRoutes } = await import('../index.js')
 
@@ -108,6 +113,22 @@ describe('adminRoutes — registro e hook de redirecionamento de fragmentos', ()
     })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toEqual({ sub: true })
+  })
+
+  it('GET em /admin/lancamentos/novo sem HX-Request → passa (página completa, não fragmento)', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/admin/lancamentos/novo?municipioId=m1', cookies,
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ novo: true })
+  })
+
+  it('GET em fragmento profundo de lançamentos (detalhe) sem HX-Request → redireciona', async () => {
+    const res = await app.inject({
+      method: 'GET', url: '/admin/lancamentos/abc/detalhe', cookies,
+    })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers['location']).toBe('/admin')
   })
 
   it('método não-GET nunca redireciona', async () => {
