@@ -1,0 +1,82 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Fontes de Recursos</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/fontes-recurso/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Nova Fonte
+  </button>
+</div>
+
+<form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/fontes-recurso">
+  <div style="max-width:320px" class="flex-grow-1">
+    <label class="form-label small fw-semibold mb-1">Modelo Contábil</label>
+    <select name="modeloContabilId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Todos —</option>
+      <% modelos.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= modeloSelecionado === m.id ? 'selected' : '' %>>
+          <%= m.descricao %><%= m.ativo ? '' : ' (inativo)' %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div style="max-width:140px">
+    <label class="form-label small fw-semibold mb-1">Ano</label>
+    <input type="number" name="ano" class="form-control form-control-sm" min="1900" max="9999"
+      value="<%= anoSelecionado %>" placeholder="Todos" onchange="this.form.submit()">
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width:90px">Código</th>
+          <th>Nomenclatura</th>
+          <th style="width:160px">Grupo</th>
+          <th class="text-center" style="width:110px">Vinculação</th>
+          <th class="text-center" style="width:80px">Ano</th>
+          <th class="text-end pe-3" style="width:120px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (fontes.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma fonte de recurso cadastrada.
+          </td></tr>
+        <% } %>
+        <% fontes.forEach(function(f) { %>
+          <tr id="fonte-<%= f.id %>">
+            <td class="ps-3 font-monospace fw-semibold"><%= f.codigo %></td>
+            <td><%= f.nomenclatura %></td>
+            <td class="text-muted small"><%= f.grupo || '—' %></td>
+            <td class="text-center">
+              <% if (f.vinculada) { %>
+                <span class="badge rounded-pill bg-warning bg-opacity-75 text-dark">Vinculada</span>
+              <% } else { %>
+                <span class="badge rounded-pill bg-success bg-opacity-75">Livre</span>
+              <% } %>
+            </td>
+            <td class="text-center"><span class="badge bg-light text-dark fw-semibold"><%= f.ano %></span></td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/fontes-recurso/<%= f.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                data-id="<%= f.id %>" data-nome="<%= f.codigo %> — <%= f.nomenclatura %>"
+                onclick="confirmarExclusaoAsync('fonte de recurso', this.dataset.id, this.dataset.nome, { url: '/admin/fontes-recurso/' + this.dataset.id, target: '#fonte-' + this.dataset.id, swap: 'outerHTML' })"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

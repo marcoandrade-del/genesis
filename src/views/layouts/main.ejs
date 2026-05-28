@@ -115,6 +115,9 @@
       <li><a class="nav-link <%= active === 'contas-despesa' ? 'active' : '' %>" href="/admin/contas-despesa">
         <i class="bi bi-diagram-3 me-2"></i>Contas da Despesa
       </a></li>
+      <li><a class="nav-link <%= active === 'fontes-recurso' ? 'active' : '' %>" href="/admin/fontes-recurso">
+        <i class="bi bi-bank me-2"></i>Fontes de Recursos
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -148,6 +151,7 @@
         'contas-receita': 'Contas da Receita',
         'planos-contas-despesa': 'Planos de Contas da Despesa',
         'contas-despesa': 'Contas da Despesa',
+        'fontes-recurso': 'Fontes de Recursos',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
