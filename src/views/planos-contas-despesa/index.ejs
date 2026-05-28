@@ -1,0 +1,74 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Planos de Contas da Despesa</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/planos-contas-despesa/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Novo Plano
+  </button>
+</div>
+
+<form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/planos-contas-despesa">
+  <div class="flex-grow-1" style="max-width:420px">
+    <label class="form-label small fw-semibold mb-1">Filtrar por Modelo Contábil</label>
+    <select name="modeloContabilId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Todos —</option>
+      <% modelos.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= modeloSelecionado === m.id ? 'selected' : '' %>>
+          <%= m.descricao %><%= m.ativo ? '' : ' (inativo)' %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Descrição</th>
+          <th>Modelo Contábil</th>
+          <th class="text-center">Ano</th>
+          <th class="text-center">Contas</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (planos.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum plano de contas da despesa cadastrado.
+          </td></tr>
+        <% } %>
+        <% planos.forEach(function(p) { %>
+          <tr id="plano-despesa-<%= p.id %>">
+            <td class="ps-3 fw-semibold"><%= p.descricao %></td>
+            <td class="text-muted small"><%= p.modeloContabil.descricao %></td>
+            <td class="text-center"><span class="badge bg-light text-dark fw-semibold"><%= p.ano %></span></td>
+            <td class="text-center text-muted small"><%= p._count.contas %></td>
+            <td class="text-end pe-3">
+              <a class="btn btn-sm btn-outline-primary me-1"
+                href="/admin/contas-despesa?planoId=<%= p.id %>"
+                title="Ver árvore de contas">
+                <i class="bi bi-diagram-3"></i>
+              </a>
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/planos-contas-despesa/<%= p.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                data-id="<%= p.id %>" data-nome="<%= p.descricao %> (<%= p.ano %>)"
+                onclick="confirmarExclusaoAsync('plano de contas da despesa', this.dataset.id, this.dataset.nome, { url: '/admin/planos-contas-despesa/' + this.dataset.id, target: '#plano-despesa-' + this.dataset.id, swap: 'outerHTML' })"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

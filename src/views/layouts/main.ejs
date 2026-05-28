@@ -109,6 +109,12 @@
       <li><a class="nav-link <%= active === 'contas-receita' ? 'active' : '' %>" href="/admin/contas-receita">
         <i class="bi bi-diagram-3 me-2"></i>Contas da Receita
       </a></li>
+      <li><a class="nav-link <%= active === 'planos-contas-despesa' ? 'active' : '' %>" href="/admin/planos-contas-despesa">
+        <i class="bi bi-wallet2 me-2"></i>Planos da Despesa
+      </a></li>
+      <li><a class="nav-link <%= active === 'contas-despesa' ? 'active' : '' %>" href="/admin/contas-despesa">
+        <i class="bi bi-diagram-3 me-2"></i>Contas da Despesa
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -140,6 +146,8 @@
         lancamentos: 'Lançamentos',
         'planos-contas-receita': 'Planos de Contas da Receita',
         'contas-receita': 'Contas da Receita',
+        'planos-contas-despesa': 'Planos de Contas da Despesa',
+        'contas-despesa': 'Contas da Despesa',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
