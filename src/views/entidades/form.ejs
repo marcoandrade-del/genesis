@@ -1,0 +1,92 @@
+<% const TIPOS = [['PREFEITURA','Prefeitura'],['CAMARA','Câmara'],['ADM_INDIRETA','Administração Indireta']] %>
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-building me-2 text-primary"></i><%= entidade ? 'Editar Entidade' : 'Nova Entidade' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (entidade) { %>
+    hx-put="/admin/entidades/<%= entidade.id %>"
+  <% } else { %>
+    hx-post="/admin/entidades"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (entidade) { %>
+      <div class="mb-3 small text-muted">
+        <strong>Município:</strong> <%= entidade.municipio.nome %>/<%= entidade.municipio.estado.sigla %>
+        <div class="form-text">O município é definido na criação e não pode ser alterado.</div>
+      </div>
+    <% } else { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Município <span class="text-danger">*</span></label>
+        <select name="municipioId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% municipios.forEach(function(m) { %>
+            <option value="<%= m.id %>"><%= m.nome %>/<%= m.estado.sigla %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Exercício (ano) <span class="text-danger">*</span></label>
+        <input type="number" name="ano" class="form-control form-control-sm"
+          value="<%= new Date().getFullYear() %>" min="1900" max="9999" required>
+        <div class="form-text">
+          Ao criar, o sistema copia as árvores (contábil, receita, despesa) e as fontes
+          do modelo do estado para este exercício.
+        </div>
+      </div>
+    <% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+      <input type="text" name="nome" class="form-control form-control-sm"
+        value="<%= entidade ? entidade.nome : '' %>"
+        placeholder="ex.: Prefeitura Municipal de Curitiba" required maxlength="200">
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+      <select name="tipo" class="form-select form-select-sm" required>
+        <option value="">— Selecione —</option>
+        <% TIPOS.forEach(function(t) { %>
+          <option value="<%= t[0] %>" <%= entidade && entidade.tipo === t[0] ? 'selected' : '' %>><%= t[1] %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">CNPJ</label>
+      <input type="text" name="cnpj" class="form-control form-control-sm font-monospace"
+        value="<%= entidade && entidade.cnpj ? entidade.cnpj : '' %>"
+        placeholder="00.000.000/0000-00" maxlength="20">
+    </div>
+
+    <% if (entidade) { %>
+      <div class="form-check">
+        <input type="hidden" name="ativo" value="<%= entidade.ativo ? 'true' : 'false' %>" id="ent-ativo-val">
+        <input type="checkbox" class="form-check-input" id="ent-chk-ativo"
+          <%= entidade.ativo ? 'checked' : '' %>
+          onchange="document.getElementById('ent-ativo-val').value = this.checked ? 'true' : 'false'">
+        <label for="ent-chk-ativo" class="form-check-label small">Ativa</label>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=nome]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>
