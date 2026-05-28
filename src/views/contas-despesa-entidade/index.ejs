@@ -1,0 +1,78 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Contas da Despesa — Entidade</h2>
+</div>
+
+<form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/contas-despesa-entidade">
+  <div class="flex-grow-1" style="max-width:420px">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= entidadeSelecionada && e.id === entidadeSelecionada.id ? 'selected' : '' %>>
+          <%= e.nome %> — <%= e.municipio.nome %>/<%= e.municipio.estado.sigla %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div style="max-width:130px">
+    <label class="form-label small fw-semibold mb-1">Exercício</label>
+    <input type="number" name="ano" class="form-control form-control-sm" min="1900" max="9999"
+      value="<%= ano %>" onchange="this.form.submit()">
+  </div>
+</form>
+
+<% if (!entidadeSelecionada) { %>
+  <div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>Selecione uma entidade para ver a árvore copiada do modelo do estado.
+  </div>
+<% } else { %>
+  <div class="small text-muted mb-2">
+    <strong><%= entidadeSelecionada.nome %></strong> — <%= entidadeSelecionada.municipio.nome %>/<%= entidadeSelecionada.municipio.estado.sigla %> · <%= ano %>
+    <span class="ms-2"><i class="bi bi-lock me-1"></i>Contas do modelo são imutáveis; só contas analíticas podem ser desdobradas.</span>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:50px"></th>
+            <th class="ps-3" style="width:240px">Código</th>
+            <th>Descrição</th>
+            <th class="text-center" style="width:110px">Movimento</th>
+            <th class="text-center" style="width:120px">Origem</th>
+            <th class="text-end pe-3" style="width:130px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="cde-tbody">
+          <% if (raizes.length === 0) { %>
+            <tr><td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Sem contas para esta entidade/exercício.
+              Verifique se a entidade foi criada com o modelo do estado para este ano.
+            </td></tr>
+          <% } %>
+          <%- include('linha', { contas: raizes }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<script>
+function colapsarConta(btn) {
+  const tr = btn.closest('tr')
+  const meuNivel = parseInt(tr.dataset.nivel)
+  let next = tr.nextElementSibling
+  while (next && parseInt(next.dataset.nivel) > meuNivel) {
+    const x = next; next = next.nextElementSibling; x.remove()
+  }
+  const cell = tr.querySelector('.expand-cell')
+  cell.querySelector('.btn-exp').style.display = ''
+  cell.querySelector('.btn-col').style.display = 'none'
+}
+function marcarExpandido(btn) {
+  const cell = btn.closest('.expand-cell')
+  cell.querySelector('.btn-exp').style.display = 'none'
+  cell.querySelector('.btn-col').style.display = ''
+}
+</script>

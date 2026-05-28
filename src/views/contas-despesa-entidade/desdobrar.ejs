@@ -1,0 +1,44 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-diagram-2 me-2 text-primary"></i>Desdobrar Conta
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/contas-despesa-entidade/<%= conta.id %>/desdobrar"
+  hx-target="#modal-body" hx-swap="innerHTML" hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <div class="mb-3 small text-muted">
+      <strong>Conta-pai:</strong> <span class="font-monospace"><%= conta.codigo %></span> — <%= conta.descricao %>
+      <div class="form-text">
+        Ao desdobrar, esta conta vira <strong>sintética</strong> e a nova conta-filha nasce
+        <strong>analítica</strong> (admite movimento).
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+      <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+        value="<%= sugestao %>" required maxlength="50">
+      <div class="form-text">Sugerido automaticamente; pode alterar. Não pode repetir código existente.</div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Descrição <span class="text-danger">*</span></label>
+      <input type="text" name="descricao" class="form-control form-control-sm" required maxlength="200">
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), this.closest('form').querySelector('[name=codigo]')?.value)">
+      <i class="bi bi-check-lg me-1"></i>Desdobrar
+    </button>
+  </div>
+</form>
