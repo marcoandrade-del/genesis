@@ -1,0 +1,76 @@
+<% const TIPO_LABEL = { PREFEITURA: 'Prefeitura', CAMARA: 'Câmara', ADM_INDIRETA: 'Adm. Indireta' } %>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Entidades</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/entidades/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Nova Entidade
+  </button>
+</div>
+
+<form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/entidades">
+  <div class="flex-grow-1" style="max-width:420px">
+    <label class="form-label small fw-semibold mb-1">Filtrar por Município</label>
+    <select name="municipioId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Todos —</option>
+      <% municipios.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= municipioSelecionado === m.id ? 'selected' : '' %>>
+          <%= m.nome %>/<%= m.estado.sigla %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Nome</th>
+          <th style="width:140px">Tipo</th>
+          <th style="width:160px">Município</th>
+          <th style="width:180px">CNPJ</th>
+          <th class="text-center" style="width:90px">Status</th>
+          <th class="text-end pe-3" style="width:120px">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (entidades.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma entidade cadastrada.
+          </td></tr>
+        <% } %>
+        <% entidades.forEach(function(e) { %>
+          <tr id="entidade-<%= e.id %>">
+            <td class="ps-3 fw-semibold"><%= e.nome %></td>
+            <td class="text-muted small"><%= TIPO_LABEL[e.tipo] || e.tipo %></td>
+            <td class="text-muted small"><%= e.municipio.nome %>/<%= e.municipio.estado.sigla %></td>
+            <td class="text-muted small font-monospace"><%= e.cnpj || '—' %></td>
+            <td class="text-center">
+              <span class="badge rounded-pill <%= e.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75">
+                <%= e.ativo ? 'Ativa' : 'Inativa' %>
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/entidades/<%= e.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                data-id="<%= e.id %>" data-nome="<%= e.nome %>"
+                onclick="confirmarExclusaoAsync('entidade', this.dataset.id, this.dataset.nome, { url: '/admin/entidades/' + this.dataset.id, target: '#entidade-' + this.dataset.id, swap: 'outerHTML' })"
+                title="Excluir (remove a entidade e suas cópias)">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

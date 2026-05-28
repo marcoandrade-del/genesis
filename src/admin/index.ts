@@ -23,6 +23,7 @@ import { adminContasReceitaRoutes } from './contas-receita.js'
 import { adminPlanosContasDespesaRoutes } from './planos-contas-despesa.js'
 import { adminContasDespesaRoutes } from './contas-despesa.js'
 import { adminFontesRecursoRoutes } from './fontes-recurso.js'
+import { adminEntidadesRoutes } from './entidades.js'
 
 // Caminhos profundos (≥2 segmentos) que são páginas completas, abertas por
 // navegação direta do browser via <a href> (não por HTMX). Todo o resto sob
@@ -118,5 +119,6 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminPlanosContasDespesaRoutes, { prefix: '/planos-contas-despesa' })
     admin.register(adminContasDespesaRoutes, { prefix: '/contas-despesa' })
     admin.register(adminFontesRecursoRoutes, { prefix: '/fontes-recurso' })
+    admin.register(adminEntidadesRoutes, { prefix: '/entidades' })
   })
 }
