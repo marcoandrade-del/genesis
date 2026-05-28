@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { parseCSV, validar } from '../src/services/importador-plano-contas.js'
 
-const csv = readFileSync('pcasp_estendido_2024.csv', 'utf-8')
+// Caminho do CSV via argumento; default mantém a fonte padrão em data/.
+const arquivo = process.argv[2] ?? 'data/pcasp_estendido_2024.csv'
+const csv = readFileSync(arquivo, 'utf-8')
 const linhas = parseCSV(csv)
 console.log(`parseCSV: ${linhas.length} linhas`)
 const niveis = validar(linhas)

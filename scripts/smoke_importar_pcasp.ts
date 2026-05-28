@@ -3,7 +3,8 @@
  * verifica contagens. Cria um ModeloContabil + PlanoDeContas
  * efêmeros e os deleta no final (mesmo em caso de falha).
  *
- * Rodar com: npx tsx scripts/smoke_importar_pcasp.ts
+ * Rodar com: npx tsx scripts/smoke_importar_pcasp.ts [caminho.csv]
+ * (default: data/pcasp_estendido_2024.csv)
  */
 
 import { readFileSync } from 'node:fs'
@@ -20,8 +21,9 @@ const SUFFIX = `smoke-${Date.now()}`
 const importador = new ImportadorPlanoContasService(prisma)
 
 async function main() {
-  console.log(`[1/5] Lendo pcasp_estendido_2024.csv ...`)
-  const csv = readFileSync('pcasp_estendido_2024.csv', 'utf-8')
+  const arquivo = process.argv[2] ?? 'data/pcasp_estendido_2024.csv'
+  console.log(`[1/5] Lendo ${arquivo} ...`)
+  const csv = readFileSync(arquivo, 'utf-8')
   console.log(`      ${csv.length.toLocaleString()} bytes`)
 
   console.log(`[2/5] Criando ModeloContabil + PlanoDeContas (${SUFFIX}) ...`)

@@ -88,4 +88,8 @@ def converter(xlsx: Path, csv_saida: Path) -> None:
 
 
 if __name__ == "__main__":
-    converter(Path("pcasp_estendido_2024.xlsx"), Path("pcasp_estendido_2024.csv"))
+    # Caminhos via argumento; default mantém a fonte padrão em data/.
+    # Saída default = mesmo nome do XLSX com extensão .csv.
+    entrada = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/pcasp_estendido_2024.xlsx")
+    saida = Path(sys.argv[2]) if len(sys.argv) > 2 else entrada.with_suffix(".csv")
+    converter(entrada, saida)
