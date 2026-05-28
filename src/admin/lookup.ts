@@ -6,19 +6,20 @@ export async function adminLookupRoutes(app: FastifyInstance) {
     const isHtmx = req.headers['hx-target'] === 'lookup-rows-usuarios'
 
     const usuarios = await app.prisma.usuario.findMany({
-      ...(q
-        ? {
-            where: {
+      where: {
+        ativo: true,
+        ...(q
+          ? {
               OR: [
                 { nomeCompleto: { contains: q, mode: 'insensitive' } },
                 { emailPrincipal: { contains: q, mode: 'insensitive' } },
               ],
-            },
-          }
-        : {}),
+            }
+          : {}),
+      },
       orderBy: { nomeCompleto: 'asc' },
       take: 50,
-      select: { id: true, nomeCompleto: true, emailPrincipal: true, ativo: true },
+      select: { id: true, nomeCompleto: true, emailPrincipal: true },
     })
 
     if (isHtmx) return reply.view('lookup/rows_usuarios', { usuarios })
