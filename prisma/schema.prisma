@@ -281,14 +281,17 @@ enum NivelAcesso {
 // ─────────────────────────────────────────────────────────────
 
 model ModeloContabil {
-  id           String          @id @default(uuid())
-  descricao    String          @unique
-  ativo        Boolean         @default(true)
-  criadoEm     DateTime        @default(now())
-  atualizadoEm DateTime        @updatedAt
-  planos       PlanoDeContas[]
-  estados      Estado[]
-  municipios   Municipio[]
+  id            String               @id @default(uuid())
+  descricao     String               @unique
+  ativo         Boolean              @default(true)
+  criadoEm      DateTime             @default(now())
+  atualizadoEm  DateTime             @updatedAt
+  planos        PlanoDeContas[]
+  planosReceita PlanoContasReceita[]
+  planosDespesa PlanoContasDespesa[]
+  fontesRecurso FonteRecurso[]
+  estados       Estado[]
+  municipios    Municipio[]
 
   @@map("modelos_contabeis")
 }
@@ -416,4 +419,94 @@ model SaldoInicialAno {
 enum TipoLancamento {
   DEBITO
   CREDITO
+}
+
+// ─── Plano de Contas da Receita (orçamentário) ───────────────────────────────
+// Árvore própria por modelo contábil × ano (cada TCE estadual define o seu).
+model PlanoContasReceita {
+  id               String         @id @default(uuid())
+  descricao        String
+  ano              Int
+  modeloContabilId String
+  criadoEm         DateTime       @default(now())
+  atualizadoEm     DateTime       @updatedAt
+  modeloContabil   ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+  contas           ContaReceita[]
+
+  @@unique([modeloContabilId, ano])
+  @@map("planos_contas_receita")
+}
+
+model ContaReceita {
+  id              String             @id @default(uuid())
+  codigo          String
+  descricao       String
+  nivel           Int // derivado do parent
+  admiteMovimento Boolean            @default(false) // true = analítica (folha)
+  planoId         String
+  parentId        String?
+  criadoEm        DateTime           @default(now())
+  atualizadoEm    DateTime           @updatedAt
+  plano           PlanoContasReceita @relation(fields: [planoId], references: [id])
+  parent          ContaReceita?      @relation("SubReceita", fields: [parentId], references: [id])
+  filhos          ContaReceita[]     @relation("SubReceita")
+
+  @@unique([planoId, codigo])
+  @@index([planoId, parentId])
+  @@map("contas_receita")
+}
+
+// ─── Plano de Contas da Despesa (orçamentário) ───────────────────────────────
+model PlanoContasDespesa {
+  id               String         @id @default(uuid())
+  descricao        String
+  ano              Int
+  modeloContabilId String
+  criadoEm         DateTime       @default(now())
+  atualizadoEm     DateTime       @updatedAt
+  modeloContabil   ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+  contas           ContaDespesa[]
+
+  @@unique([modeloContabilId, ano])
+  @@map("planos_contas_despesa")
+}
+
+model ContaDespesa {
+  id              String             @id @default(uuid())
+  codigo          String
+  descricao       String
+  nivel           Int // derivado do parent
+  admiteMovimento Boolean            @default(false) // true = analítica (folha)
+  planoId         String
+  parentId        String?
+  criadoEm        DateTime           @default(now())
+  atualizadoEm    DateTime           @updatedAt
+  plano           PlanoContasDespesa @relation(fields: [planoId], references: [id])
+  parent          ContaDespesa?      @relation("SubDespesa", fields: [parentId], references: [id])
+  filhos          ContaDespesa[]     @relation("SubDespesa")
+
+  @@unique([planoId, codigo])
+  @@index([planoId, parentId])
+  @@map("contas_despesa")
+}
+
+// ─── Fonte ou Destinação de Recursos ─────────────────────────────────────────
+// Lista plana versionada por modelo contábil × ano (NÃO é árvore). Elo
+// integrador receita↔despesa; o vínculo com a execução vem em fase posterior.
+model FonteRecurso {
+  id               String         @id @default(uuid())
+  codigo           String // 3 dígitos (Estados/DF/Municípios: 500-999)
+  ano              Int
+  nomenclatura     String
+  especificacao    String?
+  vinculada        Boolean        @default(true) // false = Recursos Livres
+  grupo            String? // "Livres", "Educação", "Saúde", "Assistência Social"...
+  modeloContabilId String
+  criadoEm         DateTime       @default(now())
+  atualizadoEm     DateTime       @updatedAt
+  modeloContabil   ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+
+  @@unique([modeloContabilId, ano, codigo])
+  @@index([modeloContabilId, ano])
+  @@map("fontes_recurso")
 }
