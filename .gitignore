@@ -35,3 +35,9 @@ __pycache__/
 PCASP.txt
 pcasp_*.xlsx
 pcasp_*.csv
+
+# Fontes de dados para importação (planilhas/CSVs baixados localmente)
+/data/
+
+# Locks temporários do LibreOffice
+.~lock.*#
