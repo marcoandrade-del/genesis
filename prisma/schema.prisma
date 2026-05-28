@@ -318,6 +318,7 @@ model Municipio {
   atualizadoEm     DateTime            @updatedAt
   estado           Estado              @relation(fields: [estadoId], references: [id])
   modeloContabil   ModeloContabil?     @relation(fields: [modeloContabilId], references: [id])
+  entidades        Entidade[]
   lancamentos      Lancamento[]
   resumos          ResumoMensalConta[]
   saldosIniciais   SaldoInicialAno[]
@@ -509,4 +510,128 @@ model FonteRecurso {
   @@unique([modeloContabilId, ano, codigo])
   @@index([modeloContabilId, ano])
   @@map("fontes_recurso")
+}
+
+// ─── Entidade (prefeitura, câmara, adm. indireta) ────────────────────────────
+// Vive sob o Município e é a dona da execução. Na criação recebe uma CÓPIA das
+// árvores do modelo do estado (contábil/receita/despesa) + fontes, por exercício.
+enum TipoEntidade {
+  PREFEITURA
+  CAMARA
+  ADM_INDIRETA
+}
+
+// Procedência de cada conta/fonte copiada: veio do modelo do TCE (imutável para
+// a entidade) ou foi um desdobramento criado pela própria entidade.
+enum OrigemConta {
+  MODELO
+  DESDOBRAMENTO
+}
+
+model Entidade {
+  id           String       @id @default(uuid())
+  nome         String
+  tipo         TipoEntidade
+  cnpj         String?      @unique
+  municipioId  String
+  ativo        Boolean      @default(true)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+  municipio    Municipio    @relation(fields: [municipioId], references: [id])
+
+  contasContabil ContaContabilEntidade[]
+  contasReceita  ContaReceitaEntidade[]
+  contasDespesa  ContaDespesaEntidade[]
+  fontesRecurso  FonteRecursoEntidade[]
+
+  @@unique([municipioId, nome])
+  @@map("entidades")
+}
+
+// As contas de entidade são cópias por exercício (ano). `modeloContaId` é uma
+// referência fraca (sem FK) à conta-fonte do modelo, para rastreio/sincronização.
+model ContaContabilEntidade {
+  id              String                  @id @default(uuid())
+  entidadeId      String
+  ano             Int
+  codigo          String
+  descricao       String
+  nivel           Int
+  admiteMovimento Boolean                 @default(false)
+  origem          OrigemConta             @default(MODELO)
+  modeloContaId   String?
+  parentId        String?
+  criadoEm        DateTime                @default(now())
+  atualizadoEm    DateTime                @updatedAt
+  entidade        Entidade                @relation(fields: [entidadeId], references: [id])
+  parent          ContaContabilEntidade?  @relation("SubContabilEnt", fields: [parentId], references: [id])
+  filhos          ContaContabilEntidade[] @relation("SubContabilEnt")
+
+  @@unique([entidadeId, ano, codigo])
+  @@index([entidadeId, ano, parentId])
+  @@map("contas_contabil_entidade")
+}
+
+model ContaReceitaEntidade {
+  id              String                 @id @default(uuid())
+  entidadeId      String
+  ano             Int
+  codigo          String
+  descricao       String
+  nivel           Int
+  admiteMovimento Boolean                @default(false)
+  origem          OrigemConta            @default(MODELO)
+  modeloContaId   String?
+  parentId        String?
+  criadoEm        DateTime               @default(now())
+  atualizadoEm    DateTime               @updatedAt
+  entidade        Entidade               @relation(fields: [entidadeId], references: [id])
+  parent          ContaReceitaEntidade?  @relation("SubReceitaEnt", fields: [parentId], references: [id])
+  filhos          ContaReceitaEntidade[] @relation("SubReceitaEnt")
+
+  @@unique([entidadeId, ano, codigo])
+  @@index([entidadeId, ano, parentId])
+  @@map("contas_receita_entidade")
+}
+
+model ContaDespesaEntidade {
+  id              String                 @id @default(uuid())
+  entidadeId      String
+  ano             Int
+  codigo          String
+  descricao       String
+  nivel           Int
+  admiteMovimento Boolean                @default(false)
+  origem          OrigemConta            @default(MODELO)
+  modeloContaId   String?
+  parentId        String?
+  criadoEm        DateTime               @default(now())
+  atualizadoEm    DateTime               @updatedAt
+  entidade        Entidade               @relation(fields: [entidadeId], references: [id])
+  parent          ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
+  filhos          ContaDespesaEntidade[] @relation("SubDespesaEnt")
+
+  @@unique([entidadeId, ano, codigo])
+  @@index([entidadeId, ano, parentId])
+  @@map("contas_despesa_entidade")
+}
+
+model FonteRecursoEntidade {
+  id            String      @id @default(uuid())
+  entidadeId    String
+  ano           Int
+  codigo        String
+  nomenclatura  String
+  especificacao String?
+  vinculada     Boolean     @default(true)
+  grupo         String?
+  origem        OrigemConta @default(MODELO)
+  modeloFonteId String?
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+  entidade      Entidade    @relation(fields: [entidadeId], references: [id])
+
+  @@unique([entidadeId, ano, codigo])
+  @@index([entidadeId, ano])
+  @@map("fontes_recurso_entidade")
 }
