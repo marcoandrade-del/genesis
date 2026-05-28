@@ -52,6 +52,13 @@
                 title="Ver árvore de contas">
                 <i class="bi bi-diagram-3"></i>
               </a>
+              <button class="btn btn-sm btn-outline-success me-1"
+                hx-get="/admin/planos-contas-despesa/<%= p.id %>/importar"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Importar CSV de contas">
+                <i class="bi bi-upload"></i>
+              </button>
               <button class="btn btn-sm btn-outline-secondary me-1"
                 hx-get="/admin/planos-contas-despesa/<%= p.id %>/form"
                 hx-target="#modal-body"

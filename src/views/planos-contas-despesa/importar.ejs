@@ -1,0 +1,102 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-upload me-2 text-primary"></i>Importar CSV de Contas da Despesa
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="mb-3">
+    <div class="small text-muted">Plano</div>
+    <div class="fw-semibold"><%= plano.descricao %> — <%= plano.ano %></div>
+    <div class="small text-muted">Modelo: <%= plano.modeloContabil.descricao %></div>
+  </div>
+
+  <% if (plano._count.contas > 0) { %>
+    <div class="alert alert-warning py-2 small mb-3">
+      <i class="bi bi-exclamation-triangle me-1"></i>
+      Este plano já possui <strong><%= plano._count.contas %></strong> conta(s). A importação
+      vai falhar com <code>409 CONFLITO</code> em caso de código duplicado — para reimportar,
+      esvazie o plano antes.
+    </div>
+  <% } %>
+
+  <div class="mb-3">
+    <label for="csv-file" class="form-label small fw-semibold">Arquivo CSV <span class="text-danger">*</span></label>
+    <input type="file" id="csv-file" accept=".csv,text/csv" class="form-control form-control-sm">
+    <div class="form-text">
+      Cabeçalho obrigatório: <code>codigo,descricao,codigoPai,admiteMovimento</code>.
+      Limite 5 MB. Validação completa antes de qualquer escrita no banco.
+    </div>
+  </div>
+
+  <div id="importar-status" class="d-none"></div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+  <button type="button" id="btn-importar-csv" class="btn btn-sm btn-primary"
+    data-base="/admin/planos-contas-despesa"
+    data-plano-id="<%= plano.id %>"
+    onclick="importarCsvArvore(this)">
+    <span class="btn-importar-spinner spinner-border spinner-border-sm me-2 d-none"></span>
+    <i class="btn-importar-icon bi bi-upload me-1"></i><span class="btn-importar-label">Importar</span>
+  </button>
+</div>
+
+<script>
+async function importarCsvArvore(btn) {
+  const base = btn.dataset.base
+  const planoId = btn.dataset.planoId
+  const fileInput = document.getElementById('csv-file')
+  const statusEl = document.getElementById('importar-status')
+  const file = fileInput.files[0]
+  const labelEl = btn.querySelector('.btn-importar-label')
+  const iconEl = btn.querySelector('.btn-importar-icon')
+  const spinnerEl = btn.querySelector('.btn-importar-spinner')
+
+  function mostrar(tipo, msg) {
+    statusEl.className = 'alert py-2 small alert-' + tipo
+    statusEl.textContent = msg
+    statusEl.classList.remove('d-none')
+  }
+  function setBusy(busy, label) {
+    btn.disabled = busy
+    labelEl.textContent = label
+    iconEl.classList.toggle('d-none', busy)
+    spinnerEl.classList.toggle('d-none', !busy)
+  }
+
+  if (!file) { mostrar('danger', 'Selecione um arquivo CSV.'); return }
+  if (file.size > 5 * 1024 * 1024) { mostrar('danger', 'Arquivo excede 5 MB.'); return }
+
+  setBusy(true, 'Importando…')
+  mostrar('info', 'Lendo arquivo…')
+
+  try {
+    const csv = await file.text()
+    mostrar('info', 'Enviando ao servidor… (' + (csv.length / 1024).toFixed(0) + ' KB)')
+    const resp = await fetch(base + '/' + planoId + '/importar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv: csv }),
+    })
+    const data = await resp.json().catch(function() { return null })
+    if (!resp.ok || !data || data.error) {
+      const msg = (data && data.error && data.error.message) || ('Erro ' + resp.status + '.')
+      mostrar('danger', msg)
+      setBusy(false, 'Importar')
+      return
+    }
+    mostrar('success', (data.data?.criadas || 0) + ' conta(s) importada(s) com sucesso.')
+    setTimeout(function() {
+      _modalDirty = false
+      fecharModalForcado()
+      window.location.href = base
+    }, 800)
+  } catch (e) {
+    mostrar('danger', 'Falha ao ler arquivo: ' + (e && e.message ? e.message : 'erro desconhecido') + '.')
+    setBusy(false, 'Importar')
+  }
+}
+</script>

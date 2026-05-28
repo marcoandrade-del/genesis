@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { buscarPorIdMock, criarMock, atualizarMock, excluirMock } = vi.hoisted(() => ({
+const { buscarPorIdMock, criarMock, atualizarMock, excluirMock, importarMock } = vi.hoisted(() => ({
   buscarPorIdMock: vi.fn(),
   criarMock: vi.fn(),
   atualizarMock: vi.fn(),
   excluirMock: vi.fn(),
+  importarMock: vi.fn(),
 }))
 
 vi.mock('../../services/planos-contas-receita.js', () => ({
@@ -13,6 +14,12 @@ vi.mock('../../services/planos-contas-receita.js', () => ({
     criar = criarMock
     atualizar = atualizarMock
     excluir = excluirMock
+  },
+}))
+
+vi.mock('../../services/importador-plano-receita.js', () => ({
+  ImportadorPlanoReceitaService: class {
+    importar = importarMock
   },
 }))
 
@@ -35,12 +42,16 @@ function form(obj: Record<string, string>) {
   }
 }
 
+function json(body: unknown) {
+  return { payload: JSON.stringify(body), headers: { 'content-type': 'application/json' } }
+}
+
 describe('adminPlanosContasReceitaRoutes', () => {
   let app: FastifyInstance
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[buscarPorIdMock, criarMock, atualizarMock, excluirMock].forEach((m) => m.mockReset())
+    ;[buscarPorIdMock, criarMock, atualizarMock, excluirMock, importarMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({
       registrar: adminPlanosContasReceitaRoutes,
       comView: true,
@@ -228,6 +239,69 @@ describe('adminPlanosContasReceitaRoutes', () => {
       atualizarMock.mockRejectedValue('boom')
       const res = await app.inject({ method: 'PUT', url: '/pr1', ...form({ descricao: 'X', ano: '2027' }) })
       expect(res.body).toContain('Erro ao atualizar plano de contas da receita')
+    })
+  })
+
+  describe('GET /:id/importar', () => {
+    it('404 quando plano não existe', async () => {
+      prisma.planoContasReceita.findUnique.mockResolvedValue(null)
+      const res = await app.inject({ method: 'GET', url: '/x/importar' })
+      expect(res.statusCode).toBe(404)
+    })
+
+    it('renderiza modal mostrando aviso se já tem contas', async () => {
+      prisma.planoContasReceita.findUnique.mockResolvedValue({ ...PLANO_COM_MODELO, _count: { contas: 42 } })
+      const res = await app.inject({ method: 'GET', url: '/pr1/importar' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Importar CSV de Contas da Receita')
+      expect(res.body).toContain('42')
+    })
+
+    it('renderiza modal sem aviso quando plano está vazio', async () => {
+      prisma.planoContasReceita.findUnique.mockResolvedValue(PLANO_COM_MODELO)
+      const res = await app.inject({ method: 'GET', url: '/pr1/importar' })
+      expect(res.body).not.toContain('já possui')
+    })
+  })
+
+  describe('POST /:id/importar', () => {
+    it('importa e devolve { data: { criadas } }', async () => {
+      importarMock.mockResolvedValue({ criadas: 100 })
+      const res = await app.inject({
+        method: 'POST', url: '/pr1/importar', ...json({ csv: 'codigo,descricao,codigoPai,admiteMovimento\n1,A,,false' }),
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.json()).toEqual({ data: { criadas: 100 } })
+      expect(importarMock).toHaveBeenCalledWith('pr1', expect.stringContaining('codigo,descricao'))
+    })
+
+    it('400 quando csv ausente (não-string)', async () => {
+      const res = await app.inject({ method: 'POST', url: '/pr1/importar', ...json({}) })
+      expect(res.statusCode).toBe(400)
+      expect(res.json()).toEqual({ error: { code: 'REQUISICAO_INVALIDA', message: 'CSV vazio.' } })
+    })
+
+    it('400 quando csv só com whitespace', async () => {
+      const res = await app.inject({ method: 'POST', url: '/pr1/importar', ...json({ csv: '   \n  ' }) })
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('propaga ErroNegocio do importer (CONFLITO → 409)', async () => {
+      const { ErroNegocio } = await import('../../errors.js')
+      importarMock.mockRejectedValue(new ErroNegocio('CONFLITO', 'Dup'))
+      const res = await app.inject({
+        method: 'POST', url: '/pr1/importar', ...json({ csv: 'codigo,descricao,codigoPai,admiteMovimento\n1,A,,false' }),
+      })
+      expect(res.statusCode).toBe(409)
+      expect(res.json()).toEqual({ error: { code: 'CONFLITO', message: 'Dup' } })
+    })
+
+    it('propaga erro não-tratado como 500', async () => {
+      importarMock.mockRejectedValue(new Error('boom genérico'))
+      const res = await app.inject({
+        method: 'POST', url: '/pr1/importar', ...json({ csv: 'codigo,descricao,codigoPai,admiteMovimento\n1,A,,false' }),
+      })
+      expect(res.statusCode).toBe(500)
     })
   })
 

@@ -134,8 +134,9 @@ export function parseBoolean(v: string | undefined): boolean {
 // Validação em memória (sem I/O)
 // ─────────────────────────────────────────────────────────────
 
-/** Retorna o mapa código→nível. Lança ErroNegocio na primeira violação. */
-export function validar(linhas: LinhaCSV[]): Map<string, number> {
+/** Retorna o mapa código→nível. Lança ErroNegocio na primeira violação.
+ * `nivelMax` permite reuso por receita/despesa (que têm tetos próprios). */
+export function validar(linhas: LinhaCSV[], nivelMax: number = NIVEL_MAX): Map<string, number> {
   // 1. Códigos únicos no arquivo.
   const porCodigo = new Map<string, LinhaCSV>()
   for (const l of linhas) {
@@ -168,8 +169,8 @@ export function validar(linhas: LinhaCSV[]): Map<string, number> {
     const linha = porCodigo.get(codigo)!
     const n = linha.codigoPai ? nivelDe(linha.codigoPai) + 1 : 1
     emProgresso.delete(codigo)
-    if (n > NIVEL_MAX) {
-      throw new ErroNegocio('CONFLITO', `Conta "${codigo}" excede a profundidade máxima de ${NIVEL_MAX} níveis.`)
+    if (n > nivelMax) {
+      throw new ErroNegocio('CONFLITO', `Conta "${codigo}" excede a profundidade máxima de ${nivelMax} níveis.`)
     }
     niveis.set(codigo, n)
     return n

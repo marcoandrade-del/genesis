@@ -1,8 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import { PlanosContasDespesaService } from '../services/planos-contas-despesa.js'
+import { ImportadorPlanoDespesaService } from '../services/importador-plano-despesa.js'
+import { erroHttp, tratarErro } from '../errors.js'
+
+const LIMITE_CSV_IMPORTACAO = 5 * 1024 * 1024
 
 export async function adminPlanosContasDespesaRoutes(app: FastifyInstance) {
   const service = new PlanosContasDespesaService(app.prisma)
+  const importador = new ImportadorPlanoDespesaService(app.prisma)
 
   // ── LIST ────────────────────────────────────────────────────────────────────
   app.get<{ Querystring: { modeloContabilId?: string } }>('/', async (req, reply) => {
@@ -54,6 +59,37 @@ export async function adminPlanosContasDespesaRoutes(app: FastifyInstance) {
     if (!plano) return reply.status(404).send('Plano de contas da despesa não encontrado.')
     return reply.view('planos-contas-despesa/form', { plano, modelos: [], erro: null })
   })
+
+  // ── IMPORTAR (modal de upload) ──────────────────────────────────────────────
+  app.get<{ Params: { id: string } }>('/:id/importar', async (req, reply) => {
+    const plano = await app.prisma.planoContasDespesa.findUnique({
+      where: { id: req.params.id },
+      include: {
+        modeloContabil: { select: { descricao: true } },
+        _count: { select: { contas: true } },
+      },
+    })
+    if (!plano) return reply.status(404).send('Plano de contas da despesa não encontrado.')
+    return reply.view('planos-contas-despesa/importar', { plano })
+  })
+
+  // ── IMPORT submit (JSON body { csv }) ──────────────────────────────────────
+  app.post<{ Params: { id: string }; Body: { csv: string } }>(
+    '/:id/importar',
+    { bodyLimit: LIMITE_CSV_IMPORTACAO },
+    async (req, reply) => {
+      const { csv } = req.body
+      if (typeof csv !== 'string' || !csv.trim()) {
+        return reply.status(400).send(erroHttp('REQUISICAO_INVALIDA', 'CSV vazio.'))
+      }
+      try {
+        const resultado = await importador.importar(req.params.id, csv)
+        return reply.send({ data: resultado })
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
 
   // ── CREATE ──────────────────────────────────────────────────────────────────
   app.post<{ Body: { descricao: string; ano: string; modeloContabilId: string } }>(
