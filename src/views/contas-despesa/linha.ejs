@@ -1,0 +1,59 @@
+<% contas.forEach(function(c) { %>
+  <tr id="conta-despesa-<%= c.id %>" data-nivel="<%= c.nivel %>">
+    <td class="expand-cell text-center">
+      <% if (c.temFilhos) { %>
+        <button type="button"
+          class="btn btn-sm btn-link p-0 btn-exp"
+          hx-get="/admin/contas-despesa/<%= c.id %>/filhos"
+          hx-target="#conta-despesa-<%= c.id %>"
+          hx-swap="afterend"
+          hx-on::after-request="marcarExpandido(this)"
+          title="Expandir">
+          <i class="bi bi-plus-square"></i>
+        </button>
+        <button type="button"
+          class="btn btn-sm btn-link p-0 btn-col"
+          style="display:none"
+          onclick="colapsarConta(this)"
+          title="Recolher">
+          <i class="bi bi-dash-square"></i>
+        </button>
+      <% } %>
+    </td>
+    <td class="ps-3 font-monospace small" style="padding-left: calc(<%= (c.nivel - 1) * 1.25 %>rem + 0.75rem) !important">
+      <%= c.codigo %>
+    </td>
+    <td><%= c.descricao %></td>
+    <td class="text-center">
+      <% if (c.admiteMovimento) { %>
+        <span class="badge rounded-pill bg-success bg-opacity-75">Folha</span>
+      <% } else { %>
+        <span class="badge rounded-pill bg-secondary bg-opacity-50">Sintética</span>
+      <% } %>
+    </td>
+    <td class="text-end pe-3">
+      <% if (!c.admiteMovimento) { %>
+        <button class="btn btn-sm btn-outline-primary me-1"
+          hx-get="/admin/contas-despesa/form?planoId=<%= c.planoId %>&parentId=<%= c.id %>"
+          hx-target="#modal-body"
+          hx-swap="innerHTML"
+          title="Adicionar filha">
+          <i class="bi bi-plus"></i>
+        </button>
+      <% } %>
+      <button class="btn btn-sm btn-outline-secondary me-1"
+        hx-get="/admin/contas-despesa/<%= c.id %>/form"
+        hx-target="#modal-body"
+        hx-swap="innerHTML"
+        title="Editar">
+        <i class="bi bi-pencil"></i>
+      </button>
+      <button class="btn btn-sm btn-outline-danger"
+        data-id="<%= c.id %>" data-nome="<%= c.codigo %> — <%= c.descricao %>"
+        onclick="confirmarExclusaoAsync('conta', this.dataset.id, this.dataset.nome, { url: '/admin/contas-despesa/' + this.dataset.id, target: '#conta-despesa-' + this.dataset.id, swap: 'outerHTML' })"
+        title="Excluir">
+        <i class="bi bi-trash"></i>
+      </button>
+    </td>
+  </tr>
+<% }) %>
