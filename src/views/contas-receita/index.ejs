@@ -1,0 +1,82 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Contas da Receita</h2>
+  <% if (planoSelecionado) { %>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/contas-receita/form?planoId=<%= planoSelecionado.id %>"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Conta-raiz
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/contas-receita">
+  <div class="flex-grow-1" style="max-width:480px">
+    <label class="form-label small fw-semibold mb-1">Plano de Contas da Receita</label>
+    <select name="planoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% planos.forEach(function(p) { %>
+        <option value="<%= p.id %>" <%= planoSelecionado && p.id === planoSelecionado.id ? 'selected' : '' %>>
+          <%= p.modeloContabil.descricao %> — <%= p.descricao %> (<%= p.ano %>)
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</form>
+
+<% if (!planoSelecionado) { %>
+  <div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>Selecione um plano de contas da receita acima para visualizar a árvore.
+  </div>
+<% } else { %>
+  <div class="small text-muted mb-2">
+    <strong><%= planoSelecionado.descricao %></strong> — <%= planoSelecionado.modeloContabil.descricao %> · <%= planoSelecionado.ano %>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width:50px"></th>
+            <th class="ps-3" style="width:240px">Código</th>
+            <th>Descrição</th>
+            <th class="text-center" style="width:120px">Movimento</th>
+            <th class="text-end pe-3" style="width:180px">Ações</th>
+          </tr>
+        </thead>
+        <tbody id="contas-receita-tbody">
+          <% if (raizes.length === 0) { %>
+            <tr><td colspan="5" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano sem contas cadastradas.
+              Use o botão "Nova Conta-raiz" para começar.
+            </td></tr>
+          <% } %>
+          <%- include('linha', { contas: raizes }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<script>
+function colapsarConta(btn) {
+  const tr = btn.closest('tr')
+  const meuNivel = parseInt(tr.dataset.nivel)
+  let next = tr.nextElementSibling
+  while (next && parseInt(next.dataset.nivel) > meuNivel) {
+    const x = next
+    next = next.nextElementSibling
+    x.remove()
+  }
+  const cell = tr.querySelector('.expand-cell')
+  cell.querySelector('.btn-exp').style.display = ''
+  cell.querySelector('.btn-col').style.display = 'none'
+}
+
+function marcarExpandido(btn) {
+  const cell = btn.closest('.expand-cell')
+  cell.querySelector('.btn-exp').style.display = 'none'
+  cell.querySelector('.btn-col').style.display = ''
+}
+</script>
