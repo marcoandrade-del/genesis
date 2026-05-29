@@ -97,6 +97,12 @@
       <li><a class="nav-link <%= active === 'entidades' ? 'active' : '' %>" href="/admin/entidades">
         <i class="bi bi-building me-2"></i>Entidades
       </a></li>
+      <li><a class="nav-link <%= active === 'contas-contabil-entidade' ? 'active' : '' %>" href="/admin/contas-contabil-entidade">
+        <i class="bi bi-diagram-2 me-2"></i>Contábil por Entidade
+      </a></li>
+      <li><a class="nav-link <%= active === 'contas-receita-entidade' ? 'active' : '' %>" href="/admin/contas-receita-entidade">
+        <i class="bi bi-diagram-2 me-2"></i>Receita por Entidade
+      </a></li>
       <li><a class="nav-link <%= active === 'contas-despesa-entidade' ? 'active' : '' %>" href="/admin/contas-despesa-entidade">
         <i class="bi bi-diagram-2 me-2"></i>Despesa por Entidade
       </a></li>
@@ -151,6 +157,8 @@
         estados: 'Estados',
         municipios: 'Municípios',
         entidades: 'Entidades',
+        'contas-contabil-entidade': 'Plano de Contas (Entidade)',
+        'contas-receita-entidade': 'Contas da Receita (Entidade)',
         'contas-despesa-entidade': 'Contas da Despesa (Entidade)',
         'planos-de-contas': 'Planos de Contas',
         contas: 'Contas',

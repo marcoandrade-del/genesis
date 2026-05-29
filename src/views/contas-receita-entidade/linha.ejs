@@ -1,0 +1,46 @@
+<% contas.forEach(function(c) { %>
+  <tr id="cre-<%= c.id %>" data-nivel="<%= c.nivel %>">
+    <td class="expand-cell text-center">
+      <% if (c.temFilhos) { %>
+        <button type="button" class="btn btn-sm btn-link p-0 btn-exp"
+          hx-get="/admin/contas-receita-entidade/<%= c.id %>/filhos"
+          hx-target="#cre-<%= c.id %>" hx-swap="afterend"
+          hx-on::after-request="marcarExpandido(this)" title="Expandir">
+          <i class="bi bi-plus-square"></i>
+        </button>
+        <button type="button" class="btn btn-sm btn-link p-0 btn-col" style="display:none"
+          onclick="colapsarConta(this)" title="Recolher">
+          <i class="bi bi-dash-square"></i>
+        </button>
+      <% } %>
+    </td>
+    <td class="ps-3 font-monospace small" style="padding-left: calc(<%= (c.nivel - 1) * 1.25 %>rem + 0.75rem) !important">
+      <%= c.codigo %>
+    </td>
+    <td><%= c.descricao %></td>
+    <td class="text-center">
+      <% if (c.admiteMovimento) { %>
+        <span class="badge rounded-pill bg-success bg-opacity-75">Folha</span>
+      <% } else { %>
+        <span class="badge rounded-pill bg-secondary bg-opacity-50">Sintética</span>
+      <% } %>
+    </td>
+    <td class="text-center">
+      <% if (c.origem === 'DESDOBRAMENTO') { %>
+        <span class="badge rounded-pill bg-info bg-opacity-75 text-dark">Desdobr.</span>
+      <% } else { %>
+        <span class="badge rounded-pill bg-light text-muted">Modelo</span>
+      <% } %>
+    </td>
+    <td class="text-end pe-3">
+      <% if (c.admiteMovimento) { %>
+        <button class="btn btn-sm btn-outline-primary"
+          hx-get="/admin/contas-receita-entidade/<%= c.id %>/desdobrar"
+          hx-target="#modal-body" hx-swap="innerHTML"
+          title="Desdobrar (criar conta-filha analítica)">
+          <i class="bi bi-diagram-2 me-1"></i>Desdobrar
+        </button>
+      <% } %>
+    </td>
+  </tr>
+<% }) %>
