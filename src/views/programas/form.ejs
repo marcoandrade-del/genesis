@@ -1,0 +1,71 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-collection me-2 text-primary"></i><%= programa && programa.id ? 'Editar Programa' : 'Novo Programa' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (programa && programa.id) { %>
+    hx-put="/admin/programas/<%= programa.id %>"
+  <% } else { %>
+    hx-post="/admin/programas"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (!programa || !programa.id) { %>
+      <input type="hidden" name="entidadeId" value="<%= entidadeId %>">
+      <input type="hidden" name="ano" value="<%= ano %>">
+      <div class="small text-muted mb-2">Exercício: <strong><%= ano %></strong></div>
+    <% } %>
+
+    <div class="row g-2">
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+        <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+          value="<%= programa ? programa.codigo : '' %>"
+          placeholder="ex.: 0001" required maxlength="20">
+      </div>
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+        <select name="tipo" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <option value="FINALISTICO" <%= programa && programa.tipo === 'FINALISTICO' ? 'selected' : '' %>>Finalístico</option>
+          <option value="GESTAO" <%= programa && programa.tipo === 'GESTAO' ? 'selected' : '' %>>Gestão</option>
+          <option value="OPERACOES_ESPECIAIS" <%= programa && programa.tipo === 'OPERACOES_ESPECIAIS' ? 'selected' : '' %>>Operações Especiais</option>
+        </select>
+      </div>
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+        <input type="text" name="nome" class="form-control form-control-sm"
+          value="<%= programa ? programa.nome : '' %>"
+          placeholder="ex.: EDUCAÇÃO DE QUALIDADE" required maxlength="200">
+      </div>
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Objetivo</label>
+        <textarea name="objetivo" class="form-control form-control-sm" rows="3"
+          placeholder="Objetivo de governo do programa…" maxlength="1000"><%= programa && programa.objetivo ? programa.objetivo : '' %></textarea>
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="prog-ativo" name="ativo" value="true"
+            <%= !programa || programa.ativo ? 'checked' : '' %>>
+          <label class="form-check-label small" for="prog-ativo">Ativo</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>
