@@ -29,12 +29,19 @@ import { adminContasReceitaEntidadeRoutes } from './contas-receita-entidade.js'
 import { adminContasContabilEntidadeRoutes } from './contas-contabil-entidade.js'
 import { adminFuncoesRoutes } from './funcoes.js'
 import { adminUnidadesOrcamentariaRoutes } from './unidades-orcamentaria.js'
+import { adminEventosContabeisRoutes } from './eventos-contabeis.js'
 
-// Caminhos profundos (≥2 segmentos) que são páginas completas, abertas por
-// navegação direta do browser via <a href> (não por HTMX). Todo o resto sob
-// ≥2 segmentos é fragmento (modal, partial de árvore/lookup) e só pode ser
-// servido dentro de uma requisição HTMX.
-const PAGINAS_COMPLETAS_PROFUNDAS = new Set(['lancamentos/novo'])
+// Caminhos profundos (≥2 segmentos) que são páginas completas. Aceita string
+// literal OU RegExp (para caminhos com ID variável, ex.: ".../:id/editar").
+const PAGINAS_COMPLETAS_PROFUNDAS: ReadonlyArray<string | RegExp> = [
+  'lancamentos/novo',
+  'eventos-contabeis/novo',
+  /^eventos-contabeis\/[^/]+\/editar$/,
+]
+
+function ePaginaCompletaProfunda(path: string): boolean {
+  return PAGINAS_COMPLETAS_PROFUNDAS.some((p) => (typeof p === 'string' ? p === path : p.test(path)))
+}
 
 export function adminNotFoundHandler(req: FastifyRequest, reply: FastifyReply) {
   return reply.status(404).view('404', { caminho: req.url })
@@ -97,7 +104,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const rawPath = req.url.split('?')[0]!
       const segments = rawPath.replace(/^\/admin\/?/, '').split('/').filter(Boolean)
       if (segments.length < 2 || segments[0] === 'funcionando') return
-      if (PAGINAS_COMPLETAS_PROFUNDAS.has(segments.join('/'))) return
+      if (ePaginaCompletaProfunda(segments.join('/'))) return
       return reply.redirect('/admin')
     })
 
@@ -130,5 +137,6 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminContasContabilEntidadeRoutes, { prefix: '/contas-contabil-entidade' })
     admin.register(adminFuncoesRoutes, { prefix: '/funcoes' })
     admin.register(adminUnidadesOrcamentariaRoutes, { prefix: '/unidades-orcamentaria' })
+    admin.register(adminEventosContabeisRoutes, { prefix: '/eventos-contabeis' })
   })
 }

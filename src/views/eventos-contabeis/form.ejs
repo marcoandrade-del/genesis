@@ -1,0 +1,168 @@
+<%# Form completo (não modal) para criar/editar evento — usa página inteira
+   porque os pares D-C podem ser muitos. Lista dinâmica de itens estilo
+   /admin/lancamentos/novo. %>
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      <%= evento && evento.id ? 'Editar Evento Contábil' : 'Novo Evento Contábil' %>
+    </h2>
+    <div class="small text-muted">
+      Modelo: <strong><%= modelo ? modelo.descricao : '—' %></strong>
+    </div>
+  </div>
+  <a href="/admin/eventos-contabeis?modeloContabilId=<%= modelo ? modelo.id : '' %>"
+    class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<% if (erro) { %>
+  <div class="alert alert-danger py-2 small"><%= erro %></div>
+<% } %>
+
+<form id="form-evento"
+  <% if (evento && evento.id) { %>
+    hx-put="/admin/eventos-contabeis/<%= evento.id %>"
+  <% } else { %>
+    hx-post="/admin/eventos-contabeis"
+  <% } %>
+  hx-target="body" hx-swap="outerHTML">
+
+  <% if (!evento || !evento.id) { %>
+    <input type="hidden" name="modeloContabilId" value="<%= modelo.id %>">
+  <% } %>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Código <span class="text-danger">*</span></label>
+          <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+            value="<%= evento ? evento.codigo : '' %>"
+            placeholder="ex.: 100001" required maxlength="20">
+        </div>
+        <div class="col-md-9">
+          <label class="form-label small fw-semibold mb-1">Descrição <span class="text-danger">*</span></label>
+          <input type="text" name="descricao" class="form-control form-control-sm"
+            value="<%= evento ? evento.descricao : '' %>"
+            placeholder="ex.: PREVISÃO INICIAL DA RECEITA BRUTA" required maxlength="500">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Tipo de Inscrição</label>
+          <input type="text" name="tipoInscricao" class="form-control form-control-sm"
+            value="<%= evento && evento.tipoInscricao ? evento.tipoInscricao : '' %>"
+            placeholder="ex.: 11 - Natureza da Receita" maxlength="200">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Máscara Contábil</label>
+          <input type="text" name="classificacaoContabilMascara"
+            class="form-control form-control-sm font-monospace"
+            value="<%= evento && evento.classificacaoContabilMascara ? evento.classificacaoContabilMascara : '' %>"
+            placeholder="ex.: 52121XXXX" maxlength="50">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Máscara Orçamentária</label>
+          <input type="text" name="classificacaoOrcamentariaMascara"
+            class="form-control form-control-sm font-monospace"
+            value="<%= evento && evento.classificacaoOrcamentariaMascara ? evento.classificacaoOrcamentariaMascara : '' %>"
+            placeholder="ex.: YYYYYYY" maxlength="50">
+        </div>
+        <div class="col-12">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="ev-ativo" name="ativo" value="true"
+              <%= !evento || evento.ativo ? 'checked' : '' %>>
+            <label class="form-check-label small" for="ev-ativo">Ativo</label>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+      <strong class="small">Pares de lançamento (D / C)</strong>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="adicionarPar()">
+        <i class="bi bi-plus-lg me-1"></i>Adicionar par
+      </button>
+    </div>
+    <div class="card-body p-0">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light small">
+          <tr>
+            <th class="ps-3" style="width:60px">#</th>
+            <th>Conta Débito</th>
+            <th>Conta Crédito</th>
+            <th class="pe-3" style="width:60px"></th>
+          </tr>
+        </thead>
+        <tbody id="pares-tbody">
+          <% (evento && evento.lancamentos ? evento.lancamentos : []).forEach(function(l, i) { %>
+            <tr>
+              <td class="ps-3 small text-muted ordem"><%= i + 1 %></td>
+              <td>
+                <input type="text" name="contaDebito"
+                  class="form-control form-control-sm font-monospace"
+                  value="<%= l.contaDebitoMascara %>" required maxlength="50">
+              </td>
+              <td>
+                <input type="text" name="contaCredito"
+                  class="form-control form-control-sm font-monospace"
+                  value="<%= l.contaCreditoMascara %>" required maxlength="50">
+              </td>
+              <td class="pe-3 text-end">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerPar(this)">
+                  <i class="bi bi-x-lg"></i>
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="d-flex justify-content-end gap-2">
+    <a href="/admin/eventos-contabeis?modeloContabilId=<%= modelo ? modelo.id : '' %>" class="btn btn-sm btn-secondary">Cancelar</a>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar Evento
+    </button>
+  </div>
+</form>
+
+<template id="tpl-par">
+  <tr>
+    <td class="ps-3 small text-muted ordem"></td>
+    <td>
+      <input type="text" name="contaDebito" class="form-control form-control-sm font-monospace"
+        required maxlength="50" placeholder="ex.: 521920100">
+    </td>
+    <td>
+      <input type="text" name="contaCredito" class="form-control form-control-sm font-monospace"
+        required maxlength="50" placeholder="ex.: 521929900">
+    </td>
+    <td class="pe-3 text-end">
+      <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="removerPar(this)">
+        <i class="bi bi-x-lg"></i>
+      </button>
+    </td>
+  </tr>
+</template>
+
+<script>
+function renumerar() {
+  document.querySelectorAll('#pares-tbody tr .ordem').forEach(function(td, i) {
+    td.textContent = i + 1
+  })
+}
+function adicionarPar() {
+  const tpl = document.getElementById('tpl-par')
+  document.getElementById('pares-tbody').appendChild(tpl.content.cloneNode(true))
+  renumerar()
+}
+function removerPar(btn) {
+  btn.closest('tr').remove()
+  renumerar()
+}
+// Garante ao menos uma linha quando o form abre vazio (criação nova).
+if (document.querySelectorAll('#pares-tbody tr').length === 0) adicionarPar()
+</script>
