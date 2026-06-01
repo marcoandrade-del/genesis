@@ -6,6 +6,7 @@ import cookiePlugin from './plugins/cookie.js'
 import formbodyPlugin from './plugins/formbody.js'
 import viewPlugin from './plugins/view.js'
 import { adminRoutes } from './admin/index.js'
+import { appRoutes } from './app/index.js'
 import { authRoutes } from './routes/auth.js'
 import { usuariosRoutes } from './routes/usuarios.js'
 import { codigosRoutes } from './routes/codigos.js'
@@ -37,6 +38,9 @@ app.get('/health', async () => ({ status: 'ok', system: 'Gênesis' }))
 
 // ── Painel Admin (HTML, autenticação via cookie) ──────────────────────────────
 app.register(adminRoutes, { prefix: '/admin' })
+
+// ── App do Usuário (HTML, cookie próprio + contexto de exercício) ─────────────
+app.register(appRoutes, { prefix: '/app' })
 
 // ── Rotas públicas (sem token) ────────────────────────────────────────────────
 app.register(authRoutes)   // /auth/registro, /auth/login, /auth/solicitar-validacao, /auth/validar
