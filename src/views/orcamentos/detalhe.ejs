@@ -1,0 +1,183 @@
+<%
+  function fmt(v) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  const ent = orcamento.entidade
+  const editavel = orcamento.status === 'RASCUNHO'
+%>
+
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      Orçamento <span class="font-monospace text-muted"><%= orcamento.ano %></span>
+      <% if (orcamento.status === 'RASCUNHO') { %>
+        <span class="badge bg-secondary bg-opacity-10 text-secondary ms-2">Rascunho</span>
+      <% } else if (orcamento.status === 'APROVADO') { %>
+        <span class="badge bg-primary bg-opacity-10 text-primary ms-2">Aprovado</span>
+      <% } else { %>
+        <span class="badge bg-success bg-opacity-10 text-success ms-2">Em Execução</span>
+      <% } %>
+    </h2>
+    <div class="small text-muted">
+      <%= ent.municipio.estado.sigla %> · <%= ent.municipio.nome %> · <%= ent.nome %>
+      <% if (orcamento.leiNumero) { %> · <strong><%= orcamento.leiNumero %></strong><% } %>
+      <% if (orcamento.dataAprovacao) { %> · aprovado em <%= new Date(orcamento.dataAprovacao).toLocaleDateString('pt-BR') %><% } %>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/admin/orcamentos?entidadeId=<%= orcamento.entidadeId %>" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <% if (orcamento.status === 'RASCUNHO') { %>
+      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
+        <input type="hidden" name="status" value="APROVADO">
+        <button class="btn btn-sm btn-primary"><i class="bi bi-check-circle me-1"></i>Aprovar</button>
+      </form>
+    <% } else if (orcamento.status === 'APROVADO') { %>
+      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
+        <input type="hidden" name="status" value="EM_EXECUCAO">
+        <button class="btn btn-sm btn-success"><i class="bi bi-play-circle me-1"></i>Iniciar execução</button>
+      </form>
+      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
+        <input type="hidden" name="status" value="RASCUNHO">
+        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Voltar para rascunho</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted">Total Receita Prevista</div>
+        <div class="h4 fw-bold mb-0 font-monospace">R$ <%= fmt(totalReceita) %></div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="small text-muted">Total Despesa Autorizada</div>
+        <div class="h4 fw-bold mb-0 font-monospace">R$ <%= fmt(totalDespesa) %></div>
+        <% if (Math.abs(totalReceita - totalDespesa) > 0.01) { %>
+          <div class="small text-warning mt-1">
+            <i class="bi bi-exclamation-triangle me-1"></i>Diferença vs. receita: R$ <%= fmt(totalDespesa - totalReceita) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Dotações de Despesa ----------------------------------------------------->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3 class="h6 fw-bold mb-0">Dotações de Despesa (<%= dotacoes.length %>)</h3>
+  <% if (editavel) { %>
+    <button class="btn btn-sm btn-primary"
+      hx-get="/admin/orcamentos/dotacoes/form?orcamentoId=<%= orcamento.id %>"
+      hx-target="#modal-body" hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Dotação
+    </button>
+  <% } %>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">UO</th>
+          <th>Função / Subfunção</th>
+          <th>Programa / Ação</th>
+          <th>Conta · Fonte</th>
+          <th class="text-end">Valor</th>
+          <% if (editavel) { %><th class="text-end pe-3" style="width:90px">&nbsp;</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (dotacoes.length === 0) { %>
+          <tr><td colspan="<%= editavel ? 6 : 5 %>" class="text-center text-muted py-4">
+            <i class="bi bi-inbox d-block mb-1"></i>Sem dotações.
+          </td></tr>
+        <% } %>
+        <% dotacoes.forEach(function(d) { %>
+          <tr id="dot-<%= d.id %>">
+            <td class="ps-3 small font-monospace"><%= d.unidadeOrcamentaria.codigo %></td>
+            <td class="small"><%= d.funcao.codigo %>.<%= d.subfuncao.codigo %> — <%= d.subfuncao.nome %></td>
+            <td class="small"><%= d.programa.codigo %>.<%= d.acao.codigo %> — <%= d.acao.nome %></td>
+            <td class="small font-monospace"><%= d.contaDespesa.codigo %> · <%= d.fonteRecurso.codigo %></td>
+            <td class="text-end font-monospace small">R$ <%= fmt(d.valorAutorizado) %></td>
+            <% if (editavel) { %>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary"
+                  hx-get="/admin/orcamentos/dotacoes/<%= d.id %>/form"
+                  hx-target="#modal-body" hx-swap="innerHTML">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                  data-id="<%= d.id %>"
+                  onclick="confirmarExclusaoAsync('dotação', this.dataset.id, 'esta dotação', { url: '/admin/orcamentos/dotacoes/' + this.dataset.id, target: '#dot-' + this.dataset.id, swap: 'outerHTML' })">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Previsões de Receita ---------------------------------------------------->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h3 class="h6 fw-bold mb-0">Previsões de Receita (<%= previsoes.length %>)</h3>
+  <% if (editavel) { %>
+    <button class="btn btn-sm btn-primary"
+      hx-get="/admin/orcamentos/previsoes/form?orcamentoId=<%= orcamento.id %>"
+      hx-target="#modal-body" hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Previsão
+    </button>
+  <% } %>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-sm table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Conta de Receita</th>
+          <th>Fonte</th>
+          <th class="text-end">Valor</th>
+          <% if (editavel) { %><th class="text-end pe-3" style="width:90px">&nbsp;</th><% } %>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (previsoes.length === 0) { %>
+          <tr><td colspan="<%= editavel ? 4 : 3 %>" class="text-center text-muted py-4">
+            <i class="bi bi-inbox d-block mb-1"></i>Sem previsões.
+          </td></tr>
+        <% } %>
+        <% previsoes.forEach(function(p) { %>
+          <tr id="prev-<%= p.id %>">
+            <td class="ps-3 small font-monospace"><%= p.contaReceita.codigo %> — <%= p.contaReceita.descricao %></td>
+            <td class="small font-monospace"><%= p.fonteRecurso.codigo %> — <%= p.fonteRecurso.nomenclatura %></td>
+            <td class="text-end font-monospace small">R$ <%= fmt(p.valorPrevisto) %></td>
+            <% if (editavel) { %>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary"
+                  hx-get="/admin/orcamentos/previsoes/<%= p.id %>/form"
+                  hx-target="#modal-body" hx-swap="innerHTML">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                  data-id="<%= p.id %>"
+                  onclick="confirmarExclusaoAsync('previsão', this.dataset.id, 'esta previsão', { url: '/admin/orcamentos/previsoes/' + this.dataset.id, target: '#prev-' + this.dataset.id, swap: 'outerHTML' })">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

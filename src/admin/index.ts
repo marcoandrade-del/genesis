@@ -31,6 +31,7 @@ import { adminFuncoesRoutes } from './funcoes.js'
 import { adminUnidadesOrcamentariaRoutes } from './unidades-orcamentaria.js'
 import { adminEventosContabeisRoutes } from './eventos-contabeis.js'
 import { adminProgramasRoutes } from './programas.js'
+import { adminOrcamentosRoutes } from './orcamentos.js'
 
 // Caminhos profundos (≥2 segmentos) que são páginas completas. Aceita string
 // literal OU RegExp (para caminhos com ID variável, ex.: ".../:id/editar").
@@ -39,6 +40,7 @@ const PAGINAS_COMPLETAS_PROFUNDAS: ReadonlyArray<string | RegExp> = [
   'eventos-contabeis/novo',
   /^eventos-contabeis\/[^/]+\/editar$/,
   /^programas\/[^/]+\/acoes$/,
+  /^orcamentos\/[^/]+$/,
 ]
 
 function ePaginaCompletaProfunda(path: string): boolean {
@@ -141,5 +143,6 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminUnidadesOrcamentariaRoutes, { prefix: '/unidades-orcamentaria' })
     admin.register(adminEventosContabeisRoutes, { prefix: '/eventos-contabeis' })
     admin.register(adminProgramasRoutes, { prefix: '/programas' })
+    admin.register(adminOrcamentosRoutes, { prefix: '/orcamentos' })
   })
 }
