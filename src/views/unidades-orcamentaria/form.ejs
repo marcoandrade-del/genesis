@@ -1,0 +1,56 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-building me-2 text-primary"></i><%= uo ? 'Editar Unidade Orçamentária' : 'Nova Unidade Orçamentária' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (uo) { %>
+    hx-put="/admin/unidades-orcamentaria/<%= uo.id %>"
+  <% } else { %>
+    hx-post="/admin/unidades-orcamentaria"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (!uo) { %>
+      <input type="hidden" name="entidadeId" value="<%= entidadeId %>">
+    <% } %>
+
+    <div class="row g-2">
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+        <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+          value="<%= uo ? uo.codigo : '' %>"
+          placeholder="ex.: 02.001" required maxlength="20">
+      </div>
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+        <input type="text" name="nome" class="form-control form-control-sm"
+          value="<%= uo ? uo.nome : '' %>"
+          placeholder="ex.: Secretaria de Educação" required maxlength="200">
+      </div>
+      <div class="col-12 mb-2">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="uo-ativa" name="ativa" value="true"
+            <%= !uo || uo.ativa ? 'checked' : '' %>>
+          <label class="form-check-label small" for="uo-ativa">Ativa</label>
+        </div>
+        <div class="form-text small">Apenas UOs ativas podem ser usadas em dotações orçamentárias.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

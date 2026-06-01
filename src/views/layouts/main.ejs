@@ -130,6 +130,12 @@
       <li><a class="nav-link <%= active === 'fontes-recurso' ? 'active' : '' %>" href="/admin/fontes-recurso">
         <i class="bi bi-bank me-2"></i>Fontes de Recursos
       </a></li>
+      <li><a class="nav-link <%= active === 'unidades-orcamentaria' ? 'active' : '' %>" href="/admin/unidades-orcamentaria">
+        <i class="bi bi-building me-2"></i>Unidades Orçamentárias
+      </a></li>
+      <li><a class="nav-link <%= active === 'funcoes' ? 'active' : '' %>" href="/admin/funcoes">
+        <i class="bi bi-list-columns me-2"></i>Classificação Funcional
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -168,6 +174,8 @@
         'planos-contas-despesa': 'Planos de Contas da Despesa',
         'contas-despesa': 'Contas da Despesa',
         'fontes-recurso': 'Fontes de Recursos',
+        'unidades-orcamentaria': 'Unidades Orçamentárias',
+        funcoes: 'Classificação Funcional',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
