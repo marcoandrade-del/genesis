@@ -1,0 +1,142 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-cash-coin me-2 text-primary"></i><%= dotacao && dotacao.id ? 'Editar Dotação' : 'Nova Dotação de Despesa' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (dotacao && dotacao.id) { %>
+    hx-put="/admin/orcamentos/dotacoes/<%= dotacao.id %>"
+  <% } else { %>
+    hx-post="/admin/orcamentos/dotacoes"
+  <% } %>
+  hx-target="#modal-body" hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!dotacao || !dotacao.id) { %>
+      <input type="hidden" name="orcamentoId" value="<%= orcamentoId %>">
+    <% } %>
+
+    <div class="row g-2">
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Unidade Orçamentária <span class="text-danger">*</span></label>
+        <select name="unidadeOrcamentariaId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% unidades.forEach(function(u) { %>
+            <option value="<%= u.id %>" <%= dotacao && dotacao.unidadeOrcamentariaId === u.id ? 'selected' : '' %>>
+              <%= u.codigo %> — <%= u.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Função <span class="text-danger">*</span></label>
+        <select name="funcaoId" id="funcaoId" class="form-select form-select-sm" required
+          onchange="atualizarSubfuncoes()">
+          <option value="">— Selecione —</option>
+          <% funcoes.forEach(function(f) { %>
+            <option value="<%= f.id %>" <%= dotacao && dotacao.funcaoId === f.id ? 'selected' : '' %>>
+              <%= f.codigo %> — <%= f.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Subfunção <span class="text-danger">*</span></label>
+        <select name="subfuncaoId" id="subfuncaoId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+        </select>
+      </div>
+
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Programa <span class="text-danger">*</span></label>
+        <select name="programaId" id="programaId" class="form-select form-select-sm" required
+          onchange="atualizarAcoes()">
+          <option value="">— Selecione —</option>
+          <% programas.forEach(function(p) { %>
+            <option value="<%= p.id %>" <%= dotacao && dotacao.programaId === p.id ? 'selected' : '' %>>
+              <%= p.codigo %> — <%= p.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Ação <span class="text-danger">*</span></label>
+        <select name="acaoId" id="acaoId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+        </select>
+      </div>
+
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Conta de Despesa (analítica) <span class="text-danger">*</span></label>
+        <select name="contaDespesaEntidadeId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% contas.forEach(function(c) { %>
+            <option value="<%= c.id %>" <%= dotacao && dotacao.contaDespesaEntidadeId === c.id ? 'selected' : '' %>>
+              <%= c.codigo %> — <%= c.descricao %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Fonte de Recurso <span class="text-danger">*</span></label>
+        <select name="fonteRecursoEntidadeId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% fontes.forEach(function(f) { %>
+            <option value="<%= f.id %>" <%= dotacao && dotacao.fonteRecursoEntidadeId === f.id ? 'selected' : '' %>>
+              <%= f.codigo %> — <%= f.nomenclatura %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Valor R$ <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" min="0" name="valorAutorizado" class="form-control form-control-sm font-monospace"
+          value="<%= dotacao && dotacao.valorAutorizado != null ? dotacao.valorAutorizado : '' %>" required>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>
+
+<script>
+  const FUNCOES = <%- JSON.stringify(funcoes) %>;
+  const PROGRAMAS = <%- JSON.stringify(programas) %>;
+  const SUBF_SEL = <%- JSON.stringify(dotacao ? dotacao.subfuncaoId : null) %>;
+  const ACAO_SEL = <%- JSON.stringify(dotacao ? dotacao.acaoId : null) %>;
+  function popularSelect(sel, itens, label, selecionado) {
+    while (sel.firstChild) sel.removeChild(sel.firstChild);
+    const placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent = '— Selecione —';
+    sel.appendChild(placeholder);
+    itens.forEach(function(item) {
+      const o = document.createElement('option');
+      o.value = item.id;
+      o.textContent = label(item);
+      if (item.id === selecionado) o.selected = true;
+      sel.appendChild(o);
+    });
+  }
+  function atualizarSubfuncoes() {
+    const f = FUNCOES.find(x => x.id === document.getElementById('funcaoId').value);
+    popularSelect(document.getElementById('subfuncaoId'), f ? f.subfuncoes : [],
+      s => s.codigo + ' — ' + s.nome, SUBF_SEL);
+  }
+  function atualizarAcoes() {
+    const p = PROGRAMAS.find(x => x.id === document.getElementById('programaId').value);
+    popularSelect(document.getElementById('acaoId'), p ? p.acoes : [],
+      a => a.codigo + ' — ' + a.nome, ACAO_SEL);
+  }
+  atualizarSubfuncoes(); atualizarAcoes();
+</script>

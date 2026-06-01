@@ -545,6 +545,7 @@ model Entidade {
   fontesRecurso        FonteRecursoEntidade[]
   unidadesOrcamentaria UnidadeOrcamentaria[]
   programas            Programa[]
+  orcamentos           Orcamento[]
   lancamentos          Lancamento[]
   resumos              ResumoMensalConta[]
   saldosIniciais       SaldoInicialAno[]
@@ -596,6 +597,7 @@ model ContaReceitaEntidade {
   entidade        Entidade               @relation(fields: [entidadeId], references: [id])
   parent          ContaReceitaEntidade?  @relation("SubReceitaEnt", fields: [parentId], references: [id])
   filhos          ContaReceitaEntidade[] @relation("SubReceitaEnt")
+  previsoes       PrevisaoReceita[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
@@ -618,6 +620,7 @@ model ContaDespesaEntidade {
   entidade        Entidade               @relation(fields: [entidadeId], references: [id])
   parent          ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
   filhos          ContaDespesaEntidade[] @relation("SubDespesaEnt")
+  dotacoes        DotacaoDespesa[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
@@ -638,6 +641,8 @@ model FonteRecursoEntidade {
   criadoEm      DateTime    @default(now())
   atualizadoEm  DateTime    @updatedAt
   entidade      Entidade    @relation(fields: [entidadeId], references: [id])
+  dotacoes      DotacaoDespesa[]
+  previsoes     PrevisaoReceita[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano])
@@ -653,6 +658,7 @@ model Funcao {
   codigo     String      @unique // "01".."28"
   nome       String
   subfuncoes Subfuncao[]
+  dotacoes   DotacaoDespesa[]
 
   @@map("funcoes")
 }
@@ -663,6 +669,7 @@ model Subfuncao {
   nome     String
   funcaoId String
   funcao   Funcao @relation(fields: [funcaoId], references: [id])
+  dotacoes DotacaoDespesa[]
 
   @@index([funcaoId])
   @@map("subfuncoes")
@@ -680,6 +687,7 @@ model UnidadeOrcamentaria {
   criadoEm     DateTime @default(now())
   atualizadoEm DateTime @updatedAt
   entidade     Entidade @relation(fields: [entidadeId], references: [id])
+  dotacoes     DotacaoDespesa[]
 
   @@unique([entidadeId, codigo])
   @@index([entidadeId])
@@ -755,6 +763,7 @@ model Programa {
   atualizadoEm DateTime     @updatedAt
   entidade     Entidade     @relation(fields: [entidadeId], references: [id])
   acoes        Acao[]
+  dotacoes     DotacaoDespesa[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano])
@@ -773,8 +782,88 @@ model Acao {
   criadoEm      DateTime @default(now())
   atualizadoEm  DateTime @updatedAt
   programa      Programa @relation(fields: [programaId], references: [id])
+  dotacoes      DotacaoDespesa[]
 
   @@unique([programaId, codigo])
   @@index([programaId])
   @@map("acoes")
+}
+
+// ─── LOA: Orçamento + Dotação de Despesa + Previsão de Receita ────────────────
+// Orcamento = cabeçalho da LOA (Lei Orçamentária Anual) por entidade × ano.
+// Ciclo: RASCUNHO → APROVADO → EM_EXECUCAO. Após APROVADO o conteúdo é
+// imutável (cláusula pétrea); ajustes durante execução virão depois via
+// créditos adicionais (fora deste PR).
+enum StatusOrcamento {
+  RASCUNHO
+  APROVADO
+  EM_EXECUCAO
+}
+
+model Orcamento {
+  id               String            @id @default(uuid())
+  entidadeId       String
+  ano              Int
+  status           StatusOrcamento   @default(RASCUNHO)
+  leiNumero        String?
+  dataAprovacao    DateTime?
+  observacoes      String?
+  criadoEm         DateTime          @default(now())
+  atualizadoEm     DateTime          @updatedAt
+  entidade         Entidade          @relation(fields: [entidadeId], references: [id])
+  dotacoes         DotacaoDespesa[]
+  previsoes        PrevisaoReceita[]
+
+  @@unique([entidadeId, ano])
+  @@index([entidadeId])
+  @@map("orcamentos")
+}
+
+// Dotação de despesa: linha LOA com TODAS as dimensões do padrão SIAFI cheio
+// obrigatórias (UO + Função + Subfunção + Programa + Ação + ContaDespesa +
+// Fonte). A combinação dessas 7 dimensões é única por Orçamento.
+model DotacaoDespesa {
+  id                     String   @id @default(uuid())
+  orcamentoId            String
+  unidadeOrcamentariaId  String
+  funcaoId               String
+  subfuncaoId            String
+  programaId             String
+  acaoId                 String
+  contaDespesaEntidadeId String
+  fonteRecursoEntidadeId String
+  valorAutorizado        Decimal  @db.Decimal(18, 2)
+  criadoEm               DateTime @default(now())
+  atualizadoEm           DateTime @updatedAt
+  orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  unidadeOrcamentaria    UnidadeOrcamentaria  @relation(fields: [unidadeOrcamentariaId], references: [id])
+  funcao                 Funcao               @relation(fields: [funcaoId], references: [id])
+  subfuncao              Subfuncao            @relation(fields: [subfuncaoId], references: [id])
+  programa               Programa             @relation(fields: [programaId], references: [id])
+  acao                   Acao                 @relation(fields: [acaoId], references: [id])
+  contaDespesa           ContaDespesaEntidade @relation(fields: [contaDespesaEntidadeId], references: [id])
+  fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+
+  @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
+  @@index([orcamentoId])
+  @@map("dotacoes_despesa")
+}
+
+// Previsão de receita: linha LOA por (ContaReceita × Fonte). Granularidade
+// padrão da maioria dos municípios; sem dimensão extra (UO/Programa).
+model PrevisaoReceita {
+  id                     String   @id @default(uuid())
+  orcamentoId            String
+  contaReceitaEntidadeId String
+  fonteRecursoEntidadeId String
+  valorPrevisto          Decimal  @db.Decimal(18, 2)
+  criadoEm               DateTime @default(now())
+  atualizadoEm           DateTime @updatedAt
+  orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  contaReceita           ContaReceitaEntidade @relation(fields: [contaReceitaEntidadeId], references: [id])
+  fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+
+  @@unique([orcamentoId, contaReceitaEntidadeId, fonteRecursoEntidadeId], name: "previsao_unica")
+  @@index([orcamentoId])
+  @@map("previsoes_receita")
 }
