@@ -70,6 +70,11 @@
       <% } %>
     </td>
     <td class="text-end pe-3">
+      <a class="btn btn-sm btn-outline-primary me-1"
+        href="/admin/acessos-entidade/usuario/<%= u.id %>"
+        title="Acessos a entidades">
+        <i class="bi bi-key"></i>
+      </a>
       <button class="btn btn-sm btn-outline-secondary me-1"
         hx-get="/admin/usuarios/<%= u.id %>/form"
         hx-target="#modal-body"
