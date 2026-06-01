@@ -58,23 +58,25 @@ export async function adminLookupRoutes(app: FastifyInstance) {
     return reply.view('lookup/modulos', { modulos, q })
   })
 
-  // Contas que admitem movimento de um plano específico — usado como picker
-  // no form de lançamentos. planoId é obrigatório (contas só existem em
-  // contexto de plano); filtro por código OU descrição.
-  app.get<{ Querystring: { q?: string; planoId?: string } }>('/contas', async (req, reply) => {
+  // Contas-folha da árvore contábil de uma entidade × ano — picker do form
+  // de lançamentos. (entidadeId, ano) são obrigatórios; filtro por código OU
+  // descrição. Inclui contas MODELO e DESDOBRAMENTO (a entidade não distingue
+  // movimento por origem).
+  app.get<{ Querystring: { q?: string; entidadeId?: string; ano?: string } }>('/contas', async (req, reply) => {
     const q = (req.query.q ?? '').trim()
-    const planoId = (req.query.planoId ?? '').trim()
+    const entidadeId = (req.query.entidadeId ?? '').trim()
+    const ano = Number(req.query.ano)
     const isHtmx = req.headers['hx-target'] === 'lookup-rows-contas'
 
-    if (!planoId) {
-      // Sem plano não há resultados possíveis; renderiza a casca vazia.
+    if (!entidadeId || !Number.isFinite(ano)) {
       if (isHtmx) return reply.view('lookup/rows_contas', { contas: [] })
-      return reply.view('lookup/contas', { contas: [], q, planoId: '' })
+      return reply.view('lookup/contas', { contas: [], q, entidadeId: '', ano: '' })
     }
 
-    const contas = await app.prisma.conta.findMany({
+    const contas = await app.prisma.contaContabilEntidade.findMany({
       where: {
-        planoId,
+        entidadeId,
+        ano,
         admiteMovimento: true,
         ...(q
           ? {
@@ -91,7 +93,7 @@ export async function adminLookupRoutes(app: FastifyInstance) {
     })
 
     if (isHtmx) return reply.view('lookup/rows_contas', { contas })
-    return reply.view('lookup/contas', { contas, q, planoId })
+    return reply.view('lookup/contas', { contas, q, entidadeId, ano })
   })
 
   app.get<{ Querystring: { q?: string } }>('/itens', async (req, reply) => {

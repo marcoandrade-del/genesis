@@ -1,14 +1,14 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h2 class="h5 fw-bold mb-0">Lançamentos</h2>
-  <% if (municipio) { %>
-    <a href="/admin/lancamentos/novo?municipioId=<%= municipio.id %>" class="btn btn-primary btn-sm">
+  <% if (entidade) { %>
+    <a href="/admin/lancamentos/novo?entidadeId=<%= entidade.id %>" class="btn btn-primary btn-sm">
       <i class="bi bi-plus-lg me-1"></i>Novo Lançamento
     </a>
   <% } %>
 </div>
 
 <form class="mb-3 row g-2 align-items-end" method="get" action="/admin/lancamentos">
-  <div class="col-md-3">
+  <div class="col-md-2">
     <label class="form-label small fw-semibold mb-1">Estado</label>
     <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
       <option value="">— Selecione —</option>
@@ -26,8 +26,21 @@
       onchange="this.form.submit()">
       <option value="">— Selecione —</option>
       <% municipios.forEach(function(m) { %>
-        <option value="<%= m.id %>" <%= municipio && m.id === municipio.id ? 'selected' : '' %>>
+        <option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>>
           <%= m.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm"
+      <%= municipioSelecionadoId ? '' : 'disabled' %>
+      onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>>
+          <%= e.nome %>
         </option>
       <% }) %>
     </select>
@@ -40,20 +53,15 @@
     <label class="form-label small fw-semibold mb-1">Data fim</label>
     <input type="date" name="dataFim" value="<%= dataFim %>" class="form-control form-control-sm">
   </div>
-  <div class="col-md-2">
-    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
-      <i class="bi bi-funnel me-1"></i>Aplicar
-    </button>
-  </div>
 </form>
 
-<% if (!municipio) { %>
+<% if (!entidade) { %>
   <div class="alert alert-info py-2 small">
-    <i class="bi bi-info-circle me-1"></i>Selecione um estado e município para listar lançamentos.
+    <i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar lançamentos.
   </div>
 <% } else { %>
   <div class="small text-muted mb-2">
-    <strong><%= municipio.estado.sigla %> · <%= municipio.nome %></strong> —
+    <strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong> —
     <%= lancamentos.length %> lançamento(s)<% if (lancamentos.length >= limite) { %>
       <span class="text-warning">(limite <%= limite %> atingido — refine o período)</span>
     <% } %>

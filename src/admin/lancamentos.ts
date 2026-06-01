@@ -11,131 +11,133 @@ function asArray<T>(v: T | T[] | undefined): T[] {
   return Array.isArray(v) ? v : [v]
 }
 
-/** Resolve o plano vigente para o município no ano da data, considerando
- * herança modelo município → estado. Retorna null se não houver plano
- * (município sem modelo, ou nenhum plano cadastrado para o ano). */
-async function resolverPlanoVigente(
+/** Conta as contas-folha disponíveis na entidade para o ano da data.
+ * `entidadeId` válido + ano válido → número >= 0. Demais casos → null. */
+async function contasDisponiveisNoAno(
   app: FastifyInstance,
-  municipioId: string,
+  entidadeId: string,
   data: string,
-): Promise<{ id: string; ano: number; descricao: string } | null> {
+): Promise<{ ano: number; total: number } | null> {
   let ano: number
   try {
     ano = extrairAnoMes(data).ano
   } catch {
     return null
   }
-  const municipio = await app.prisma.municipio.findUnique({
-    where: { id: municipioId },
-    include: { estado: { select: { modeloContabilId: true } } },
+  const total = await app.prisma.contaContabilEntidade.count({
+    where: { entidadeId, ano, admiteMovimento: true },
   })
-  if (!municipio) return null
-  const modeloEfetivoId = municipio.modeloContabilId ?? municipio.estado.modeloContabilId
-  if (!modeloEfetivoId) return null
-  const plano = await app.prisma.planoDeContas.findFirst({
-    where: { modeloContabilId: modeloEfetivoId, ano },
-    select: { id: true, ano: true, descricao: true },
-  })
-  return plano
+  return { ano, total }
 }
 
 /**
  * Admin de lançamentos contábeis.
  *
- * Listagem/detalhe/exclusão usam cascata Estado→Município via querystring,
- * igual ao admin de Municípios. Criação tem página própria com lista
- * dinâmica de itens; plano vigente é resolvido por HTMX quando o usuário
- * altera a data (precisamos do planoId para filtrar contas no picker).
+ * Listagem/detalhe/exclusão usam cascata Estado→Município→Entidade via
+ * querystring (lançamento é por entidade, não por município). Criação tem
+ * página própria com lista dinâmica de itens. Ao trocar a data, HTMX recarrega
+ * o badge de "ano vigente" (que confere se a entidade tem contas no ano).
  */
 export async function adminLancamentosRoutes(app: FastifyInstance) {
   const service = new LancamentosService(app.prisma)
 
   // ── LIST ────────────────────────────────────────────────────────────────────
-  app.get<{ Querystring: { estadoId?: string; municipioId?: string; dataInicio?: string; dataFim?: string } }>(
-    '/',
-    async (req, reply) => {
-      const estadoId = req.query.estadoId?.trim() || ''
-      const municipioId = req.query.municipioId?.trim() || ''
-      const dataInicio = req.query.dataInicio?.trim() || ''
-      const dataFim = req.query.dataFim?.trim() || ''
+  app.get<{
+    Querystring: {
+      estadoId?: string
+      municipioId?: string
+      entidadeId?: string
+      dataInicio?: string
+      dataFim?: string
+    }
+  }>('/', async (req, reply) => {
+    const estadoId = req.query.estadoId?.trim() || ''
+    const municipioId = req.query.municipioId?.trim() || ''
+    const entidadeId = req.query.entidadeId?.trim() || ''
+    const dataInicio = req.query.dataInicio?.trim() || ''
+    const dataFim = req.query.dataFim?.trim() || ''
 
-      const [estados, municipios] = await Promise.all([
-        app.prisma.estado.findMany({ orderBy: { sigla: 'asc' }, select: { id: true, sigla: true, nome: true } }),
-        estadoId
-          ? app.prisma.municipio.findMany({
-              where: { estadoId },
-              orderBy: { nome: 'asc' },
-              select: { id: true, nome: true },
-            })
-          : Promise.resolve([]),
-      ])
-
-      const municipio = municipioId
-        ? await app.prisma.municipio.findUnique({
-            where: { id: municipioId },
-            include: { estado: { select: { id: true, sigla: true, nome: true } } },
+    const [estados, municipios, entidades] = await Promise.all([
+      app.prisma.estado.findMany({ orderBy: { sigla: 'asc' }, select: { id: true, sigla: true, nome: true } }),
+      estadoId
+        ? app.prisma.municipio.findMany({
+            where: { estadoId },
+            orderBy: { nome: 'asc' },
+            select: { id: true, nome: true },
           })
-        : null
-
-      const lancamentos = municipio
-        ? await service.listar(municipio.id, {
-            ...(dataInicio ? { dataInicio } : {}),
-            ...(dataFim ? { dataFim } : {}),
+        : Promise.resolve([]),
+      municipioId
+        ? app.prisma.entidade.findMany({
+            where: { municipioId, ativo: true },
+            orderBy: { nome: 'asc' },
+            select: { id: true, nome: true, tipo: true },
           })
-        : []
+        : Promise.resolve([]),
+    ])
 
-      return reply.view(
-        'lancamentos/index',
-        {
-          title: 'Lançamentos — Gênesis Admin',
-          active: 'lancamentos',
-          userEmail: req.user.email,
-          estados,
-          municipios,
-          estadoSelecionadoId: estadoId,
-          municipio,
-          dataInicio,
-          dataFim,
-          lancamentos,
-          limite: LIMITE_LISTAGEM,
-        },
-        { layout: 'layouts/main' },
-      )
-    },
-  )
+    const entidade = entidadeId
+      ? await app.prisma.entidade.findUnique({
+          where: { id: entidadeId },
+          include: { municipio: { include: { estado: { select: { id: true, sigla: true, nome: true } } } } },
+        })
+      : null
 
-  // ── PLANO VIGENTE (fragmento HTMX) ──────────────────────────────────────────
+    const lancamentos = entidade
+      ? await service.listar(entidade.id, {
+          ...(dataInicio ? { dataInicio } : {}),
+          ...(dataFim ? { dataFim } : {}),
+        })
+      : []
+
+    return reply.view(
+      'lancamentos/index',
+      {
+        title: 'Lançamentos — Gênesis Admin',
+        active: 'lancamentos',
+        userEmail: req.user.email,
+        estados,
+        municipios,
+        entidades,
+        estadoSelecionadoId: estadoId,
+        municipioSelecionadoId: municipioId,
+        entidade,
+        dataInicio,
+        dataFim,
+        lancamentos,
+        limite: LIMITE_LISTAGEM,
+      },
+      { layout: 'layouts/main' },
+    )
+  })
+
+  // ── ANO VIGENTE (fragmento HTMX) ────────────────────────────────────────────
   // Disparado quando o usuário troca a data no form; devolve badge + hidden
-  // input atualizado. Fora-do-form, o picker de contas usa o hidden #planoId.
-  app.get<{ Querystring: { municipioId?: string; data?: string } }>(
-    '/plano-vigente',
-    async (req, reply) => {
-      const municipioId = req.query.municipioId?.trim() || ''
-      const data = req.query.data?.trim() || ''
-      if (!municipioId || !data) {
-        return reply.view('lancamentos/_plano_vigente', { plano: null, ano: null })
-      }
-      const plano = await resolverPlanoVigente(app, municipioId, data)
-      const ano = data.match(/^(\d{4})-/)?.[1]
-      return reply.view('lancamentos/_plano_vigente', { plano, ano: ano ? Number(ano) : null })
-    },
-  )
+  // input atualizado. Fora-do-form, o picker de contas usa o hidden #ano.
+  app.get<{ Querystring: { entidadeId?: string; data?: string } }>('/ano-vigente', async (req, reply) => {
+    const entidadeId = req.query.entidadeId?.trim() || ''
+    const data = req.query.data?.trim() || ''
+    if (!entidadeId || !data) {
+      return reply.view('lancamentos/_ano_vigente', { info: null, ano: null })
+    }
+    const info = await contasDisponiveisNoAno(app, entidadeId, data)
+    return reply.view('lancamentos/_ano_vigente', { info, ano: info?.ano ?? null })
+  })
 
   // ── FORM (novo) ─────────────────────────────────────────────────────────────
-  app.get<{ Querystring: { municipioId?: string } }>('/novo', async (req, reply) => {
-    const municipioId = req.query.municipioId?.trim() || ''
-    if (!municipioId) {
+  app.get<{ Querystring: { entidadeId?: string } }>('/novo', async (req, reply) => {
+    const entidadeId = req.query.entidadeId?.trim() || ''
+    if (!entidadeId) {
       return reply.redirect('/admin/lancamentos')
     }
-    const municipio = await app.prisma.municipio.findUnique({
-      where: { id: municipioId },
-      include: { estado: { select: { sigla: true, nome: true } } },
+    const entidade = await app.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
     })
-    if (!municipio) return reply.status(404).send('Município não encontrado.')
+    if (!entidade) return reply.status(404).send('Entidade não encontrada.')
 
     // Default = hoje em UTC (consistente com extrairAnoMes que evita timezone).
     const hoje = new Date().toISOString().slice(0, 10)
-    const plano = await resolverPlanoVigente(app, municipioId, hoje)
+    const info = await contasDisponiveisNoAno(app, entidadeId, hoje)
 
     return reply.view(
       'lancamentos/novo',
@@ -143,9 +145,9 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
         title: 'Novo Lançamento — Gênesis Admin',
         active: 'lancamentos',
         userEmail: req.user.email,
-        municipio,
+        entidade,
         dataPadrao: hoje,
-        plano,
+        info,
         ano: Number(hoje.slice(0, 4)),
         erro: null,
         itensPreenchidos: null,
@@ -161,7 +163,7 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
   // arrays naturalmente. Front-end garante a ordem entre as três listas.
   app.post<{
     Body: {
-      municipioId: string
+      entidadeId: string
       data: string
       historico: string
       tipo?: string | string[]
@@ -169,17 +171,17 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
       valor?: string | string[]
     }
   }>('/', async (req, reply) => {
-    const { municipioId, data, historico } = req.body
+    const { entidadeId, data, historico } = req.body
     const tipos = asArray(req.body.tipo)
     const contaIds = asArray(req.body.contaId)
     const valores = asArray(req.body.valor)
 
     const reRenderErro = async (erro: string) => {
-      const municipio = await app.prisma.municipio.findUnique({
-        where: { id: municipioId },
-        include: { estado: { select: { sigla: true, nome: true } } },
+      const entidade = await app.prisma.entidade.findUnique({
+        where: { id: entidadeId },
+        include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
       })
-      const plano = data ? await resolverPlanoVigente(app, municipioId, data) : null
+      const info = data ? await contasDisponiveisNoAno(app, entidadeId, data) : null
       const anoMatch = (data ?? '').match(/^(\d{4})-/)?.[1]
       return reply.view(
         'lancamentos/novo',
@@ -187,9 +189,9 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
           title: 'Novo Lançamento — Gênesis Admin',
           active: 'lancamentos',
           userEmail: req.user.email,
-          municipio,
+          entidade,
           dataPadrao: data || new Date().toISOString().slice(0, 10),
-          plano,
+          info,
           ano: anoMatch ? Number(anoMatch) : null,
           erro,
           // Devolve os itens preenchidos para o usuário corrigir.
@@ -204,7 +206,10 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
       )
     }
 
-    if (!municipioId?.trim()) return reRenderErro('Município não informado.')
+    if (!entidadeId?.trim()) {
+      // Sem entidade não conseguimos renderizar o form novamente.
+      return reply.status(400).send('Entidade não informada.')
+    }
     if (!data?.trim()) return reRenderErro('Data é obrigatória.')
     if (!historico?.trim()) return reRenderErro('Histórico é obrigatório.')
     if (tipos.length === 0) return reRenderErro('Adicione ao menos 1 débito e 1 crédito.')
@@ -223,13 +228,13 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
 
     try {
       await service.criar({
-        municipioId,
+        entidadeId,
         data,
         historico: historico.trim(),
         itens: itens as { tipo: 'DEBITO' | 'CREDITO'; contaId: string; valor: string }[],
         criadoPorId: req.user.sub,
       })
-      const qs = new URLSearchParams({ municipioId }).toString()
+      const qs = new URLSearchParams({ entidadeId }).toString()
       return reply.header('HX-Redirect', `/admin/lancamentos?${qs}`).status(204).send()
     } catch (e: unknown) {
       return reRenderErro(e instanceof Error ? e.message : 'Erro ao criar lançamento.')
@@ -241,19 +246,19 @@ export async function adminLancamentosRoutes(app: FastifyInstance) {
     const lanc = await service.buscarPorId(req.params.id)
     if (!lanc) return reply.status(404).send('Lançamento não encontrado.')
 
-    const [municipio, contas] = await Promise.all([
-      app.prisma.municipio.findUnique({
-        where: { id: lanc.municipioId },
-        include: { estado: { select: { sigla: true, nome: true } } },
+    const [entidade, contas] = await Promise.all([
+      app.prisma.entidade.findUnique({
+        where: { id: lanc.entidadeId },
+        include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
       }),
-      app.prisma.conta.findMany({
+      app.prisma.contaContabilEntidade.findMany({
         where: { id: { in: lanc.itens.map((i) => i.contaId) } },
         select: { id: true, codigo: true, descricao: true },
       }),
     ])
     const contasPorId = new Map(contas.map((c) => [c.id, c]))
 
-    return reply.view('lancamentos/detalhe', { lanc, municipio, contasPorId })
+    return reply.view('lancamentos/detalhe', { lanc, entidade, contasPorId })
   })
 
   // ── DELETE ──────────────────────────────────────────────────────────────────

@@ -1,0 +1,19 @@
+<%# Substituído por HTMX sempre que a data muda. Contém badge + hidden #ano
+   que o picker de contas lê para filtrar (junto com entidadeId). Sem contas
+   no ano → hidden vazio e mensagem bloqueando o submit. %>
+<% if (info && info.total > 0) { %>
+  <span class="badge bg-success-subtle text-success border border-success-subtle">
+    <i class="bi bi-check-circle me-1"></i>Exercício <%= info.ano %> — <%= info.total %> conta(s) de movimento
+  </span>
+  <input type="hidden" id="ano" value="<%= info.ano %>">
+<% } else if (ano) { %>
+  <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+    <i class="bi bi-exclamation-triangle me-1"></i>Sem contas de movimento para <%= ano %>
+  </span>
+  <input type="hidden" id="ano" value="">
+<% } else { %>
+  <span class="badge bg-secondary-subtle text-muted">
+    <i class="bi bi-dash-circle me-1"></i>Defina uma data
+  </span>
+  <input type="hidden" id="ano" value="">
+<% } %>

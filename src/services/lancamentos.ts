@@ -7,7 +7,7 @@ export type TipoLancamento = (typeof TIPOS)[number]
 export type ItemDado = { contaId: string; tipo: TipoLancamento; valor: string }
 
 export type DadosCriarLancamento = {
-  municipioId: string
+  entidadeId: string
   data: string // YYYY-MM-DD
   historico: string
   itens: ItemDado[]
@@ -24,12 +24,12 @@ const dec = (v: string | number | Prisma.Decimal) => new Prisma.Decimal(v)
 const ZERO = dec(0)
 
 /**
- * Lançamentos contábeis com partida dobrada.
+ * Lançamentos contábeis com partida dobrada, escopados pela Entidade.
  *
  * Invariantes mantidos:
  *  1. ∑ DEBITO = ∑ CREDITO em cada lançamento (e >= 1 item de cada tipo).
- *  2. Toda conta referenciada admite movimento (folha) e pertence ao plano
- *     vigente do município no ano da data.
+ *  2. Toda conta referenciada é uma `ContaContabilEntidade` da própria
+ *     entidade, no ano da data, e admite movimento (folha).
  *  3. Criar/excluir atualiza ResumoMensalConta na mesma transação.
  *
  * Lançamentos são imutáveis: para corrigir, registra-se um contra-lançamento.
@@ -37,8 +37,8 @@ const ZERO = dec(0)
 export class LancamentosService {
   constructor(private prisma: PrismaClient) {}
 
-  async listar(municipioId: string, filtros: FiltrosListagem = {}) {
-    const where: Prisma.LancamentoWhereInput = { municipioId }
+  async listar(entidadeId: string, filtros: FiltrosListagem = {}) {
+    const where: Prisma.LancamentoWhereInput = { entidadeId }
     if (filtros.dataInicio || filtros.dataFim) {
       where.data = {}
       if (filtros.dataInicio) where.data.gte = new Date(filtros.dataInicio)
@@ -80,42 +80,25 @@ export class LancamentosService {
       throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'Valor total do lançamento não pode ser zero.')
     }
 
-    // Resolver município, modelo efetivo (próprio ou herdado do estado) e plano do ano.
-    const municipio = await this.prisma.municipio.findUnique({
-      where: { id: dados.municipioId },
-      include: { estado: { select: { modeloContabilId: true } } },
-    })
-    if (!municipio) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Município não encontrado.')
+    const entidade = await this.prisma.entidade.findUnique({ where: { id: dados.entidadeId } })
+    if (!entidade) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Entidade não encontrada.')
 
-    const modeloEfetivoId = municipio.modeloContabilId ?? municipio.estado.modeloContabilId
-    if (!modeloEfetivoId) {
-      throw new ErroNegocio(
-        'ENTIDADE_NAO_PROCESSAVEL',
-        'Município (e seu estado) não têm modelo contábil definido.',
-      )
-    }
-
-    const plano = await this.prisma.planoDeContas.findFirst({
-      where: { modeloContabilId: modeloEfetivoId, ano },
-    })
-    if (!plano) {
-      throw new ErroNegocio(
-        'ENTIDADE_NAO_PROCESSAVEL',
-        `Nenhum plano de contas vigente para o ano ${ano} no modelo do município.`,
-      )
-    }
-
-    // Valida cada conta: existe, é do plano vigente, admite movimento.
+    // Valida cada conta: existe na cópia desta entidade no ano e admite movimento.
     const contaIds = [...new Set(dados.itens.map((i) => i.contaId))]
-    const contas = await this.prisma.conta.findMany({ where: { id: { in: contaIds } } })
+    const contas = await this.prisma.contaContabilEntidade.findMany({
+      where: { id: { in: contaIds } },
+    })
     const porId = new Map(contas.map((c) => [c.id, c]))
     for (const id of contaIds) {
       const c = porId.get(id)
       if (!c) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', `Conta "${id}" não encontrada.`)
-      if (c.planoId !== plano.id) {
+      if (c.entidadeId !== dados.entidadeId) {
+        throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Conta "${c.codigo}" pertence a outra entidade.`)
+      }
+      if (c.ano !== ano) {
         throw new ErroNegocio(
           'ENTIDADE_NAO_PROCESSAVEL',
-          `Conta "${c.codigo}" pertence a outro plano. Use as contas do plano vigente para ${ano}.`,
+          `Conta "${c.codigo}" é do ano ${c.ano}; a data do lançamento é ${ano}.`,
         )
       }
       if (!c.admiteMovimento) {
@@ -136,7 +119,7 @@ export class LancamentosService {
     return this.prisma.$transaction(async (tx) => {
       const lanc = await tx.lancamento.create({
         data: {
-          municipioId: dados.municipioId,
+          entidadeId: dados.entidadeId,
           data: new Date(dados.data),
           historico: dados.historico,
           valor: somaD,
@@ -155,8 +138,8 @@ export class LancamentosService {
 
       for (const [contaId, { debito, credito }] of totaisPorConta) {
         await tx.resumoMensalConta.upsert({
-          where: { municipioId_contaId_ano_mes: { municipioId: dados.municipioId, contaId, ano, mes } },
-          create: { municipioId: dados.municipioId, contaId, ano, mes, totalDebito: debito, totalCredito: credito },
+          where: { entidadeId_contaId_ano_mes: { entidadeId: dados.entidadeId, contaId, ano, mes } },
+          create: { entidadeId: dados.entidadeId, contaId, ano, mes, totalDebito: debito, totalCredito: credito },
           update: { totalDebito: { increment: debito }, totalCredito: { increment: credito } },
         })
       }
@@ -186,7 +169,7 @@ export class LancamentosService {
     await this.prisma.$transaction(async (tx) => {
       for (const [contaId, { debito, credito }] of totaisPorConta) {
         await tx.resumoMensalConta.update({
-          where: { municipioId_contaId_ano_mes: { municipioId: lanc.municipioId, contaId, ano, mes } },
+          where: { entidadeId_contaId_ano_mes: { entidadeId: lanc.entidadeId, contaId, ano, mes } },
           data: { totalDebito: { decrement: debito }, totalCredito: { decrement: credito } },
         })
       }

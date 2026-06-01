@@ -9,10 +9,10 @@
 <div class="modal-body">
   <div class="row g-3 mb-3">
     <div class="col-md-6">
-      <div class="small text-muted">Município</div>
+      <div class="small text-muted">Entidade</div>
       <div class="fw-semibold">
-        <% if (municipio) { %>
-          <%= municipio.estado.sigla %> · <%= municipio.nome %>
+        <% if (entidade) { %>
+          <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %>
         <% } else { %>
           <span class="text-muted">—</span>
         <% } %>
