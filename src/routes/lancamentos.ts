@@ -7,10 +7,10 @@ export async function lancamentosRoutes(app: FastifyInstance) {
   const service = new LancamentosService(app.prisma)
 
   app.get<{
-    Params: { municipioId: string }
+    Params: { entidadeId: string }
     Querystring: { dataInicio?: string; dataFim?: string }
-  }>('/municipios/:municipioId/lancamentos', async (req) => {
-    const data = await service.listar(req.params.municipioId, req.query)
+  }>('/entidades/:entidadeId/lancamentos', async (req) => {
+    const data = await service.listar(req.params.entidadeId, req.query)
     return { data }
   })
 
@@ -21,15 +21,15 @@ export async function lancamentosRoutes(app: FastifyInstance) {
   })
 
   app.post<{
-    Params: { municipioId: string }
+    Params: { entidadeId: string }
     Body: { data: string; historico: string; itens: ItemDado[] }
   }>(
-    '/municipios/:municipioId/lancamentos',
+    '/entidades/:entidadeId/lancamentos',
     { schema: sCriarLancamento },
     async (req, reply) => {
       try {
         const lanc = await service.criar({
-          municipioId: req.params.municipioId,
+          entidadeId: req.params.entidadeId,
           ...req.body,
           criadoPorId: req.user.sub,
         })

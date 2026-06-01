@@ -1,14 +1,15 @@
 <%# Form de criação de lançamento. Lista de itens é dinâmica (JS no client),
    cada linha submete 3 campos paralelos: tipo, contaId, valor. O server zipa
-   pela ordem. Picker de contas usa #planoId (resolvido via HTMX ao trocar data). %>
+   pela ordem. Picker de contas usa #ano (atualizado via HTMX ao trocar data)
+   + entidadeId do form. %>
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
     <h2 class="h5 fw-bold mb-1">Novo Lançamento</h2>
     <div class="small text-muted">
-      <%= municipio.estado.sigla %> · <%= municipio.nome %>
+      <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %>
     </div>
   </div>
-  <a href="/admin/lancamentos?municipioId=<%= municipio.id %>" class="btn btn-sm btn-outline-secondary">
+  <a href="/admin/lancamentos?entidadeId=<%= entidade.id %>" class="btn btn-sm btn-outline-secondary">
     <i class="bi bi-arrow-left me-1"></i>Voltar
   </a>
 </div>
@@ -20,7 +21,7 @@
 <form id="form-lancamento" method="post" action="/admin/lancamentos"
   hx-post="/admin/lancamentos" hx-target="body" hx-swap="outerHTML">
 
-  <input type="hidden" name="municipioId" value="<%= municipio.id %>">
+  <input type="hidden" name="entidadeId" value="<%= entidade.id %>">
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-body">
@@ -29,16 +30,16 @@
           <label class="form-label small fw-semibold mb-1">Data <span class="text-danger">*</span></label>
           <input type="date" name="data" value="<%= dataPadrao %>" required
             class="form-control form-control-sm"
-            hx-get="/admin/lancamentos/plano-vigente"
+            hx-get="/admin/lancamentos/ano-vigente"
             hx-trigger="change"
-            hx-include="[name='municipioId']"
-            hx-target="#plano-vigente-slot"
+            hx-include="[name='entidadeId']"
+            hx-target="#ano-vigente-slot"
             hx-swap="innerHTML">
         </div>
         <div class="col-md-9">
-          <label class="form-label small fw-semibold mb-1">Plano contábil vigente</label>
-          <div id="plano-vigente-slot">
-            <%- include('_plano_vigente', { plano: plano, ano: ano }) %>
+          <label class="form-label small fw-semibold mb-1">Exercício / contas disponíveis</label>
+          <div id="ano-vigente-slot">
+            <%- include('_ano_vigente', { info: info, ano: ano }) %>
           </div>
         </div>
       </div>
@@ -132,7 +133,7 @@
 
   <div class="d-flex justify-content-end align-items-center gap-3">
     <small class="text-warning" id="motivo-bloqueio"></small>
-    <a href="/admin/lancamentos?municipioId=<%= municipio.id %>" class="btn btn-sm btn-secondary">Cancelar</a>
+    <a href="/admin/lancamentos?entidadeId=<%= entidade.id %>" class="btn btn-sm btn-secondary">Cancelar</a>
     <button type="submit" class="btn btn-sm btn-primary" id="btn-salvar" disabled>
       <i class="bi bi-check-lg me-1"></i>Salvar Lançamento
     </button>
@@ -210,13 +211,15 @@ function verificarDuplicatas() {
   })
 }
 
-// Picker abre offcanvas com planoId atual; callback preenche hidden + label.
+// Picker abre offcanvas com (entidadeId, ano) atuais; callback preenche
+// hidden + label.
 function abrirContaPickerLinha(btn) {
-  const planoId = document.getElementById('planoId')?.value
-  if (!planoId) {
+  const ano = document.getElementById('ano')?.value
+  const entidadeId = document.querySelector('input[name="entidadeId"]')?.value
+  if (!ano || !entidadeId) {
     _mostrarConfirmar({
-      titulo: 'Plano contábil',
-      texto: 'Defina uma data com plano vigente antes de selecionar contas.',
+      titulo: 'Exercício',
+      texto: 'Defina uma data com contas disponíveis antes de selecionar.',
       tipo: 'warning', semCancelar: true, okTexto: 'Entendi',
     }, function() {})
     return
@@ -230,7 +233,7 @@ function abrirContaPickerLinha(btn) {
     label.classList.remove('text-muted')
     verificarDuplicatas()
     atualizarTotais()
-  }, { planoId: planoId })
+  }, { entidadeId: entidadeId, ano: ano })
 }
 
 // Soma totais em pt-BR + decide se pode salvar. Mesmas regras que o service

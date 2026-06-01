@@ -3,16 +3,25 @@ import { Prisma } from '@prisma/client'
 import { LancamentosService, extrairAnoMes } from '../lancamentos.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 
-const MUNICIPIO = {
-  id: 'mun1',
-  nome: 'BH',
-  estadoId: 'e1',
-  modeloContabilId: null,
-  estado: { modeloContabilId: 'm1' },
+const ENTIDADE = { id: 'ent1', nome: 'Prefeitura Teste', municipioId: 'mun1' }
+const CAIXA = {
+  id: 'c1',
+  entidadeId: 'ent1',
+  ano: 2026,
+  codigo: '1.1.1.01',
+  descricao: 'Caixa',
+  admiteMovimento: true,
+  nivel: 4,
 }
-const PLANO = { id: 'p1', descricao: 'PCASP 2026', ano: 2026, modeloContabilId: 'm1' }
-const CAIXA = { id: 'c1', codigo: '1.1.1.01', descricao: 'Caixa', planoId: 'p1', admiteMovimento: true, nivel: 4 }
-const RECEITA = { id: 'c2', codigo: '4.1.1', descricao: 'Receita', planoId: 'p1', admiteMovimento: true, nivel: 3 }
+const RECEITA = {
+  id: 'c2',
+  entidadeId: 'ent1',
+  ano: 2026,
+  codigo: '4.1.1',
+  descricao: 'Receita',
+  admiteMovimento: true,
+  nivel: 3,
+}
 
 let prisma: PrismaMock
 let service: LancamentosService
@@ -24,7 +33,7 @@ beforeEach(() => {
 
 function dadosOk() {
   return {
-    municipioId: 'mun1',
+    entidadeId: 'ent1',
     data: '2026-05-25',
     historico: 'Recebimento',
     criadoPorId: 'u1',
@@ -36,10 +45,9 @@ function dadosOk() {
 }
 
 function mockHappyPath() {
-  prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-  prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
-  prisma.conta.findMany.mockResolvedValue([CAIXA, RECEITA])
-  prisma.lancamento.create.mockResolvedValue({ id: 'lanc1', ...dadosOk(), data: new Date('2026-05-25') })
+  prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+  prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, RECEITA])
+  prisma.lancamento.create.mockResolvedValue({ id: 'lanc1', entidadeId: 'ent1', data: new Date('2026-05-25') })
   prisma.lancamentoItem.createMany.mockResolvedValue({ count: 2 })
   prisma.resumoMensalConta.upsert.mockResolvedValue({})
 }
@@ -59,9 +67,9 @@ describe('extrairAnoMes', () => {
 describe('LancamentosService.listar', () => {
   it('lista sem filtros, ordenado por data desc', async () => {
     prisma.lancamento.findMany.mockResolvedValue([])
-    await service.listar('mun1')
+    await service.listar('ent1')
     expect(prisma.lancamento.findMany).toHaveBeenCalledWith({
-      where: { municipioId: 'mun1' },
+      where: { entidadeId: 'ent1' },
       orderBy: [{ data: 'desc' }, { criadoEm: 'desc' }],
       take: 500,
     })
@@ -69,7 +77,7 @@ describe('LancamentosService.listar', () => {
 
   it('aplica filtro de data', async () => {
     prisma.lancamento.findMany.mockResolvedValue([])
-    await service.listar('mun1', { dataInicio: '2026-01-01', dataFim: '2026-12-31' })
+    await service.listar('ent1', { dataInicio: '2026-01-01', dataFim: '2026-12-31' })
     const args = prisma.lancamento.findMany.mock.calls[0][0]
     expect(args.where.data.gte).toBeInstanceOf(Date)
     expect(args.where.data.lte).toBeInstanceOf(Date)
@@ -77,7 +85,7 @@ describe('LancamentosService.listar', () => {
 
   it('aplica só dataInicio quando dataFim ausente', async () => {
     prisma.lancamento.findMany.mockResolvedValue([])
-    await service.listar('mun1', { dataInicio: '2026-01-01' })
+    await service.listar('ent1', { dataInicio: '2026-01-01' })
     const args = prisma.lancamento.findMany.mock.calls[0][0]
     expect(args.where.data.gte).toBeInstanceOf(Date)
     expect(args.where.data.lte).toBeUndefined()
@@ -85,7 +93,7 @@ describe('LancamentosService.listar', () => {
 
   it('aplica só dataFim quando dataInicio ausente', async () => {
     prisma.lancamento.findMany.mockResolvedValue([])
-    await service.listar('mun1', { dataFim: '2026-12-31' })
+    await service.listar('ent1', { dataFim: '2026-12-31' })
     const args = prisma.lancamento.findMany.mock.calls[0][0]
     expect(args.where.data.gte).toBeUndefined()
     expect(args.where.data.lte).toBeInstanceOf(Date)
@@ -116,8 +124,8 @@ describe('LancamentosService.criar — validações', () => {
 
     // Valida valores no upsert (caixa débito 100, receita crédito 100)
     const calls = prisma.resumoMensalConta.upsert.mock.calls.map((c) => c[0])
-    const callCaixa = calls.find((c) => c.where.municipioId_contaId_ano_mes.contaId === 'c1')!
-    expect(callCaixa.where.municipioId_contaId_ano_mes).toMatchObject({ municipioId: 'mun1', ano: 2026, mes: 5 })
+    const callCaixa = calls.find((c) => c.where.entidadeId_contaId_ano_mes.contaId === 'c1')!
+    expect(callCaixa.where.entidadeId_contaId_ano_mes).toMatchObject({ entidadeId: 'ent1', ano: 2026, mes: 5 })
     expect(callCaixa.create.totalDebito.toString()).toBe('100')
     expect(callCaixa.update.totalDebito.increment.toString()).toBe('100')
   })
@@ -126,7 +134,7 @@ describe('LancamentosService.criar — validações', () => {
     const d = dadosOk()
     d.itens = [d.itens[0]!]
     await expect(service.criar(d)).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
-    expect(prisma.municipio.findUnique).not.toHaveBeenCalled()
+    expect(prisma.entidade.findUnique).not.toHaveBeenCalled()
   })
 
   it('rejeita só débitos', async () => {
@@ -171,62 +179,38 @@ describe('LancamentosService.criar — validações', () => {
     })
   })
 
-  it('rejeita quando município não existe', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(null)
+  it('rejeita quando entidade não existe', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(null)
     await expect(service.criar(dadosOk())).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
-  })
-
-  it('rejeita quando nem município nem estado têm modelo', async () => {
-    prisma.municipio.findUnique.mockResolvedValue({ ...MUNICIPIO, modeloContabilId: null, estado: { modeloContabilId: null } })
-    await expect(service.criar(dadosOk())).rejects.toMatchObject({
-      code: 'ENTIDADE_NAO_PROCESSAVEL',
-      message: expect.stringContaining('modelo contábil'),
-    })
-  })
-
-  it('usa modelo próprio do município quando definido (sobrescreve herança do estado)', async () => {
-    prisma.municipio.findUnique.mockResolvedValue({ ...MUNICIPIO, modeloContabilId: 'm-proprio' })
-    prisma.planoDeContas.findFirst.mockResolvedValue({ ...PLANO, modeloContabilId: 'm-proprio' })
-    prisma.conta.findMany.mockResolvedValue([CAIXA, RECEITA])
-    prisma.lancamento.create.mockResolvedValue({ id: 'lanc1' })
-    prisma.lancamentoItem.createMany.mockResolvedValue({ count: 2 })
-
-    await service.criar(dadosOk())
-    expect(prisma.planoDeContas.findFirst).toHaveBeenCalledWith({
-      where: { modeloContabilId: 'm-proprio', ano: 2026 },
-    })
-  })
-
-  it('rejeita quando não há plano vigente para o ano da data', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(null)
-    await expect(service.criar(dadosOk())).rejects.toMatchObject({
-      code: 'ENTIDADE_NAO_PROCESSAVEL',
-      message: expect.stringContaining('plano de contas vigente para o ano 2026'),
-    })
   })
 
   it('rejeita quando uma conta não existe', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
-    prisma.conta.findMany.mockResolvedValue([CAIXA]) // c2 ausente
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA]) // c2 ausente
     await expect(service.criar(dadosOk())).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
 
-  it('rejeita quando conta pertence a outro plano', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
-    prisma.conta.findMany.mockResolvedValue([CAIXA, { ...RECEITA, planoId: 'p-outro' }])
+  it('rejeita quando conta pertence a outra entidade', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, { ...RECEITA, entidadeId: 'ent-outra' }])
     await expect(service.criar(dadosOk())).rejects.toMatchObject({
       code: 'ENTIDADE_NAO_PROCESSAVEL',
-      message: expect.stringContaining('outro plano'),
+      message: expect.stringContaining('outra entidade'),
+    })
+  })
+
+  it('rejeita quando conta é de outro ano (data não bate)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, { ...RECEITA, ano: 2025 }])
+    await expect(service.criar(dadosOk())).rejects.toMatchObject({
+      code: 'ENTIDADE_NAO_PROCESSAVEL',
+      message: expect.stringContaining('ano'),
     })
   })
 
   it('rejeita quando conta não admite movimento', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
-    prisma.conta.findMany.mockResolvedValue([CAIXA, { ...RECEITA, admiteMovimento: false }])
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, { ...RECEITA, admiteMovimento: false }])
     await expect(service.criar(dadosOk())).rejects.toMatchObject({
       code: 'ENTIDADE_NAO_PROCESSAVEL',
       message: expect.stringContaining('não admite movimento'),
@@ -234,15 +218,17 @@ describe('LancamentosService.criar — validações', () => {
   })
 
   it('lançamento composto: 1 débito → 2 créditos com agregação correta de resumos', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     const OUTRA = { ...RECEITA, id: 'c3', codigo: '4.2.1' }
-    prisma.conta.findMany.mockResolvedValue([CAIXA, RECEITA, OUTRA])
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, RECEITA, OUTRA])
     prisma.lancamento.create.mockResolvedValue({ id: 'lanc-comp' })
     prisma.lancamentoItem.createMany.mockResolvedValue({ count: 3 })
 
     await service.criar({
-      municipioId: 'mun1', data: '2026-05-25', historico: 'X', criadoPorId: 'u1',
+      entidadeId: 'ent1',
+      data: '2026-05-25',
+      historico: 'X',
+      criadoPorId: 'u1',
       itens: [
         { contaId: 'c1', tipo: 'DEBITO', valor: '300.00' },
         { contaId: 'c2', tipo: 'CREDITO', valor: '200.00' },
@@ -256,14 +242,16 @@ describe('LancamentosService.criar — validações', () => {
   })
 
   it('mesma conta com débito e crédito no mesmo lançamento: um só upsert', async () => {
-    prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
-    prisma.planoDeContas.findFirst.mockResolvedValue(PLANO)
-    prisma.conta.findMany.mockResolvedValue([CAIXA, RECEITA])
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([CAIXA, RECEITA])
     prisma.lancamento.create.mockResolvedValue({ id: 'l' })
     prisma.lancamentoItem.createMany.mockResolvedValue({ count: 3 })
 
     await service.criar({
-      municipioId: 'mun1', data: '2026-05-25', historico: 'X', criadoPorId: 'u1',
+      entidadeId: 'ent1',
+      data: '2026-05-25',
+      historico: 'X',
+      criadoPorId: 'u1',
       itens: [
         { contaId: 'c1', tipo: 'DEBITO', valor: '150' },
         { contaId: 'c1', tipo: 'CREDITO', valor: '50' }, // mesma conta!
@@ -275,7 +263,7 @@ describe('LancamentosService.criar — validações', () => {
     expect(prisma.resumoMensalConta.upsert).toHaveBeenCalledTimes(2)
     const callC1 = prisma.resumoMensalConta.upsert.mock.calls
       .map((c) => c[0])
-      .find((c) => c.where.municipioId_contaId_ano_mes.contaId === 'c1')!
+      .find((c) => c.where.entidadeId_contaId_ano_mes.contaId === 'c1')!
     expect(callC1.create.totalDebito.toString()).toBe('150')
     expect(callC1.create.totalCredito.toString()).toBe('50')
   })
@@ -284,7 +272,7 @@ describe('LancamentosService.criar — validações', () => {
 describe('LancamentosService.excluir', () => {
   const LANC = {
     id: 'lanc1',
-    municipioId: 'mun1',
+    entidadeId: 'ent1',
     data: new Date('2026-05-25T00:00:00Z'),
     valor: new Prisma.Decimal(100),
     itens: [
@@ -306,8 +294,8 @@ describe('LancamentosService.excluir', () => {
 
     const callCaixa = prisma.resumoMensalConta.update.mock.calls
       .map((c) => c[0])
-      .find((c) => c.where.municipioId_contaId_ano_mes.contaId === 'c1')!
-    expect(callCaixa.where.municipioId_contaId_ano_mes).toMatchObject({ ano: 2026, mes: 5 })
+      .find((c) => c.where.entidadeId_contaId_ano_mes.contaId === 'c1')!
+    expect(callCaixa.where.entidadeId_contaId_ano_mes).toMatchObject({ entidadeId: 'ent1', ano: 2026, mes: 5 })
     expect(callCaixa.data.totalDebito.decrement.toString()).toBe('100')
   })
 

@@ -310,18 +310,15 @@ model Estado {
 }
 
 model Municipio {
-  id               String              @id @default(uuid())
+  id               String          @id @default(uuid())
   nome             String
   estadoId         String
   modeloContabilId String?
-  criadoEm         DateTime            @default(now())
-  atualizadoEm     DateTime            @updatedAt
-  estado           Estado              @relation(fields: [estadoId], references: [id])
-  modeloContabil   ModeloContabil?     @relation(fields: [modeloContabilId], references: [id])
+  criadoEm         DateTime        @default(now())
+  atualizadoEm     DateTime        @updatedAt
+  estado           Estado          @relation(fields: [estadoId], references: [id])
+  modeloContabil   ModeloContabil? @relation(fields: [modeloContabilId], references: [id])
   entidades        Entidade[]
-  lancamentos      Lancamento[]
-  resumos          ResumoMensalConta[]
-  saldosIniciais   SaldoInicialAno[]
 
   @@unique([nome, estadoId])
   @@map("municipios")
@@ -342,78 +339,80 @@ model PlanoDeContas {
 }
 
 model Conta {
-  id              String              @id @default(uuid())
+  id              String        @id @default(uuid())
   codigo          String
   descricao       String
   nivel           Int // 1..7 (PCASP Estendido)
-  admiteMovimento Boolean             @default(false)
+  admiteMovimento Boolean       @default(false)
   planoId         String
   parentId        String?
-  criadoEm        DateTime            @default(now())
-  atualizadoEm    DateTime            @updatedAt
-  plano           PlanoDeContas       @relation(fields: [planoId], references: [id])
-  parent          Conta?              @relation("Subcontas", fields: [parentId], references: [id])
-  filhos          Conta[]             @relation("Subcontas")
-  lancamentoItens LancamentoItem[]
-  resumos         ResumoMensalConta[]
-  saldosIniciais  SaldoInicialAno[]
+  criadoEm        DateTime      @default(now())
+  atualizadoEm    DateTime      @updatedAt
+  plano           PlanoDeContas @relation(fields: [planoId], references: [id])
+  parent          Conta?        @relation("Subcontas", fields: [parentId], references: [id])
+  filhos          Conta[]       @relation("Subcontas")
 
   @@unique([planoId, codigo])
   @@index([planoId, parentId])
   @@map("contas")
 }
 
+// Lançamento patrimonial: vive na ENTIDADE (não mais no município). As contas
+// referenciadas são as cópias da entidade (ContaContabilEntidade), nunca as
+// contas-modelo do TCE.
 model Lancamento {
   id          String           @id @default(uuid())
-  municipioId String
+  entidadeId  String
   data        DateTime         @db.Date
   historico   String
   valor       Decimal          @db.Decimal(18, 2) // soma dos itens; invariante D = C
   criadoEm    DateTime         @default(now())
   criadoPorId String
-  municipio   Municipio        @relation(fields: [municipioId], references: [id])
+  entidade    Entidade         @relation(fields: [entidadeId], references: [id])
   itens       LancamentoItem[]
 
-  @@index([municipioId, data])
+  @@index([entidadeId, data])
   @@map("lancamentos")
 }
 
 model LancamentoItem {
-  id           String         @id @default(uuid())
+  id           String                @id @default(uuid())
   lancamentoId String
-  contaId      String
+  contaId      String // FK em ContaContabilEntidade (cópia da entidade)
   tipo         TipoLancamento
-  valor        Decimal        @db.Decimal(18, 2)
-  lancamento   Lancamento     @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
-  conta        Conta          @relation(fields: [contaId], references: [id])
+  valor        Decimal               @db.Decimal(18, 2)
+  lancamento   Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+  conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
 
   @@index([contaId])
   @@map("lancamento_itens")
 }
 
+// Agregado mensal por (entidade × conta-da-entidade × ano × mês). Atualizado
+// na mesma transação do lançamento.
 model ResumoMensalConta {
-  municipioId  String
+  entidadeId   String
   contaId      String
   ano          Int
   mes          Int // 1..12
-  totalDebito  Decimal   @default(0) @db.Decimal(18, 2)
-  totalCredito Decimal   @default(0) @db.Decimal(18, 2)
-  municipio    Municipio @relation(fields: [municipioId], references: [id])
-  conta        Conta     @relation(fields: [contaId], references: [id])
+  totalDebito  Decimal               @default(0) @db.Decimal(18, 2)
+  totalCredito Decimal               @default(0) @db.Decimal(18, 2)
+  entidade     Entidade              @relation(fields: [entidadeId], references: [id])
+  conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
 
-  @@id([municipioId, contaId, ano, mes])
+  @@id([entidadeId, contaId, ano, mes])
   @@map("resumos_mensais_conta")
 }
 
 model SaldoInicialAno {
-  municipioId String
-  contaId     String
-  ano         Int
-  valor       Decimal   @default(0) @db.Decimal(18, 2)
-  municipio   Municipio @relation(fields: [municipioId], references: [id])
-  conta       Conta     @relation(fields: [contaId], references: [id])
+  entidadeId String
+  contaId    String
+  ano        Int
+  valor      Decimal               @default(0) @db.Decimal(18, 2)
+  entidade   Entidade              @relation(fields: [entidadeId], references: [id])
+  conta      ContaContabilEntidade @relation(fields: [contaId], references: [id])
 
-  @@id([municipioId, contaId, ano])
+  @@id([entidadeId, contaId, ano])
   @@map("saldos_iniciais_ano")
 }
 
@@ -543,6 +542,9 @@ model Entidade {
   contasReceita  ContaReceitaEntidade[]
   contasDespesa  ContaDespesaEntidade[]
   fontesRecurso  FonteRecursoEntidade[]
+  lancamentos    Lancamento[]
+  resumos        ResumoMensalConta[]
+  saldosIniciais SaldoInicialAno[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -566,6 +568,9 @@ model ContaContabilEntidade {
   entidade        Entidade                @relation(fields: [entidadeId], references: [id])
   parent          ContaContabilEntidade?  @relation("SubContabilEnt", fields: [parentId], references: [id])
   filhos          ContaContabilEntidade[] @relation("SubContabilEnt")
+  lancamentoItens LancamentoItem[]
+  resumos         ResumoMensalConta[]
+  saldosIniciais  SaldoInicialAno[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])

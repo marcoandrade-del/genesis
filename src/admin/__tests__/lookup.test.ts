@@ -126,28 +126,28 @@ describe('adminLookupRoutes', () => {
   })
 
   describe('GET /contas', () => {
-    it('sem planoId não consulta e renderiza casca vazia', async () => {
+    it('sem entidadeId/ano não consulta e renderiza casca vazia', async () => {
       const res = await app.inject({ method: 'GET', url: '/contas' })
       expect(res.statusCode).toBe(200)
-      expect(prisma.conta.findMany).not.toHaveBeenCalled()
+      expect(prisma.contaContabilEntidade.findMany).not.toHaveBeenCalled()
     })
 
-    it('sem planoId com HX-Target também não consulta', async () => {
+    it('sem parâmetros e com HX-Target também não consulta', async () => {
       const res = await app.inject({
         method: 'GET',
         url: '/contas',
         headers: { 'hx-target': 'lookup-rows-contas' },
       })
       expect(res.statusCode).toBe(200)
-      expect(prisma.conta.findMany).not.toHaveBeenCalled()
+      expect(prisma.contaContabilEntidade.findMany).not.toHaveBeenCalled()
     })
 
-    it('com planoId filtra por plano e admiteMovimento=true', async () => {
-      prisma.conta.findMany.mockResolvedValue([])
-      await app.inject({ method: 'GET', url: '/contas?planoId=p1' })
-      expect(prisma.conta.findMany).toHaveBeenCalledWith(
+    it('com entidadeId+ano filtra por entidade, ano e admiteMovimento=true', async () => {
+      prisma.contaContabilEntidade.findMany.mockResolvedValue([])
+      await app.inject({ method: 'GET', url: '/contas?entidadeId=ent1&ano=2026' })
+      expect(prisma.contaContabilEntidade.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { planoId: 'p1', admiteMovimento: true },
+          where: { entidadeId: 'ent1', ano: 2026, admiteMovimento: true },
           orderBy: { codigo: 'asc' },
           take: 50,
         }),
@@ -155,12 +155,13 @@ describe('adminLookupRoutes', () => {
     })
 
     it('com q aplica OR em codigo e descricao', async () => {
-      prisma.conta.findMany.mockResolvedValue([])
-      await app.inject({ method: 'GET', url: '/contas?planoId=p1&q=caixa' })
-      expect(prisma.conta.findMany).toHaveBeenCalledWith(
+      prisma.contaContabilEntidade.findMany.mockResolvedValue([])
+      await app.inject({ method: 'GET', url: '/contas?entidadeId=ent1&ano=2026&q=caixa' })
+      expect(prisma.contaContabilEntidade.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
-            planoId: 'p1',
+            entidadeId: 'ent1',
+            ano: 2026,
             admiteMovimento: true,
             OR: [
               { codigo: { contains: 'caixa', mode: 'insensitive' } },
@@ -172,13 +173,19 @@ describe('adminLookupRoutes', () => {
     })
 
     it('HX-Target renderiza partial', async () => {
-      prisma.conta.findMany.mockResolvedValue([])
+      prisma.contaContabilEntidade.findMany.mockResolvedValue([])
       const res = await app.inject({
         method: 'GET',
-        url: '/contas?planoId=p1',
+        url: '/contas?entidadeId=ent1&ano=2026',
         headers: { 'hx-target': 'lookup-rows-contas' },
       })
       expect(res.statusCode).toBe(200)
+    })
+
+    it('ano não-numérico é tratado como ausente', async () => {
+      const res = await app.inject({ method: 'GET', url: '/contas?entidadeId=ent1&ano=abc' })
+      expect(res.statusCode).toBe(200)
+      expect(prisma.contaContabilEntidade.findMany).not.toHaveBeenCalled()
     })
   })
 
