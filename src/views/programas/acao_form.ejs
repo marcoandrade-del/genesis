@@ -1,0 +1,77 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-bullseye me-2 text-primary"></i><%= acao && acao.id ? 'Editar Ação' : 'Nova Ação' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (acao && acao.id) { %>
+    hx-put="/admin/programas/acoes/<%= acao.id %>"
+  <% } else { %>
+    hx-post="/admin/programas/acoes"
+  <% } %>
+  hx-target="#modal-body"
+  hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <% if (!acao || !acao.id) { %>
+      <input type="hidden" name="programaId" value="<%= programaId %>">
+    <% } %>
+
+    <div class="row g-2">
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+        <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+          value="<%= acao ? acao.codigo : '' %>"
+          placeholder="ex.: 2001" required maxlength="20">
+      </div>
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+        <select name="tipo" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <option value="PROJETO" <%= acao && acao.tipo === 'PROJETO' ? 'selected' : '' %>>Projeto (1xxx)</option>
+          <option value="ATIVIDADE" <%= acao && acao.tipo === 'ATIVIDADE' ? 'selected' : '' %>>Atividade (2xxx)</option>
+          <option value="OPERACAO_ESPECIAL" <%= acao && acao.tipo === 'OPERACAO_ESPECIAL' ? 'selected' : '' %>>Operação Especial (0xxx/9xxx)</option>
+        </select>
+      </div>
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+        <input type="text" name="nome" class="form-control form-control-sm"
+          value="<%= acao ? acao.nome : '' %>"
+          placeholder="ex.: MANUTENÇÃO DAS ESCOLAS DE ENSINO FUNDAMENTAL" required maxlength="200">
+      </div>
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Unidade de Medida</label>
+        <input type="text" name="unidadeMedida" class="form-control form-control-sm"
+          value="<%= acao && acao.unidadeMedida ? acao.unidadeMedida : '' %>"
+          placeholder="ex.: escola atendida" maxlength="50">
+      </div>
+      <div class="col-6 mb-2">
+        <label class="form-label small fw-semibold">Meta Física</label>
+        <input type="number" name="metaFisica" step="0.01" min="0"
+          class="form-control form-control-sm text-end font-monospace"
+          value="<%= acao && acao.metaFisica != null ? acao.metaFisica : '' %>"
+          placeholder="ex.: 25">
+      </div>
+      <div class="col-12">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="acao-ativa" name="ativa" value="true"
+            <%= !acao || acao.ativa ? 'checked' : '' %>>
+          <label class="form-check-label small" for="acao-ativa">Ativa</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

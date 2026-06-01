@@ -1,0 +1,97 @@
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      Ações do Programa <span class="font-monospace text-muted"><%= programa.codigo %></span>
+    </h2>
+    <div class="small text-muted">
+      <% if (entidade) { %>
+        <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %> ·
+      <% } %>
+      Exercício <strong><%= programa.ano %></strong> ·
+      <strong><%= programa.nome %></strong>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="/admin/programas?entidadeId=<%= programa.entidadeId %>&ano=<%= programa.ano %>"
+      class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/programas/acoes/form?programaId=<%= programa.id %>"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Ação
+    </button>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width:90px">Código</th>
+          <th>Nome</th>
+          <th style="width:140px">Tipo</th>
+          <th class="text-end" style="width:160px">Meta física</th>
+          <th class="text-center" style="width:80px">Status</th>
+          <th class="text-end pe-3" style="width:120px">&nbsp;</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (programa.acoes.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma ação cadastrada.
+          </td></tr>
+        <% } %>
+        <% programa.acoes.forEach(function(a) { %>
+          <tr id="acao-<%= a.id %>">
+            <td class="ps-3 font-monospace fw-semibold"><%= a.codigo %></td>
+            <td><%= a.nome %></td>
+            <td class="small">
+              <% if (a.tipo === 'PROJETO') { %>
+                <span class="badge bg-info bg-opacity-10 text-info">Projeto</span>
+              <% } else if (a.tipo === 'ATIVIDADE') { %>
+                <span class="badge bg-primary bg-opacity-10 text-primary">Atividade</span>
+              <% } else { %>
+                <span class="badge bg-warning bg-opacity-10 text-warning">Op. Especial</span>
+              <% } %>
+            </td>
+            <td class="text-end font-monospace small">
+              <% if (a.metaFisica != null) { %>
+                <%= Number(a.metaFisica).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+                <% if (a.unidadeMedida) { %>
+                  <span class="text-muted"><%= a.unidadeMedida %></span>
+                <% } %>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td class="text-center">
+              <% if (a.ativa) { %>
+                <span class="badge rounded-pill bg-success bg-opacity-75">Ativa</span>
+              <% } else { %>
+                <span class="badge rounded-pill bg-secondary bg-opacity-75">Inativa</span>
+              <% } %>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/programas/acoes/<%= a.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                data-id="<%= a.id %>" data-nome="<%= a.codigo %> — <%= a.nome %>"
+                onclick="confirmarExclusaoAsync('ação', this.dataset.id, this.dataset.nome, { url: '/admin/programas/acoes/' + this.dataset.id, target: '#acao-' + this.dataset.id, swap: 'outerHTML' })"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

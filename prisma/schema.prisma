@@ -544,6 +544,7 @@ model Entidade {
   contasDespesa        ContaDespesaEntidade[]
   fontesRecurso        FonteRecursoEntidade[]
   unidadesOrcamentaria UnidadeOrcamentaria[]
+  programas            Programa[]
   lancamentos          Lancamento[]
   resumos              ResumoMensalConta[]
   saldosIniciais       SaldoInicialAno[]
@@ -721,4 +722,59 @@ model EventoLancamento {
 
   @@index([eventoId, ordem])
   @@map("eventos_lancamentos")
+}
+
+// ─── Programa e Ação (PPA-LOA) ────────────────────────────────────────────────
+// Programa = unidade que articula um conjunto de Ações em torno de um objetivo
+// de governo. Cadastrado por entidade × ano (a entidade define seus próprios
+// programas para cada exercício orçamentário).
+enum TipoPrograma {
+  FINALISTICO // resultados para a sociedade
+  GESTAO // suporte/manutenção da máquina pública
+  OPERACOES_ESPECIAIS // amortização de dívida, transferências etc.
+}
+
+// Tipo da Ação: deriva da convenção de código (Projeto 1xxx, Atividade 2xxx,
+// Operação Especial 0xxx/9xxx). Mantemos como enum para queries e UI.
+enum TipoAcao {
+  PROJETO
+  ATIVIDADE
+  OPERACAO_ESPECIAL
+}
+
+model Programa {
+  id           String       @id @default(uuid())
+  entidadeId   String
+  ano          Int
+  codigo       String // 4 dígitos (ex.: "0001")
+  nome         String
+  objetivo     String?
+  tipo         TipoPrograma
+  ativo        Boolean      @default(true)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+  entidade     Entidade     @relation(fields: [entidadeId], references: [id])
+  acoes        Acao[]
+
+  @@unique([entidadeId, ano, codigo])
+  @@index([entidadeId, ano])
+  @@map("programas")
+}
+
+model Acao {
+  id            String   @id @default(uuid())
+  programaId    String
+  codigo        String // 4 dígitos (ex.: "1001" projeto, "2001" atividade)
+  nome          String
+  tipo          TipoAcao
+  unidadeMedida String? // ex.: "escola construída"
+  metaFisica    Decimal? @db.Decimal(18, 2)
+  ativa         Boolean  @default(true)
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  programa      Programa @relation(fields: [programaId], references: [id])
+
+  @@unique([programaId, codigo])
+  @@index([programaId])
+  @@map("acoes")
 }
