@@ -1,0 +1,111 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Unidades Orçamentárias</h2>
+  <% if (entidade) { %>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/unidades-orcamentaria/form?entidadeId=<%= entidade.id %>"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova UO
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/unidades-orcamentaria">
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>>
+          <%= e.sigla %> — <%= e.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm"
+      <%= estadoSelecionadoId ? '' : 'disabled' %>
+      onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>>
+          <%= m.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm"
+      <%= municipioSelecionadoId ? '' : 'disabled' %>
+      onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>>
+          <%= e.nome %>
+        </option>
+      <% }) %>
+    </select>
+  </div>
+</form>
+
+<% if (!entidade) { %>
+  <div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar as unidades orçamentárias.
+  </div>
+<% } else { %>
+  <div class="small text-muted mb-2">
+    <strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong> —
+    <%= unidades.length %> unidade(s)
+  </div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3" style="width:140px">Código</th>
+            <th>Nome</th>
+            <th class="text-center" style="width:100px">Status</th>
+            <th class="text-end pe-3" style="width:120px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (unidades.length === 0) { %>
+            <tr><td colspan="4" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma unidade orçamentária cadastrada.
+            </td></tr>
+          <% } %>
+          <% unidades.forEach(function(u) { %>
+            <tr id="uo-<%= u.id %>">
+              <td class="ps-3 font-monospace fw-semibold"><%= u.codigo %></td>
+              <td><%= u.nome %></td>
+              <td class="text-center">
+                <% if (u.ativa) { %>
+                  <span class="badge rounded-pill bg-success bg-opacity-75">Ativa</span>
+                <% } else { %>
+                  <span class="badge rounded-pill bg-secondary bg-opacity-75">Inativa</span>
+                <% } %>
+              </td>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary me-1"
+                  hx-get="/admin/unidades-orcamentaria/<%= u.id %>/form"
+                  hx-target="#modal-body"
+                  hx-swap="innerHTML"
+                  title="Editar">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                  data-id="<%= u.id %>" data-nome="<%= u.codigo %> — <%= u.nome %>"
+                  onclick="confirmarExclusaoAsync('unidade orçamentária', this.dataset.id, this.dataset.nome, { url: '/admin/unidades-orcamentaria/' + this.dataset.id, target: '#uo-' + this.dataset.id, swap: 'outerHTML' })"
+                  title="Excluir">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

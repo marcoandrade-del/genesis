@@ -538,13 +538,14 @@ model Entidade {
   atualizadoEm DateTime     @updatedAt
   municipio    Municipio    @relation(fields: [municipioId], references: [id])
 
-  contasContabil ContaContabilEntidade[]
-  contasReceita  ContaReceitaEntidade[]
-  contasDespesa  ContaDespesaEntidade[]
-  fontesRecurso  FonteRecursoEntidade[]
-  lancamentos    Lancamento[]
-  resumos        ResumoMensalConta[]
-  saldosIniciais SaldoInicialAno[]
+  contasContabil       ContaContabilEntidade[]
+  contasReceita        ContaReceitaEntidade[]
+  contasDespesa        ContaDespesaEntidade[]
+  fontesRecurso        FonteRecursoEntidade[]
+  unidadesOrcamentaria UnidadeOrcamentaria[]
+  lancamentos          Lancamento[]
+  resumos              ResumoMensalConta[]
+  saldosIniciais       SaldoInicialAno[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -639,4 +640,46 @@ model FonteRecursoEntidade {
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano])
   @@map("fontes_recurso_entidade")
+}
+
+// ─── Classificação Funcional (Portaria MOG nº 42/1999) ────────────────────────
+// Função e Subfunção são tabelas de referência globais — a portaria define a
+// lista fechada (28 funções + ~109 subfunções). Aplica-se ao Brasil inteiro;
+// não há cópia por entidade. Códigos: 2 dígitos (função), 3 dígitos (subfunção).
+model Funcao {
+  id         String      @id @default(uuid())
+  codigo     String      @unique // "01".."28"
+  nome       String
+  subfuncoes Subfuncao[]
+
+  @@map("funcoes")
+}
+
+model Subfuncao {
+  id       String @id @default(uuid())
+  codigo   String @unique // 3 dígitos
+  nome     String
+  funcaoId String
+  funcao   Funcao @relation(fields: [funcaoId], references: [id])
+
+  @@index([funcaoId])
+  @@map("subfuncoes")
+}
+
+// ─── Unidade Orçamentária ─────────────────────────────────────────────────────
+// Estrutura orgânica da entidade (secretarias, fundos, autarquias). Cadastrada
+// pelo município, não vem do modelo do TCE. Código livre (ex.: "02.001").
+model UnidadeOrcamentaria {
+  id           String   @id @default(uuid())
+  entidadeId   String
+  codigo       String
+  nome         String
+  ativa        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  entidade     Entidade @relation(fields: [entidadeId], references: [id])
+
+  @@unique([entidadeId, codigo])
+  @@index([entidadeId])
+  @@map("unidades_orcamentarias")
 }
