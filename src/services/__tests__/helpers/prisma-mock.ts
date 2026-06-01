@@ -327,6 +327,20 @@ export function criarPrismaMock() {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
+    eventoContabil: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    eventoLancamento: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn(),
   }
 

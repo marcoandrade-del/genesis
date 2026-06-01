@@ -290,6 +290,7 @@ model ModeloContabil {
   planosReceita PlanoContasReceita[]
   planosDespesa PlanoContasDespesa[]
   fontesRecurso FonteRecurso[]
+  eventos       EventoContabil[]
   estados       Estado[]
   municipios    Municipio[]
 
@@ -682,4 +683,42 @@ model UnidadeOrcamentaria {
   @@unique([entidadeId, codigo])
   @@index([entidadeId])
   @@map("unidades_orcamentarias")
+}
+
+// ─── Tabela de Eventos Contábeis ──────────────────────────────────────────────
+// Receita do "como contabilizar" cada movimento de execução orçamentária.
+// Cada evento, ao ser disparado por uma execução (empenho, liquidação, etc.),
+// gera N pares D-C de lançamentos contábeis. As contas dos lançamentos podem
+// conter máscaras (X = classificação contábil; Y = classificação orçamentária),
+// preenchidas no momento da execução pelo Tipo de Inscrição do evento.
+// Inspirado no modelo SIGGo (GDF) — apenas UG Origem nesta fase.
+model EventoContabil {
+  id                               String             @id @default(uuid())
+  modeloContabilId                 String
+  codigo                           String // 6 dígitos (1xxxxx receita, 3xxxxx despesa)
+  descricao                        String
+  tipoInscricao                    String? // ex.: "11 - Natureza da Receita". Define o significado dos X.
+  classificacaoContabilMascara     String? // ex.: "52121XXXX"
+  classificacaoOrcamentariaMascara String? // ex.: "YYYYYYY"
+  ativo                            Boolean            @default(true)
+  criadoEm                         DateTime           @default(now())
+  atualizadoEm                     DateTime           @updatedAt
+  modeloContabil                   ModeloContabil     @relation(fields: [modeloContabilId], references: [id])
+  lancamentos                      EventoLancamento[]
+
+  @@unique([modeloContabilId, codigo])
+  @@index([modeloContabilId])
+  @@map("eventos_contabeis")
+}
+
+model EventoLancamento {
+  id                  String         @id @default(uuid())
+  eventoId            String
+  ordem               Int // sequência de exibição (1, 2, 3...)
+  contaDebitoMascara  String // ex.: "521920100" ou "52121XXXX"
+  contaCreditoMascara String // ex.: "521929900"
+  evento              EventoContabil @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+
+  @@index([eventoId, ordem])
+  @@map("eventos_lancamentos")
 }
