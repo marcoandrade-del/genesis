@@ -99,6 +99,7 @@ model Usuario {
   senhaHash                String?
   adminModulos             AdminModulo[]
   adminSistemas            AdminSistema[]
+  acessosEntidade          AcessoEntidade[]
   codigosValidacao         CodigoValidacao[]
   favoritos                FavoritoRelatorio[]
   favoritosItem            FavoritoItem[]
@@ -271,6 +272,14 @@ enum NivelAcesso {
   EDITAR
   EXCLUIR
   TOTAL
+}
+
+// Nível do acesso de um usuário a uma Entidade. Hierarquia:
+// ADMIN ⊃ ESCRITA ⊃ LEITURA. Usado por AcessoEntidade.
+enum NivelAcessoEntidade {
+  LEITURA
+  ESCRITA
+  ADMIN
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -546,6 +555,7 @@ model Entidade {
   unidadesOrcamentaria UnidadeOrcamentaria[]
   programas            Programa[]
   orcamentos           Orcamento[]
+  acessos              AcessoEntidade[]
   lancamentos          Lancamento[]
   resumos              ResumoMensalConta[]
   saldosIniciais       SaldoInicialAno[]
@@ -866,4 +876,26 @@ model PrevisaoReceita {
   @@unique([orcamentoId, contaReceitaEntidadeId, fonteRecursoEntidadeId], name: "previsao_unica")
   @@index([orcamentoId])
   @@map("previsoes_receita")
+}
+
+// ─── Acesso de Usuário a Entidade ────────────────────────────────────────────
+// Define se um usuário pode operar em uma Entidade e em qual nível
+// (LEITURA/ESCRITA/ADMIN). Base do login de usuário comum (não-admin do
+// sistema): após autenticar, lista as entidades acessíveis e o usuário
+// escolhe contexto. Único por (usuarioId, entidadeId) — um nível por par.
+model AcessoEntidade {
+  id           String              @id @default(uuid())
+  usuarioId    String
+  entidadeId   String
+  nivel        NivelAcessoEntidade
+  ativo        Boolean             @default(true)
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
+  usuario      Usuario             @relation(fields: [usuarioId], references: [id])
+  entidade     Entidade            @relation(fields: [entidadeId], references: [id])
+
+  @@unique([usuarioId, entidadeId])
+  @@index([usuarioId])
+  @@index([entidadeId])
+  @@map("acessos_entidade")
 }
