@@ -1,0 +1,150 @@
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      <i class="bi bi-key me-1 text-primary"></i>Acessos a Entidades
+    </h2>
+    <div class="small text-muted">
+      <strong><%= usuario.nomeCompleto %></strong> · <%= usuario.emailPrincipal %>
+    </div>
+  </div>
+  <a href="/admin/usuarios" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Voltar
+  </a>
+</div>
+
+<!-- Acessos atuais ---------------------------------------------------------->
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-light fw-semibold small">
+    Acessos atuais (<%= acessos.length %>)
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Município</th>
+          <th>Entidade</th>
+          <th style="width:160px">Nível</th>
+          <th class="text-center" style="width:90px">Status</th>
+          <th class="text-end pe-3" style="width:130px">&nbsp;</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (acessos.length === 0) { %>
+          <tr><td colspan="5" class="text-center text-muted py-4">
+            <i class="bi bi-inbox d-block mb-1"></i>Nenhum acesso concedido. Use o formulário abaixo para conceder.
+          </td></tr>
+        <% } %>
+        <% acessos.forEach(function(a) { %>
+          <tr id="ace-<%= a.id %>">
+            <td class="ps-3 small">
+              <span class="text-muted"><%= a.entidade.municipio.estado.sigla %></span> ·
+              <%= a.entidade.municipio.nome %>
+            </td>
+            <td class="small fw-semibold"><%= a.entidade.nome %></td>
+            <td class="small">
+              <% if (a.nivel === 'ADMIN') { %>
+                <span class="badge bg-danger bg-opacity-10 text-danger">Admin</span>
+              <% } else if (a.nivel === 'ESCRITA') { %>
+                <span class="badge bg-primary bg-opacity-10 text-primary">Escrita</span>
+              <% } else { %>
+                <span class="badge bg-secondary bg-opacity-10 text-secondary">Leitura</span>
+              <% } %>
+            </td>
+            <td class="text-center">
+              <% if (a.ativo) { %>
+                <span class="badge rounded-pill bg-success bg-opacity-75">Ativo</span>
+              <% } else { %>
+                <span class="badge rounded-pill bg-secondary bg-opacity-75">Suspenso</span>
+              <% } %>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/acessos-entidade/<%= a.id %>/form"
+                hx-target="#modal-body" hx-swap="innerHTML"
+                title="Editar nível/status">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                data-id="<%= a.id %>" data-nome="<%= a.entidade.municipio.nome %> · <%= a.entidade.nome %>"
+                onclick="confirmarExclusaoAsync('acesso', this.dataset.id, this.dataset.nome, { url: '/admin/acessos-entidade/' + this.dataset.id, target: '#ace-' + this.dataset.id, swap: 'outerHTML' })"
+                title="Revogar">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Conceder novo acesso ---------------------------------------------------->
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-light fw-semibold small">
+    Conceder novo acesso
+  </div>
+  <div class="card-body">
+    <form method="get" action="/admin/acessos-entidade/usuario/<%= usuario.id %>" class="row g-2 align-items-end mb-3">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-1">Estado</label>
+        <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">— Selecione —</option>
+          <% estados.forEach(function(e) { %>
+            <option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>>
+              <%= e.sigla %> — <%= e.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label small fw-semibold mb-1">Município</label>
+        <select name="municipioId" class="form-select form-select-sm"
+          <%= estadoSelecionadoId ? '' : 'disabled' %>
+          onchange="this.form.submit()">
+          <option value="">— Selecione —</option>
+          <% municipios.forEach(function(m) { %>
+            <option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>>
+              <%= m.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+    </form>
+
+    <% if (!municipioSelecionadoId) { %>
+      <div class="alert alert-info py-2 small mb-0">
+        <i class="bi bi-info-circle me-1"></i>Selecione um estado e município para listar as entidades disponíveis.
+      </div>
+    <% } else if (entidades.length === 0) { %>
+      <div class="alert alert-warning py-2 small mb-0">
+        <i class="bi bi-exclamation-circle me-1"></i>Nenhuma entidade disponível para conceder (todas já foram concedidas a este usuário, ou o município não tem entidades ativas).
+      </div>
+    <% } else { %>
+      <form method="post" action="/admin/acessos-entidade" class="row g-2 align-items-end">
+        <input type="hidden" name="usuarioId" value="<%= usuario.id %>">
+        <div class="col-md-6">
+          <label class="form-label small fw-semibold mb-1">Entidade <span class="text-danger">*</span></label>
+          <select name="entidadeId" class="form-select form-select-sm" required>
+            <option value="">— Selecione —</option>
+            <% entidades.forEach(function(e) { %>
+              <option value="<%= e.id %>"><%= e.nome %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Nível <span class="text-danger">*</span></label>
+          <select name="nivel" class="form-select form-select-sm" required>
+            <option value="LEITURA">Leitura</option>
+            <option value="ESCRITA">Escrita</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+        </div>
+        <div class="col-md-3 text-end">
+          <button type="submit" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Conceder
+          </button>
+        </div>
+      </form>
+    <% } %>
+  </div>
+</div>

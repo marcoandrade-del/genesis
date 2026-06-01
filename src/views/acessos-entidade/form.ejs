@@ -1,0 +1,40 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-key me-2 text-primary"></i>Editar Acesso
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-put="/admin/acessos-entidade/<%= acesso.id %>" hx-target="#modal-body" hx-swap="innerHTML">
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+
+    <div class="mb-3">
+      <div class="small text-muted">Entidade</div>
+      <div class="fw-semibold"><%= acesso.entidade.nome %></div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Nível <span class="text-danger">*</span></label>
+      <select name="nivel" class="form-select form-select-sm" required>
+        <% niveis.forEach(function(n) { %>
+          <option value="<%= n %>" <%= acesso.nivel === n ? 'selected' : '' %>><%= n %></option>
+        <% }) %>
+      </select>
+    </div>
+
+    <div class="form-check">
+      <input type="checkbox" class="form-check-input" id="ace-ativo" name="ativo" value="true"
+        <%= acesso.ativo ? 'checked' : '' %>>
+      <label class="form-check-label small" for="ace-ativo">Ativo</label>
+      <div class="small text-muted">Desativar suspende temporariamente sem revogar.</div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>
