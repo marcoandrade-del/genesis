@@ -1,0 +1,71 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Atas de Registro de Preços</h2>
+  <% if (entidade) { %>
+    <button class="btn btn-primary btn-sm" hx-get="/admin/atas-registro-preco/form?entidadeId=<%= entidade.id %>" hx-target="#modal-body" hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Ata
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/atas-registro-preco">
+  <div class="col-md-2">
+    <label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %><option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>><%= e.sigla %> — <%= e.nome %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm" <%= estadoSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %><option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>><%= m.nome %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm" <%= municipioSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %><option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>><%= e.nome %></option><% }) %>
+    </select>
+  </div>
+</form>
+
+<% if (!entidade) { %>
+  <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar as atas.</div>
+<% } else { %>
+  <div class="small text-muted mb-2"><strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong> · <%= atas.length %> ata(s)</div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th class="ps-3" style="width:110px">Número</th><th>Fornecedor / Objeto</th><th style="width:170px">Vigência</th><th class="text-center" style="width:70px">Itens</th><th style="width:100px">Status</th><th class="text-end pe-3" style="width:130px">&nbsp;</th></tr>
+        </thead>
+        <tbody>
+          <% if (atas.length === 0) { %>
+            <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma ata para esta entidade.</td></tr>
+          <% } %>
+          <% atas.forEach(function(a) { %>
+            <tr id="ata-<%= a.id %>">
+              <td class="ps-3 font-monospace fw-semibold"><%= a.numero %></td>
+              <td><div class="fw-semibold small"><%= a.fornecedor.razaoSocial %></div><div class="small text-muted"><%= a.objeto %></div></td>
+              <td class="small font-monospace"><%= new Date(a.vigenciaInicio).toLocaleDateString('pt-BR') %> – <%= new Date(a.vigenciaFim).toLocaleDateString('pt-BR') %></td>
+              <td class="text-center"><span class="badge bg-light text-dark"><%= a._count.itens %></span></td>
+              <td>
+                <% if (a.status === 'VIGENTE') { %><span class="badge bg-success bg-opacity-10 text-success">Vigente</span>
+                <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Encerrada</span><% } %>
+              </td>
+              <td class="text-end pe-3">
+                <% if (a.status === 'VIGENTE') { %>
+                  <button class="btn btn-sm btn-outline-secondary me-1" hx-post="/admin/atas-registro-preco/<%= a.id %>/status" hx-vals='{"status":"ENCERRADA"}' hx-confirm="Encerrar a ata <%= a.numero %>?" data-confirm-titulo="Encerrar" data-confirm-ok="Encerrar" title="Encerrar"><i class="bi bi-check2-all"></i></button>
+                  <button class="btn btn-sm btn-outline-secondary me-1" hx-get="/admin/atas-registro-preco/<%= a.id %>/form" hx-target="#modal-body" hx-swap="innerHTML" title="Editar"><i class="bi bi-pencil"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" hx-delete="/admin/atas-registro-preco/<%= a.id %>" hx-target="#ata-<%= a.id %>" hx-swap="outerHTML" hx-confirm="Excluir a ata <%= a.numero %>?" data-confirm-titulo="Excluir ata" data-confirm-tipo="danger" data-confirm-ok="Excluir" title="Excluir"><i class="bi bi-trash"></i></button>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

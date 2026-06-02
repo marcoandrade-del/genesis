@@ -1,0 +1,93 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-gavel me-2 text-primary"></i>Julgamento — Processo <%= processo.numero %>/<%= processo.ano %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body" data-modal-size="modal-lg">
+  <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+  <p class="small text-muted">
+    Critério: <strong><%= processo.criterioJulgamento === 'POR_LOTE' ? 'Por lote' : 'Por item' %></strong>.
+    O preço adjudicado não pode exceder o estimado (REGRA 3).
+  </p>
+
+  <% if (processo.criterioJulgamento === 'POR_ITEM') { %>
+    <% processo.lotes.forEach(function(lote) { %>
+      <div class="fw-semibold small mb-1">Lote <%= lote.numero %><%= lote.descricao ? ' — ' + lote.descricao : '' %></div>
+      <table class="table table-sm align-middle mb-3">
+        <thead class="table-light"><tr><th>Item</th><th style="width:90px">Estim.</th><th style="width:170px">Fornecedor</th><th style="width:120px">Adjudicado</th><th style="width:60px"></th></tr></thead>
+        <tbody>
+          <% lote.itens.forEach(function(item) { %>
+            <tr>
+              <td class="small"><%= item.itemCatalogo.codigo %> — <%= item.itemCatalogo.descricao %></td>
+              <td class="font-monospace small"><%= Number(item.precoEstimadoUnitario).toFixed(2) %></td>
+              <td colspan="3">
+                <form hx-post="/admin/processos/itens/<%= item.id %>/adjudicar" hx-target="#modal-body" hx-swap="innerHTML" class="d-flex gap-1">
+                  <input type="hidden" name="processoId" value="<%= processo.id %>">
+                  <select name="fornecedorId" class="form-select form-select-sm" required>
+                    <option value="">— Fornecedor —</option>
+                    <% fornecedores.forEach(function(f) { %>
+                      <option value="<%= f.id %>" <%= item.fornecedorVencedor && item.fornecedorVencedor.id === f.id ? 'selected' : '' %>><%= f.razaoSocial %></option>
+                    <% }) %>
+                  </select>
+                  <input type="number" step="0.01" min="0" name="preco" class="form-control form-control-sm font-monospace" style="max-width:110px"
+                    value="<%= item.precoAdjudicadoUnitario != null ? Number(item.precoAdjudicadoUnitario).toFixed(2) : Number(item.precoEstimadoUnitario).toFixed(2) %>" required>
+                  <button type="submit" class="btn btn-sm btn-primary" title="Adjudicar"><i class="bi bi-check-lg"></i></button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% }) %>
+  <% } else { %>
+    <% processo.lotes.forEach(function(lote) { %>
+      <form hx-post="/admin/processos/lotes/<%= lote.id %>/adjudicar" hx-target="#modal-body" hx-swap="innerHTML"
+        hx-on::config-request="loteSerialize(this)" class="border rounded p-2 mb-3">
+        <input type="hidden" name="processoId" value="<%= processo.id %>">
+        <input type="hidden" name="itensJson" class="lote-itens-json" value="">
+        <div class="d-flex justify-content-between align-items-end mb-2">
+          <div class="flex-grow-1 me-2">
+            <label class="form-label small fw-semibold mb-0">Lote <%= lote.numero %> — vencedor</label>
+            <select name="fornecedorId" class="form-select form-select-sm" required>
+              <option value="">— Fornecedor —</option>
+              <% fornecedores.forEach(function(f) { %>
+                <option value="<%= f.id %>" <%= lote.fornecedorVencedor && lote.fornecedorVencedor.id === f.id ? 'selected' : '' %>><%= f.razaoSocial %></option>
+              <% }) %>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Adjudicar lote</button>
+        </div>
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light"><tr><th>Item</th><th style="width:90px">Estim.</th><th style="width:140px">Adjudicado R$</th></tr></thead>
+          <tbody>
+            <% lote.itens.forEach(function(item) { %>
+              <tr>
+                <td class="small"><%= item.itemCatalogo.codigo %> — <%= item.itemCatalogo.descricao %></td>
+                <td class="font-monospace small"><%= Number(item.precoEstimadoUnitario).toFixed(2) %></td>
+                <td><input type="number" step="0.01" min="0" class="form-control form-control-sm font-monospace lote-preco" data-item="<%= item.id %>"
+                  value="<%= item.precoAdjudicadoUnitario != null ? Number(item.precoAdjudicadoUnitario).toFixed(2) : Number(item.precoEstimadoUnitario).toFixed(2) %>" required></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </form>
+    <% }) %>
+  <% } %>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Fechar</button>
+</div>
+
+<script>
+  // Serializa os preços dos itens de um lote no campo itensJson antes do envio.
+  function loteSerialize(form) {
+    var itens = [];
+    form.querySelectorAll('.lote-preco').forEach(function(inp) {
+      itens.push({ itemProcessoId: inp.dataset.item, precoAdjudicadoUnitario: inp.value || '0' });
+    });
+    form.querySelector('.lote-itens-json').value = JSON.stringify(itens);
+  }
+</script>

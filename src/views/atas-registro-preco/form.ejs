@@ -1,0 +1,91 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-journal-check me-2 text-primary"></i><%= ata && ata.id ? 'Editar Ata' : 'Nova Ata de Registro de Preços' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (ata && ata.id) { %>hx-put="/admin/atas-registro-preco/<%= ata.id %>"<% } else { %>hx-post="/admin/atas-registro-preco"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML" hx-on::config-request="arpSerialize()" data-modal-size="modal-lg">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!ata || !ata.id) { %><input type="hidden" name="entidadeId" value="<%= entidadeId %>"><% } %>
+    <input type="hidden" name="itensJson" id="arp-itens-json" value="">
+
+    <div class="row g-2 mb-2">
+      <div class="col-7"><label class="form-label small fw-semibold">Fornecedor <span class="text-danger">*</span></label>
+        <select name="fornecedorId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% fornecedores.forEach(function(f){ %><option value="<%= f.id %>" <%= ata && ata.fornecedorId === f.id ? 'selected' : '' %>><%= f.razaoSocial %></option><% }) %>
+        </select></div>
+      <div class="col-5"><label class="form-label small fw-semibold">Processo (opcional)</label>
+        <select name="processoId" class="form-select form-select-sm">
+          <option value="">— Nenhum —</option>
+          <% processos.forEach(function(p){ %><option value="<%= p.id %>" <%= ata && ata.processoId === p.id ? 'selected' : '' %>><%= p.numero %>/<%= p.ano %></option><% }) %>
+        </select></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= ata && ata.numero ? ata.numero : '' %>" maxlength="30" required></div>
+      <div class="col-8"><label class="form-label small fw-semibold">Objeto <span class="text-danger">*</span></label>
+        <input type="text" name="objeto" class="form-control form-control-sm" value="<%= ata && ata.objeto ? ata.objeto : '' %>" maxlength="200" required></div>
+      <div class="col-6"><label class="form-label small fw-semibold">Início vigência <span class="text-danger">*</span></label>
+        <input type="date" name="vigenciaInicio" class="form-control form-control-sm" value="<%= ata && ata.vigenciaInicio ? (typeof ata.vigenciaInicio === 'string' ? ata.vigenciaInicio : new Date(ata.vigenciaInicio).toISOString().slice(0,10)) : '' %>" required></div>
+      <div class="col-6"><label class="form-label small fw-semibold">Fim vigência <span class="text-danger">*</span></label>
+        <input type="date" name="vigenciaFim" class="form-control form-control-sm" value="<%= ata && ata.vigenciaFim ? (typeof ata.vigenciaFim === 'string' ? ata.vigenciaFim : new Date(ata.vigenciaFim).toISOString().slice(0,10)) : '' %>" required></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label small fw-semibold mb-0">Itens registrados</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="arpAddRow()"><i class="bi bi-plus-lg me-1"></i>Adicionar item</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th>Item do catálogo</th><th style="width:120px">Qtd. registrada</th><th style="width:140px">Preço unit. R$</th><th style="width:40px"></th></tr></thead>
+        <tbody id="arp-itens-body"></tbody>
+      </table>
+    </div>
+    <div id="arp-itens-vazio" class="text-muted small text-center py-2" style="display:none">Nenhum item — clique em "Adicionar item".</div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>
+
+<script>
+  var ARP_CATALOGO = <%- JSON.stringify(catalogo) %>;
+  var ARP_ITENS = <%- JSON.stringify(itens) %>;
+  function arpCatSelect(selId) {
+    var sel = document.createElement('select'); sel.className = 'form-select form-select-sm arp-cat'; sel.addEventListener('change', arpSerialize);
+    sel.add(new Option('— Selecione —', ''));
+    ARP_CATALOGO.forEach(function(c) { var r = (c.tipo === 'MATERIAL' ? 'Mat.' : 'Serv.') + ' ' + c.codigo + ' — ' + c.descricao + ' (' + c.unidadeMedida + ')'; var o = new Option(r, c.id); if (c.id === selId) o.selected = true; sel.add(o); });
+    return sel;
+  }
+  function arpNum(cls, val, step) { var i = document.createElement('input'); i.type = 'number'; i.step = step; i.min = '0'; i.className = 'form-control form-control-sm font-monospace ' + cls; if (val != null && val !== '') i.value = val; i.addEventListener('input', arpSerialize); return i; }
+  function arpCell(c) { var td = document.createElement('td'); td.appendChild(c); return td; }
+  function arpAddRow(item) {
+    item = item || {};
+    var tr = document.createElement('tr');
+    tr.appendChild(arpCell(arpCatSelect(item.itemCatalogoId)));
+    tr.appendChild(arpCell(arpNum('arp-qtd', item.quantidadeRegistrada, 'any')));
+    tr.appendChild(arpCell(arpNum('arp-preco', item.precoUnitario, '0.01')));
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-sm btn-outline-danger';
+    btn.addEventListener('click', function() { tr.remove(); arpSerialize(); });
+    var ic = document.createElement('i'); ic.className = 'bi bi-x'; btn.appendChild(ic);
+    var tdx = document.createElement('td'); tdx.className = 'text-end'; tdx.appendChild(btn); tr.appendChild(tdx);
+    document.getElementById('arp-itens-body').appendChild(tr); arpSerialize();
+  }
+  function arpSerialize() {
+    var linhas = [];
+    document.querySelectorAll('#arp-itens-body tr').forEach(function(tr) {
+      var id = tr.querySelector('.arp-cat').value; if (!id) return;
+      linhas.push({ itemCatalogoId: id, quantidadeRegistrada: tr.querySelector('.arp-qtd').value || '0', precoUnitario: tr.querySelector('.arp-preco').value || '0' });
+    });
+    document.getElementById('arp-itens-json').value = JSON.stringify(linhas);
+    document.getElementById('arp-itens-vazio').style.display = document.querySelectorAll('#arp-itens-body tr').length ? 'none' : 'block';
+  }
+  ARP_ITENS.forEach(function(i) { arpAddRow(i); });
+  arpSerialize();
+</script>

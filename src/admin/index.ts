@@ -37,6 +37,10 @@ import { adminItensCatalogoRoutes } from './itens-catalogo.js'
 import { adminReservasDotacaoRoutes } from './reservas-dotacao.js'
 import { adminPlanosContratacaoRoutes } from './planos-contratacao.js'
 import { adminDocumentosDemandaRoutes } from './documentos-demanda.js'
+import { adminFornecedoresRoutes } from './fornecedores.js'
+import { adminProcessosRoutes } from './processos.js'
+import { adminContratosRoutes } from './contratos.js'
+import { adminAtasRegistroPrecoRoutes } from './atas-registro-preco.js'
 
 // Caminhos profundos (≥2 segmentos) que são páginas completas. Aceita string
 // literal OU RegExp (para caminhos com ID variável, ex.: ".../:id/editar").
@@ -155,5 +159,9 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminReservasDotacaoRoutes, { prefix: '/reservas-dotacao' })
     admin.register(adminPlanosContratacaoRoutes, { prefix: '/planos-contratacao' })
     admin.register(adminDocumentosDemandaRoutes, { prefix: '/documentos-demanda' })
+    admin.register(adminFornecedoresRoutes, { prefix: '/fornecedores' })
+    admin.register(adminProcessosRoutes, { prefix: '/processos' })
+    admin.register(adminContratosRoutes, { prefix: '/contratos' })
+    admin.register(adminAtasRegistroPrecoRoutes, { prefix: '/atas-registro-preco' })
   })
 }
