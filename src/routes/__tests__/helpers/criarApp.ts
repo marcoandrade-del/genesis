@@ -20,6 +20,10 @@ type Opcoes = {
   comView?: boolean
   // Simula admin autenticado via cookie: injeta req.user antes do handler.
   simularAdmin?: { sub: string; email: string }
+  // Igual ao simularAdmin, mas semanticamente para rotas /app.
+  simularUsuario?: { sub: string; email: string }
+  // Injeta req.contexto (do /app) antes do handler.
+  simularContexto?: { entidadeId: string; ano: number; nivel: 'LEITURA' | 'ESCRITA' | 'ADMIN' }
 }
 
 // Fastify mínimo para testes: prisma mockado, JWT real, cookie+formbody, sem view engine.
@@ -54,10 +58,14 @@ export async function criarApp(opcoes: Opcoes): Promise<{ app: FastifyInstance; 
       api.addHook('onRequest', app.authenticate)
       await opcoes.registrar(api)
     }, opcoes.prefix ? { prefix: opcoes.prefix } : {})
-  } else if (opcoes.simularAdmin) {
-    const userFake = opcoes.simularAdmin
+  } else if (opcoes.simularAdmin || opcoes.simularUsuario || opcoes.simularContexto) {
+    const userFake = opcoes.simularAdmin ?? opcoes.simularUsuario
+    const contextoFake = opcoes.simularContexto
     await app.register(async (api) => {
-      api.addHook('onRequest', async (req) => { req.user = userFake })
+      api.addHook('onRequest', async (req) => {
+        if (userFake) req.user = userFake
+        if (contextoFake) req.contexto = contextoFake
+      })
       await opcoes.registrar(api)
     }, opcoes.prefix ? { prefix: opcoes.prefix } : {})
   } else {
