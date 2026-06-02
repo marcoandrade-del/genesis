@@ -53,6 +53,25 @@
   #dd-modo-indicador.copiar { background: rgba(13,110,253,.92); }
   #dd-modo-indicador.atalho { background: rgba(102,16,242,.92); }
   #dd-modo-indicador.bloqueado { background: rgba(220,53,69,.92); }
+  /* Drop zones: durante uma sessão de drag, garantem área visível mesmo em
+     containers colapsados ou vazios — caso contrário o cursor não tem onde
+     pousar e SortableJS não calcula área de drop. */
+  body.dd-active .tree-children[data-sortable] { min-height: 18px; }
+  body.dd-active .tree-children[data-sortable]:empty {
+    min-height: 28px;
+    outline: 1px dashed rgba(13,110,253,.5);
+    outline-offset: -2px;
+    border-radius: 4px;
+    margin: 2px 0 2px 16px;
+    padding-left: 0;
+  }
+  /* Tree-row em hover durante drag (alvo de auto-expand): destaca visualmente
+     para o usuário saber que parar ali vai expandir o filho. */
+  body.dd-active .tree-row.dd-hover-expand {
+    background: rgba(13,110,253,.12);
+    outline: 1px dashed rgba(13,110,253,.5);
+    border-radius: 4px;
+  }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js"></script>
 
@@ -177,6 +196,60 @@
       _ddAtualizarModo(_ddCalcularModo(e))
     }
 
+    // ── Hover-expand durante drag ─────────────────────────────────────────────
+    // Quando o cursor pausa sobre um tree-row cujo container filho está
+    // colapsado (display:none), expande automaticamente após ~600ms. Resolve
+    // o caso "não tem onde dropar" quando o destino está fechado.
+    var _hoverRow = null
+    var _hoverTimer = null
+    function _kidsDe(row) {
+      var tipo = row.dataset.tipo, id = row.dataset.id
+      var prefix =
+        tipo === 'modulo' ? 'kids-m-' :
+        tipo === 'menu'   ? 'kids-menu-' :
+        tipo === 'item'   ? 'kids-item-' :
+        tipo === 'sistema'? 'kids-s-' : null
+      return prefix ? document.getElementById(prefix + id) : null
+    }
+    function _cancelarHover() {
+      if (_hoverTimer) { clearTimeout(_hoverTimer); _hoverTimer = null }
+      if (_hoverRow) { _hoverRow.classList.remove('dd-hover-expand'); _hoverRow = null }
+    }
+    function _expandirRow(row) {
+      var kids = _kidsDe(row)
+      if (!kids || kids.style.display !== 'none') return false
+      kids.style.display = 'block'
+      var icon = row.querySelector('.tree-toggle i')
+      if (icon) icon.className = 'bi bi-chevron-down'
+      return true
+    }
+    function _ddMouseMove(e) {
+      // O ghost do SortableJS (forceFallback) segue o cursor — preciso ignorá-lo
+      // ao consultar elementFromPoint para enxergar a row debaixo.
+      var ghost = document.querySelector('.sortable-fallback') || document.querySelector('.dd-ghost')
+      var prev = null
+      if (ghost) { prev = ghost.style.pointerEvents; ghost.style.pointerEvents = 'none' }
+      var el = document.elementFromPoint(e.clientX, e.clientY)
+      if (ghost) ghost.style.pointerEvents = prev || ''
+      var row = el ? el.closest('.tree-row') : null
+      if (row === _hoverRow) return
+      _cancelarHover()
+      if (!row) return
+      var kids = _kidsDe(row)
+      if (!kids || kids.style.display !== 'none') return
+      _hoverRow = row
+      row.classList.add('dd-hover-expand')
+      _hoverTimer = setTimeout(function() {
+        _expandirRow(row)
+        _cancelarHover()
+      }, 600)
+    }
+    function _ddAtivarHover() { document.addEventListener('mousemove', _ddMouseMove) }
+    function _ddDesativarHover() {
+      document.removeEventListener('mousemove', _ddMouseMove)
+      _cancelarHover()
+    }
+
     document.querySelectorAll('[data-sortable]').forEach(function(el) {
       var existing = Sortable.get(el)
       if (existing) existing.destroy()
@@ -189,11 +262,17 @@
         chosenClass: 'dd-chosen',
         dragClass: 'dd-drag',
         forceFallback: true,
+        // Containers vazios precisam de threshold > 0 para aceitar drop.
+        // Combina com a regra CSS min-height de :empty[data-sortable].
+        emptyInsertThreshold: 12,
       }
 
       if (tipo === 'modulos') {
         opts.group = 'mod-' + (el.dataset.sistemaId || 'x')
+        opts.onStart = function() { document.body.classList.add('dd-active'); _ddAtivarHover() }
         opts.onEnd = function(evt) {
+          document.body.classList.remove('dd-active')
+          _ddDesativarHover()
           if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return
           var ids = Array.from(evt.to.children).map(function(c) { return c.dataset.id }).filter(Boolean)
           fetch('/admin/menus/reordenar/modulos', {
@@ -206,7 +285,10 @@
         }
       } else if (tipo === 'menus') {
         opts.group = 'men-' + (el.dataset.moduloId || 'x')
+        opts.onStart = function() { document.body.classList.add('dd-active'); _ddAtivarHover() }
         opts.onEnd = function(evt) {
+          document.body.classList.remove('dd-active')
+          _ddDesativarHover()
           if (evt.from === evt.to && evt.oldIndex === evt.newIndex) return
           var ids = Array.from(evt.to.children).map(function(c) { return c.dataset.id }).filter(Boolean)
           fetch('/admin/menus/reordenar/menus', {
@@ -220,9 +302,23 @@
       } else if (tipo === 'itens') {
         opts.group = { name: 'itens', pull: 'itens', put: 'itens' }
 
+        // Recupera o moduloId responsável por um container de itens,
+        // subindo até o [data-sortable="menus"] que carrega data-modulo-id.
+        function _moduloIdDeItens(itensEl) {
+          var c = itensEl.closest('[data-sortable="menus"]')
+          return c ? c.dataset.moduloId : null
+        }
+
         opts.onMove = function(evt) {
           var row = evt.dragged.querySelector('.tree-row') || evt.dragged
-          var valido = !(row.dataset.itemTipo === 'SUBMENU' && evt.to.dataset.parentId)
+          // 1. SUBMENU não pode descer para dentro de outro item.
+          var bloqueioSubmenu = row.dataset.itemTipo === 'SUBMENU' && !!evt.to.dataset.parentId
+          // 2. Cross-module: o backend rejeita (itens.ts:252), bloqueia já no front
+          // para indicar visualmente e evitar snap-back.
+          var modFrom = _moduloIdDeItens(evt.from)
+          var modTo = _moduloIdDeItens(evt.to)
+          var bloqueioModulo = !!(modFrom && modTo && modFrom !== modTo)
+          var valido = !(bloqueioSubmenu || bloqueioModulo)
           _ddAtualizarBloqueio(!valido)
           if (!valido) return false
           document.querySelectorAll('[data-sortable="itens"].dd-over').forEach(function(e2) { e2.classList.remove('dd-over') })
@@ -239,11 +335,13 @@
           _ddAtualizarModo(_ddCalcularModo(orig))
           document.addEventListener('keydown', _ddKeyHandler)
           document.addEventListener('keyup', _ddKeyHandler)
+          _ddAtivarHover()
         }
 
         opts.onEnd = function(evt) {
           document.removeEventListener('keydown', _ddKeyHandler)
           document.removeEventListener('keyup', _ddKeyHandler)
+          _ddDesativarHover()
           document.body.classList.remove('dd-active', 'dd-copy', 'dd-atalho', 'dd-bloqueado')
           _ddBloqueado = false
           _ddIndicador.classList.remove('ativo', 'copiar', 'atalho', 'bloqueado')
