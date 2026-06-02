@@ -33,6 +33,10 @@ import { adminEventosContabeisRoutes } from './eventos-contabeis.js'
 import { adminProgramasRoutes } from './programas.js'
 import { adminOrcamentosRoutes } from './orcamentos.js'
 import { adminAcessosEntidadeRoutes } from './acessos-entidade.js'
+import { adminItensCatalogoRoutes } from './itens-catalogo.js'
+import { adminReservasDotacaoRoutes } from './reservas-dotacao.js'
+import { adminPlanosContratacaoRoutes } from './planos-contratacao.js'
+import { adminDocumentosDemandaRoutes } from './documentos-demanda.js'
 
 // Caminhos profundos (≥2 segmentos) que são páginas completas. Aceita string
 // literal OU RegExp (para caminhos com ID variável, ex.: ".../:id/editar").
@@ -147,5 +151,9 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminProgramasRoutes, { prefix: '/programas' })
     admin.register(adminOrcamentosRoutes, { prefix: '/orcamentos' })
     admin.register(adminAcessosEntidadeRoutes, { prefix: '/acessos-entidade' })
+    admin.register(adminItensCatalogoRoutes, { prefix: '/itens-catalogo' })
+    admin.register(adminReservasDotacaoRoutes, { prefix: '/reservas-dotacao' })
+    admin.register(adminPlanosContratacaoRoutes, { prefix: '/planos-contratacao' })
+    admin.register(adminDocumentosDemandaRoutes, { prefix: '/documentos-demanda' })
   })
 }

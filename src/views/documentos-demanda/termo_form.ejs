@@ -1,0 +1,150 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-file-earmark-ruled me-2 text-primary"></i>
+    Termo de Referência — DOD <%= dod.numero %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (tr) { %>hx-put="/admin/documentos-demanda/termo/<%= tr.id %>"<% } else { %>hx-post="/admin/documentos-demanda/<%= dod.id %>/termo"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML"
+  hx-on::config-request="trSerialize()"
+  data-modal-size="modal-lg">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <input type="hidden" name="itensJson" id="tr-itens-json" value="">
+
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Objeto <span class="text-danger">*</span></label>
+      <input type="text" name="objeto" class="form-control form-control-sm"
+        value="<%= tr && tr.objeto ? tr.objeto : '' %>" maxlength="200" required>
+    </div>
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Observações</label>
+      <input type="text" name="observacoes" class="form-control form-control-sm"
+        value="<%= tr && tr.observacoes ? tr.observacoes : '' %>" maxlength="500">
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label small fw-semibold mb-0">Itens (pesquisa de preço)</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="trAddRow()">
+        <i class="bi bi-plus-lg me-1"></i>Adicionar item
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Item do catálogo</th>
+            <th style="width:110px">Qtd.</th>
+            <th style="width:140px">Preço unit. R$</th>
+            <th class="text-end" style="width:130px">Máx. aceitável</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="tr-itens-body"></tbody>
+        <tfoot>
+          <tr class="table-light">
+            <td colspan="3" class="text-end fw-semibold small">Preço Máximo Aceitável total</td>
+            <td class="text-end fw-bold font-monospace" id="tr-total">R$ 0,00</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div id="tr-itens-vazio" class="text-muted small text-center py-2" style="display:none">Nenhum item — clique em "Adicionar item".</div>
+  </div>
+
+  <div class="modal-footer justify-content-between">
+    <div>
+      <% if (tr) { %>
+        <button type="button" class="btn btn-sm btn-outline-danger"
+          hx-delete="/admin/documentos-demanda/termo/<%= tr.id %>"
+          hx-confirm="Excluir o Termo de Referência da DOD <%= dod.numero %>?"
+          data-confirm-titulo="Excluir TR" data-confirm-tipo="danger" data-confirm-ok="Excluir">
+          <i class="bi bi-trash me-1"></i>Excluir TR
+        </button>
+      <% } %>
+    </div>
+    <div>
+      <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+      <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+    </div>
+  </div>
+</form>
+
+<script>
+  var TR_CATALOGO = <%- JSON.stringify(catalogo) %>;
+  var TR_ITENS = <%- JSON.stringify(itens) %>;
+
+  function trCatSelect(selId) {
+    var sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm tr-cat';
+    sel.addEventListener('change', trSerialize);
+    sel.add(new Option('— Selecione —', ''));
+    TR_CATALOGO.forEach(function(c) {
+      var rotulo = (c.tipo === 'MATERIAL' ? 'Mat.' : 'Serv.') + ' ' + c.codigo + ' — ' + c.descricao + ' (' + c.unidadeMedida + ')';
+      var o = new Option(rotulo, c.id);
+      if (c.id === selId) o.selected = true;
+      sel.add(o);
+    });
+    return sel;
+  }
+
+  function trNum(cls, val, step) {
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.step = step; inp.min = '0';
+    inp.className = 'form-control form-control-sm font-monospace ' + cls;
+    if (val != null && val !== '') inp.value = val;
+    inp.addEventListener('input', trSerialize);
+    return inp;
+  }
+
+  function trCell(child) { var td = document.createElement('td'); td.appendChild(child); return td; }
+
+  function trAddRow(item) {
+    item = item || {};
+    var tr = document.createElement('tr');
+    tr.appendChild(trCell(trCatSelect(item.itemCatalogoId)));
+    tr.appendChild(trCell(trNum('tr-qtd', item.quantidade, 'any')));
+    tr.appendChild(trCell(trNum('tr-preco', item.precoUnitarioEstimado, '0.01')));
+    var tdMax = document.createElement('td'); tdMax.className = 'text-end font-monospace tr-max small'; tdMax.textContent = '—';
+    tr.appendChild(tdMax);
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn btn-sm btn-outline-danger';
+    btn.addEventListener('click', function() { tr.remove(); trSerialize(); });
+    var ic = document.createElement('i'); ic.className = 'bi bi-x'; btn.appendChild(ic);
+    var tdX = document.createElement('td'); tdX.className = 'text-end'; tdX.appendChild(btn);
+    tr.appendChild(tdX);
+    document.getElementById('tr-itens-body').appendChild(tr);
+    trSerialize();
+  }
+
+  function trSerialize() {
+    var linhas = [];
+    var total = 0;
+    document.querySelectorAll('#tr-itens-body tr').forEach(function(tr) {
+      var id = tr.querySelector('.tr-cat').value;
+      var q = parseFloat(tr.querySelector('.tr-qtd').value) || 0;
+      var p = parseFloat(tr.querySelector('.tr-preco').value) || 0;
+      var max = q * p;
+      tr.querySelector('.tr-max').textContent = id ? max.toFixed(2) : '—';
+      if (!id) return;
+      total += max;
+      linhas.push({
+        itemCatalogoId: id,
+        quantidade: tr.querySelector('.tr-qtd').value || '0',
+        precoUnitarioEstimado: tr.querySelector('.tr-preco').value || '0',
+      });
+    });
+    document.getElementById('tr-itens-json').value = JSON.stringify(linhas);
+    document.getElementById('tr-total').textContent = 'R$ ' + total.toFixed(2);
+    document.getElementById('tr-itens-vazio').style.display =
+      document.querySelectorAll('#tr-itens-body tr').length ? 'none' : 'block';
+  }
+
+  TR_ITENS.forEach(function(i) { trAddRow(i); });
+  trSerialize();
+</script>

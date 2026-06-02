@@ -1,0 +1,73 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Catálogo de Itens</h2>
+  <button class="btn btn-primary btn-sm"
+    hx-get="/admin/itens-catalogo/form"
+    hx-target="#modal-body"
+    hx-swap="innerHTML">
+    <i class="bi bi-plus-lg me-1"></i>Novo Item
+  </button>
+</div>
+
+<div class="btn-group btn-group-sm mb-3" role="group">
+  <a href="/admin/itens-catalogo" class="btn btn-outline-secondary <%= tipoFiltro === '' ? 'active' : '' %>">Todos</a>
+  <a href="/admin/itens-catalogo?tipo=MATERIAL" class="btn btn-outline-secondary <%= tipoFiltro === 'MATERIAL' ? 'active' : '' %>">Materiais</a>
+  <a href="/admin/itens-catalogo?tipo=SERVICO" class="btn btn-outline-secondary <%= tipoFiltro === 'SERVICO' ? 'active' : '' %>">Serviços</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Tipo</th>
+          <th>Código</th>
+          <th>Descrição</th>
+          <th>Unid.</th>
+          <th>Status</th>
+          <th class="text-end pe-3">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (items.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum item cadastrado.
+          </td></tr>
+        <% } %>
+        <% items.forEach(function(item) { %>
+          <tr id="item-catalogo-<%= item.id %>">
+            <td class="ps-3">
+              <span class="badge rounded-pill <%= item.tipo === 'MATERIAL' ? 'bg-primary' : 'bg-info' %> bg-opacity-75">
+                <%= item.tipo === 'MATERIAL' ? 'Material' : 'Serviço' %>
+              </span>
+            </td>
+            <td class="font-monospace"><%= item.codigo %></td>
+            <td class="fw-semibold"><%= item.descricao %></td>
+            <td><%= item.unidadeMedida %></td>
+            <td>
+              <span class="badge rounded-pill <%= item.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75">
+                <%= item.ativo ? 'Ativo' : 'Inativo' %>
+              </span>
+            </td>
+            <td class="text-end pe-3">
+              <button class="btn btn-sm btn-outline-secondary me-1"
+                hx-get="/admin/itens-catalogo/<%= item.id %>/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Editar">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger"
+                hx-delete="/admin/itens-catalogo/<%= item.id %>"
+                hx-target="#item-catalogo-<%= item.id %>"
+                hx-swap="outerHTML"
+                hx-confirm="Excluir '<%= item.descricao %>'?"
+                title="Excluir">
+                <i class="bi bi-trash"></i>
+              </button>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>

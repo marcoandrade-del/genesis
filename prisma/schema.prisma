@@ -559,6 +559,9 @@ model Entidade {
   lancamentos          Lancamento[]
   resumos              ResumoMensalConta[]
   saldosIniciais       SaldoInicialAno[]
+  planosContratacao    PlanoContratacaoAnual[]
+  documentosDemanda    DocumentoDemanda[]
+  reservasDotacao      ReservaDotacao[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -638,19 +641,19 @@ model ContaDespesaEntidade {
 }
 
 model FonteRecursoEntidade {
-  id            String      @id @default(uuid())
+  id            String            @id @default(uuid())
   entidadeId    String
   ano           Int
   codigo        String
   nomenclatura  String
   especificacao String?
-  vinculada     Boolean     @default(true)
+  vinculada     Boolean           @default(true)
   grupo         String?
-  origem        OrigemConta @default(MODELO)
+  origem        OrigemConta       @default(MODELO)
   modeloFonteId String?
-  criadoEm      DateTime    @default(now())
-  atualizadoEm  DateTime    @updatedAt
-  entidade      Entidade    @relation(fields: [entidadeId], references: [id])
+  criadoEm      DateTime          @default(now())
+  atualizadoEm  DateTime          @updatedAt
+  entidade      Entidade          @relation(fields: [entidadeId], references: [id])
   dotacoes      DotacaoDespesa[]
   previsoes     PrevisaoReceita[]
 
@@ -664,8 +667,8 @@ model FonteRecursoEntidade {
 // lista fechada (28 funções + ~109 subfunções). Aplica-se ao Brasil inteiro;
 // não há cópia por entidade. Códigos: 2 dígitos (função), 3 dígitos (subfunção).
 model Funcao {
-  id         String      @id @default(uuid())
-  codigo     String      @unique // "01".."28"
+  id         String           @id @default(uuid())
+  codigo     String           @unique // "01".."28"
   nome       String
   subfuncoes Subfuncao[]
   dotacoes   DotacaoDespesa[]
@@ -674,11 +677,11 @@ model Funcao {
 }
 
 model Subfuncao {
-  id       String @id @default(uuid())
-  codigo   String @unique // 3 dígitos
+  id       String           @id @default(uuid())
+  codigo   String           @unique // 3 dígitos
   nome     String
   funcaoId String
-  funcao   Funcao @relation(fields: [funcaoId], references: [id])
+  funcao   Funcao           @relation(fields: [funcaoId], references: [id])
   dotacoes DotacaoDespesa[]
 
   @@index([funcaoId])
@@ -689,15 +692,16 @@ model Subfuncao {
 // Estrutura orgânica da entidade (secretarias, fundos, autarquias). Cadastrada
 // pelo município, não vem do modelo do TCE. Código livre (ex.: "02.001").
 model UnidadeOrcamentaria {
-  id           String   @id @default(uuid())
-  entidadeId   String
-  codigo       String
-  nome         String
-  ativa        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-  entidade     Entidade @relation(fields: [entidadeId], references: [id])
-  dotacoes     DotacaoDespesa[]
+  id                String             @id @default(uuid())
+  entidadeId        String
+  codigo            String
+  nome              String
+  ativa             Boolean            @default(true)
+  criadoEm          DateTime           @default(now())
+  atualizadoEm      DateTime           @updatedAt
+  entidade          Entidade           @relation(fields: [entidadeId], references: [id])
+  dotacoes          DotacaoDespesa[]
+  documentosDemanda DocumentoDemanda[]
 
   @@unique([entidadeId, codigo])
   @@index([entidadeId])
@@ -761,17 +765,17 @@ enum TipoAcao {
 }
 
 model Programa {
-  id           String       @id @default(uuid())
+  id           String           @id @default(uuid())
   entidadeId   String
   ano          Int
   codigo       String // 4 dígitos (ex.: "0001")
   nome         String
   objetivo     String?
   tipo         TipoPrograma
-  ativo        Boolean      @default(true)
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
-  entidade     Entidade     @relation(fields: [entidadeId], references: [id])
+  ativo        Boolean          @default(true)
+  criadoEm     DateTime         @default(now())
+  atualizadoEm DateTime         @updatedAt
+  entidade     Entidade         @relation(fields: [entidadeId], references: [id])
   acoes        Acao[]
   dotacoes     DotacaoDespesa[]
 
@@ -781,17 +785,17 @@ model Programa {
 }
 
 model Acao {
-  id            String   @id @default(uuid())
+  id            String           @id @default(uuid())
   programaId    String
   codigo        String // 4 dígitos (ex.: "1001" projeto, "2001" atividade)
   nome          String
   tipo          TipoAcao
   unidadeMedida String? // ex.: "escola construída"
-  metaFisica    Decimal? @db.Decimal(18, 2)
-  ativa         Boolean  @default(true)
-  criadoEm      DateTime @default(now())
-  atualizadoEm  DateTime @updatedAt
-  programa      Programa @relation(fields: [programaId], references: [id])
+  metaFisica    Decimal?         @db.Decimal(18, 2)
+  ativa         Boolean          @default(true)
+  criadoEm      DateTime         @default(now())
+  atualizadoEm  DateTime         @updatedAt
+  programa      Programa         @relation(fields: [programaId], references: [id])
   dotacoes      DotacaoDespesa[]
 
   @@unique([programaId, codigo])
@@ -811,18 +815,18 @@ enum StatusOrcamento {
 }
 
 model Orcamento {
-  id               String            @id @default(uuid())
-  entidadeId       String
-  ano              Int
-  status           StatusOrcamento   @default(RASCUNHO)
-  leiNumero        String?
-  dataAprovacao    DateTime?
-  observacoes      String?
-  criadoEm         DateTime          @default(now())
-  atualizadoEm     DateTime          @updatedAt
-  entidade         Entidade          @relation(fields: [entidadeId], references: [id])
-  dotacoes         DotacaoDespesa[]
-  previsoes        PrevisaoReceita[]
+  id            String            @id @default(uuid())
+  entidadeId    String
+  ano           Int
+  status        StatusOrcamento   @default(RASCUNHO)
+  leiNumero     String?
+  dataAprovacao DateTime?
+  observacoes   String?
+  criadoEm      DateTime          @default(now())
+  atualizadoEm  DateTime          @updatedAt
+  entidade      Entidade          @relation(fields: [entidadeId], references: [id])
+  dotacoes      DotacaoDespesa[]
+  previsoes     PrevisaoReceita[]
 
   @@unique([entidadeId, ano])
   @@index([entidadeId])
@@ -833,7 +837,7 @@ model Orcamento {
 // obrigatórias (UO + Função + Subfunção + Programa + Ação + ContaDespesa +
 // Fonte). A combinação dessas 7 dimensões é única por Orçamento.
 model DotacaoDespesa {
-  id                     String   @id @default(uuid())
+  id                     String               @id @default(uuid())
   orcamentoId            String
   unidadeOrcamentariaId  String
   funcaoId               String
@@ -842,9 +846,13 @@ model DotacaoDespesa {
   acaoId                 String
   contaDespesaEntidadeId String
   fonteRecursoEntidadeId String
-  valorAutorizado        Decimal  @db.Decimal(18, 2)
-  criadoEm               DateTime @default(now())
-  atualizadoEm           DateTime @updatedAt
+  valorAutorizado        Decimal              @db.Decimal(18, 2)
+  // Saldo materializado da execução: disponível = autorizado − reservado − empenhado.
+  // Atualizado transacionalmente por reservas (pré-empenho) e empenhos.
+  valorReservado         Decimal              @default(0) @db.Decimal(18, 2)
+  valorEmpenhado         Decimal              @default(0) @db.Decimal(18, 2)
+  criadoEm               DateTime             @default(now())
+  atualizadoEm           DateTime             @updatedAt
   orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   unidadeOrcamentaria    UnidadeOrcamentaria  @relation(fields: [unidadeOrcamentariaId], references: [id])
   funcao                 Funcao               @relation(fields: [funcaoId], references: [id])
@@ -853,6 +861,7 @@ model DotacaoDespesa {
   acao                   Acao                 @relation(fields: [acaoId], references: [id])
   contaDespesa           ContaDespesaEntidade @relation(fields: [contaDespesaEntidadeId], references: [id])
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+  reservas               ReservaDotacao[]
 
   @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
   @@index([orcamentoId])
@@ -862,13 +871,13 @@ model DotacaoDespesa {
 // Previsão de receita: linha LOA por (ContaReceita × Fonte). Granularidade
 // padrão da maioria dos municípios; sem dimensão extra (UO/Programa).
 model PrevisaoReceita {
-  id                     String   @id @default(uuid())
+  id                     String               @id @default(uuid())
   orcamentoId            String
   contaReceitaEntidadeId String
   fonteRecursoEntidadeId String
-  valorPrevisto          Decimal  @db.Decimal(18, 2)
-  criadoEm               DateTime @default(now())
-  atualizadoEm           DateTime @updatedAt
+  valorPrevisto          Decimal              @db.Decimal(18, 2)
+  criadoEm               DateTime             @default(now())
+  atualizadoEm           DateTime             @updatedAt
   orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   contaReceita           ContaReceitaEntidade @relation(fields: [contaReceitaEntidadeId], references: [id])
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
@@ -898,4 +907,199 @@ model AcessoEntidade {
   @@index([usuarioId])
   @@index([entidadeId])
   @@map("acessos_entidade")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPRAS PÚBLICAS — Fase 1: Planejamento e Requisição (fase interna)
+// Lei nº 14.133/2021 + Lei nº 4.320/1964. Fluxo: PCA → DOD → TR → Reserva de
+// Dotação (pré-empenho) → Parecer Jurídico. As fases de Seleção do Fornecedor e
+// Execução Financeira (Empenho/Liquidação/Pagamento) virão em PRs seguintes.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── Catálogo de Itens (CATMAT/CATSER) ────────────────────────────────────────
+// Cadastro central e global de materiais e serviços, reutilizado por todas as
+// entidades (espelha o catálogo federal CATMAT/CATSER). Itens de PCA, DOD e TR
+// referenciam o catálogo para padronizar descrições e unidades. Código único
+// por tipo (a numeração de material e de serviço é independente).
+enum TipoItemCatalogo {
+  MATERIAL
+  SERVICO
+}
+
+model ItemCatalogo {
+  id            String                @id @default(uuid())
+  tipo          TipoItemCatalogo
+  codigo        String // CATMAT (material) ou CATSER (serviço)
+  descricao     String
+  unidadeMedida String // ex.: "UN", "CX", "HORA", "MÊS"
+  ativo         Boolean               @default(true)
+  criadoEm      DateTime              @default(now())
+  atualizadoEm  DateTime              @updatedAt
+  itensPca      ItemPca[]
+  itensDemanda  ItemDemanda[]
+  itensTermo    ItemTermoReferencia[]
+
+  @@unique([tipo, codigo])
+  @@index([tipo])
+  @@map("itens_catalogo")
+}
+
+// ─── PCA — Plano de Contratações Anual ─────────────────────────────────────────
+// Consolida tudo que a entidade pretende contratar no exercício. Por
+// entidade × ano (único). O DOD nasce vinculado a um PCA.
+enum StatusPca {
+  RASCUNHO
+  APROVADO
+}
+
+model PlanoContratacaoAnual {
+  id           String             @id @default(uuid())
+  entidadeId   String
+  ano          Int
+  status       StatusPca          @default(RASCUNHO)
+  observacoes  String?
+  criadoEm     DateTime           @default(now())
+  atualizadoEm DateTime           @updatedAt
+  entidade     Entidade           @relation(fields: [entidadeId], references: [id])
+  itens        ItemPca[]
+  demandas     DocumentoDemanda[]
+
+  @@unique([entidadeId, ano])
+  @@index([entidadeId])
+  @@map("planos_contratacao_anual")
+}
+
+model ItemPca {
+  id                    String                @id @default(uuid())
+  pcaId                 String
+  itemCatalogoId        String
+  quantidadeEstimada    Decimal               @db.Decimal(18, 4)
+  valorUnitarioEstimado Decimal               @db.Decimal(18, 2)
+  criadoEm              DateTime              @default(now())
+  atualizadoEm          DateTime              @updatedAt
+  pca                   PlanoContratacaoAnual @relation(fields: [pcaId], references: [id], onDelete: Cascade)
+  itemCatalogo          ItemCatalogo          @relation(fields: [itemCatalogoId], references: [id])
+
+  @@unique([pcaId, itemCatalogoId])
+  @@index([pcaId])
+  @@map("itens_pca")
+}
+
+// ─── DOD — Documento de Oficialização da Demanda ───────────────────────────────
+// Pedido originário criado pelo setor requisitante (Unidade Orçamentária),
+// vinculado opcionalmente ao PCA. O parecer jurídico (passo 4) é modelado como
+// status + campos do próprio DOD, não como tabela separada.
+enum StatusDemanda {
+  RASCUNHO
+  AGUARDANDO_PARECER
+  APROVADA
+  REPROVADA
+}
+
+model DocumentoDemanda {
+  id                    String                 @id @default(uuid())
+  entidadeId            String
+  ano                   Int
+  numero                String // ex.: "2026/0001"
+  unidadeOrcamentariaId String // setor requisitante
+  pcaId                 String?
+  justificativa         String
+  status                StatusDemanda          @default(RASCUNHO)
+  parecerData           DateTime?
+  parecerResponsavel    String?
+  parecerObservacao     String?
+  criadoEm              DateTime               @default(now())
+  atualizadoEm          DateTime               @updatedAt
+  entidade              Entidade               @relation(fields: [entidadeId], references: [id])
+  unidadeOrcamentaria   UnidadeOrcamentaria    @relation(fields: [unidadeOrcamentariaId], references: [id])
+  pca                   PlanoContratacaoAnual? @relation(fields: [pcaId], references: [id])
+  itens                 ItemDemanda[]
+  termoReferencia       TermoReferencia?
+
+  @@unique([entidadeId, ano, numero])
+  @@index([entidadeId, ano])
+  @@map("documentos_demanda")
+}
+
+model ItemDemanda {
+  id                 String           @id @default(uuid())
+  documentoDemandaId String
+  itemCatalogoId     String
+  quantidade         Decimal          @db.Decimal(18, 4)
+  criadoEm           DateTime         @default(now())
+  atualizadoEm       DateTime         @updatedAt
+  documentoDemanda   DocumentoDemanda @relation(fields: [documentoDemandaId], references: [id], onDelete: Cascade)
+  itemCatalogo       ItemCatalogo     @relation(fields: [itemCatalogoId], references: [id])
+
+  @@unique([documentoDemandaId, itemCatalogoId])
+  @@index([documentoDemandaId])
+  @@map("itens_demanda")
+}
+
+// ─── TR — Termo de Referência ──────────────────────────────────────────────────
+// Detalhamento técnico do DOD + pesquisa de preço de mercado. Cada item recebe
+// um preço unitário estimado; o Preço Máximo Aceitável do item é
+// quantidade × precoUnitarioEstimado (calculado no service). 1:1 com o DOD.
+model TermoReferencia {
+  id                 String                @id @default(uuid())
+  documentoDemandaId String                @unique
+  objeto             String
+  observacoes        String?
+  criadoEm           DateTime              @default(now())
+  atualizadoEm       DateTime              @updatedAt
+  documentoDemanda   DocumentoDemanda      @relation(fields: [documentoDemandaId], references: [id], onDelete: Cascade)
+  itens              ItemTermoReferencia[]
+  reservas           ReservaDotacao[]
+
+  @@map("termos_referencia")
+}
+
+model ItemTermoReferencia {
+  id                    String          @id @default(uuid())
+  termoReferenciaId     String
+  itemCatalogoId        String
+  quantidade            Decimal         @db.Decimal(18, 4)
+  precoUnitarioEstimado Decimal         @db.Decimal(18, 2)
+  criadoEm              DateTime        @default(now())
+  atualizadoEm          DateTime        @updatedAt
+  termoReferencia       TermoReferencia @relation(fields: [termoReferenciaId], references: [id], onDelete: Cascade)
+  itemCatalogo          ItemCatalogo    @relation(fields: [itemCatalogoId], references: [id])
+
+  @@unique([termoReferenciaId, itemCatalogoId])
+  @@index([termoReferenciaId])
+  @@map("itens_termo_referencia")
+}
+
+// ─── Reserva de Dotação (Pré-Empenho) ──────────────────────────────────────────
+// Bloqueia saldo orçamentário da Dotação para a futura contratação.
+// REGRA 1 (Garantia de Saldo): valor da reserva não pode exceder o saldo
+// disponível da dotação (autorizado − reservado − empenhado). O service soma
+// `valorReservado` na DotacaoDespesa dentro da mesma transação. Será baixada na
+// geração do Empenho (PR-3, REGRA 2 de conversão de saldo).
+enum StatusReserva {
+  ATIVA
+  BAIXADA
+  CANCELADA
+}
+
+model ReservaDotacao {
+  id                String           @id @default(uuid())
+  entidadeId        String
+  dotacaoDespesaId  String
+  termoReferenciaId String?
+  numero            String
+  valor             Decimal          @db.Decimal(18, 2)
+  status            StatusReserva    @default(ATIVA)
+  data              DateTime         @default(now())
+  observacoes       String?
+  criadoEm          DateTime         @default(now())
+  atualizadoEm      DateTime         @updatedAt
+  entidade          Entidade         @relation(fields: [entidadeId], references: [id])
+  dotacaoDespesa    DotacaoDespesa   @relation(fields: [dotacaoDespesaId], references: [id])
+  termoReferencia   TermoReferencia? @relation(fields: [termoReferenciaId], references: [id])
+
+  @@unique([entidadeId, numero])
+  @@index([dotacaoDespesaId])
+  @@index([entidadeId])
+  @@map("reservas_dotacao")
 }
