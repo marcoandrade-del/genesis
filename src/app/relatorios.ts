@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import {
   CabecalhosRodapesService,
   ELEMENTOS_CABECALHO,
@@ -6,7 +6,9 @@ import {
   ROTULOS_ELEMENTO,
 } from '../services/cabecalhos-rodapes.js'
 import { MeusRelatoriosService } from '../services/meus-relatorios.js'
+import { MeusRelatoriosOrgService } from '../services/meus-relatorios-org.js'
 import { criarExecutorPadrao } from '../services/relatorio-executor.js'
+import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf } from '../services/relatorio-pdf.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
@@ -45,6 +47,7 @@ function lerLayoutSeguro(raw: unknown): unknown[] {
 export async function appRelatoriosRoutes(app: FastifyInstance) {
   const svc = new CabecalhosRodapesService(app.prisma)
   const meus = new MeusRelatoriosService(app.prisma)
+  const org = new MeusRelatoriosOrgService(app.prisma)
   const executor = criarExecutorPadrao()
 
   const carregarEntidade = (entidadeId: string) =>
@@ -64,10 +67,11 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     usuarioId: string,
     opts: { erro?: string; status?: number } = {},
   ) {
-    const [cabecalhos, rodapes, relatorios] = await Promise.all([
+    const [cabecalhos, rodapes, arvore, pastas] = await Promise.all([
       svc.listarCabecalhos(entidadeId),
       svc.listarRodapes(entidadeId),
-      meus.listar(usuarioId, entidadeId),
+      org.arvore(usuarioId, entidadeId),
+      org.listarPastas(usuarioId, entidadeId),
     ])
     if (opts.status) reply.code(opts.status)
     return reply.view('app/relatorios', {
@@ -76,7 +80,8 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       nivel,
       cabecalhos,
       rodapes,
-      relatorios,
+      arvore,
+      pastas,
       podeEscrever: podeEscrever(nivel),
       erro: opts.erro ?? null,
       layout: null,
@@ -383,6 +388,84 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       geradoEm: new Date(),
       layout: null,
     })
+  })
+
+  // Boilerplate comum às mutações: carrega entidade, exige escrita, redireciona
+  // no sucesso e re-renderiza o hub com a mensagem em caso de ErroNegocio.
+  async function comEscrita(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    acao: (entidadeId: string, usuarioId: string) => Promise<unknown>,
+  ) {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    }
+    try {
+      await acao(entidadeId, req.user.sub)
+      return reply.redirect('/app/relatorios')
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
+  }
+
+  // ── Pastas de "Meus Relatórios" ───────────────────────────────
+  app.post<{ Body: { nome?: string; parentId?: string } }>('/relatorios/pastas', (req, reply) =>
+    comEscrita(req, reply, (eid, uid) => org.criarPasta(uid, eid, req.body ?? {})),
+  )
+  app.post<{ Params: { id: string }; Body: { nome?: string } }>('/relatorios/pastas/:id', (req, reply) =>
+    comEscrita(req, reply, (eid, uid) => org.renomearPasta(req.params.id, uid, eid, req.body?.nome)),
+  )
+  app.post<{ Params: { id: string } }>('/relatorios/pastas/:id/excluir', (req, reply) =>
+    comEscrita(req, reply, (eid, uid) => org.excluirPasta(req.params.id, uid, eid)),
+  )
+  // Mover um relatório para uma pasta (pastaId vazio = sem pasta).
+  app.post<{ Params: { id: string }; Body: { pastaId?: string } }>('/relatorios/meus/:id/pasta', (req, reply) =>
+    comEscrita(req, reply, (eid, uid) => org.atribuirRelatorio(req.params.id, uid, eid, req.body?.pastaId)),
+  )
+
+  // ── Exportar PDF (Playwright) — LEITURA pode (é leitura) ───────
+  app.get<{ Params: { id: string } }>('/relatorios/meus/:id/pdf', async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    const reg = await meus.buscar(req.params.id)
+    if (!reg || reg.usuarioId !== req.user.sub || reg.entidadeId !== entidadeId) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Relatório não encontrado.', status: 404 })
+    }
+    try {
+      const resultado = await executor.executar(reg.query ?? '', { entidadeId, ano })
+      const geradoEm = new Date()
+      const dadosFaixa = {
+        nomeEntidade: entidade.nome,
+        enderecoEntidade: entidade.endereco ?? '',
+        nomeRelatorio: reg.nome,
+        brasao: entidade.brasao ?? null,
+        dataGeracao: geradoEm.toLocaleDateString('pt-BR'),
+        horaGeracao: geradoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      }
+      const pdf = await gerarPdf({
+        corpoHtml: montarCorpoHtml({ colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome),
+        header: montarTemplateFaixa(reg.cabecalho, dadosFaixa),
+        footer: montarTemplateFaixa(reg.rodape, dadosFaixa),
+        margemTopoMm: margemParaFaixa(reg.cabecalho, 12),
+        margemRodapeMm: margemParaFaixa(reg.rodape, 12),
+      })
+      return reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', 'inline; filename="relatorio.pdf"')
+        .send(pdf)
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
   })
 }
 

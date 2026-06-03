@@ -1,0 +1,22 @@
+<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+  <div class="text-truncate">
+    <i class="bi bi-file-earmark-text text-muted me-1"></i><span class="fw-medium"><%= r.nome %></span>
+    <% if (r.descricao) { %><span class="small text-muted ms-2"><%= r.descricao %></span><% } %>
+  </div>
+  <div class="d-flex align-items-center gap-1 flex-shrink-0">
+    <a href="/app/relatorios/meus/<%= r.id %>/executar" class="btn btn-sm btn-outline-primary py-0" title="Executar"><i class="bi bi-play-fill"></i></a>
+    <a href="/app/relatorios/meus/<%= r.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary py-0" title="Exportar PDF"><i class="bi bi-file-earmark-pdf"></i></a>
+    <% if (podeEscrever) { %>
+      <a href="/app/relatorios/meus/<%= r.id %>" class="btn btn-sm btn-outline-secondary py-0" title="Editar"><i class="bi bi-pencil"></i></a>
+      <form method="post" action="/app/relatorios/meus/<%= r.id %>/pasta" class="d-inline">
+        <select name="pastaId" class="form-select form-select-sm py-0" style="width:auto" title="Mover para pasta" onchange="this.form.submit()">
+          <option value="">Sem pasta</option>
+          <% pastas.forEach(function(p) { %><option value="<%= p.id %>"<%= pastaAtual === p.id ? ' selected' : '' %>><%= p.nome %></option><% }) %>
+        </select>
+      </form>
+      <form method="post" action="/app/relatorios/meus/<%= r.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o relatório «' + <%- JSON.stringify(r.nome) %> + '»?')">
+        <button class="btn btn-sm btn-outline-danger py-0" title="Excluir"><i class="bi bi-trash"></i></button>
+      </form>
+    <% } %>
+  </div>
+</div>

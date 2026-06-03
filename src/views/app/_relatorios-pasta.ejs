@@ -1,0 +1,25 @@
+<div class="mt-2">
+  <div class="d-flex justify-content-between align-items-center">
+    <span class="fw-semibold"><i class="bi bi-folder2 text-warning me-1"></i><%= no.nome %></span>
+    <% if (podeEscrever) { %>
+      <span class="d-flex gap-1">
+        <form method="post" action="/app/relatorios/pastas/<%= no.id %>" class="d-inline"
+              onsubmit="var n=prompt('Novo nome da pasta:', <%- JSON.stringify(no.nome) %>); if(n===null||!n.trim())return false; this.nome.value=n; return true;">
+          <input type="hidden" name="nome" value="<%= no.nome %>">
+          <button class="btn btn-sm btn-outline-secondary py-0" title="Renomear"><i class="bi bi-pencil"></i></button>
+        </form>
+        <form method="post" action="/app/relatorios/pastas/<%= no.id %>/excluir" class="d-inline"
+              onsubmit="return confirm('Excluir a pasta «' + <%- JSON.stringify(no.nome) %> + '»?')">
+          <button class="btn btn-sm btn-outline-danger py-0" title="Excluir pasta"><i class="bi bi-trash"></i></button>
+        </form>
+      </span>
+    <% } %>
+  </div>
+  <div class="ms-4">
+    <% no.relatorios.forEach(function(r) { %><%- include('_relatorios-linha', { r: r, pastas: pastas, podeEscrever: podeEscrever, pastaAtual: no.id }) %><% }) %>
+    <% if (no.relatorios.length === 0 && no.filhos.length === 0) { %>
+      <div class="small text-muted fst-italic py-1">(pasta vazia)</div>
+    <% } %>
+    <% no.filhos.forEach(function(f) { %><%- include('_relatorios-pasta', { no: f, pastas: pastas, podeEscrever: podeEscrever }) %><% }) %>
+  </div>
+</div>
