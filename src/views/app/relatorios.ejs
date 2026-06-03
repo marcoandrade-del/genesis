@@ -38,11 +38,51 @@
   </nav>
 
   <h2 class="h4 fw-bold mb-1">Relatórios</h2>
-  <p class="text-muted mb-4">Modelos de cabeçalho e rodapé desta entidade, usados na geração dos relatórios.</p>
+  <p class="text-muted mb-4">Seus relatórios desta entidade e os modelos de cabeçalho/rodapé usados na geração.</p>
 
   <% if (erro) { %>
     <div class="alert alert-danger py-2"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
   <% } %>
+
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 fw-bold mb-0"><i class="bi bi-file-earmark-bar-graph me-1"></i>Meus Relatórios <span class="text-muted">(<%= relatorios.length %>)</span></h3>
+    <% if (podeEscrever) { %>
+      <a href="/app/relatorios/meus/novo" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Novo relatório</a>
+    <% } %>
+  </div>
+  <div class="card border-0 shadow-sm mb-4"><div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr><th class="ps-3">Nome</th><th>Cabeçalho/Rodapé</th><th class="text-end pe-3">Ações</th></tr></thead>
+      <tbody>
+        <% if (relatorios.length === 0) { %>
+          <tr><td colspan="3" class="text-center text-muted py-4">Nenhum relatório criado.</td></tr>
+        <% } %>
+        <% relatorios.forEach(function(r) { %>
+          <tr>
+            <td class="ps-3">
+              <div class="fw-semibold"><%= r.nome %></div>
+              <% if (r.descricao) { %><div class="small text-muted"><%= r.descricao %></div><% } %>
+            </td>
+            <td class="small text-muted">
+              <i class="bi <%= r.cabecalhoId ? 'bi-check-circle text-success' : 'bi-dash-circle' %>"></i> Cabeçalho
+              · <i class="bi <%= r.rodapeId ? 'bi-check-circle text-success' : 'bi-dash-circle' %>"></i> Rodapé
+            </td>
+            <td class="text-end pe-3">
+              <a href="/app/relatorios/meus/<%= r.id %>/executar" class="btn btn-sm btn-outline-primary"><i class="bi bi-play-fill me-1"></i>Executar</a>
+              <% if (podeEscrever) { %>
+                <a href="/app/relatorios/meus/<%= r.id %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+                <form method="post" action="/app/relatorios/meus/<%= r.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o relatório «' + <%- JSON.stringify(r.nome) %> + '»?')">
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              <% } %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div></div>
+
+  <h3 class="h6 fw-bold text-muted text-uppercase mt-4 mb-3" style="letter-spacing:.05em">Modelos</h3>
 
   <% [
        { titulo: 'Cabeçalhos', icone: 'bi-layout-text-window', base: '/app/relatorios/cabecalhos', lista: cabecalhos },

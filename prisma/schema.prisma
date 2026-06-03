@@ -199,12 +199,19 @@ model RelatorioPersonalizado {
   nome         String
   descricao    String?
   configuracao Json
+  query        String?
   ativo        Boolean             @default(true)
   criadoEm     DateTime            @default(now())
   atualizadoEm DateTime            @updatedAt
   usuarioId    String
+  entidadeId   String?
+  cabecalhoId  String?
+  rodapeId     String?
   favoritos    FavoritoRelatorio[]
   usuario      Usuario             @relation(fields: [usuarioId], references: [id])
+  entidade     Entidade?           @relation(fields: [entidadeId], references: [id])
+  cabecalho    CabecalhoRelatorio? @relation(fields: [cabecalhoId], references: [id])
+  rodape       RodapeRelatorio?    @relation(fields: [rodapeId], references: [id])
 
   @@map("relatorios_personalizados")
 }
@@ -258,17 +265,18 @@ model FavoritoRelatorio {
 // qualquer largura de saída. `criadoPor` é só auditoria — o template é
 // compartilhado entre os operadores da entidade.
 model CabecalhoRelatorio {
-  id           String   @id @default(uuid())
+  id           String                   @id @default(uuid())
   nome         String
-  altura       Int      @default(120)
+  altura       Int                      @default(120)
   layout       Json
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  ativo        Boolean                  @default(true)
+  criadoEm     DateTime                 @default(now())
+  atualizadoEm DateTime                 @updatedAt
   entidadeId   String
   criadoPorId  String
-  entidade     Entidade @relation(fields: [entidadeId], references: [id])
-  criadoPor    Usuario  @relation(fields: [criadoPorId], references: [id])
+  entidade     Entidade                 @relation(fields: [entidadeId], references: [id])
+  criadoPor    Usuario                  @relation(fields: [criadoPorId], references: [id])
+  relatorios   RelatorioPersonalizado[]
 
   @@map("cabecalhos_relatorio")
 }
@@ -276,17 +284,18 @@ model CabecalhoRelatorio {
 // Template de rodapé de relatório. Mesma mecânica do cabeçalho; difere apenas
 // no conjunto de elementos permitidos (ver service).
 model RodapeRelatorio {
-  id           String   @id @default(uuid())
+  id           String                   @id @default(uuid())
   nome         String
-  altura       Int      @default(80)
+  altura       Int                      @default(80)
   layout       Json
-  ativo        Boolean  @default(true)
-  criadoEm     DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
+  ativo        Boolean                  @default(true)
+  criadoEm     DateTime                 @default(now())
+  atualizadoEm DateTime                 @updatedAt
   entidadeId   String
   criadoPorId  String
-  entidade     Entidade @relation(fields: [entidadeId], references: [id])
-  criadoPor    Usuario  @relation(fields: [criadoPorId], references: [id])
+  entidade     Entidade                 @relation(fields: [entidadeId], references: [id])
+  criadoPor    Usuario                  @relation(fields: [criadoPorId], references: [id])
+  relatorios   RelatorioPersonalizado[]
 
   @@map("rodapes_relatorio")
 }
@@ -591,28 +600,29 @@ model Entidade {
   atualizadoEm DateTime     @updatedAt
   municipio    Municipio    @relation(fields: [municipioId], references: [id])
 
-  contasContabil       ContaContabilEntidade[]
-  contasReceita        ContaReceitaEntidade[]
-  contasDespesa        ContaDespesaEntidade[]
-  fontesRecurso        FonteRecursoEntidade[]
-  unidadesOrcamentaria UnidadeOrcamentaria[]
-  programas            Programa[]
-  orcamentos           Orcamento[]
-  acessos              AcessoEntidade[]
-  lancamentos          Lancamento[]
-  resumos              ResumoMensalConta[]
-  saldosIniciais       SaldoInicialAno[]
-  planosContratacao    PlanoContratacaoAnual[]
-  documentosDemanda    DocumentoDemanda[]
-  reservasDotacao      ReservaDotacao[]
-  processos            Processo[]
-  contratos            Contrato[]
-  atasRegistroPreco    AtaRegistroPreco[]
-  empenhos             Empenho[]
-  liquidacoes          Liquidacao[]
-  ordensPagamento      OrdemPagamento[]
-  cabecalhosRelatorio  CabecalhoRelatorio[]
-  rodapesRelatorio     RodapeRelatorio[]
+  contasContabil           ContaContabilEntidade[]
+  contasReceita            ContaReceitaEntidade[]
+  contasDespesa            ContaDespesaEntidade[]
+  fontesRecurso            FonteRecursoEntidade[]
+  unidadesOrcamentaria     UnidadeOrcamentaria[]
+  programas                Programa[]
+  orcamentos               Orcamento[]
+  acessos                  AcessoEntidade[]
+  lancamentos              Lancamento[]
+  resumos                  ResumoMensalConta[]
+  saldosIniciais           SaldoInicialAno[]
+  planosContratacao        PlanoContratacaoAnual[]
+  documentosDemanda        DocumentoDemanda[]
+  reservasDotacao          ReservaDotacao[]
+  processos                Processo[]
+  contratos                Contrato[]
+  atasRegistroPreco        AtaRegistroPreco[]
+  empenhos                 Empenho[]
+  liquidacoes              Liquidacao[]
+  ordensPagamento          OrdemPagamento[]
+  cabecalhosRelatorio      CabecalhoRelatorio[]
+  rodapesRelatorio         RodapeRelatorio[]
+  relatoriosPersonalizados RelatorioPersonalizado[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
