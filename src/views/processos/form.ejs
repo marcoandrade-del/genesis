@@ -1,0 +1,165 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-hammer me-2 text-primary"></i><%= processo && processo.id ? 'Editar Processo' : 'Novo Processo' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (processo && processo.id) { %>hx-put="/admin/processos/<%= processo.id %>"<% } else { %>hx-post="/admin/processos"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML"
+  hx-on::config-request="procSerialize()"
+  data-modal-size="modal-xl">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!processo || !processo.id) { %><input type="hidden" name="entidadeId" value="<%= entidadeId %>"><% } %>
+    <input type="hidden" name="lotesJson" id="proc-lotes-json" value="">
+
+    <div class="row g-2 mb-2">
+      <div class="col-2"><label class="form-label small fw-semibold">Exercício <span class="text-danger">*</span></label>
+        <input type="number" name="ano" class="form-control form-control-sm font-monospace" value="<%= processo ? processo.ano : new Date().getFullYear() %>" min="1900" max="9999" required></div>
+      <div class="col-3"><label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= processo && processo.numero ? processo.numero : '' %>" maxlength="30" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Modalidade <span class="text-danger">*</span></label>
+        <select name="modalidade" class="form-select form-select-sm" required>
+          <% ['PREGAO','CONCORRENCIA','DISPENSA','INEXIGIBILIDADE'].forEach(function(m){ %>
+            <option value="<%= m %>" <%= processo && processo.modalidade === m ? 'selected' : '' %>><%= m.charAt(0) + m.slice(1).toLowerCase() %></option>
+          <% }) %>
+        </select></div>
+      <div class="col-3"><label class="form-label small fw-semibold">Critério <span class="text-danger">*</span></label>
+        <select name="criterioJulgamento" class="form-select form-select-sm" required>
+          <option value="POR_ITEM" <%= processo && processo.criterioJulgamento === 'POR_LOTE' ? '' : 'selected' %>>Por item</option>
+          <option value="POR_LOTE" <%= processo && processo.criterioJulgamento === 'POR_LOTE' ? 'selected' : '' %>>Por lote</option>
+        </select></div>
+      <div class="col-12"><label class="form-label small fw-semibold">Objeto <span class="text-danger">*</span></label>
+        <input type="text" name="objeto" class="form-control form-control-sm" value="<%= processo && processo.objeto ? processo.objeto : '' %>" maxlength="200" required></div>
+      <div class="col-6"><label class="form-label small fw-semibold">Termo de Referência (opcional)</label>
+        <select name="termoReferenciaId" class="form-select form-select-sm">
+          <option value="">— Nenhum —</option>
+          <% termos.forEach(function(t){ %><option value="<%= t.id %>" <%= processo && processo.termoReferenciaId === t.id ? 'selected' : '' %>>DOD <%= t.documentoDemanda.numero %> — <%= t.objeto %></option><% }) %>
+        </select></div>
+      <div class="col-3"><label class="form-label small fw-semibold">Abertura</label>
+        <input type="date" name="dataAbertura" class="form-control form-control-sm" value="<%= processo && processo.dataAbertura ? (typeof processo.dataAbertura === 'string' ? processo.dataAbertura : new Date(processo.dataAbertura).toISOString().slice(0,10)) : '' %>"></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label small fw-semibold mb-0">Lotes e itens</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="procAddLote()"><i class="bi bi-plus-lg me-1"></i>Adicionar lote</button>
+    </div>
+    <div id="proc-lotes"></div>
+    <div id="proc-lotes-vazio" class="text-muted small text-center py-2" style="display:none">Nenhum lote — clique em "Adicionar lote".</div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>
+
+<script>
+  // Editor aninhado lotes→itens, construído via DOM API (sem innerHTML).
+  var PROC_CATALOGO = <%- JSON.stringify(catalogo) %>;
+  var PROC_LOTES = <%- JSON.stringify(lotes) %>;
+
+  function procCatSelect(selId) {
+    var sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm proc-cat';
+    sel.addEventListener('change', procSerialize);
+    sel.add(new Option('— Selecione —', ''));
+    PROC_CATALOGO.forEach(function(c) {
+      var r = (c.tipo === 'MATERIAL' ? 'Mat.' : 'Serv.') + ' ' + c.codigo + ' — ' + c.descricao + ' (' + c.unidadeMedida + ')';
+      var o = new Option(r, c.id);
+      if (c.id === selId) o.selected = true;
+      sel.add(o);
+    });
+    return sel;
+  }
+  function procNum(cls, val, step) {
+    var i = document.createElement('input');
+    i.type = 'number'; i.step = step; i.min = '0';
+    i.className = 'form-control form-control-sm font-monospace ' + cls;
+    if (val != null && val !== '') i.value = val;
+    i.addEventListener('input', procSerialize);
+    return i;
+  }
+  function procCell(c) { var td = document.createElement('td'); td.appendChild(c); return td; }
+  function procIconBtn(cls, iconCls, label) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = cls;
+    var ic = document.createElement('i'); ic.className = iconCls; b.appendChild(ic);
+    if (label) b.appendChild(document.createTextNode(' ' + label));
+    return b;
+  }
+
+  function procAddItem(tbody, item) {
+    item = item || {};
+    var tr = document.createElement('tr');
+    tr.appendChild(procCell(procCatSelect(item.itemCatalogoId)));
+    tr.appendChild(procCell(procNum('proc-qtd', item.quantidade, 'any')));
+    tr.appendChild(procCell(procNum('proc-preco', item.precoEstimadoUnitario, '0.01')));
+    var btn = procIconBtn('btn btn-sm btn-outline-danger', 'bi bi-x', '');
+    btn.addEventListener('click', function() { tr.remove(); procSerialize(); });
+    var tdx = document.createElement('td'); tdx.className = 'text-end'; tdx.appendChild(btn); tr.appendChild(tdx);
+    tbody.appendChild(tr);
+    procSerialize();
+  }
+
+  function procColLabel(colCls, texto, input) {
+    var col = document.createElement('div'); col.className = colCls;
+    var lbl = document.createElement('label'); lbl.className = 'form-label small fw-semibold mb-0'; lbl.textContent = texto;
+    col.appendChild(lbl); col.appendChild(input);
+    return col;
+  }
+
+  function procAddLote(lote) {
+    lote = lote || {};
+    var card = document.createElement('div');
+    card.className = 'border rounded p-2 mb-2 proc-lote';
+
+    var inN = document.createElement('input'); inN.className = 'form-control form-control-sm font-monospace proc-lote-num'; if (lote.numero) inN.value = lote.numero; inN.addEventListener('input', procSerialize);
+    var inD = document.createElement('input'); inD.className = 'form-control form-control-sm proc-lote-desc'; if (lote.descricao) inD.value = lote.descricao; inD.addEventListener('input', procSerialize);
+    var top = document.createElement('div'); top.className = 'row g-2 align-items-end mb-2';
+    top.appendChild(procColLabel('col-3', 'Lote nº', inN));
+    top.appendChild(procColLabel('col-7', 'Descrição', inD));
+    var c3 = document.createElement('div'); c3.className = 'col-2 text-end';
+    var btnDel = procIconBtn('btn btn-sm btn-outline-danger', 'bi bi-trash', 'Lote');
+    btnDel.addEventListener('click', function() { card.remove(); procSerialize(); });
+    c3.appendChild(btnDel); top.appendChild(c3);
+
+    var table = document.createElement('table'); table.className = 'table table-sm align-middle mb-1';
+    var thead = document.createElement('thead'); thead.className = 'table-light';
+    var htr = document.createElement('tr');
+    [['Item do catálogo', ''], ['Qtd.', '110px'], ['Preço estim. R$', '140px'], ['', '40px']].forEach(function(h) {
+      var th = document.createElement('th'); th.textContent = h[0]; if (h[1]) th.style.width = h[1]; htr.appendChild(th);
+    });
+    thead.appendChild(htr);
+    var tbody = document.createElement('tbody'); tbody.className = 'proc-itens';
+    table.appendChild(thead); table.appendChild(tbody);
+
+    var addItemBtn = procIconBtn('btn btn-sm btn-outline-secondary', 'bi bi-plus', 'Item');
+    addItemBtn.addEventListener('click', function() { procAddItem(tbody); });
+
+    card.appendChild(top); card.appendChild(table); card.appendChild(addItemBtn);
+    document.getElementById('proc-lotes').appendChild(card);
+    (lote.itens || []).forEach(function(i) { procAddItem(tbody, i); });
+    procSerialize();
+  }
+
+  function procSerialize() {
+    var lotes = [];
+    document.querySelectorAll('#proc-lotes .proc-lote').forEach(function(card) {
+      var itens = [];
+      card.querySelectorAll('.proc-itens tr').forEach(function(tr) {
+        var id = tr.querySelector('.proc-cat').value;
+        if (!id) return;
+        itens.push({ itemCatalogoId: id, quantidade: tr.querySelector('.proc-qtd').value || '0', precoEstimadoUnitario: tr.querySelector('.proc-preco').value || '0' });
+      });
+      lotes.push({ numero: card.querySelector('.proc-lote-num').value, descricao: card.querySelector('.proc-lote-desc').value, itens: itens });
+    });
+    document.getElementById('proc-lotes-json').value = JSON.stringify(lotes);
+    document.getElementById('proc-lotes-vazio').style.display = lotes.length ? 'none' : 'block';
+  }
+
+  PROC_LOTES.forEach(function(l) { procAddLote(l); });
+  procSerialize();
+</script>

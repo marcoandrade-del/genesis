@@ -562,6 +562,9 @@ model Entidade {
   planosContratacao    PlanoContratacaoAnual[]
   documentosDemanda    DocumentoDemanda[]
   reservasDotacao      ReservaDotacao[]
+  processos            Processo[]
+  contratos            Contrato[]
+  atasRegistroPreco    AtaRegistroPreco[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -927,17 +930,20 @@ enum TipoItemCatalogo {
 }
 
 model ItemCatalogo {
-  id            String                @id @default(uuid())
+  id            String                 @id @default(uuid())
   tipo          TipoItemCatalogo
   codigo        String // CATMAT (material) ou CATSER (serviço)
   descricao     String
   unidadeMedida String // ex.: "UN", "CX", "HORA", "MÊS"
-  ativo         Boolean               @default(true)
-  criadoEm      DateTime              @default(now())
-  atualizadoEm  DateTime              @updatedAt
+  ativo         Boolean                @default(true)
+  criadoEm      DateTime               @default(now())
+  atualizadoEm  DateTime               @updatedAt
   itensPca      ItemPca[]
   itensDemanda  ItemDemanda[]
   itensTermo    ItemTermoReferencia[]
+  itensProcesso ItemProcesso[]
+  itensContrato ItemContrato[]
+  itensAta      ItemAtaRegistroPreco[]
 
   @@unique([tipo, codigo])
   @@index([tipo])
@@ -1050,6 +1056,7 @@ model TermoReferencia {
   documentoDemanda   DocumentoDemanda      @relation(fields: [documentoDemandaId], references: [id], onDelete: Cascade)
   itens              ItemTermoReferencia[]
   reservas           ReservaDotacao[]
+  processos          Processo[]
 
   @@map("termos_referencia")
 }
@@ -1102,4 +1109,219 @@ model ReservaDotacao {
   @@index([dotacaoDespesaId])
   @@index([entidadeId])
   @@map("reservas_dotacao")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPRAS PÚBLICAS — Fase 2: Seleção do Fornecedor (fase externa)
+// Edital/Processo → Julgamento/Homologação → Contrato / Ata de Registro de Preços.
+// Fornecedor é cadastro global (CNPJ/CPF único). A execução financeira
+// (Empenho/Liquidação/Pagamento) virá no PR-3.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── Fornecedor (cadastro global) ──────────────────────────────────────────────
+enum TipoPessoa {
+  PJ
+  PF
+}
+
+model Fornecedor {
+  id           String     @id @default(uuid())
+  tipoPessoa   TipoPessoa
+  cnpj         String?    @unique // PJ
+  cpf          String?    @unique // PF (MEI/autônomo)
+  razaoSocial  String
+  nomeFantasia String?
+  email        String?
+  telefone     String?
+  ativo        Boolean    @default(true)
+  criadoEm     DateTime   @default(now())
+  atualizadoEm DateTime   @updatedAt
+
+  lotesVencidos Lote[]
+  itensVencidos ItemProcesso[]
+  contratos     Contrato[]
+  atas          AtaRegistroPreco[]
+
+  @@map("fornecedores")
+}
+
+// ─── Processo Licitatório (Edital/Certame) ─────────────────────────────────────
+enum ModalidadeLicitacao {
+  PREGAO
+  CONCORRENCIA
+  DISPENSA
+  INEXIGIBILIDADE
+}
+
+enum CriterioJulgamento {
+  POR_ITEM
+  POR_LOTE
+}
+
+enum StatusProcesso {
+  ABERTO
+  HOMOLOGADO
+  CANCELADO
+}
+
+model Processo {
+  id                 String              @id @default(uuid())
+  entidadeId         String
+  ano                Int
+  numero             String
+  modalidade         ModalidadeLicitacao
+  criterioJulgamento CriterioJulgamento  @default(POR_ITEM)
+  objeto             String
+  termoReferenciaId  String?
+  status             StatusProcesso      @default(ABERTO)
+  dataAbertura       DateTime?
+  dataHomologacao    DateTime?
+  observacoes        String?
+  criadoEm           DateTime            @default(now())
+  atualizadoEm       DateTime            @updatedAt
+  entidade           Entidade            @relation(fields: [entidadeId], references: [id])
+  termoReferencia    TermoReferencia?    @relation(fields: [termoReferenciaId], references: [id])
+  lotes              Lote[]
+  contratos          Contrato[]
+  atas               AtaRegistroPreco[]
+
+  @@unique([entidadeId, ano, numero])
+  @@index([entidadeId, ano])
+  @@map("processos")
+}
+
+// Lote agrupa itens do processo. No julgamento POR_LOTE o vencedor é registrado
+// aqui; no POR_ITEM, em cada ItemProcesso.
+model Lote {
+  id                   String         @id @default(uuid())
+  processoId           String
+  numero               String
+  descricao            String?
+  fornecedorVencedorId String?
+  criadoEm             DateTime       @default(now())
+  atualizadoEm         DateTime       @updatedAt
+  processo             Processo       @relation(fields: [processoId], references: [id], onDelete: Cascade)
+  fornecedorVencedor   Fornecedor?    @relation(fields: [fornecedorVencedorId], references: [id])
+  itens                ItemProcesso[]
+
+  @@unique([processoId, numero])
+  @@index([processoId])
+  @@map("lotes")
+}
+
+// Item disputado. precoEstimadoUnitario vem do TR; após o julgamento recebe
+// fornecedor vencedor + precoAdjudicadoUnitario.
+// REGRA 3 (service): precoAdjudicadoUnitario ≤ precoEstimadoUnitario.
+model ItemProcesso {
+  id                      String       @id @default(uuid())
+  loteId                  String
+  itemCatalogoId          String
+  quantidade              Decimal      @db.Decimal(18, 4)
+  precoEstimadoUnitario   Decimal      @db.Decimal(18, 2)
+  fornecedorVencedorId    String?
+  precoAdjudicadoUnitario Decimal?     @db.Decimal(18, 2)
+  criadoEm                DateTime     @default(now())
+  atualizadoEm            DateTime     @updatedAt
+  lote                    Lote         @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  itemCatalogo            ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
+  fornecedorVencedor      Fornecedor?  @relation(fields: [fornecedorVencedorId], references: [id])
+
+  @@unique([loteId, itemCatalogoId])
+  @@index([loteId])
+  @@map("itens_processo")
+}
+
+// ─── Contrato ──────────────────────────────────────────────────────────────────
+enum StatusContrato {
+  VIGENTE
+  ENCERRADO
+  RESCINDIDO
+}
+
+model Contrato {
+  id             String         @id @default(uuid())
+  entidadeId     String
+  processoId     String?
+  fornecedorId   String
+  numero         String
+  objeto         String
+  vigenciaInicio DateTime
+  vigenciaFim    DateTime
+  valorTotal     Decimal        @db.Decimal(18, 2)
+  status         StatusContrato @default(VIGENTE)
+  criadoEm       DateTime       @default(now())
+  atualizadoEm   DateTime       @updatedAt
+  entidade       Entidade       @relation(fields: [entidadeId], references: [id])
+  processo       Processo?      @relation(fields: [processoId], references: [id])
+  fornecedor     Fornecedor     @relation(fields: [fornecedorId], references: [id])
+  itens          ItemContrato[]
+
+  @@unique([entidadeId, numero])
+  @@index([entidadeId])
+  @@map("contratos")
+}
+
+// quantidadeEmpenhada: saldo materializado para o PR-3 (o empenho consome o
+// saldo contratado). Saldo = quantidadeContratada − quantidadeEmpenhada.
+model ItemContrato {
+  id                   String       @id @default(uuid())
+  contratoId           String
+  itemCatalogoId       String
+  quantidadeContratada Decimal      @db.Decimal(18, 4)
+  precoUnitario        Decimal      @db.Decimal(18, 2)
+  quantidadeEmpenhada  Decimal      @default(0) @db.Decimal(18, 4)
+  criadoEm             DateTime     @default(now())
+  atualizadoEm         DateTime     @updatedAt
+  contrato             Contrato     @relation(fields: [contratoId], references: [id], onDelete: Cascade)
+  itemCatalogo         ItemCatalogo @relation(fields: [itemCatalogoId], references: [id])
+
+  @@unique([contratoId, itemCatalogoId])
+  @@index([contratoId])
+  @@map("itens_contrato")
+}
+
+// ─── Ata de Registro de Preços (ARP) ───────────────────────────────────────────
+enum StatusAta {
+  VIGENTE
+  ENCERRADA
+}
+
+model AtaRegistroPreco {
+  id             String                 @id @default(uuid())
+  entidadeId     String
+  processoId     String?
+  fornecedorId   String
+  numero         String
+  objeto         String
+  vigenciaInicio DateTime
+  vigenciaFim    DateTime
+  status         StatusAta              @default(VIGENTE)
+  criadoEm       DateTime               @default(now())
+  atualizadoEm   DateTime               @updatedAt
+  entidade       Entidade               @relation(fields: [entidadeId], references: [id])
+  processo       Processo?              @relation(fields: [processoId], references: [id])
+  fornecedor     Fornecedor             @relation(fields: [fornecedorId], references: [id])
+  itens          ItemAtaRegistroPreco[]
+
+  @@unique([entidadeId, numero])
+  @@index([entidadeId])
+  @@map("atas_registro_preco")
+}
+
+// quantidadeUtilizada: saldo materializado (consumo por contratos/empenhos no PR-3).
+model ItemAtaRegistroPreco {
+  id                   String           @id @default(uuid())
+  ataId                String
+  itemCatalogoId       String
+  quantidadeRegistrada Decimal          @db.Decimal(18, 4)
+  precoUnitario        Decimal          @db.Decimal(18, 2)
+  quantidadeUtilizada  Decimal          @default(0) @db.Decimal(18, 4)
+  criadoEm             DateTime         @default(now())
+  atualizadoEm         DateTime         @updatedAt
+  ata                  AtaRegistroPreco @relation(fields: [ataId], references: [id], onDelete: Cascade)
+  itemCatalogo         ItemCatalogo     @relation(fields: [itemCatalogoId], references: [id])
+
+  @@unique([ataId, itemCatalogoId])
+  @@index([ataId])
+  @@map("itens_ata_registro_preco")
 }

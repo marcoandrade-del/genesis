@@ -1,0 +1,93 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-file-earmark-medical me-2 text-primary"></i><%= contrato && contrato.id ? 'Editar Contrato' : 'Novo Contrato' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (contrato && contrato.id) { %>hx-put="/admin/contratos/<%= contrato.id %>"<% } else { %>hx-post="/admin/contratos"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML" hx-on::config-request="ctrSerialize()" data-modal-size="modal-lg">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!contrato || !contrato.id) { %><input type="hidden" name="entidadeId" value="<%= entidadeId %>"><% } %>
+    <input type="hidden" name="itensJson" id="ctr-itens-json" value="">
+
+    <div class="row g-2 mb-2">
+      <div class="col-7"><label class="form-label small fw-semibold">Fornecedor <span class="text-danger">*</span></label>
+        <select name="fornecedorId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% fornecedores.forEach(function(f){ %><option value="<%= f.id %>" <%= contrato && contrato.fornecedorId === f.id ? 'selected' : '' %>><%= f.razaoSocial %></option><% }) %>
+        </select></div>
+      <div class="col-5"><label class="form-label small fw-semibold">Processo (opcional)</label>
+        <select name="processoId" class="form-select form-select-sm">
+          <option value="">— Nenhum —</option>
+          <% processos.forEach(function(p){ %><option value="<%= p.id %>" <%= contrato && contrato.processoId === p.id ? 'selected' : '' %>><%= p.numero %>/<%= p.ano %></option><% }) %>
+        </select></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= contrato && contrato.numero ? contrato.numero : '' %>" maxlength="30" required></div>
+      <div class="col-8"><label class="form-label small fw-semibold">Objeto <span class="text-danger">*</span></label>
+        <input type="text" name="objeto" class="form-control form-control-sm" value="<%= contrato && contrato.objeto ? contrato.objeto : '' %>" maxlength="200" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Início vigência <span class="text-danger">*</span></label>
+        <input type="date" name="vigenciaInicio" class="form-control form-control-sm" value="<%= contrato && contrato.vigenciaInicio ? (typeof contrato.vigenciaInicio === 'string' ? contrato.vigenciaInicio : new Date(contrato.vigenciaInicio).toISOString().slice(0,10)) : '' %>" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Fim vigência <span class="text-danger">*</span></label>
+        <input type="date" name="vigenciaFim" class="form-control form-control-sm" value="<%= contrato && contrato.vigenciaFim ? (typeof contrato.vigenciaFim === 'string' ? contrato.vigenciaFim : new Date(contrato.vigenciaFim).toISOString().slice(0,10)) : '' %>" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Valor total R$ <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" min="0" name="valorTotal" class="form-control form-control-sm font-monospace" value="<%= contrato && contrato.valorTotal != null ? contrato.valorTotal : '' %>" required></div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label small fw-semibold mb-0">Itens do contrato</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="ctrAddRow()"><i class="bi bi-plus-lg me-1"></i>Adicionar item</button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th>Item do catálogo</th><th style="width:120px">Qtd.</th><th style="width:140px">Preço unit. R$</th><th style="width:40px"></th></tr></thead>
+        <tbody id="ctr-itens-body"></tbody>
+      </table>
+    </div>
+    <div id="ctr-itens-vazio" class="text-muted small text-center py-2" style="display:none">Nenhum item — clique em "Adicionar item".</div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>
+
+<script>
+  var CTR_CATALOGO = <%- JSON.stringify(catalogo) %>;
+  var CTR_ITENS = <%- JSON.stringify(itens) %>;
+  function ctrCatSelect(selId) {
+    var sel = document.createElement('select'); sel.className = 'form-select form-select-sm ctr-cat'; sel.addEventListener('change', ctrSerialize);
+    sel.add(new Option('— Selecione —', ''));
+    CTR_CATALOGO.forEach(function(c) { var r = (c.tipo === 'MATERIAL' ? 'Mat.' : 'Serv.') + ' ' + c.codigo + ' — ' + c.descricao + ' (' + c.unidadeMedida + ')'; var o = new Option(r, c.id); if (c.id === selId) o.selected = true; sel.add(o); });
+    return sel;
+  }
+  function ctrNum(cls, val, step) { var i = document.createElement('input'); i.type = 'number'; i.step = step; i.min = '0'; i.className = 'form-control form-control-sm font-monospace ' + cls; if (val != null && val !== '') i.value = val; i.addEventListener('input', ctrSerialize); return i; }
+  function ctrCell(c) { var td = document.createElement('td'); td.appendChild(c); return td; }
+  function ctrAddRow(item) {
+    item = item || {};
+    var tr = document.createElement('tr');
+    tr.appendChild(ctrCell(ctrCatSelect(item.itemCatalogoId)));
+    tr.appendChild(ctrCell(ctrNum('ctr-qtd', item.quantidadeContratada, 'any')));
+    tr.appendChild(ctrCell(ctrNum('ctr-preco', item.precoUnitario, '0.01')));
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'btn btn-sm btn-outline-danger';
+    btn.addEventListener('click', function() { tr.remove(); ctrSerialize(); });
+    var ic = document.createElement('i'); ic.className = 'bi bi-x'; btn.appendChild(ic);
+    var tdx = document.createElement('td'); tdx.className = 'text-end'; tdx.appendChild(btn); tr.appendChild(tdx);
+    document.getElementById('ctr-itens-body').appendChild(tr); ctrSerialize();
+  }
+  function ctrSerialize() {
+    var linhas = [];
+    document.querySelectorAll('#ctr-itens-body tr').forEach(function(tr) {
+      var id = tr.querySelector('.ctr-cat').value; if (!id) return;
+      linhas.push({ itemCatalogoId: id, quantidadeContratada: tr.querySelector('.ctr-qtd').value || '0', precoUnitario: tr.querySelector('.ctr-preco').value || '0' });
+    });
+    document.getElementById('ctr-itens-json').value = JSON.stringify(linhas);
+    document.getElementById('ctr-itens-vazio').style.display = document.querySelectorAll('#ctr-itens-body tr').length ? 'none' : 'block';
+  }
+  CTR_ITENS.forEach(function(i) { ctrAddRow(i); });
+  ctrSerialize();
+</script>

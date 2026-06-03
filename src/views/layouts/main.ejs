@@ -159,6 +159,18 @@
       <li><a class="nav-link <%= active === 'reservas-dotacao' ? 'active' : '' %>" href="/admin/reservas-dotacao">
         <i class="bi bi-bookmark-check me-2"></i>Reservas de Dotação
       </a></li>
+      <li><a class="nav-link <%= active === 'fornecedores' ? 'active' : '' %>" href="/admin/fornecedores">
+        <i class="bi bi-truck me-2"></i>Fornecedores
+      </a></li>
+      <li><a class="nav-link <%= active === 'processos' ? 'active' : '' %>" href="/admin/processos">
+        <i class="bi bi-hammer me-2"></i>Processos Licitatórios
+      </a></li>
+      <li><a class="nav-link <%= active === 'contratos' ? 'active' : '' %>" href="/admin/contratos">
+        <i class="bi bi-file-earmark-medical me-2"></i>Contratos
+      </a></li>
+      <li><a class="nav-link <%= active === 'atas-registro-preco' ? 'active' : '' %>" href="/admin/atas-registro-preco">
+        <i class="bi bi-journal-check me-2"></i>Atas de Registro de Preços
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -207,6 +219,10 @@
         'planos-contratacao': 'Plano de Contratações (PCA)',
         'documentos-demanda': 'Demandas (DOD)',
         'reservas-dotacao': 'Reservas de Dotação',
+        fornecedores: 'Fornecedores',
+        processos: 'Processos Licitatórios',
+        contratos: 'Contratos',
+        'atas-registro-preco': 'Atas de Registro de Preços',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>
