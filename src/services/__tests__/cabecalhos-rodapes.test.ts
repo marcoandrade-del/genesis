@@ -70,7 +70,7 @@ describe('CabecalhosRodapesService', () => {
 
     it('arredonda altura fracionária', async () => {
       prisma.cabecalhoRelatorio.create.mockResolvedValue({ id: 'c1' })
-      await svc.criarCabecalho('ent1', 'u1', { nome: 'X', altura: 90.7, layout: [] })
+      await svc.criarCabecalho('ent1', 'u1', { nome: 'X', altura: 90.7, layout: [{ tipo: 'BRASAO', x: 1, y: 1 }] })
       expect((prisma.cabecalhoRelatorio.create as any).mock.calls[0][0].data.altura).toBe(91)
     })
 
@@ -117,14 +117,32 @@ describe('CabecalhosRodapesService', () => {
     it('rejeita x/y não-finito', async () => {
       await expect(svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [{ tipo: 'BRASAO', x: 'abc', y: 0 }] })).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
     })
+
+    it('rejeita layout vazio (faixa precisa de ao menos um elemento)', async () => {
+      await expect(svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [] })).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    })
+
+    it('traduz violação de unicidade do nome (P2002) em erro de negócio', async () => {
+      prisma.cabecalhoRelatorio.create.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }))
+      await expect(
+        svc.criarCabecalho('ent1', 'u1', { nome: 'Dup', layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    })
+
+    it('propaga erro não-P2002 do banco intacto', async () => {
+      prisma.cabecalhoRelatorio.create.mockRejectedValue(Object.assign(new Error('boom'), { code: 'P2010' }))
+      await expect(
+        svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] }),
+      ).rejects.toMatchObject({ code: 'P2010' })
+    })
   })
 
   describe('atualizarCabecalho', () => {
     it('atualiza mantendo altura atual quando omitida', async () => {
       prisma.cabecalhoRelatorio.findUnique.mockResolvedValue({ id: 'c1', entidadeId: 'ent1', altura: 200 })
       prisma.cabecalhoRelatorio.update.mockResolvedValue({ id: 'c1' })
-      await svc.atualizarCabecalho('c1', 'ent1', { nome: 'Novo', layout: [] })
-      expect(prisma.cabecalhoRelatorio.update).toHaveBeenCalledWith({ where: { id: 'c1' }, data: { nome: 'Novo', altura: 200, layout: [] } })
+      await svc.atualizarCabecalho('c1', 'ent1', { nome: 'Novo', layout: [{ tipo: 'NOME_ENTIDADE', x: 0, y: 0 }] })
+      expect(prisma.cabecalhoRelatorio.update).toHaveBeenCalledWith({ where: { id: 'c1' }, data: { nome: 'Novo', altura: 200, layout: [{ tipo: 'NOME_ENTIDADE', x: 0, y: 0 }] } })
     })
     it('rejeita inexistente', async () => {
       prisma.cabecalhoRelatorio.findUnique.mockResolvedValue(null)
@@ -133,6 +151,13 @@ describe('CabecalhosRodapesService', () => {
     it('rejeita de outra entidade (guard multi-tenant)', async () => {
       prisma.cabecalhoRelatorio.findUnique.mockResolvedValue({ id: 'c1', entidadeId: 'OUTRA', altura: 120 })
       await expect(svc.atualizarCabecalho('c1', 'ent1', { nome: 'X', layout: [] })).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+    })
+    it('traduz P2002 (nome duplicado) na atualização', async () => {
+      prisma.cabecalhoRelatorio.findUnique.mockResolvedValue({ id: 'c1', entidadeId: 'ent1', altura: 120 })
+      prisma.cabecalhoRelatorio.update.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }))
+      await expect(
+        svc.atualizarCabecalho('c1', 'ent1', { nome: 'Dup', layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
     })
   })
 
@@ -184,8 +209,8 @@ describe('CabecalhosRodapesService', () => {
     it('atualiza e exclui com guard de entidade', async () => {
       prisma.rodapeRelatorio.findUnique.mockResolvedValue({ id: 'r1', entidadeId: 'ent1', altura: 80 })
       prisma.rodapeRelatorio.update.mockResolvedValue({ id: 'r1' })
-      await svc.atualizarRodape('r1', 'ent1', { nome: 'N', altura: 100, layout: [] })
-      expect(prisma.rodapeRelatorio.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { nome: 'N', altura: 100, layout: [] } })
+      await svc.atualizarRodape('r1', 'ent1', { nome: 'N', altura: 100, layout: [{ tipo: 'DATA_GERACAO', x: 0, y: 0 }] })
+      expect(prisma.rodapeRelatorio.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { nome: 'N', altura: 100, layout: [{ tipo: 'DATA_GERACAO', x: 0, y: 0 }] } })
 
       prisma.rodapeRelatorio.delete.mockResolvedValue({ id: 'r1' })
       await svc.excluirRodape('r1', 'ent1')
@@ -197,6 +222,15 @@ describe('CabecalhosRodapesService', () => {
       await expect(svc.atualizarRodape('r1', 'ent1', { nome: 'X', layout: [] })).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
       prisma.rodapeRelatorio.findUnique.mockResolvedValue({ id: 'r1', entidadeId: 'OUTRA' })
       await expect(svc.excluirRodape('r1', 'ent1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+    })
+
+    it('rejeita layout vazio e traduz P2002 no rodapé', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      await expect(svc.criarRodape('ent1', 'u1', { nome: 'X', layout: [] })).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+      prisma.rodapeRelatorio.create.mockRejectedValue(Object.assign(new Error('unique'), { code: 'P2002' }))
+      await expect(
+        svc.criarRodape('ent1', 'u1', { nome: 'Dup', layout: [{ tipo: 'DATA_GERACAO', x: 0, y: 0 }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
     })
   })
 

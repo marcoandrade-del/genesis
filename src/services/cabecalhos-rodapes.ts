@@ -69,7 +69,7 @@ function clampPct(n: number): number {
 function validarLayout(permitidos: readonly string[], layout: unknown): ElementoLayout[] {
   if (!Array.isArray(layout)) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Layout inválido.')
   const vistos = new Set<string>()
-  return layout.map((el) => {
+  const itens = layout.map((el) => {
     if (typeof el !== 'object' || el === null) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Elemento de layout inválido.')
     }
@@ -86,6 +86,27 @@ function validarLayout(permitidos: readonly string[], layout: unknown): Elemento
     }
     return { tipo, x: clampPct(nx), y: clampPct(ny) }
   })
+  if (itens.length === 0) {
+    throw new ErroNegocio('REQUISICAO_INVALIDA', 'Adicione ao menos um elemento à faixa.')
+  }
+  return itens
+}
+
+// Traduz a violação de unicidade do nome (índice (entidadeId, nome)) numa
+// mensagem de negócio amigável. Demais erros sobem intactos.
+function eErroUnicidade(e: unknown): boolean {
+  return typeof e === 'object' && e !== null && (e as { code?: unknown }).code === 'P2002'
+}
+
+async function comNomeUnico<T>(rotulo: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    if (eErroUnicidade(e)) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', `Já existe um ${rotulo} com esse nome nesta entidade.`)
+    }
+    throw e
+  }
 }
 
 /**
@@ -117,7 +138,9 @@ export class CabecalhosRodapesService {
     const nome = normalizarNome(dados.nome)
     const altura = normalizarAltura(dados.altura, ALTURA_PADRAO_CABECALHO)
     const layout = validarLayout(ELEMENTOS_CABECALHO, dados.layout)
-    return this.prisma.cabecalhoRelatorio.create({ data: { entidadeId, criadoPorId, nome, altura, layout } })
+    return comNomeUnico('cabeçalho', () =>
+      this.prisma.cabecalhoRelatorio.create({ data: { entidadeId, criadoPorId, nome, altura, layout } }),
+    )
   }
 
   async atualizarCabecalho(id: string, entidadeId: string, dados: DadosTemplate) {
@@ -128,7 +151,9 @@ export class CabecalhosRodapesService {
     const nome = normalizarNome(dados.nome)
     const altura = normalizarAltura(dados.altura, atual.altura)
     const layout = validarLayout(ELEMENTOS_CABECALHO, dados.layout)
-    return this.prisma.cabecalhoRelatorio.update({ where: { id }, data: { nome, altura, layout } })
+    return comNomeUnico('cabeçalho', () =>
+      this.prisma.cabecalhoRelatorio.update({ where: { id }, data: { nome, altura, layout } }),
+    )
   }
 
   async excluirCabecalho(id: string, entidadeId: string) {
@@ -154,7 +179,9 @@ export class CabecalhosRodapesService {
     const nome = normalizarNome(dados.nome)
     const altura = normalizarAltura(dados.altura, ALTURA_PADRAO_RODAPE)
     const layout = validarLayout(ELEMENTOS_RODAPE, dados.layout)
-    return this.prisma.rodapeRelatorio.create({ data: { entidadeId, criadoPorId, nome, altura, layout } })
+    return comNomeUnico('rodapé', () =>
+      this.prisma.rodapeRelatorio.create({ data: { entidadeId, criadoPorId, nome, altura, layout } }),
+    )
   }
 
   async atualizarRodape(id: string, entidadeId: string, dados: DadosTemplate) {
@@ -165,7 +192,9 @@ export class CabecalhosRodapesService {
     const nome = normalizarNome(dados.nome)
     const altura = normalizarAltura(dados.altura, atual.altura)
     const layout = validarLayout(ELEMENTOS_RODAPE, dados.layout)
-    return this.prisma.rodapeRelatorio.update({ where: { id }, data: { nome, altura, layout } })
+    return comNomeUnico('rodapé', () =>
+      this.prisma.rodapeRelatorio.update({ where: { id }, data: { nome, altura, layout } }),
+    )
   }
 
   async excluirRodape(id: string, entidadeId: string) {

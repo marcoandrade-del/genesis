@@ -280,6 +280,7 @@ model CabecalhoRelatorio {
   criadoPor    Usuario                  @relation(fields: [criadoPorId], references: [id])
   relatorios   RelatorioPersonalizado[]
 
+  @@unique([entidadeId, nome])
   @@map("cabecalhos_relatorio")
 }
 
@@ -299,6 +300,7 @@ model RodapeRelatorio {
   criadoPor    Usuario                  @relation(fields: [criadoPorId], references: [id])
   relatorios   RelatorioPersonalizado[]
 
+  @@unique([entidadeId, nome])
   @@map("rodapes_relatorio")
 }
 
