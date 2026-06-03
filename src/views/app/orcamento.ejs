@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Orçamento · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
+  <a class="navbar-brand fw-bold fs-6" href="/app">
+    <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
+  </a>
+  <div class="d-flex align-items-center gap-3">
+    <span class="text-white-50 small">
+      <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> ·
+      <strong class="text-white"><%= entidade.nome %></strong> ·
+      <strong class="text-white font-monospace"><%= ano %></strong>
+    </span>
+    <a href="/app/contexto" class="btn btn-sm btn-outline-secondary text-white border-secondary">
+      <i class="bi bi-arrow-left-right me-1"></i>Trocar contexto
+    </a>
+    <a href="/app/logout" class="btn btn-sm btn-outline-secondary text-white border-secondary">
+      <i class="bi bi-box-arrow-right me-1"></i>Sair
+    </a>
+  </div>
+</nav>
+
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Orçamento</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 fw-bold mb-0">Orçamento (LOA) — <span class="font-monospace"><%= ano %></span></h2>
+    <% if (orcamento) { %>
+      <% if (orcamento.status === 'RASCUNHO') { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
+      <% } else if (orcamento.status === 'APROVADO') { %><span class="badge bg-primary bg-opacity-10 text-primary">Aprovado</span>
+      <% } else { %><span class="badge bg-success bg-opacity-10 text-success">Em Execução</span><% } %>
+    <% } %>
+  </div>
+
+  <% if (!orcamento) { %>
+    <div class="alert alert-info py-3">
+      <i class="bi bi-info-circle me-1"></i>
+      Não há orçamento cadastrado para <strong><%= entidade.nome %></strong> no exercício <strong><%= ano %></strong>.
+      <div class="small text-muted mt-1">Use "Trocar contexto" para escolher outro exercício.</div>
+    </div>
+  <% } else { %>
+    <div class="row g-3 mb-4">
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="small text-muted mb-1">Total despesa autorizada</div>
+          <div class="h5 fw-semibold mb-0 font-monospace">R$ <%= totalDespesa.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+        </div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="small text-muted mb-1">Total receita prevista</div>
+          <div class="h5 fw-semibold mb-0 font-monospace">R$ <%= totalReceita.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+        </div></div>
+      </div>
+      <div class="col-md-4">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="small text-muted mb-1">Equilíbrio</div>
+          <% var dif = totalReceita - totalDespesa; %>
+          <div class="h5 fw-semibold mb-0 font-monospace <%= Math.abs(dif) < 0.005 ? 'text-success' : 'text-danger' %>">
+            R$ <%= dif.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+          </div>
+        </div></div>
+      </div>
+    </div>
+
+    <h3 class="h6 fw-bold mb-2">Dotações de despesa <span class="text-muted">(<%= dotacoes.length %>)</span></h3>
+    <div class="card border-0 shadow-sm mb-4"><div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr><th class="ps-3">Unid. Orç.</th><th>Função/Subf.</th><th>Programa/Ação</th><th>Natureza</th><th>Fonte</th><th class="text-end pe-3">Autorizado R$</th></tr></thead>
+        <tbody>
+          <% if (dotacoes.length === 0) { %><tr><td colspan="6" class="text-center text-muted py-4">Sem dotações.</td></tr><% } %>
+          <% dotacoes.forEach(function(d) { %>
+            <tr>
+              <td class="ps-3 font-monospace small"><%= d.unidadeOrcamentaria.codigo %></td>
+              <td class="font-monospace small"><%= d.funcao.codigo %>.<%= d.subfuncao.codigo %></td>
+              <td class="font-monospace small"><%= d.programa.codigo %>.<%= d.acao.codigo %></td>
+              <td class="font-monospace small"><%= d.contaDespesa.codigo %></td>
+              <td class="font-monospace small"><%= d.fonteRecurso.codigo %></td>
+              <td class="text-end pe-3 font-monospace"><%= Number(d.valorAutorizado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div></div>
+
+    <h3 class="h6 fw-bold mb-2">Previsões de receita <span class="text-muted">(<%= previsoes.length %>)</span></h3>
+    <div class="card border-0 shadow-sm"><div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr><th class="ps-3">Conta de receita</th><th>Fonte</th><th class="text-end pe-3">Previsto R$</th></tr></thead>
+        <tbody>
+          <% if (previsoes.length === 0) { %><tr><td colspan="3" class="text-center text-muted py-4">Sem previsões.</td></tr><% } %>
+          <% previsoes.forEach(function(p) { %>
+            <tr>
+              <td class="ps-3 small"><span class="font-monospace"><%= p.contaReceita.codigo %></span> — <%= p.contaReceita.descricao %></td>
+              <td class="font-monospace small"><%= p.fonteRecurso.codigo %></td>
+              <td class="text-end pe-3 font-monospace"><%= Number(p.valorPrevisto).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div></div>
+  <% } %>
+</div>
+</body>
+</html>

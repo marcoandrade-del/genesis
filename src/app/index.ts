@@ -3,6 +3,7 @@ import { AcessosEntidadeService } from '../services/acessos-entidade.js'
 import { appAuthRoutes } from './auth.js'
 import { appContextoRoutes, parseContextoCookie } from './contexto.js'
 import { appDashboardRoutes } from './dashboard.js'
+import { appOrcamentoRoutes } from './orcamento.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
 // escolheu na sessão atual). Injetado pelo middleware antes de qualquer rota
@@ -91,5 +92,6 @@ export async function appRoutes(app: FastifyInstance) {
 
     autenticado.register(appContextoRoutes)
     autenticado.register(appDashboardRoutes)
+    autenticado.register(appOrcamentoRoutes)
   })
 }
