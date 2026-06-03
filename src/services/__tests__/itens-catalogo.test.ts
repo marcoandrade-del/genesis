@@ -157,3 +157,62 @@ describe('ItensCatalogoService.listarPaginado', () => {
     expect(prisma.itemCatalogo.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 200 }))
   })
 })
+
+describe('ItensCatalogoService.importarCsv', () => {
+  const CSV = 'codigo,descricao\n100,Caneta azul\n200,"Caderno, 96 folhas"\n'
+
+  it('importa em massa aplicando tipo/unidade e retorna contagens', async () => {
+    prisma.itemCatalogo.createMany.mockResolvedValue({ count: 2 })
+    const r = await service.importarCsv(CSV, { tipo: 'MATERIAL' as never, unidadeMedida: 'UN' })
+    expect(r).toEqual({ recebidos: 2, criados: 2, pulados: 0 })
+    expect(prisma.itemCatalogo.createMany).toHaveBeenCalledOnce()
+    const arg = prisma.itemCatalogo.createMany.mock.calls[0][0]
+    expect(arg.skipDuplicates).toBe(true)
+    expect(arg.data).toEqual([
+      { tipo: 'MATERIAL', codigo: '100', descricao: 'Caneta azul', unidadeMedida: 'UN' },
+      { tipo: 'MATERIAL', codigo: '200', descricao: 'Caderno, 96 folhas', unidadeMedida: 'UN' },
+    ])
+  })
+
+  it('conta como pulados os já existentes (skipDuplicates)', async () => {
+    prisma.itemCatalogo.createMany.mockResolvedValue({ count: 1 })
+    const r = await service.importarCsv(CSV, { tipo: 'MATERIAL' as never, unidadeMedida: 'UN' })
+    expect(r).toEqual({ recebidos: 2, criados: 1, pulados: 1 })
+  })
+
+  it('deduplica códigos repetidos no arquivo (1ª ocorrência vence)', async () => {
+    prisma.itemCatalogo.createMany.mockResolvedValue({ count: 1 })
+    const r = await service.importarCsv('codigo,descricao\n100,A\n100,B\n', { tipo: 'SERVICO' as never, unidadeMedida: 'HORA' })
+    expect(r.recebidos).toBe(1)
+    expect(prisma.itemCatalogo.createMany.mock.calls[0][0].data).toEqual([
+      { tipo: 'SERVICO', codigo: '100', descricao: 'A', unidadeMedida: 'HORA' },
+    ])
+  })
+
+  it('rejeita tipo inválido (sem tocar o banco)', async () => {
+    await expect(service.importarCsv(CSV, { tipo: 'X' as never, unidadeMedida: 'UN' }))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(prisma.itemCatalogo.createMany).not.toHaveBeenCalled()
+  })
+
+  it('rejeita unidade vazia', async () => {
+    await expect(service.importarCsv(CSV, { tipo: 'MATERIAL' as never, unidadeMedida: '  ' }))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
+  it('rejeita cabeçalho sem codigo/descricao', async () => {
+    await expect(service.importarCsv('foo,bar\n1,2\n', { tipo: 'MATERIAL' as never, unidadeMedida: 'UN' }))
+      .rejects.toThrow(/colunas "codigo" e "descricao"/)
+  })
+
+  it('rejeita CSV só com cabeçalho (sem linhas de dados)', async () => {
+    await expect(service.importarCsv('codigo,descricao\n', { tipo: 'MATERIAL' as never, unidadeMedida: 'UN' }))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(prisma.itemCatalogo.createMany).not.toHaveBeenCalled()
+  })
+
+  it('rejeita linha com código vazio', async () => {
+    await expect(service.importarCsv('codigo,descricao\n,SemCodigo\n', { tipo: 'MATERIAL' as never, unidadeMedida: 'UN' }))
+      .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+})

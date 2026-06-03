@@ -1,8 +1,11 @@
 import type { FastifyInstance } from 'fastify'
 import type { TipoItemCatalogo } from '@prisma/client'
 import { ItensCatalogoService } from '../services/itens-catalogo.js'
+import { erroHttp, tratarErro } from '../errors.js'
 
 const TIPOS: ReadonlyArray<TipoItemCatalogo> = ['MATERIAL', 'SERVICO']
+// O CATMAT completo em CSV ocupa ~28 MB; folga de ~2× para crescimento.
+const LIMITE_CSV_IMPORTACAO = 64 * 1024 * 1024
 
 /**
  * Admin do Catálogo de Itens (CATMAT/CATSER) — cadastro global de materiais e
@@ -35,6 +38,33 @@ export async function adminItensCatalogoRoutes(app: FastifyInstance) {
       { layout: 'layouts/main' },
     )
   })
+
+  // ── IMPORTAR (modal de upload) ──────────────────────────────────────────────
+  app.get('/importar', async (_req, reply) => {
+    return reply.view('itens-catalogo/importar', {})
+  })
+
+  // ── IMPORT submit (JSON body { csv, tipo, unidadeMedida }) ──────────────────
+  // O CSV é lido no cliente (FileReader) e enviado como JSON. Reaproveita o service.
+  app.post<{ Body: { csv?: string; tipo?: string; unidadeMedida?: string } }>(
+    '/importar',
+    { bodyLimit: LIMITE_CSV_IMPORTACAO },
+    async (req, reply) => {
+      const { csv, tipo, unidadeMedida } = req.body
+      if (typeof csv !== 'string' || !csv.trim()) {
+        return reply.status(400).send(erroHttp('REQUISICAO_INVALIDA', 'CSV vazio.'))
+      }
+      try {
+        const resultado = await service.importarCsv(csv, {
+          tipo: tipo as TipoItemCatalogo,
+          unidadeMedida: unidadeMedida ?? '',
+        })
+        return reply.send({ data: resultado })
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
 
   // ── FORM (novo) ─────────────────────────────────────────────────────────────
   app.get('/form', async (_req, reply) => {
