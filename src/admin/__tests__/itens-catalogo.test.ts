@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarMock, buscarMock, criarMock, atualizarMock, excluirMock } = vi.hoisted(() => ({
-  listarMock: vi.fn(),
+const { listarPaginadoMock, buscarMock, criarMock, atualizarMock, excluirMock } = vi.hoisted(() => ({
+  listarPaginadoMock: vi.fn(),
   buscarMock: vi.fn(),
   criarMock: vi.fn(),
   atualizarMock: vi.fn(),
@@ -10,7 +10,7 @@ const { listarMock, buscarMock, criarMock, atualizarMock, excluirMock } = vi.hoi
 
 vi.mock('../../services/itens-catalogo.js', () => ({
   ItensCatalogoService: class {
-    listar = listarMock
+    listarPaginado = listarPaginadoMock
     buscarPorId = buscarMock
     criar = criarMock
     atualizar = atualizarMock
@@ -23,6 +23,7 @@ import { adminItensCatalogoRoutes } from '../itens-catalogo.js'
 import type { FastifyInstance } from 'fastify'
 
 const ITEM = { id: 'i1', tipo: 'MATERIAL', codigo: '123456', descricao: 'Caneta azul', unidadeMedida: 'UN', ativo: true }
+const pag = (itens: unknown[]) => ({ itens, total: itens.length, pagina: 1, porPagina: 50, totalPaginas: 1 })
 
 function form(obj: Record<string, string>) {
   return { payload: new URLSearchParams(obj).toString(), headers: { 'content-type': 'application/x-www-form-urlencoded' } }
@@ -32,7 +33,8 @@ describe('adminItensCatalogoRoutes', () => {
   let app: FastifyInstance
 
   beforeEach(async () => {
-    ;[listarMock, buscarMock, criarMock, atualizarMock, excluirMock].forEach((m) => m.mockReset())
+    ;[listarPaginadoMock, buscarMock, criarMock, atualizarMock, excluirMock].forEach((m) => m.mockReset())
+    listarPaginadoMock.mockResolvedValue(pag([]))
     ;({ app } = await criarApp({
       registrar: adminItensCatalogoRoutes,
       comView: true,
@@ -41,24 +43,30 @@ describe('adminItensCatalogoRoutes', () => {
   })
 
   describe('GET /', () => {
-    it('lista sem filtro', async () => {
-      listarMock.mockResolvedValue([ITEM])
+    it('lista sem filtro (paginado)', async () => {
+      listarPaginadoMock.mockResolvedValue(pag([ITEM]))
       const res = await app.inject({ method: 'GET', url: '/' })
       expect(res.statusCode).toBe(200)
-      expect(listarMock).toHaveBeenCalledWith({})
+      expect(listarPaginadoMock).toHaveBeenCalledWith({ busca: '', pagina: 1, porPagina: 50 })
       expect(res.body).toContain('Caneta azul')
     })
 
     it('filtra por tipo válido', async () => {
-      listarMock.mockResolvedValue([])
+      listarPaginadoMock.mockResolvedValue(pag([]))
       await app.inject({ method: 'GET', url: '/?tipo=SERVICO' })
-      expect(listarMock).toHaveBeenCalledWith({ tipo: 'SERVICO' })
+      expect(listarPaginadoMock).toHaveBeenCalledWith({ tipo: 'SERVICO', busca: '', pagina: 1, porPagina: 50 })
     })
 
     it('ignora tipo inválido', async () => {
-      listarMock.mockResolvedValue([])
+      listarPaginadoMock.mockResolvedValue(pag([]))
       await app.inject({ method: 'GET', url: '/?tipo=XX' })
-      expect(listarMock).toHaveBeenCalledWith({})
+      expect(listarPaginadoMock).toHaveBeenCalledWith({ busca: '', pagina: 1, porPagina: 50 })
+    })
+
+    it('repassa busca e página', async () => {
+      listarPaginadoMock.mockResolvedValue(pag([]))
+      await app.inject({ method: 'GET', url: '/?q=caneta&pagina=2' })
+      expect(listarPaginadoMock).toHaveBeenCalledWith({ busca: 'caneta', pagina: 2, porPagina: 50 })
     })
   })
 

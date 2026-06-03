@@ -12,19 +12,25 @@ export async function adminItensCatalogoRoutes(app: FastifyInstance) {
   const service = new ItensCatalogoService(app.prisma)
 
   // ── LIST ──────────────────────────────────────────────────────────────────
-  app.get<{ Querystring: { tipo?: string } }>('/', async (req, reply) => {
+  app.get<{ Querystring: { tipo?: string; q?: string; pagina?: string } }>('/', async (req, reply) => {
     const tipoFiltro = TIPOS.includes(req.query.tipo as TipoItemCatalogo)
       ? (req.query.tipo as TipoItemCatalogo)
       : ''
-    const items = await service.listar(tipoFiltro ? { tipo: tipoFiltro } : {})
+    const busca = (req.query.q ?? '').trim()
+    const pagina = Math.max(parseInt(req.query.pagina ?? '1', 10) || 1, 1)
+    const r = await service.listarPaginado({ ...(tipoFiltro ? { tipo: tipoFiltro } : {}), busca, pagina, porPagina: 50 })
     return reply.view(
       'itens-catalogo/index',
       {
         title: 'Catálogo de Itens — Gênesis Admin',
         active: 'itens-catalogo',
         userEmail: req.user.email,
-        items,
+        items: r.itens,
         tipoFiltro,
+        busca,
+        pagina: r.pagina,
+        totalPaginas: r.totalPaginas,
+        total: r.total,
       },
       { layout: 'layouts/main' },
     )

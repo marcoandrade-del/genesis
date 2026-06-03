@@ -112,3 +112,48 @@ describe('ItensCatalogoService.excluir', () => {
     expect(prisma.itemCatalogo.delete).toHaveBeenCalledWith({ where: { id: 'i1' } })
   })
 })
+
+describe('ItensCatalogoService.contar', () => {
+  it('conta com ativos + busca (OR código/descrição, descrição insensitive)', async () => {
+    prisma.itemCatalogo.count.mockResolvedValue(3)
+    const n = await service.contar({ apenasAtivos: true, busca: 'caneta' })
+    expect(n).toBe(3)
+    expect(prisma.itemCatalogo.count).toHaveBeenCalledWith({
+      where: {
+        ativo: true,
+        OR: [{ codigo: { contains: 'caneta' } }, { descricao: { contains: 'caneta', mode: 'insensitive' } }],
+      },
+    })
+  })
+
+  it('sem busca não inclui OR', async () => {
+    prisma.itemCatalogo.count.mockResolvedValue(0)
+    await service.contar({ apenasAtivos: true })
+    expect(prisma.itemCatalogo.count).toHaveBeenCalledWith({ where: { ativo: true } })
+  })
+})
+
+describe('ItensCatalogoService.listarPaginado', () => {
+  it('aplica skip/take e calcula totalPaginas', async () => {
+    prisma.itemCatalogo.count.mockResolvedValue(120)
+    prisma.itemCatalogo.findMany.mockResolvedValue([{ id: 'i1' }])
+    const r = await service.listarPaginado({ apenasAtivos: true, pagina: 2, porPagina: 50 })
+    expect(r).toMatchObject({ total: 120, pagina: 2, porPagina: 50, totalPaginas: 3, itens: [{ id: 'i1' }] })
+    expect(prisma.itemCatalogo.findMany).toHaveBeenCalledWith({
+      where: { ativo: true },
+      orderBy: [{ tipo: 'asc' }, { codigo: 'asc' }],
+      skip: 50,
+      take: 50,
+    })
+  })
+
+  it('clampa página < 1 e porPagina ao teto (200); total 0 → 1 página', async () => {
+    prisma.itemCatalogo.count.mockResolvedValue(0)
+    prisma.itemCatalogo.findMany.mockResolvedValue([])
+    const r = await service.listarPaginado({ pagina: 0, porPagina: 9999 })
+    expect(r.pagina).toBe(1)
+    expect(r.porPagina).toBe(200)
+    expect(r.totalPaginas).toBe(1)
+    expect(prisma.itemCatalogo.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 0, take: 200 }))
+  })
+})
