@@ -5,10 +5,13 @@ import {
   ELEMENTOS_RODAPE,
   ROTULOS_ELEMENTO,
 } from '../services/cabecalhos-rodapes.js'
+import { MeusRelatoriosService } from '../services/meus-relatorios.js'
+import { criarExecutorPadrao } from '../services/relatorio-executor.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
 type CorpoTemplate = { nome?: string; altura?: string; layout?: string }
+type CorpoRelatorio = { nome?: string; descricao?: string; query?: string; cabecalhoId?: string; rodapeId?: string }
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -41,6 +44,8 @@ function lerLayoutSeguro(raw: unknown): unknown[] {
  */
 export async function appRelatoriosRoutes(app: FastifyInstance) {
   const svc = new CabecalhosRodapesService(app.prisma)
+  const meus = new MeusRelatoriosService(app.prisma)
+  const executor = criarExecutorPadrao()
 
   const carregarEntidade = (entidadeId: string) =>
     app.prisma.entidade.findUnique({
@@ -48,18 +53,21 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
     })
 
-  // Renderiza o hub (listas + erro opcional).
+  // Renderiza o hub (listas + erro opcional). Mostra templates (cabeçalho/rodapé,
+  // da entidade) e os relatórios do usuário naquela entidade.
   async function renderHub(
     reply: FastifyReply,
     entidade: unknown,
     ano: number,
     nivel: string,
     entidadeId: string,
+    usuarioId: string,
     opts: { erro?: string; status?: number } = {},
   ) {
-    const [cabecalhos, rodapes] = await Promise.all([
+    const [cabecalhos, rodapes, relatorios] = await Promise.all([
       svc.listarCabecalhos(entidadeId),
       svc.listarRodapes(entidadeId),
+      meus.listar(usuarioId, entidadeId),
     ])
     if (opts.status) reply.code(opts.status)
     return reply.view('app/relatorios', {
@@ -68,6 +76,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       nivel,
       cabecalhos,
       rodapes,
+      relatorios,
       podeEscrever: podeEscrever(nivel),
       erro: opts.erro ?? null,
       layout: null,
@@ -79,7 +88,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     const { entidadeId, ano, nivel } = req.contexto
     const entidade = await carregarEntidade(entidadeId)
     if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
-    return renderHub(reply, entidade, ano, nivel, entidadeId)
+    return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub)
   })
 
   // Registra as 5 rotas de um tipo de template (cabeçalho ou rodapé).
@@ -131,7 +140,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       const entidade = await carregarEntidade(entidadeId)
       if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
       if (!podeEscrever(nivel)) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: ERRO_LEITURA, status: 403 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
       }
       return renderEditor(reply, entidade, ano, nivel, null)
     })
@@ -142,11 +151,11 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       const entidade = await carregarEntidade(entidadeId)
       if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
       if (!podeEscrever(nivel)) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: ERRO_LEITURA, status: 403 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
       }
       const reg = await ops.buscar(req.params.id)
       if (!reg || reg.entidadeId !== entidadeId) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: 'Template não encontrado.', status: 404 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Template não encontrado.', status: 404 })
       }
       return renderEditor(reply, entidade, ano, nivel, {
         id: reg.id,
@@ -162,7 +171,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       const entidade = await carregarEntidade(entidadeId)
       if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
       if (!podeEscrever(nivel)) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: ERRO_LEITURA, status: 403 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
       }
       const body = req.body ?? {}
       try {
@@ -189,7 +198,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       const entidade = await carregarEntidade(entidadeId)
       if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
       if (!podeEscrever(nivel)) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: ERRO_LEITURA, status: 403 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
       }
       const body = req.body ?? {}
       try {
@@ -216,14 +225,14 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       const entidade = await carregarEntidade(entidadeId)
       if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
       if (!podeEscrever(nivel)) {
-        return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: ERRO_LEITURA, status: 403 })
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
       }
       try {
         await ops.excluir(req.params.id, entidadeId)
         return reply.redirect('/app/relatorios')
       } catch (e) {
         if (e instanceof ErroNegocio) {
-          return renderHub(reply, entidade, ano, nivel, entidadeId, { erro: e.message, status: statusDeErro(e.code) })
+          return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
         }
         throw e
       }
@@ -232,7 +241,150 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
 
   registrarTemplate('CABECALHO')
   registrarTemplate('RODAPE')
+
+  // ── Meus Relatórios (relatório com query + cabeçalho/rodapé) ───
+  const baseRel = '/relatorios/meus'
+
+  async function renderRelEditor(
+    reply: FastifyReply,
+    entidade: unknown,
+    ano: number,
+    nivel: string,
+    entidadeId: string,
+    registro: CorpoRelatorio & { id?: string } | null,
+    opts: { erro?: string; status?: number } = {},
+  ) {
+    const [cabecalhos, rodapes] = await Promise.all([svc.listarCabecalhos(entidadeId), svc.listarRodapes(entidadeId)])
+    if (opts.status) reply.code(opts.status)
+    return reply.view('app/relatorios-relatorio-editor', {
+      entidade,
+      ano,
+      nivel,
+      registro,
+      cabecalhos,
+      rodapes,
+      erro: opts.erro ?? null,
+      layout: null,
+    })
+  }
+
+  // GET novo
+  app.get(`${baseRel}/novo`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    return renderRelEditor(reply, entidade, ano, nivel, entidadeId, null)
+  })
+
+  // GET editar
+  app.get<{ Params: { id: string } }>(`${baseRel}/:id`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    const reg = await meus.buscar(req.params.id)
+    if (!reg || reg.usuarioId !== req.user.sub || reg.entidadeId !== entidadeId) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Relatório não encontrado.', status: 404 })
+    }
+    return renderRelEditor(reply, entidade, ano, nivel, entidadeId, {
+      id: reg.id,
+      nome: reg.nome,
+      descricao: reg.descricao ?? '',
+      query: reg.query ?? '',
+      cabecalhoId: reg.cabecalhoId ?? '',
+      rodapeId: reg.rodapeId ?? '',
+    })
+  })
+
+  // POST criar
+  app.post<{ Body: CorpoRelatorio }>(baseRel, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    const body = req.body ?? {}
+    try {
+      await meus.criar(req.user.sub, entidadeId, body)
+      return reply.redirect('/app/relatorios')
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { ...body }, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
+  })
+
+  // POST atualizar
+  app.post<{ Params: { id: string }; Body: CorpoRelatorio }>(`${baseRel}/:id`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    const body = req.body ?? {}
+    try {
+      await meus.atualizar(req.params.id, req.user.sub, entidadeId, body)
+      return reply.redirect('/app/relatorios')
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { id: req.params.id, ...body }, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
+  })
+
+  // POST excluir
+  app.post<{ Params: { id: string } }>(`${baseRel}/:id/excluir`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    try {
+      await meus.excluir(req.params.id, req.user.sub, entidadeId)
+      return reply.redirect('/app/relatorios')
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
+  })
+
+  // GET executar — preview HTML. LEITURA também pode (executar é leitura).
+  app.get<{ Params: { id: string } }>(`${baseRel}/:id/executar`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    const reg = await meus.buscar(req.params.id)
+    if (!reg || reg.usuarioId !== req.user.sub || reg.entidadeId !== entidadeId) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Relatório não encontrado.', status: 404 })
+    }
+    let resultado = null
+    let erro: string | null = null
+    try {
+      resultado = await executor.executar(reg.query ?? '', { entidadeId, ano })
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        erro = e.message
+        reply.code(statusDeErro(e.code))
+      } else {
+        throw e
+      }
+    }
+    return reply.view('app/relatorios-preview', {
+      entidade,
+      ano,
+      nivel,
+      relatorio: reg,
+      cabecalho: reg.cabecalho,
+      rodape: reg.rodape,
+      resultado,
+      erro,
+      geradoEm: new Date(),
+      layout: null,
+    })
+  })
 }
 
 const ERRO_LEITURA =
-  'Seu nível de acesso nesta entidade é apenas leitura — você pode visualizar, mas não criar ou editar templates.'
+  'Seu nível de acesso nesta entidade é apenas leitura — você pode visualizar e executar, mas não criar ou editar.'
