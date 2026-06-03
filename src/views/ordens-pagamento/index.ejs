@@ -1,0 +1,67 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Ordens de Pagamento</h2>
+  <% if (entidade) { %>
+    <button class="btn btn-primary btn-sm" hx-get="/admin/ordens-pagamento/form?entidadeId=<%= entidade.id %>" hx-target="#modal-body" hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova OP
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/ordens-pagamento">
+  <div class="col-md-2"><label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %><option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>><%= e.sigla %> — <%= e.nome %></option><% }) %>
+    </select></div>
+  <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm" <%= estadoSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %><option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>><%= m.nome %></option><% }) %>
+    </select></div>
+  <div class="col-md-3"><label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm" <%= municipioSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %><option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>><%= e.nome %></option><% }) %>
+    </select></div>
+</form>
+
+<% if (!entidade) { %>
+  <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar as ordens de pagamento.</div>
+<% } else { %>
+  <div class="small text-muted mb-2"><strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong> · <%= ordens.length %> OP(s)</div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr><th class="ps-3" style="width:120px">Número</th><th>Liquidação / Empenho</th><th>Conta bancária</th><th class="text-end" style="width:110px">Valor R$</th><th style="width:100px">Status</th><th class="text-end pe-3" style="width:150px">&nbsp;</th></tr>
+        </thead>
+        <tbody>
+          <% if (ordens.length === 0) { %>
+            <tr><td colspan="6" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma OP para esta entidade.</td></tr>
+          <% } %>
+          <% ordens.forEach(function(o) { %>
+            <tr id="op-<%= o.id %>">
+              <td class="ps-3 font-monospace fw-semibold"><%= o.numero %></td>
+              <td class="small"><span class="font-monospace"><%= o.liquidacao.numero %></span> · emp. <%= o.liquidacao.empenho.numero %></td>
+              <td class="small text-muted font-monospace"><%= o.contaBancaria %></td>
+              <td class="text-end font-monospace"><%= Number(o.valor).toFixed(2) %></td>
+              <td>
+                <% if (o.status === 'EMITIDA') { %><span class="badge bg-primary bg-opacity-10 text-primary">Emitida</span>
+                <% } else if (o.status === 'PAGA') { %><span class="badge bg-success bg-opacity-10 text-success">Paga</span>
+                <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Cancelada</span><% } %>
+              </td>
+              <td class="text-end pe-3">
+                <% if (o.status === 'EMITIDA') { %>
+                  <button class="btn btn-sm btn-outline-success me-1" hx-post="/admin/ordens-pagamento/<%= o.id %>/confirmar" hx-confirm="Confirmar o pagamento da OP <%= o.numero %>?" data-confirm-titulo="Confirmar pagamento" data-confirm-ok="Confirmar" title="Confirmar pagamento"><i class="bi bi-check2-circle"></i></button>
+                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/ordens-pagamento/<%= o.id %>/cancelar" hx-confirm="Cancelar a OP <%= o.numero %>?" data-confirm-titulo="Cancelar OP" data-confirm-tipo="danger" data-confirm-ok="Cancelar" title="Cancelar"><i class="bi bi-x-circle"></i></button>
+                <% } else if (o.status === 'PAGA') { %>
+                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/ordens-pagamento/<%= o.id %>/cancelar" hx-confirm="Cancelar a OP paga <%= o.numero %>? O valor será estornado." data-confirm-titulo="Cancelar OP" data-confirm-tipo="danger" data-confirm-ok="Cancelar" title="Cancelar"><i class="bi bi-x-circle"></i></button>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

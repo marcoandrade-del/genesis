@@ -1,0 +1,40 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold"><i class="bi bi-clipboard2-check me-2 text-primary"></i>Nova Liquidação</h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/liquidacoes" hx-target="#modal-body" hx-swap="innerHTML">
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <input type="hidden" name="entidadeId" value="<%= entidadeId %>">
+
+    <div class="row g-2">
+      <div class="col-12 mb-1"><label class="form-label small fw-semibold">Empenho <span class="text-danger">*</span></label>
+        <% if (empenhos.length === 0) { %><div class="alert alert-warning py-2 small mb-1">Nenhum empenho ATIVO disponível.</div><% } %>
+        <select name="empenhoId" class="form-select form-select-sm" required
+          onchange="document.getElementById('liq-saldo').textContent = this.options[this.selectedIndex].dataset.disp ? ('Saldo do empenho: R$ ' + this.options[this.selectedIndex].dataset.disp) : ''">
+          <option value="" data-disp="">— Selecione —</option>
+          <% empenhos.forEach(function(e){ %><option value="<%= e.id %>" data-disp="<%= e.disponivel %>" <%= liquidacao && liquidacao.empenhoId === e.id ? 'selected' : '' %>><%= e.rotulo %> — disp. R$ <%= e.disponivel %></option><% }) %>
+        </select>
+        <div id="liq-saldo" class="form-text text-success fw-semibold"></div></div>
+
+      <div class="col-5 mb-1"><label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= liquidacao ? liquidacao.numero : '' %>" maxlength="30" required></div>
+      <div class="col-4 mb-1"><label class="form-label small fw-semibold">Valor R$ <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm font-monospace" value="<%= liquidacao ? liquidacao.valor : '' %>" required></div>
+      <div class="col-3 mb-1"><label class="form-label small fw-semibold">Data</label>
+        <input type="date" name="data" class="form-control form-control-sm" value="<%= liquidacao && liquidacao.data ? liquidacao.data : '' %>"></div>
+
+      <div class="col-6 mb-1"><label class="form-label small fw-semibold">Nota fiscal</label>
+        <input type="text" name="notaFiscal" class="form-control form-control-sm" value="<%= liquidacao && liquidacao.notaFiscal ? liquidacao.notaFiscal : '' %>" maxlength="50"></div>
+      <div class="col-6 mb-1"><label class="form-label small fw-semibold">Responsável pelo ateste</label>
+        <input type="text" name="atesteResponsavel" class="form-control form-control-sm" value="<%= liquidacao && liquidacao.atesteResponsavel ? liquidacao.atesteResponsavel : '' %>" maxlength="120"></div>
+    </div>
+    <p class="small text-muted mb-0 mt-1"><i class="bi bi-info-circle me-1"></i>A soma das liquidações não pode exceder o valor do empenho (REGRA 4).</p>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Liquidar</button>
+  </div>
+</form>

@@ -171,6 +171,15 @@
       <li><a class="nav-link <%= active === 'atas-registro-preco' ? 'active' : '' %>" href="/admin/atas-registro-preco">
         <i class="bi bi-journal-check me-2"></i>Atas de Registro de Preços
       </a></li>
+      <li><a class="nav-link <%= active === 'empenhos' ? 'active' : '' %>" href="/admin/empenhos">
+        <i class="bi bi-cash-stack me-2"></i>Empenhos
+      </a></li>
+      <li><a class="nav-link <%= active === 'liquidacoes' ? 'active' : '' %>" href="/admin/liquidacoes">
+        <i class="bi bi-clipboard2-check me-2"></i>Liquidações
+      </a></li>
+      <li><a class="nav-link <%= active === 'ordens-pagamento' ? 'active' : '' %>" href="/admin/ordens-pagamento">
+        <i class="bi bi-bank me-2"></i>Ordens de Pagamento
+      </a></li>
 
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
@@ -223,6 +232,9 @@
         processos: 'Processos Licitatórios',
         contratos: 'Contratos',
         'atas-registro-preco': 'Atas de Registro de Preços',
+        empenhos: 'Empenhos',
+        liquidacoes: 'Liquidações',
+        'ordens-pagamento': 'Ordens de Pagamento',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>

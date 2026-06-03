@@ -1,0 +1,64 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold"><i class="bi bi-cash-stack me-2 text-primary"></i>Novo Empenho</h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/empenhos" hx-target="#modal-body" hx-swap="innerHTML">
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <input type="hidden" name="entidadeId" value="<%= entidadeId %>">
+
+    <div class="row g-2">
+      <div class="col-4 mb-1"><label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= empenho ? empenho.numero : '' %>" placeholder="2026NE0001" maxlength="30" required></div>
+      <div class="col-4 mb-1"><label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+        <select name="tipo" class="form-select form-select-sm" required>
+          <% ['ORDINARIO','GLOBAL','ESTIMATIVO'].forEach(function(t){ %><option value="<%= t %>" <%= empenho && empenho.tipo === t ? 'selected' : '' %>><%= t.charAt(0)+t.slice(1).toLowerCase() %></option><% }) %>
+        </select></div>
+      <div class="col-4 mb-1"><label class="form-label small fw-semibold">Valor R$ <span class="text-danger">*</span></label>
+        <input type="number" step="0.01" min="0.01" name="valor" class="form-control form-control-sm font-monospace" value="<%= empenho ? empenho.valor : '' %>" required></div>
+
+      <div class="col-12 mb-1"><label class="form-label small fw-semibold">Dotação <span class="text-danger">*</span></label>
+        <% if (dotacoes.length === 0) { %><div class="alert alert-warning py-2 small mb-1">Nenhuma dotação disponível (precisa de orçamento APROVADO/EM EXECUÇÃO).</div><% } %>
+        <select name="dotacaoDespesaId" class="form-select form-select-sm" required
+          onchange="document.getElementById('emp-saldo').textContent = this.options[this.selectedIndex].dataset.disp ? ('Saldo disponível: R$ ' + this.options[this.selectedIndex].dataset.disp) : ''">
+          <option value="" data-disp="">— Selecione —</option>
+          <% dotacoes.forEach(function(d){ %><option value="<%= d.id %>" data-disp="<%= d.disponivel %>" <%= empenho && empenho.dotacaoDespesaId === d.id ? 'selected' : '' %>><%= d.rotulo %> (<%= d.ano %>) — disp. R$ <%= d.disponivel %></option><% }) %>
+        </select>
+        <div id="emp-saldo" class="form-text text-success fw-semibold"></div></div>
+
+      <div class="col-6 mb-1"><label class="form-label small fw-semibold">Fornecedor <span class="text-danger">*</span></label>
+        <select name="fornecedorId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% fornecedores.forEach(function(f){ %><option value="<%= f.id %>" <%= empenho && empenho.fornecedorId === f.id ? 'selected' : '' %>><%= f.razaoSocial %></option><% }) %>
+        </select></div>
+      <div class="col-6 mb-1"><label class="form-label small fw-semibold">Reserva a converter (opcional)</label>
+        <select name="reservaDotacaoId" class="form-select form-select-sm">
+          <option value="">— Nenhuma —</option>
+          <% reservas.forEach(function(r){ %><option value="<%= r.id %>" <%= empenho && empenho.reservaDotacaoId === r.id ? 'selected' : '' %>><%= r.numero %> — R$ <%= r.valor %></option><% }) %>
+        </select>
+        <div class="form-text">Converter uma reserva baixa o bloqueio e move para empenhado (REGRA 2).</div></div>
+
+      <div class="col-5 mb-1"><label class="form-label small fw-semibold">Contrato (opcional)</label>
+        <select name="contratoId" class="form-select form-select-sm">
+          <option value="">— Nenhum —</option>
+          <% contratos.forEach(function(c){ %><option value="<%= c.id %>" <%= empenho && empenho.contratoId === c.id ? 'selected' : '' %>><%= c.numero %></option><% }) %>
+        </select></div>
+      <div class="col-4 mb-1"><label class="form-label small fw-semibold">Ata (opcional)</label>
+        <select name="ataRegistroPrecoId" class="form-select form-select-sm">
+          <option value="">— Nenhuma —</option>
+          <% atas.forEach(function(a){ %><option value="<%= a.id %>" <%= empenho && empenho.ataRegistroPrecoId === a.id ? 'selected' : '' %>><%= a.numero %></option><% }) %>
+        </select></div>
+      <div class="col-3 mb-1"><label class="form-label small fw-semibold">Data</label>
+        <input type="date" name="data" class="form-control form-control-sm" value="<%= empenho && empenho.data ? empenho.data : '' %>"></div>
+
+      <div class="col-12 mb-1"><label class="form-label small fw-semibold">Histórico</label>
+        <input type="text" name="historico" class="form-control form-control-sm" value="<%= empenho && empenho.historico ? empenho.historico : '' %>" maxlength="500"></div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Empenhar</button>
+  </div>
+</form>
