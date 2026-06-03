@@ -96,6 +96,16 @@ describe('appRelatoriosRoutes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('modelo de cabeçalho')
     expect(res.body).toContain('Elementos disponíveis')
+    // O form precisa postar com o prefixo /app, senão o submit do navegador
+    // bate em rota inexistente (404) — o editor é servido sob /app.
+    expect(res.body).toContain('action="/app/relatorios/cabecalhos"')
+  })
+
+  it('editor de edição posta para /app/...//:id (prefixo /app preservado)', async () => {
+    m.buscarCabecalho.mockResolvedValue({ id: 'c1', entidadeId: 'ent1', nome: 'Meu Cab', altura: 150, layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/cabecalhos/c1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('action="/app/relatorios/cabecalhos/c1"')
   })
 
   it('GET cabecalhos/novo bloqueado para LEITURA (403, volta ao hub)', async () => {
