@@ -19,8 +19,8 @@ beforeEach(() => {
 })
 
 describe('NIVEL_MAX', () => {
-  it('é 7 conforme spec (PCASP Estendido)', () => {
-    expect(NIVEL_MAX).toBe(7)
+  it('é 9 conforme spec (PCASP Estendido TCE-PR)', () => {
+    expect(NIVEL_MAX).toBe(9)
   })
 })
 
@@ -104,19 +104,19 @@ describe('ContasService.criar', () => {
     expect(prisma.conta.create).not.toHaveBeenCalled()
   })
 
-  it('lança CONFLITO quando excede NIVEL_MAX (parent.nivel=7 → filho seria nivel 8)', async () => {
+  it('lança CONFLITO quando excede NIVEL_MAX (parent.nivel=9 → filho seria nivel 10)', async () => {
     prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
-    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 7, admiteMovimento: false })
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 9, admiteMovimento: false })
     await expect(service.criar({ planoId: 'p1', codigo: 'x', descricao: 'X', parentId: 'c-pai' }))
       .rejects.toMatchObject({ code: 'CONFLITO' })
   })
 
   it('permite criar filho cujo nível resultante é exatamente NIVEL_MAX', async () => {
     prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
-    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 6, admiteMovimento: false })
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 8, admiteMovimento: false })
     prisma.conta.create.mockResolvedValue({})
     await service.criar({ planoId: 'p1', codigo: 'x', descricao: 'X', parentId: 'c-pai' })
-    expect(prisma.conta.create.mock.calls[0][0].data.nivel).toBe(7)
+    expect(prisma.conta.create.mock.calls[0][0].data.nivel).toBe(9)
   })
 
   it('lança CONFLITO em P2002 (código duplicado no plano)', async () => {

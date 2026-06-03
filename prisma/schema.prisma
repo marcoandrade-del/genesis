@@ -404,7 +404,7 @@ model Conta {
   id              String        @id @default(uuid())
   codigo          String
   descricao       String
-  nivel           Int // 1..7 (PCASP Estendido)
+  nivel           Int // 1..9 (PCASP Estendido TCE-PR)
   admiteMovimento Boolean       @default(false)
   planoId         String
   parentId        String?
