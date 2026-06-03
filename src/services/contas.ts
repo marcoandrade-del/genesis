@@ -1,9 +1,10 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
-// PCASP Estendido oficial chega a 7 níveis (Classe→Grupo→SubGrupo→Título→
-// SubTítulo→Ítem→SubÍtem); valor casado com a importação do plano oficial.
-export const NIVEL_MAX = 7
+// PCASP Estendido municipal (TCE-PR) chega a 9 níveis: os 7 oficiais
+// (Classe→Grupo→SubGrupo→Título→SubTítulo→Ítem→SubÍtem) + 2 desdobramentos
+// estendidos do plano paranaense; valor casado com a importação do plano oficial.
+export const NIVEL_MAX = 9
 
 export type DadosCriarConta = {
   planoId: string
