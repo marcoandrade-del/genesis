@@ -565,6 +565,9 @@ model Entidade {
   processos            Processo[]
   contratos            Contrato[]
   atasRegistroPreco    AtaRegistroPreco[]
+  empenhos             Empenho[]
+  liquidacoes          Liquidacao[]
+  ordensPagamento      OrdemPagamento[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -865,6 +868,7 @@ model DotacaoDespesa {
   contaDespesa           ContaDespesaEntidade @relation(fields: [contaDespesaEntidadeId], references: [id])
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
   reservas               ReservaDotacao[]
+  empenhos               Empenho[]
 
   @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
   @@index([orcamentoId])
@@ -1104,6 +1108,7 @@ model ReservaDotacao {
   entidade          Entidade         @relation(fields: [entidadeId], references: [id])
   dotacaoDespesa    DotacaoDespesa   @relation(fields: [dotacaoDespesaId], references: [id])
   termoReferencia   TermoReferencia? @relation(fields: [termoReferenciaId], references: [id])
+  empenhos          Empenho[]
 
   @@unique([entidadeId, numero])
   @@index([dotacaoDespesaId])
@@ -1141,6 +1146,7 @@ model Fornecedor {
   itensVencidos ItemProcesso[]
   contratos     Contrato[]
   atas          AtaRegistroPreco[]
+  empenhos      Empenho[]
 
   @@map("fornecedores")
 }
@@ -1255,6 +1261,7 @@ model Contrato {
   processo       Processo?      @relation(fields: [processoId], references: [id])
   fornecedor     Fornecedor     @relation(fields: [fornecedorId], references: [id])
   itens          ItemContrato[]
+  empenhos       Empenho[]
 
   @@unique([entidadeId, numero])
   @@index([entidadeId])
@@ -1302,6 +1309,7 @@ model AtaRegistroPreco {
   processo       Processo?              @relation(fields: [processoId], references: [id])
   fornecedor     Fornecedor             @relation(fields: [fornecedorId], references: [id])
   itens          ItemAtaRegistroPreco[]
+  empenhos       Empenho[]
 
   @@unique([entidadeId, numero])
   @@index([entidadeId])
@@ -1324,4 +1332,111 @@ model ItemAtaRegistroPreco {
   @@unique([ataId, itemCatalogoId])
   @@index([ataId])
   @@map("itens_ata_registro_preco")
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COMPRAS PÚBLICAS — Fase 3: Execução Financeira (3 estágios da despesa)
+// Empenho → Liquidação → Pagamento. Granularidade por valor (saldos
+// materializados). REGRA 2 (conversão reserva→empenho), REGRA 4 (Σ liquidações ≤
+// empenho), REGRA 5 (precedência: OP exige liquidação; liquidação exige empenho).
+// ══════════════════════════════════════════════════════════════════════════════
+
+// ─── Empenho (1º estágio) ──────────────────────────────────────────────────────
+enum TipoEmpenho {
+  ORDINARIO
+  GLOBAL
+  ESTIMATIVO
+}
+
+enum StatusEmpenho {
+  ATIVO
+  ANULADO
+}
+
+model Empenho {
+  id                 String            @id @default(uuid())
+  entidadeId         String
+  dotacaoDespesaId   String
+  fornecedorId       String
+  reservaDotacaoId   String? // reserva convertida (REGRA 2)
+  contratoId         String? // vínculo informativo
+  ataRegistroPrecoId String? // vínculo informativo
+  numero             String
+  tipo               TipoEmpenho
+  data               DateTime          @default(now())
+  valor              Decimal           @db.Decimal(18, 2)
+  valorLiquidado     Decimal           @default(0) @db.Decimal(18, 2)
+  historico          String?
+  status             StatusEmpenho     @default(ATIVO)
+  criadoEm           DateTime          @default(now())
+  atualizadoEm       DateTime          @updatedAt
+  entidade           Entidade          @relation(fields: [entidadeId], references: [id])
+  dotacaoDespesa     DotacaoDespesa    @relation(fields: [dotacaoDespesaId], references: [id])
+  fornecedor         Fornecedor        @relation(fields: [fornecedorId], references: [id])
+  reservaDotacao     ReservaDotacao?   @relation(fields: [reservaDotacaoId], references: [id])
+  contrato           Contrato?         @relation(fields: [contratoId], references: [id])
+  ataRegistroPreco   AtaRegistroPreco? @relation(fields: [ataRegistroPrecoId], references: [id])
+  liquidacoes        Liquidacao[]
+
+  @@unique([entidadeId, numero])
+  @@index([dotacaoDespesaId])
+  @@index([entidadeId])
+  @@map("empenhos")
+}
+
+// ─── Liquidação (2º estágio) ────────────────────────────────────────────────────
+enum StatusLiquidacao {
+  ATIVA
+  CANCELADA
+}
+
+model Liquidacao {
+  id                String           @id @default(uuid())
+  entidadeId        String
+  empenhoId         String
+  numero            String
+  data              DateTime         @default(now())
+  valor             Decimal          @db.Decimal(18, 2)
+  valorPago         Decimal          @default(0) @db.Decimal(18, 2)
+  notaFiscal        String?
+  atesteResponsavel String?
+  status            StatusLiquidacao @default(ATIVA)
+  criadoEm          DateTime         @default(now())
+  atualizadoEm      DateTime         @updatedAt
+  entidade          Entidade         @relation(fields: [entidadeId], references: [id])
+  empenho           Empenho          @relation(fields: [empenhoId], references: [id])
+  ordensPagamento   OrdemPagamento[]
+
+  @@unique([entidadeId, numero])
+  @@index([empenhoId])
+  @@index([entidadeId])
+  @@map("liquidacoes")
+}
+
+// ─── Ordem de Pagamento (3º estágio) ─────────────────────────────────────────────
+enum StatusOrdemPagamento {
+  EMITIDA
+  PAGA
+  CANCELADA
+}
+
+model OrdemPagamento {
+  id            String               @id @default(uuid())
+  entidadeId    String
+  liquidacaoId  String
+  numero        String
+  data          DateTime             @default(now())
+  valor         Decimal              @db.Decimal(18, 2)
+  contaBancaria String // conta bancária municipal (texto)
+  comprovante   String?
+  status        StatusOrdemPagamento @default(EMITIDA)
+  criadoEm      DateTime             @default(now())
+  atualizadoEm  DateTime             @updatedAt
+  entidade      Entidade             @relation(fields: [entidadeId], references: [id])
+  liquidacao    Liquidacao           @relation(fields: [liquidacaoId], references: [id])
+
+  @@unique([entidadeId, numero])
+  @@index([liquidacaoId])
+  @@index([entidadeId])
+  @@map("ordens_pagamento")
 }
