@@ -1,0 +1,96 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-upload me-2 text-primary"></i>Importar Catálogo (CSV)
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="row g-2">
+    <div class="col-7 mb-2">
+      <label for="imp-tipo" class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+      <select id="imp-tipo" class="form-select form-select-sm">
+        <option value="MATERIAL">Material (CATMAT)</option>
+        <option value="SERVICO">Serviço (CATSER)</option>
+      </select>
+    </div>
+    <div class="col-5 mb-2">
+      <label for="imp-unidade" class="form-label small fw-semibold">Unidade <span class="text-danger">*</span></label>
+      <input type="text" id="imp-unidade" class="form-control form-control-sm" value="UN" maxlength="10">
+    </div>
+  </div>
+
+  <div class="mb-3">
+    <label for="imp-file" class="form-label small fw-semibold">Arquivo CSV <span class="text-danger">*</span></label>
+    <input type="file" id="imp-file" accept=".csv,text/csv" class="form-control form-control-sm">
+    <div class="form-text">
+      Cabeçalho obrigatório: <code>codigo,descricao</code>. O <strong>tipo</strong> e a
+      <strong>unidade</strong> acima são aplicados a todas as linhas. Importação
+      <strong>idempotente</strong>: códigos já existentes são pulados (não atualizados). Limite 64 MB.
+    </div>
+  </div>
+
+  <div id="imp-status" class="d-none"></div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+  <button type="button" id="btn-imp-catalogo" class="btn btn-sm btn-primary" onclick="importarCatalogoCsv(this)">
+    <span class="btn-imp-spinner spinner-border spinner-border-sm me-2 d-none"></span>
+    <i class="btn-imp-icon bi bi-upload me-1"></i><span class="btn-imp-label">Importar</span>
+  </button>
+</div>
+
+<script>
+async function importarCatalogoCsv(btn) {
+  const tipo = document.getElementById('imp-tipo').value
+  const unidade = document.getElementById('imp-unidade').value.trim()
+  const fileInput = document.getElementById('imp-file')
+  const statusEl = document.getElementById('imp-status')
+  const file = fileInput.files[0]
+  const labelEl = btn.querySelector('.btn-imp-label')
+  const iconEl = btn.querySelector('.btn-imp-icon')
+  const spinnerEl = btn.querySelector('.btn-imp-spinner')
+
+  function mostrar(tipo, msg) {
+    statusEl.className = 'alert py-2 small alert-' + tipo
+    statusEl.textContent = msg
+    statusEl.classList.remove('d-none')
+  }
+  function setBusy(busy, label) {
+    btn.disabled = busy
+    labelEl.textContent = label
+    iconEl.classList.toggle('d-none', busy)
+    spinnerEl.classList.toggle('d-none', !busy)
+  }
+
+  if (!unidade) { mostrar('danger', 'Informe a unidade de medida.'); return }
+  if (!file) { mostrar('danger', 'Selecione um arquivo CSV.'); return }
+  if (file.size > 64 * 1024 * 1024) { mostrar('danger', 'Arquivo excede 64 MB.'); return }
+
+  setBusy(true, 'Importando…')
+  mostrar('info', 'Lendo arquivo…')
+  try {
+    const csv = await file.text()
+    mostrar('info', 'Enviando ao servidor… (' + (csv.length / 1024 / 1024).toFixed(1) + ' MB). Pode levar alguns segundos.')
+    const resp = await fetch('/admin/itens-catalogo/importar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ csv: csv, tipo: tipo, unidadeMedida: unidade }),
+    })
+    const data = await resp.json().catch(function() { return null })
+    if (!resp.ok || !data || data.error) {
+      const msg = (data && data.error && data.error.message) || ('Erro ' + resp.status + '.')
+      mostrar('danger', msg)
+      setBusy(false, 'Importar')
+      return
+    }
+    const r = data.data || {}
+    mostrar('success', (r.criados || 0) + ' item(ns) importado(s), ' + (r.pulados || 0) + ' já existente(s) pulado(s).')
+    setTimeout(function() { window.location.href = '/admin/itens-catalogo'; }, 1200)
+  } catch (e) {
+    mostrar('danger', 'Falha ao ler arquivo: ' + (e && e.message ? e.message : 'erro desconhecido') + '.')
+    setBusy(false, 'Importar')
+  }
+}
+</script>

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma, type TipoItemCatalogo } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { parseCSVLine } from './importador-plano-contas.js'
 
 export type DadosItemCatalogo = {
   tipo: TipoItemCatalogo
@@ -11,7 +12,12 @@ export type DadosItemCatalogo = {
 
 export type FiltroCatalogo = { tipo?: TipoItemCatalogo; apenasAtivos?: boolean; busca?: string }
 
+/** Resultado da importação em massa: recebidos = linhas válidas no arquivo;
+ *  criados = inseridos de fato; pulados = códigos que já existiam (skipDuplicates). */
+export type ResultadoImportacaoCatalogo = { recebidos: number; criados: number; pulados: number }
+
 const TIPOS: ReadonlyArray<TipoItemCatalogo> = ['MATERIAL', 'SERVICO']
+const LOTE_IMPORTACAO = 5000
 
 /**
  * Catálogo central de itens (CATMAT/CATSER). Cadastro global e reutilizado por
@@ -106,6 +112,65 @@ export class ItensCatalogoService {
       }
       throw e
     }
+  }
+
+  /**
+   * Importa um CSV (cabeçalho `codigo,descricao`) em massa, aplicando `tipo` e
+   * `unidadeMedida` a todas as linhas. Idempotente: `skipDuplicates` sobre
+   * `@@unique([tipo, codigo])` — códigos já existentes são pulados, não atualizados.
+   * Inserção em lotes porque o catálogo (CATMAT/CATSER) tem ~centenas de milhares
+   * de itens.
+   */
+  async importarCsv(
+    csv: string,
+    opts: { tipo: TipoItemCatalogo; unidadeMedida: string },
+  ): Promise<ResultadoImportacaoCatalogo> {
+    if (!TIPOS.includes(opts.tipo)) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Tipo deve ser MATERIAL ou SERVICO.')
+    }
+    const unidadeMedida = opts.unidadeMedida?.trim()
+    if (!unidadeMedida) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Unidade de medida é obrigatória.')
+
+    const linhas = this.parseCatalogoCsv(csv)
+    if (linhas.length === 0) throw new ErroNegocio('REQUISICAO_INVALIDA', 'CSV não contém linhas de dados.')
+
+    // Dedup dentro do arquivo (1ª ocorrência vence) antes de tocar o banco.
+    const porCodigo = new Map<string, string>()
+    for (const l of linhas) if (!porCodigo.has(l.codigo)) porCodigo.set(l.codigo, l.descricao)
+    const dados = [...porCodigo].map(([codigo, descricao]) => ({ tipo: opts.tipo, codigo, descricao, unidadeMedida }))
+
+    let criados = 0
+    for (let i = 0; i < dados.length; i += LOTE_IMPORTACAO) {
+      const { count } = await this.prisma.itemCatalogo.createMany({
+        data: dados.slice(i, i + LOTE_IMPORTACAO),
+        skipDuplicates: true,
+      })
+      criados += count
+    }
+    return { recebidos: dados.length, criados, pulados: dados.length - criados }
+  }
+
+  /** Tokeniza o CSV de catálogo. Exige cabeçalho com `codigo` e `descricao`. */
+  private parseCatalogoCsv(csv: string): { codigo: string; descricao: string }[] {
+    const limpo = csv.replace(/^﻿/, '')
+    const linhas = limpo.split(/\r?\n/).filter((l) => l.trim() !== '')
+    if (linhas.length === 0) throw new ErroNegocio('REQUISICAO_INVALIDA', 'CSV vazio.')
+    const header = parseCSVLine(linhas[0]!).map((c) => c.trim())
+    const iCod = header.indexOf('codigo')
+    const iDesc = header.indexOf('descricao')
+    if (iCod < 0 || iDesc < 0) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Cabeçalho deve conter as colunas "codigo" e "descricao".')
+    }
+    const out: { codigo: string; descricao: string }[] = []
+    for (let i = 1; i < linhas.length; i++) {
+      const partes = parseCSVLine(linhas[i]!)
+      const codigo = (partes[iCod] ?? '').trim()
+      const descricao = (partes[iDesc] ?? '').trim()
+      if (!codigo) throw new ErroNegocio('REQUISICAO_INVALIDA', `Linha ${i + 1}: código vazio.`)
+      if (!descricao) throw new ErroNegocio('REQUISICAO_INVALIDA', `Linha ${i + 1}: descrição vazia.`)
+      out.push({ codigo, descricao })
+    }
+    return out
   }
 
   private validar(dados: DadosItemCatalogo): DadosItemCatalogo {
