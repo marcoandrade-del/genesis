@@ -1,0 +1,130 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-file-earmark-text me-2 text-primary"></i><%= dod && dod.id ? 'Editar Demanda' : 'Nova Demanda (DOD)' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (dod && dod.id) { %>hx-put="/admin/documentos-demanda/<%= dod.id %>"<% } else { %>hx-post="/admin/documentos-demanda"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML"
+  hx-on::config-request="dodSerialize()"
+  data-modal-size="modal-lg">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!dod || !dod.id) { %><input type="hidden" name="entidadeId" value="<%= entidadeId %>"><% } %>
+    <input type="hidden" name="itensJson" id="dod-itens-json" value="">
+
+    <div class="row g-2 mb-2">
+      <div class="col-3">
+        <label class="form-label small fw-semibold">Exercício <span class="text-danger">*</span></label>
+        <input type="number" name="ano" class="form-control form-control-sm font-monospace"
+          value="<%= dod ? dod.ano : new Date().getFullYear() %>" min="1900" max="9999" required>
+      </div>
+      <div class="col-4">
+        <label class="form-label small fw-semibold">Número <span class="text-danger">*</span></label>
+        <input type="text" name="numero" class="form-control form-control-sm font-monospace"
+          value="<%= dod && dod.numero ? dod.numero : '' %>" placeholder="2026/0001" maxlength="30" required>
+      </div>
+      <div class="col-5">
+        <label class="form-label small fw-semibold">PCA (opcional)</label>
+        <select name="pcaId" class="form-select form-select-sm">
+          <option value="">— Nenhum —</option>
+          <% pcas.forEach(function(p) { %>
+            <option value="<%= p.id %>" <%= dod && dod.pcaId === p.id ? 'selected' : '' %>>PCA <%= p.ano %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Unidade requisitante <span class="text-danger">*</span></label>
+        <select name="unidadeOrcamentariaId" class="form-select form-select-sm" required>
+          <option value="">— Selecione —</option>
+          <% unidades.forEach(function(u) { %>
+            <option value="<%= u.id %>" <%= dod && dod.unidadeOrcamentariaId === u.id ? 'selected' : '' %>>
+              <%= u.codigo %> — <%= u.nome %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="col-12">
+        <label class="form-label small fw-semibold">Justificativa <span class="text-danger">*</span></label>
+        <textarea name="justificativa" class="form-control form-control-sm" rows="2" maxlength="1000" required><%= dod && dod.justificativa ? dod.justificativa : '' %></textarea>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-1">
+      <label class="form-label small fw-semibold mb-0">Itens da demanda</label>
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="dodAddRow()">
+        <i class="bi bi-plus-lg me-1"></i>Adicionar item
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr><th>Item do catálogo</th><th style="width:140px">Quantidade</th><th style="width:40px"></th></tr>
+        </thead>
+        <tbody id="dod-itens-body"></tbody>
+      </table>
+    </div>
+    <div id="dod-itens-vazio" class="text-muted small text-center py-2" style="display:none">Nenhum item — clique em "Adicionar item".</div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>
+
+<script>
+  var DOD_CATALOGO = <%- JSON.stringify(catalogo) %>;
+  var DOD_ITENS = <%- JSON.stringify(itens) %>;
+
+  function dodCatSelect(selId) {
+    var sel = document.createElement('select');
+    sel.className = 'form-select form-select-sm dod-cat';
+    sel.addEventListener('change', dodSerialize);
+    sel.add(new Option('— Selecione —', ''));
+    DOD_CATALOGO.forEach(function(c) {
+      var rotulo = (c.tipo === 'MATERIAL' ? 'Mat.' : 'Serv.') + ' ' + c.codigo + ' — ' + c.descricao + ' (' + c.unidadeMedida + ')';
+      var o = new Option(rotulo, c.id);
+      if (c.id === selId) o.selected = true;
+      sel.add(o);
+    });
+    return sel;
+  }
+
+  function dodAddRow(item) {
+    item = item || {};
+    var tr = document.createElement('tr');
+    var tdC = document.createElement('td'); tdC.appendChild(dodCatSelect(item.itemCatalogoId)); tr.appendChild(tdC);
+    var inp = document.createElement('input');
+    inp.type = 'number'; inp.step = 'any'; inp.min = '0';
+    inp.className = 'form-control form-control-sm font-monospace dod-qtd';
+    if (item.quantidade != null && item.quantidade !== '') inp.value = item.quantidade;
+    inp.addEventListener('input', dodSerialize);
+    var tdQ = document.createElement('td'); tdQ.appendChild(inp); tr.appendChild(tdQ);
+    var btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'btn btn-sm btn-outline-danger';
+    btn.addEventListener('click', function() { tr.remove(); dodSerialize(); });
+    var ic = document.createElement('i'); ic.className = 'bi bi-x'; btn.appendChild(ic);
+    var tdX = document.createElement('td'); tdX.className = 'text-end'; tdX.appendChild(btn); tr.appendChild(tdX);
+    document.getElementById('dod-itens-body').appendChild(tr);
+    dodSerialize();
+  }
+
+  function dodSerialize() {
+    var linhas = [];
+    document.querySelectorAll('#dod-itens-body tr').forEach(function(tr) {
+      var id = tr.querySelector('.dod-cat').value;
+      if (!id) return;
+      linhas.push({ itemCatalogoId: id, quantidade: tr.querySelector('.dod-qtd').value || '0' });
+    });
+    document.getElementById('dod-itens-json').value = JSON.stringify(linhas);
+    document.getElementById('dod-itens-vazio').style.display =
+      document.querySelectorAll('#dod-itens-body tr').length ? 'none' : 'block';
+  }
+
+  DOD_ITENS.forEach(function(i) { dodAddRow(i); });
+  dodSerialize();
+</script>

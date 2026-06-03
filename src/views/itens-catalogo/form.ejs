@@ -1,0 +1,60 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-box-seam me-2 text-primary"></i><%= item && item.id ? 'Editar Item' : 'Novo Item' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (item && item.id) { %>
+    hx-put="/admin/itens-catalogo/<%= item.id %>"
+  <% } else { %>
+    hx-post="/admin/itens-catalogo"
+  <% } %>
+  hx-target="#modal-body" hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+
+    <div class="row g-2">
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Tipo <span class="text-danger">*</span></label>
+        <select name="tipo" class="form-select form-select-sm" required>
+          <option value="MATERIAL" <%= item && item.tipo === 'MATERIAL' ? 'selected' : '' %>>Material</option>
+          <option value="SERVICO" <%= item && item.tipo === 'SERVICO' ? 'selected' : '' %>>Serviço</option>
+        </select>
+      </div>
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+        <input type="text" name="codigo" class="form-control form-control-sm font-monospace"
+          value="<%= item ? item.codigo : '' %>" placeholder="CATMAT / CATSER" maxlength="30" required>
+      </div>
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Descrição <span class="text-danger">*</span></label>
+        <input type="text" name="descricao" class="form-control form-control-sm"
+          value="<%= item ? item.descricao : '' %>" maxlength="200" required>
+      </div>
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Unidade <span class="text-danger">*</span></label>
+        <input type="text" name="unidadeMedida" class="form-control form-control-sm"
+          value="<%= item ? item.unidadeMedida : '' %>" placeholder="UN, CX, HORA…" maxlength="20" required>
+      </div>
+      <% if (item && item.id) { %>
+        <div class="col-12 mt-2">
+          <div class="form-check">
+            <input type="checkbox" name="ativo" id="chk-ativo" class="form-check-input"
+              value="true" <%= item.ativo ? 'checked' : '' %>>
+            <label for="chk-ativo" class="form-check-label small">Ativo</label>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary">
+      <i class="bi bi-check-lg me-1"></i>Salvar
+    </button>
+  </div>
+</form>

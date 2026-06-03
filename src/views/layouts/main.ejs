@@ -146,6 +146,20 @@
         <i class="bi bi-arrow-left-right me-2"></i>Eventos Contábeis
       </a></li>
 
+      <li><div class="section-label mt-1">Compras</div></li>
+      <li><a class="nav-link <%= active === 'itens-catalogo' ? 'active' : '' %>" href="/admin/itens-catalogo">
+        <i class="bi bi-box-seam me-2"></i>Catálogo de Itens
+      </a></li>
+      <li><a class="nav-link <%= active === 'planos-contratacao' ? 'active' : '' %>" href="/admin/planos-contratacao">
+        <i class="bi bi-card-checklist me-2"></i>Plano de Contratações
+      </a></li>
+      <li><a class="nav-link <%= active === 'documentos-demanda' ? 'active' : '' %>" href="/admin/documentos-demanda">
+        <i class="bi bi-file-earmark-text me-2"></i>Demandas (DOD)
+      </a></li>
+      <li><a class="nav-link <%= active === 'reservas-dotacao' ? 'active' : '' %>" href="/admin/reservas-dotacao">
+        <i class="bi bi-bookmark-check me-2"></i>Reservas de Dotação
+      </a></li>
+
       <li><div class="section-label mt-1">Sistema</div></li>
       <li><a class="nav-link" href="/admin/funcionando" target="_blank">
         <i class="bi bi-play-circle-fill me-2" style="color: var(--primary)"></i>Funcionando…
@@ -189,6 +203,10 @@
         orcamentos: 'Orçamentos (LOA)',
         'eventos-contabeis': 'Eventos Contábeis',
         'acessos-entidade': 'Acessos a Entidades',
+        'itens-catalogo': 'Catálogo de Itens',
+        'planos-contratacao': 'Plano de Contratações (PCA)',
+        'documentos-demanda': 'Demandas (DOD)',
+        'reservas-dotacao': 'Reservas de Dotação',
       }
     %>
     <% if (typeof active !== 'undefined' && _bcLabels[active]) { %>

@@ -1,0 +1,115 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Plano de Contratações (PCA)</h2>
+  <% if (entidade) { %>
+    <button class="btn btn-primary btn-sm"
+      hx-get="/admin/planos-contratacao/form?entidadeId=<%= entidade.id %>"
+      hx-target="#modal-body"
+      hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Novo PCA
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/planos-contratacao">
+  <div class="col-md-2">
+    <label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>><%= e.sigla %> — <%= e.nome %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm" <%= estadoSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %>
+        <option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>><%= m.nome %></option>
+      <% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm" <%= municipioSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %>
+        <option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>><%= e.nome %></option>
+      <% }) %>
+    </select>
+  </div>
+</form>
+
+<% if (!entidade) { %>
+  <div class="alert alert-info py-2 small">
+    <i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar os planos.
+  </div>
+<% } else { %>
+  <div class="small text-muted mb-2">
+    <strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong>
+    · <%= planos.length %> plano(s)
+  </div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3" style="width:90px">Exercício</th>
+            <th>Observações</th>
+            <th class="text-center" style="width:90px">Itens</th>
+            <th class="text-center" style="width:100px">Demandas</th>
+            <th style="width:110px">Status</th>
+            <th class="text-end pe-3" style="width:200px">&nbsp;</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (planos.length === 0) { %>
+            <tr><td colspan="6" class="text-center text-muted py-5">
+              <i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum PCA para esta entidade.
+            </td></tr>
+          <% } %>
+          <% planos.forEach(function(p) { %>
+            <tr id="pca-<%= p.id %>">
+              <td class="ps-3 font-monospace fw-semibold"><%= p.ano %></td>
+              <td class="small text-muted"><%= p.observacoes || '—' %></td>
+              <td class="text-center"><span class="badge bg-light text-dark"><%= p._count.itens %></span></td>
+              <td class="text-center"><span class="badge bg-light text-dark"><%= p._count.demandas %></span></td>
+              <td>
+                <% if (p.status === 'APROVADO') { %>
+                  <span class="badge bg-success bg-opacity-10 text-success">Aprovado</span>
+                <% } else { %>
+                  <span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
+                <% } %>
+              </td>
+              <td class="text-end pe-3">
+                <% if (p.status === 'RASCUNHO') { %>
+                  <button class="btn btn-sm btn-outline-success me-1"
+                    hx-post="/admin/planos-contratacao/<%= p.id %>/status"
+                    hx-vals='{"status":"APROVADO"}'
+                    title="Aprovar"><i class="bi bi-check2-circle"></i></button>
+                <% } else { %>
+                  <button class="btn btn-sm btn-outline-warning me-1"
+                    hx-post="/admin/planos-contratacao/<%= p.id %>/status"
+                    hx-vals='{"status":"RASCUNHO"}'
+                    title="Reabrir"><i class="bi bi-arrow-counterclockwise"></i></button>
+                <% } %>
+                <button class="btn btn-sm btn-outline-secondary me-1"
+                  hx-get="/admin/planos-contratacao/<%= p.id %>/form"
+                  hx-target="#modal-body" hx-swap="innerHTML"
+                  title="Editar"><i class="bi bi-pencil"></i></button>
+                <% if (p.status === 'RASCUNHO' && p._count.demandas === 0) { %>
+                  <button class="btn btn-sm btn-outline-danger"
+                    hx-delete="/admin/planos-contratacao/<%= p.id %>"
+                    hx-target="#pca-<%= p.id %>" hx-swap="outerHTML"
+                    hx-confirm="Excluir o PCA <%= p.ano %>?"
+                    data-confirm-titulo="Excluir PCA" data-confirm-tipo="danger" data-confirm-ok="Excluir"
+                    title="Excluir"><i class="bi bi-trash"></i></button>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

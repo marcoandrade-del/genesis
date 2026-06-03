@@ -1,0 +1,40 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-clipboard-check me-2 text-primary"></i>Parecer Jurídico — DOD <%= dod.numero %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form hx-post="/admin/documentos-demanda/<%= dod.id %>/status" hx-target="#modal-body" hx-swap="innerHTML">
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold d-block">Decisão <span class="text-danger">*</span></label>
+      <div class="form-check form-check-inline">
+        <input type="radio" name="status" id="parecer-aprovar" value="APROVADA" class="form-check-input" checked>
+        <label for="parecer-aprovar" class="form-check-label small text-success">Aprovar</label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input type="radio" name="status" id="parecer-reprovar" value="REPROVADA" class="form-check-input">
+        <label for="parecer-reprovar" class="form-check-label small text-danger">Reprovar</label>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Responsável <span class="text-danger">*</span></label>
+      <input type="text" name="responsavel" class="form-control form-control-sm" maxlength="120" required
+        placeholder="Nome do parecerista">
+    </div>
+
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Observação</label>
+      <textarea name="observacao" class="form-control form-control-sm" rows="3" maxlength="1000"></textarea>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Registrar parecer</button>
+  </div>
+</form>
