@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Compras · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Compras</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-1">
+    <h2 class="h4 fw-bold mb-0">Compras — Planejamento <span class="font-monospace"><%= ano %></span></h2>
+    <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-eye me-1"></i>Somente leitura</span>
+  </div>
+  <p class="text-muted small mb-4">
+    Fase interna da Lei 14.133 — escopo: <strong><%= entidade.nome %></strong>, exercício <strong><%= ano %></strong>.
+  </p>
+
+  <div class="row g-3">
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/catalogo" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-box-seam fs-4 text-primary"></i><span class="fw-semibold text-dark">Catálogo</span></div>
+          <div class="small text-muted">Itens (CATMAT/CATSER) ativos</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.catalogo %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/pca" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-card-checklist fs-4 text-primary"></i><span class="fw-semibold text-dark">PCA</span></div>
+          <div class="small text-muted">Plano de Contratações <%= ano %></div>
+          <% if (counts.pcaExiste) { %>
+            <div class="h4 fw-bold mb-0 mt-1"><%= counts.pcaItens %> <span class="fs-6 fw-normal text-muted">itens</span></div>
+          <% } else { %>
+            <div class="text-muted mt-2"><i class="bi bi-dash-circle me-1"></i>Sem PCA neste exercício</div>
+          <% } %>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/demandas" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-file-earmark-text fs-4 text-primary"></i><span class="fw-semibold text-dark">Demandas (DOD)</span></div>
+          <div class="small text-muted">Oficialização da demanda <%= ano %></div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.demandas %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/reservas" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-bookmark-check fs-4 text-primary"></i><span class="fw-semibold text-dark">Reservas</span></div>
+          <div class="small text-muted">Pré-empenho (dotação)</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.reservas %></div>
+        </div></div>
+      </a>
+    </div>
+  </div>
+</div>
+</body>
+</html>
