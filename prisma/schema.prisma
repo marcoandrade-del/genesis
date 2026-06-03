@@ -107,6 +107,8 @@ model Usuario {
   pastas                   PastaFavorito[]
   permissoes               PermissaoAcesso[]
   relatoriosPersonalizados RelatorioPersonalizado[]
+  cabecalhosRelatorio      CabecalhoRelatorio[]
+  rodapesRelatorio         RodapeRelatorio[]
 
   @@map("usuarios")
 }
@@ -248,6 +250,45 @@ model FavoritoRelatorio {
   usuario                  Usuario                 @relation(fields: [usuarioId], references: [id])
 
   @@map("favoritos_relatorio")
+}
+
+// Template de cabeçalho de relatório, escopado por Entidade (contexto do /app).
+// `layout` é a lista de elementos posicionados livremente pelo editor WYSIWYG:
+// [{ tipo, x, y }] com x/y em porcentagem (0-100) da faixa, para escalar em
+// qualquer largura de saída. `criadoPor` é só auditoria — o template é
+// compartilhado entre os operadores da entidade.
+model CabecalhoRelatorio {
+  id           String   @id @default(uuid())
+  nome         String
+  altura       Int      @default(120)
+  layout       Json
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  entidadeId   String
+  criadoPorId  String
+  entidade     Entidade @relation(fields: [entidadeId], references: [id])
+  criadoPor    Usuario  @relation(fields: [criadoPorId], references: [id])
+
+  @@map("cabecalhos_relatorio")
+}
+
+// Template de rodapé de relatório. Mesma mecânica do cabeçalho; difere apenas
+// no conjunto de elementos permitidos (ver service).
+model RodapeRelatorio {
+  id           String   @id @default(uuid())
+  nome         String
+  altura       Int      @default(80)
+  layout       Json
+  ativo        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  entidadeId   String
+  criadoPorId  String
+  entidade     Entidade @relation(fields: [entidadeId], references: [id])
+  criadoPor    Usuario  @relation(fields: [criadoPorId], references: [id])
+
+  @@map("rodapes_relatorio")
 }
 
 enum TipoItem {
@@ -542,6 +583,8 @@ model Entidade {
   nome         String
   tipo         TipoEntidade
   cnpj         String?      @unique
+  endereco     String?
+  brasao       String?      @db.Text // imagem do brasão como data URL (base64)
   municipioId  String
   ativo        Boolean      @default(true)
   criadoEm     DateTime     @default(now())
@@ -568,6 +611,8 @@ model Entidade {
   empenhos             Empenho[]
   liquidacoes          Liquidacao[]
   ordensPagamento      OrdemPagamento[]
+  cabecalhosRelatorio  CabecalhoRelatorio[]
+  rodapesRelatorio     RodapeRelatorio[]
 
   @@unique([municipioId, nome])
   @@map("entidades")

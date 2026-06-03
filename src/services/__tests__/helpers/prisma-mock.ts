@@ -534,6 +534,22 @@ export function criarPrismaMock() {
       delete: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
+    cabecalhoRelatorio: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    rodapeRelatorio: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+    },
     $transaction: vi.fn(),
   }
 

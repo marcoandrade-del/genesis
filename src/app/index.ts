@@ -6,6 +6,7 @@ import { appDashboardRoutes } from './dashboard.js'
 import { appOrcamentoRoutes } from './orcamento.js'
 import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
+import { appRelatoriosRoutes } from './relatorios.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
 // escolheu na sessão atual). Injetado pelo middleware antes de qualquer rota
@@ -97,5 +98,6 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appOrcamentoRoutes)
     autenticado.register(appLancamentosRoutes)
     autenticado.register(appContasRoutes)
+    autenticado.register(appRelatoriosRoutes)
   })
 }
