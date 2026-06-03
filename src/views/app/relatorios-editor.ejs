@@ -4,7 +4,7 @@
   var ehCabecalho = tipo === 'CABECALHO'
   var titulo = ehCabecalho ? 'cabeçalho' : 'rodapé'
   var actionUrl = (registro && registro.id) ? (base + '/' + registro.id) : base
-  var alturaAtual = registro ? registro.altura : (ehCabecalho ? 120 : 80)
+  var alturaAtual = (registro && Number(registro.altura)) ? registro.altura : (ehCabecalho ? 120 : 80)
   var layoutInicial = (registro && Array.isArray(registro.layout)) ? registro.layout : []
 %>
 <head>
