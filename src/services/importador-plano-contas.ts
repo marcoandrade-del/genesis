@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { PrismaClient, Prisma } from '@prisma/client'
+import {
+  PrismaClient,
+  Prisma,
+  type NaturezaInformacao,
+  type NaturezaSaldo,
+  type SuperavitFinanceiro,
+} from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { NIVEL_MAX } from './contas.js'
 
@@ -8,9 +14,60 @@ export type LinhaCSV = {
   descricao: string
   codigoPai: string | null
   admiteMovimento: boolean
+  // Atributos PCASP — opcionais, em código bruto da planilha TCE-PR (P/O/C, D/C/X,
+  // F/P/X/O, texto). Só o plano contábil os traz; receita/despesa não.
+  naturezaInformacao?: string
+  naturezaSaldo?: string
+  superavitFinanceiro?: string
+  funcao?: string
 }
 
 const COLUNAS_OBRIGATORIAS = ['codigo', 'descricao', 'codigoPai', 'admiteMovimento'] as const
+const COLUNAS_PCASP = ['naturezaInformacao', 'naturezaSaldo', 'superavitFinanceiro', 'funcao'] as const
+
+/** Mapeia o código bruto da planilha (tpNaturezaInformacao) para o enum. */
+export function mapearNaturezaInformacao(raw: string | undefined): NaturezaInformacao | null {
+  switch ((raw ?? '').trim().toUpperCase()) {
+    case 'P':
+      return 'PATRIMONIAL'
+    case 'O':
+      return 'ORCAMENTARIA'
+    case 'C':
+      return 'CONTROLE'
+    default:
+      return null
+  }
+}
+
+/** Mapeia tpNaturezaSaldo (D/C/X) para o enum. X = mista (admite inversão). */
+export function mapearNaturezaSaldo(raw: string | undefined): NaturezaSaldo | null {
+  switch ((raw ?? '').trim().toUpperCase()) {
+    case 'D':
+      return 'DEVEDORA'
+    case 'C':
+      return 'CREDORA'
+    case 'X':
+      return 'MISTA'
+    default:
+      return null
+  }
+}
+
+/** Mapeia tpSuperavitFinanceiro (F/P/X/O) para o enum. */
+export function mapearSuperavitFinanceiro(raw: string | undefined): SuperavitFinanceiro | null {
+  switch ((raw ?? '').trim().toUpperCase()) {
+    case 'F':
+      return 'FINANCEIRO'
+    case 'P':
+      return 'PATRIMONIAL'
+    case 'X':
+      return 'MISTA'
+    case 'O':
+      return 'OUTROS_CONTROLES'
+    default:
+      return null
+  }
+}
 
 /**
  * Importador de plano de contas via CSV.
@@ -45,6 +102,10 @@ export class ImportadorPlanoContasService {
       nivel: niveis.get(l.codigo)!,
       admiteMovimento: l.admiteMovimento,
       parentId: l.codigoPai ? idPorCodigo.get(l.codigoPai)! : null,
+      naturezaInformacao: mapearNaturezaInformacao(l.naturezaInformacao),
+      naturezaSaldo: mapearNaturezaSaldo(l.naturezaSaldo),
+      superavitFinanceiro: mapearSuperavitFinanceiro(l.superavitFinanceiro),
+      funcao: (l.funcao ?? '').trim() || null,
     }))
 
     try {
@@ -79,6 +140,14 @@ export function parseCSV(texto: string): LinhaCSV[] {
     if (i < 0) throw new ErroNegocio('REQUISICAO_INVALIDA', `Coluna obrigatória ausente: "${c}".`)
     idx[c] = i
   }
+  // Colunas PCASP são opcionais: presentes só no CSV contábil enriquecido. Quando
+  // ausentes, as linhas mantêm o formato de 4 campos (receita/despesa intactos).
+  const idxPcasp: Record<string, number> = {}
+  for (const c of COLUNAS_PCASP) {
+    const i = header.indexOf(c)
+    if (i >= 0) idxPcasp[c] = i
+  }
+  const temPcasp = Object.keys(idxPcasp).length > 0
 
   const result: LinhaCSV[] = []
   for (let i = 1; i < linhas.length; i++) {
@@ -89,12 +158,23 @@ export function parseCSV(texto: string): LinhaCSV[] {
     if (!codigo) throw new ErroNegocio('REQUISICAO_INVALIDA', `Linha ${numero}: código vazio.`)
     if (!descricao) throw new ErroNegocio('REQUISICAO_INVALIDA', `Linha ${numero}: descrição vazia.`)
     const codigoPaiRaw = (partes[idx['codigoPai']!] ?? '').trim()
-    result.push({
+    const linha: LinhaCSV = {
       codigo,
       descricao,
       codigoPai: codigoPaiRaw === '' ? null : codigoPaiRaw,
       admiteMovimento: parseBoolean(partes[idx['admiteMovimento']!]),
-    })
+    }
+    if (temPcasp) {
+      const lerPcasp = (c: string) => {
+        const j = idxPcasp[c]
+        return j === undefined ? '' : (partes[j] ?? '').trim()
+      }
+      linha.naturezaInformacao = lerPcasp('naturezaInformacao')
+      linha.naturezaSaldo = lerPcasp('naturezaSaldo')
+      linha.superavitFinanceiro = lerPcasp('superavitFinanceiro')
+      linha.funcao = lerPcasp('funcao')
+    }
+    result.push(linha)
   }
   return result
 }

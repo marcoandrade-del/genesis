@@ -408,6 +408,12 @@ model Conta {
   descricao       String
   nivel           Int // 1..9 (PCASP Estendido TCE-PR)
   admiteMovimento Boolean       @default(false)
+  // Atributos PCASP (origem: planilha TCE-PR; nullable pois contas criadas à mão
+  // ou planos não-importados podem não tê-los). Só no plano-modelo contábil.
+  naturezaInformacao  NaturezaInformacao?
+  naturezaSaldo       NaturezaSaldo?
+  superavitFinanceiro SuperavitFinanceiro?
+  funcao              String?       @db.Text
   planoId         String
   parentId        String?
   criadoEm        DateTime      @default(now())
@@ -419,6 +425,29 @@ model Conta {
   @@unique([planoId, codigo])
   @@index([planoId, parentId])
   @@map("contas")
+}
+
+/// Natureza da Informação (PCASP): classifica a conta. Patrimonial (classes
+/// 1-4), Orçamentária (5-6), Controle (7-8).
+enum NaturezaInformacao {
+  PATRIMONIAL
+  ORCAMENTARIA
+  CONTROLE
+}
+
+/// Natureza do saldo da conta (PCASP). Mista admite inversão de saldo.
+enum NaturezaSaldo {
+  DEVEDORA
+  CREDORA
+  MISTA
+}
+
+/// Indicador de superávit financeiro / outros controles (PCASP TCE-PR).
+enum SuperavitFinanceiro {
+  FINANCEIRO
+  PATRIMONIAL
+  MISTA
+  OUTROS_CONTROLES
 }
 
 // Lançamento patrimonial: vive na ENTIDADE (não mais no município). As contas
