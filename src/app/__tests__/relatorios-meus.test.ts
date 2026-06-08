@@ -190,6 +190,9 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     expect(m.executar).toHaveBeenCalledWith('select 1', { entidadeId: 'ent1', ano: 2026 })
     expect(res.body).toContain('Empenho')
     expect(res.body).toContain('historico')
+    // menu de exportação (substitui o antigo botão de PDF) com link /app/.../exportar
+    expect(res.body).toContain('/app/relatorios/meus/rp1/exportar/csv')
+    expect(res.body).toContain('Exportar')
   })
 
   it('GET executar renderiza as faixas de cabeçalho/rodapé com os elementos', async () => {

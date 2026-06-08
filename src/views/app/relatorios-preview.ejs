@@ -41,6 +41,12 @@
     .faixa .el { position: absolute; font-size: 13px; white-space: nowrap; }
     .folha { background: #fff; }
     @media print { .no-print { display: none !important; } }
+    /* Menu de exportação via <details> nativo (a prévia não carrega o JS do Bootstrap). */
+    details.export-menu { position: relative; }
+    details.export-menu > summary { list-style: none; cursor: pointer; }
+    details.export-menu > summary::-webkit-details-marker { display: none; }
+    details.export-menu .dropdown-menu { display: none; position: absolute; top: 100%; right: 0; left: auto; z-index: 10; }
+    details.export-menu[open] .dropdown-menu { display: block; }
   </style>
 </head>
 <body class="bg-light">
@@ -69,7 +75,14 @@
     <h2 class="h4 fw-bold mb-0"><%= relatorio.nome %></h2>
     <div class="d-flex gap-2">
       <button class="btn btn-sm btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer me-1"></i>Imprimir</button>
-      <a href="/app/relatorios/meus/<%= relatorio.id %>/pdf" target="_blank" class="btn btn-sm btn-outline-secondary"><i class="bi bi-file-earmark-pdf me-1"></i>Exportar PDF</a>
+      <details class="export-menu d-inline-block">
+        <summary class="btn btn-sm btn-outline-secondary"><i class="bi bi-download me-1"></i>Exportar <i class="bi bi-caret-down-fill ms-1" style="font-size:.65em"></i></summary>
+        <ul class="dropdown-menu shadow-sm mt-1 py-1">
+          <% formatos.forEach(function(f) { %>
+            <li><a class="dropdown-item small" href="/app/relatorios/meus/<%= relatorio.id %>/exportar/<%= f.id %>"<%- f.download ? ' download' : ' target="_blank"' %>><i class="bi <%= f.icone %> me-2"></i><%= f.label %></a></li>
+          <% }) %>
+        </ul>
+      </details>
       <a href="/app/relatorios" class="btn btn-sm btn-outline-secondary">Voltar</a>
     </div>
   </div>

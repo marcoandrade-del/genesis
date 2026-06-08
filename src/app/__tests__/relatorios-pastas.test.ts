@@ -187,4 +187,107 @@ describe('appRelatoriosRoutes — Pastas e PDF', () => {
     expect((await app.inject({ method: 'GET', url: '/relatorios/meus/r1/pdf' })).statusCode).toBe(200)
     expect(m.executar).toHaveBeenCalledWith('', { entidadeId: 'ent1', ano: 2026 })
   })
+
+  // ── Exportar (multi-formato) ──────────────────────────────────
+  const REL = { id: 'r1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Lançamentos 2026', query: 'select 1', cabecalho: null, rodape: null }
+  const RESULTADO = { colunas: ['historico', 'valor'], linhas: [['Empenho;NE', 1234.5]], total: 1, truncado: false }
+
+  it.each([
+    ['csv', 'text/csv', 'attachment'],
+    ['txt', 'text/plain', 'attachment'],
+    ['json', 'application/json', 'attachment'],
+    ['xml', 'application/xml', 'attachment'],
+    ['html', 'text/html', 'inline'],
+    ['xls', 'spreadsheetml.sheet', 'attachment'],
+    ['doc', 'wordprocessingml.document', 'attachment'],
+  ])('GET exportar/%s devolve o mime e a disposição certos', async (fmt, mime, disp) => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    const res = await app.inject({ method: 'GET', url: `/relatorios/meus/r1/exportar/${fmt}` })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain(mime)
+    expect(res.headers['content-disposition']).toContain(disp)
+    expect(res.headers['content-disposition']).toContain('lancamentos_2026.')
+  })
+
+  it('GET exportar/csv: BOM, separador ; e campo escapado', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })
+    expect(res.body.charCodeAt(0)).toBe(0xfeff)
+    expect(res.body).toContain('historico;valor')
+    expect(res.body).toContain('"Empenho;NE"')
+  })
+
+  it('GET exportar/json: corpo é JSON com as linhas', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/json' })
+    expect(JSON.parse(res.body).linhas[0]).toEqual({ historico: 'Empenho;NE', valor: 1234.5 })
+  })
+
+  it('GET exportar/xls e /doc são arquivos zip (PK)', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    for (const fmt of ['xls', 'doc']) {
+      const res = await app.inject({ method: 'GET', url: `/relatorios/meus/r1/exportar/${fmt}` })
+      expect(res.statusCode).toBe(200)
+      expect(res.rawPayload[0]).toBe(0x50)
+      expect(res.rawPayload[1]).toBe(0x4b)
+    }
+  })
+
+  it('GET exportar/pdf usa o Playwright (gerarPdf)', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    m.gerarPdf.mockResolvedValue(Buffer.from('%PDF'))
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/pdf' })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('application/pdf')
+    expect(m.gerarPdf).toHaveBeenCalled()
+  })
+
+  it('GET exportar/<inválido> → 400 sem executar a query', async () => {
+    m.buscar.mockResolvedValue(REL)
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/zip' })
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toContain('Formato de exportação inválido')
+    expect(m.executar).not.toHaveBeenCalled()
+  })
+
+  it('GET exportar: inexistente → 404; entidade sumiu → 302', async () => {
+    m.buscar.mockResolvedValue(null)
+    expect((await app.inject({ method: 'GET', url: '/relatorios/meus/x/exportar/csv' })).statusCode).toBe(404)
+    prisma.entidade.findUnique.mockResolvedValue(null)
+    expect((await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })).statusCode).toBe(302)
+  })
+
+  it('GET exportar: erro do sandbox volta ao hub', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockRejectedValue(new ErroNegocio('CONFLITO', 'Sandbox não configurado.'))
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })
+    expect(res.statusCode).toBe(409)
+    expect(res.body).toContain('Sandbox não configurado.')
+  })
+
+  it('GET exportar: LEITURA pode (é leitura)', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'LEITURA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockResolvedValue(RESULTADO)
+    expect((await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })).statusCode).toBe(200)
+  })
+
+  it('GET exportar propaga erro inesperado (500)', async () => {
+    m.buscar.mockResolvedValue(REL)
+    m.executar.mockRejectedValue(new Error('boom'))
+    expect((await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })).statusCode).toBe(500)
+  })
+
+  it('GET exportar tolera query nula (executa com string vazia)', async () => {
+    m.buscar.mockResolvedValue({ ...REL, query: null })
+    m.executar.mockResolvedValue(RESULTADO)
+    expect((await app.inject({ method: 'GET', url: '/relatorios/meus/r1/exportar/csv' })).statusCode).toBe(200)
+    expect(m.executar).toHaveBeenCalledWith('', { entidadeId: 'ent1', ano: 2026 })
+  })
 })
