@@ -80,3 +80,55 @@ describe('desdobrar', () => {
     await expect(service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'X' })).rejects.toThrow('boom')
   })
 })
+
+describe('excluir', () => {
+  const DESD = { id: 'd1', entidadeId: 'e1', ano: 2026, codigo: '1.1.1.01', descricao: 'Caixa Geral', nivel: 4, admiteMovimento: true, origem: 'DESDOBRAMENTO', parentId: 'p1' }
+
+  it('exclui um desdobramento folha e reverte o pai a analítica', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0) // filhos=0; irmãos pós=0
+    const r = await service.excluir('d1')
+    expect(prisma.contaContabilEntidade.delete).toHaveBeenCalledWith({ where: { id: 'd1' } })
+    expect(prisma.contaContabilEntidade.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { admiteMovimento: true } })
+    expect(r).toEqual(DESD)
+  })
+
+  it('NÃO reverte o pai quando ainda há irmãos', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2)
+    await service.excluir('d1')
+    expect(prisma.contaContabilEntidade.update).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia excluir conta do MODELO', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ ...DESD, origem: 'MODELO' })
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaContabilEntidade.delete).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia quando tem filhos', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.count.mockResolvedValue(1)
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaContabilEntidade.delete).not.toHaveBeenCalled()
+  })
+
+  it('bloqueia (P2003) conta com movimentação', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.count.mockResolvedValueOnce(0)
+    prisma.contaContabilEntidade.delete.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('fk', { code: 'P2003', clientVersion: '7.0.0' }))
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+  })
+
+  it('não encontrada', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(null)
+    await expect(service.excluir('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+
+  it('propaga erro não-Prisma na exclusão', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.count.mockResolvedValueOnce(0)
+    prisma.contaContabilEntidade.delete.mockRejectedValue(new Error('boom'))
+    await expect(service.excluir('d1')).rejects.toThrow('boom')
+  })
+})

@@ -93,4 +93,22 @@ export async function adminContasDespesaEntidadeRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // Excluir um desdobramento (cópias do modelo não se excluem aqui).
+  app.delete<{ Params: { id: string } }>('/:id', async (req, reply) => {
+    try {
+      const conta = await service.excluir(req.params.id)
+      return reply
+        .header('HX-Redirect', `/admin/contas-despesa-entidade?entidadeId=${conta.entidadeId}&ano=${conta.ano}`)
+        .status(204)
+        .send()
+    } catch (e: unknown) {
+      const texto = e instanceof Error ? e.message : 'Erro ao excluir conta.'
+      return reply
+        .header('HX-Reswap', 'none')
+        .header('HX-Trigger', JSON.stringify({ mostrarInfo: { titulo: 'Exclusão não permitida', texto } }))
+        .status(200)
+        .send('')
+    }
+  })
 }

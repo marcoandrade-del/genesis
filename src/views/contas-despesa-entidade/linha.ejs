@@ -41,6 +41,14 @@
           <i class="bi bi-diagram-2 me-1"></i>Desdobrar
         </button>
       <% } %>
+      <% if (c.origem === 'DESDOBRAMENTO' && !c.temFilhos) { %>
+        <button class="btn btn-sm btn-outline-danger ms-1"
+          hx-delete="/admin/contas-despesa-entidade/<%= c.id %>"
+          hx-confirm="Excluir o desdobramento «<%= c.descricao %>» (<%= c.codigo %>)?"
+          title="Excluir desdobramento">
+          <i class="bi bi-trash"></i>
+        </button>
+      <% } %>
     </td>
   </tr>
 <% }) %>

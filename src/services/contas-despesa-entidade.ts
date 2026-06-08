@@ -73,4 +73,31 @@ export class ContasDespesaEntidadeService {
       throw e
     }
   }
+
+  /** Exclui um DESDOBRAMENTO (cópias do modelo não se excluem aqui). Ao remover o
+   *  último filho, o pai volta a ser analítica. */
+  async excluir(id: string) {
+    const conta = await this.prisma.contaDespesaEntidade.findUnique({ where: { id } })
+    if (!conta) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
+    if (conta.origem !== 'DESDOBRAMENTO') {
+      throw new ErroNegocio('CONFLITO', 'Só desdobramentos podem ser excluídos. Contas do modelo são geridas no plano-modelo.')
+    }
+    const filhos = await this.prisma.contaDespesaEntidade.count({ where: { parentId: id } })
+    if (filhos > 0) throw new ErroNegocio('CONFLITO', `Conta com ${filhos} filho(s) não pode ser excluída.`)
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.contaDespesaEntidade.delete({ where: { id } })
+        if (conta.parentId) {
+          const irmaos = await tx.contaDespesaEntidade.count({ where: { parentId: conta.parentId } })
+          if (irmaos === 0) await tx.contaDespesaEntidade.update({ where: { id: conta.parentId }, data: { admiteMovimento: true } })
+        }
+      })
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ErroNegocio('CONFLITO', 'Conta com movimentação não pode ser excluída.')
+      }
+      throw e
+    }
+    return conta
+  }
 }
