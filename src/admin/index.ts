@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { adminAuthRoutes } from './auth.js'
 import { adminDashboardRoutes } from './dashboard.js'
+import { adminEscopoRoutes } from './escopo.js'
 import { adminSistemasRoutes } from './sistemas.js'
 import { adminModulosRoutes } from './modulos.js'
 import { adminMenusRoutes } from './menus.js'
@@ -126,6 +127,7 @@ export async function adminRoutes(app: FastifyInstance) {
     })
 
     admin.register(adminDashboardRoutes)
+    admin.register(adminEscopoRoutes, { prefix: '/escopo' })
     admin.register(adminSistemasRoutes, { prefix: '/sistemas' })
     admin.register(adminModulosRoutes, { prefix: '/modulos' })
     admin.register(adminMenusRoutes, { prefix: '/menus' })

@@ -1,0 +1,108 @@
+<%
+  // Apresentação de cada status: rótulo + classe de badge + ícone.
+  const STATUS = {
+    PRONTO:        { rotulo: 'Pronto',       badge: 'bg-success bg-opacity-75', icone: 'check-circle-fill' },
+    EM_ANDAMENTO:  { rotulo: 'Em andamento', badge: 'bg-warning text-dark',      icone: 'arrow-repeat' },
+    A_FAZER:       { rotulo: 'A fazer',      badge: 'bg-secondary bg-opacity-50', icone: 'circle' },
+  }
+%>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <h2 class="h5 fw-bold mb-0">Escopo do Sistema</h2>
+  <span class="text-muted small">Roadmap — o que foi feito e o que falta</span>
+</div>
+<p class="text-muted small mb-4" style="max-width: 60rem"><%= visaoGeral %></p>
+
+<div class="row g-3 mb-4">
+  <%# Hero — percentual concluído em lime (paleta Wise) %>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded p-2" style="background: var(--primary)">
+          <i class="bi bi-graph-up-arrow fs-5" style="color: var(--ink)"></i>
+        </div>
+        <div>
+          <div class="fw-bold fs-4 lh-1"><%= resumo.percentConcluido %>%</div>
+          <div class="text-muted small">Concluído</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded p-2" style="background: var(--canvas-soft)">
+          <i class="bi bi-check-circle fs-5" style="color: var(--ink)"></i>
+        </div>
+        <div>
+          <div class="fw-bold fs-4 lh-1"><%= resumo.pronto %></div>
+          <div class="text-muted small">Prontos</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded p-2" style="background: var(--canvas-soft)">
+          <i class="bi bi-arrow-repeat fs-5" style="color: var(--ink)"></i>
+        </div>
+        <div>
+          <div class="fw-bold fs-4 lh-1"><%= resumo.emAndamento %></div>
+          <div class="text-muted small">Em andamento</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body d-flex align-items-center gap-3">
+        <div class="rounded p-2" style="background: var(--canvas-soft)">
+          <i class="bi bi-list-ul fs-5" style="color: var(--ink)"></i>
+        </div>
+        <div>
+          <div class="fw-bold fs-4 lh-1"><%= resumo.aFazer %></div>
+          <div class="text-muted small">A fazer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%# Barra de progresso geral %>
+<div class="progress mb-4" style="height: .5rem" role="progressbar"
+  aria-valuenow="<%= resumo.percentConcluido %>" aria-valuemin="0" aria-valuemax="100">
+  <div class="progress-bar" style="width: <%= resumo.percentConcluido %>%; background: var(--primary)"></div>
+</div>
+
+<%# Uma seção por área %>
+<% areas.forEach(function(area) {
+     const feitos = area.itens.filter(function(i){ return i.status === 'PRONTO' }).length %>
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center">
+      <span class="fw-semibold small">
+        <i class="bi bi-<%= area.icone %> me-2"></i><%= area.nome %>
+      </span>
+      <span class="text-muted" style="font-size:.75rem"><%= feitos %>/<%= area.itens.length %></span>
+    </div>
+    <div class="px-3 pt-2 pb-1 text-muted" style="font-size:.78rem"><%= area.descricao %></div>
+    <ul class="list-group list-group-flush">
+      <% area.itens.forEach(function(item) { const s = STATUS[item.status] %>
+        <li class="list-group-item d-flex justify-content-between align-items-start gap-3 py-2">
+          <div>
+            <div class="small fw-semibold">
+              <%= item.titulo %>
+              <% if (item.ref) { %>
+                <span class="text-muted fw-normal" style="font-size:.72rem"><%= item.ref %></span>
+              <% } %>
+            </div>
+            <div class="text-muted" style="font-size:.75rem"><%= item.descricao %></div>
+          </div>
+          <span class="badge rounded-pill <%= s.badge %> flex-shrink-0">
+            <i class="bi bi-<%= s.icone %> me-1"></i><%= s.rotulo %>
+          </span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+<% }) %>
