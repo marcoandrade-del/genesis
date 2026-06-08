@@ -90,6 +90,21 @@ describe('montarCorpoHtml', () => {
     expect(html).toContain('&lt;b&gt;x&lt;/b&gt;')
     expect(html).toContain('&lt;i&gt;t&lt;/i&gt;')
   })
+
+  it('com coluna de valor e porPagina: subtotais (com quebra) + total geral', () => {
+    const r = { colunas: ['c', 'v'], linhas: [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4']] }
+    const html = montarCorpoHtml(r, 'X', 2) // 2 linhas/página → 2 páginas
+    expect((html.match(/class="subtotal"/g) || []).length).toBe(2)
+    expect(html).toContain('break-after:page') // quebra entre páginas (não na última)
+    expect(html).toContain('class="total"')
+  })
+
+  it('sem porPagina, com coluna de valor: só total geral (sem subtotal)', () => {
+    const html = montarCorpoHtml({ colunas: ['c', 'v'], linhas: [['a', '10.5'], ['b', '4.5']] }, 'X')
+    expect(html).toContain('class="total"')
+    expect(html).not.toContain('class="subtotal"')
+    expect(html).toContain('15.0') // 10.5 + 4.5, 1 casa
+  })
 })
 
 describe('margemParaFaixa', () => {

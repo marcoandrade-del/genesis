@@ -6,12 +6,6 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
     })
   }
-  // Formata um valor de célula do resultado (datas em pt-BR; resto como veio).
-  function fmtCelula(v) {
-    if (v === null || v === undefined) return ''
-    if (v instanceof Date) return v.toLocaleDateString('pt-BR')
-    return v
-  }
   // Conteúdo (HTML escapado) de cada elemento de faixa, preenchido com os dados reais.
   function conteudoEl(tipo) {
     switch (tipo) {
@@ -106,12 +100,11 @@
         <table class="table table-sm table-bordered align-middle">
           <thead class="table-light"><tr><% resultado.colunas.forEach(function(c) { %><th><%= c %></th><% }) %></tr></thead>
           <tbody>
-            <% if (resultado.linhas.length === 0) { %>
+            <% if (!render || render.linhas.length === 0) { %>
               <tr><td colspan="<%= resultado.colunas.length || 1 %>" class="text-center text-muted py-3">Sem resultados.</td></tr>
-            <% } %>
-            <% resultado.linhas.forEach(function(row) { %>
-              <tr><% row.forEach(function(v) { %><td class="font-monospace small"><%= fmtCelula(v) %></td><% }) %></tr>
-            <% }) %>
+            <% } else { render.linhas.forEach(function(l) { %>
+              <tr class="<%= l.tipo === 'detalhe' ? '' : 'fw-bold table-light' %>"><% l.celulas.forEach(function(c) { %><td class="font-monospace small"><%= c %></td><% }) %></tr>
+            <% }) } %>
           </tbody>
         </table>
 

@@ -10,6 +10,7 @@ import { MeusRelatoriosOrgService } from '../services/meus-relatorios-org.js'
 import { criarExecutorPadrao } from '../services/relatorio-executor.js'
 import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf, type Faixa } from '../services/relatorio-pdf.js'
 import { exportarResultado, formatoValido, nomeArquivo, FORMATOS } from '../services/relatorio-export.js'
+import { montarRender, linhasPorPagina } from '../services/relatorio-totais.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
@@ -377,6 +378,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
         throw e
       }
     }
+    const porPagina = linhasPorPagina(margemParaFaixa(reg.cabecalho, 12), margemParaFaixa(reg.rodape, 12))
     return reply.view('app/relatorios-preview', {
       entidade,
       ano,
@@ -386,6 +388,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       rodape: reg.rodape,
       formatos: FORMATOS,
       resultado,
+      render: resultado ? montarRender(resultado, porPagina) : null,
       erro,
       geradoEm: new Date(),
       layout: null,
@@ -496,7 +499,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
 /** Monta o PDF (A4 com cabeçalho/rodapé repetidos) a partir do resultado. */
 async function montarPdfBuffer(
   reg: { nome: string; cabecalho: Faixa; rodape: Faixa },
-  resultado: { colunas: string[]; linhas: unknown[][] },
+  resultado: { colunas: string[]; linhas: unknown[][]; truncado?: boolean },
   entidade: { nome: string; endereco: string | null; brasao: string | null },
 ): Promise<Buffer> {
   const geradoEm = new Date()
@@ -508,12 +511,14 @@ async function montarPdfBuffer(
     dataGeracao: geradoEm.toLocaleDateString('pt-BR'),
     horaGeracao: geradoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
   }
+  const margemTopoMm = margemParaFaixa(reg.cabecalho, 12)
+  const margemRodapeMm = margemParaFaixa(reg.rodape, 12)
   return gerarPdf({
-    corpoHtml: montarCorpoHtml({ colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome),
+    corpoHtml: montarCorpoHtml(resultado, reg.nome, linhasPorPagina(margemTopoMm, margemRodapeMm)),
     header: montarTemplateFaixa(reg.cabecalho, dadosFaixa),
     footer: montarTemplateFaixa(reg.rodape, dadosFaixa),
-    margemTopoMm: margemParaFaixa(reg.cabecalho, 12),
-    margemRodapeMm: margemParaFaixa(reg.rodape, 12),
+    margemTopoMm,
+    margemRodapeMm,
   })
 }
 

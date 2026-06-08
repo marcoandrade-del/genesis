@@ -122,4 +122,33 @@ describe('relatorio-export', () => {
       expect(ext).toBe('docx')
     })
   })
+
+  describe('Total geral (automático)', () => {
+    it('CSV: linha final TOTAL GERAL soma a coluna de valor', async () => {
+      const { conteudo } = await exportarResultado('csv', R, 't')
+      const linhas = (conteudo as string).slice(1).split('\r\n')
+      expect(linhas.at(-1)).toBe('TOTAL GERAL;1234.5;')
+    })
+    it('JSON: totalGeral só das colunas de valor', async () => {
+      const { conteudo } = await exportarResultado('json', R, 't')
+      expect(JSON.parse(conteudo as string).totalGeral).toEqual({ Valor: 1234.5 })
+    })
+    it('XLS: última linha com rótulo e soma numérica', async () => {
+      const { conteudo } = await exportarResultado('xls', R, 't')
+      const wb = new ExcelJS.Workbook()
+      await wb.xlsx.load(conteudo as unknown as ArrayBuffer)
+      const ultima = wb.worksheets[0]!.lastRow!
+      expect(ultima.getCell(1).value).toBe('TOTAL GERAL')
+      expect(ultima.getCell(2).value).toBe(1234.5)
+    })
+    it('HTML/XML trazem a linha de total', async () => {
+      expect((await exportarResultado('html', R, 't')).conteudo as string).toContain('tr class="total"')
+      expect((await exportarResultado('xml', R, 't')).conteudo as string).toContain('<total>')
+    })
+    it('sem coluna de valor → nenhum total', async () => {
+      const semValor = { colunas: ['nome'], linhas: [['a'], ['b']] }
+      expect((await exportarResultado('csv', semValor, 't')).conteudo as string).not.toContain('TOTAL GERAL')
+      expect(JSON.parse((await exportarResultado('json', semValor, 't')).conteudo as string).totalGeral).toBeUndefined()
+    })
+  })
 })

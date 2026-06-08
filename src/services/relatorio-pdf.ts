@@ -1,4 +1,5 @@
 import { chromium, type Browser } from 'playwright'
+import { montarRender } from './relatorio-totais.js'
 
 export type DadosFaixa = {
   nomeEntidade: string
@@ -10,16 +11,10 @@ export type DadosFaixa = {
 }
 export type Faixa = { altura: number; layout: unknown } | null
 type ElLayout = { tipo: string; x: number; y: number }
-export type ResultadoPdf = { colunas: string[]; linhas: unknown[][] }
+export type ResultadoPdf = { colunas: string[]; linhas: unknown[][]; truncado?: boolean }
 
 function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
-}
-
-function fmtCelula(v: unknown): string {
-  if (v === null || v === undefined) return ''
-  if (v instanceof Date) return v.toLocaleDateString('pt-BR')
-  return esc(v)
 }
 
 // Conteúdo de um elemento de faixa no PDF. NUMERO_PAGINA usa os spans nativos do
@@ -48,19 +43,37 @@ export function montarTemplateFaixa(faixa: Faixa, dados: DadosFaixa): string {
   return `<div style="position:relative;width:100%;height:${faixa.altura}px;font-size:10px;font-family:sans-serif;padding:0 12mm;box-sizing:border-box">${els}</div>`
 }
 
-/** Documento HTML (corpo do PDF) com a tabela do resultado. */
-export function montarCorpoHtml(resultado: ResultadoPdf, titulo: string): string {
+/**
+ * Documento HTML (corpo do PDF) com a tabela do resultado. Quando há colunas de
+ * valor, insere subtotal por página (com quebra de página entre elas) e o total
+ * geral no fim. `porPagina` = linhas-detalhe por página (0 = sem subtotais, só
+ * total geral). O `<thead>` se repete em cada página (comportamento do Chromium).
+ */
+export function montarCorpoHtml(resultado: ResultadoPdf, titulo: string, porPagina = 0): string {
   const ths = resultado.colunas.map((c) => `<th>${esc(c)}</th>`).join('')
-  const trs = resultado.linhas.length
-    ? resultado.linhas.map((row) => `<tr>${row.map((v) => `<td>${fmtCelula(v)}</td>`).join('')}</tr>`).join('')
-    : `<tr><td colspan="${resultado.colunas.length || 1}" style="text-align:center;color:#888">Sem resultados.</td></tr>`
+  let trs: string
+  if (resultado.linhas.length === 0) {
+    trs = `<tr><td colspan="${resultado.colunas.length || 1}" style="text-align:center;color:#888">Sem resultados.</td></tr>`
+  } else {
+    const { linhas } = montarRender(resultado, porPagina > 0 ? porPagina : resultado.linhas.length + 1)
+    const idxSubs = linhas.flatMap((l, i) => (l.tipo === 'subtotal' ? [i] : []))
+    const ultimoSub = idxSubs.length ? idxSubs[idxSubs.length - 1] : -1
+    trs = linhas
+      .map((l, i) => {
+        const cls = l.tipo === 'detalhe' ? '' : ` class="${l.tipo}"`
+        const quebra = l.tipo === 'subtotal' && i !== ultimoSub ? ';break-after:page' : ''
+        const tds = l.celulas.map((c) => `<td>${esc(c)}</td>`).join('')
+        return `<tr${cls} style="break-inside:avoid${quebra}">${tds}</tr>`
+      })
+      .join('')
+  }
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
     body{font-family:sans-serif;font-size:11px;color:#111;margin:0}
     h1{font-size:14px;margin:0 0 8px}
     table{width:100%;border-collapse:collapse}
     th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;font-family:monospace}
     th{background:#f2f2f2}
-    tr{break-inside:avoid}
+    tr.subtotal td,tr.total td{font-weight:bold;background:#f2f2f2}
   </style></head><body>
     <h1>${esc(titulo)}</h1>
     <table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>
