@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { SincronizadorContas } from './sincronizador-contas.js'
 
 // PCASP Estendido municipal (TCE-PR) chega a 9 níveis: os 7 oficiais
 // (Classe→Grupo→SubGrupo→Título→SubTítulo→Ítem→SubÍtem) + 2 desdobramentos
@@ -35,6 +36,8 @@ export type DadosAtualizarConta = {
 export class ContasService {
   constructor(private prisma: PrismaClient) {}
 
+  private readonly sync = new SincronizadorContas()
+
   async listar(planoId: string) {
     return this.prisma.conta.findMany({
       where: { planoId },
@@ -67,15 +70,19 @@ export class ContasService {
     }
 
     try {
-      return await this.prisma.conta.create({
-        data: {
-          planoId: dados.planoId,
-          codigo: dados.codigo,
-          descricao: dados.descricao,
-          nivel,
-          admiteMovimento: dados.admiteMovimento ?? false,
-          parentId: dados.parentId ?? null,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const conta = await tx.conta.create({
+          data: {
+            planoId: dados.planoId,
+            codigo: dados.codigo,
+            descricao: dados.descricao,
+            nivel,
+            admiteMovimento: dados.admiteMovimento ?? false,
+            parentId: dados.parentId ?? null,
+          },
+        })
+        await this.sync.contaCriada(tx, 'CONTABIL', conta, { ano: plano.ano, modeloContabilId: plano.modeloContabilId })
+        return conta
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -102,7 +109,11 @@ export class ContasService {
     }
 
     try {
-      return await this.prisma.conta.update({ where: { id }, data: dados })
+      return await this.prisma.$transaction(async (tx) => {
+        const atualizada = await tx.conta.update({ where: { id }, data: dados })
+        await this.sync.contaAtualizada(tx, 'CONTABIL', atualizada)
+        return atualizada
+      })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         if (e.code === 'P2002') throw new ErroNegocio('CONFLITO', 'Já existe uma conta com esse código neste plano.')
@@ -133,6 +144,9 @@ export class ContasService {
       )
     }
 
-    await this.prisma.conta.delete({ where: { id } })
+    await this.prisma.$transaction(async (tx) => {
+      await this.sync.contaExcluida(tx, 'CONTABIL', id)
+      await tx.conta.delete({ where: { id } })
+    })
   }
 }

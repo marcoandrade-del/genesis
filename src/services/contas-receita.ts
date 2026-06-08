@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { SincronizadorContas } from './sincronizador-contas.js'
 
 // A Natureza da Receita do MCASP tem 8 dígitos base, mas os TCEs estaduais
 // estendem o detalhamento (o PR chega a ~12 segmentos). Teto generoso.
@@ -33,6 +34,8 @@ export type DadosAtualizarContaReceita = {
 export class ContasReceitaService {
   constructor(private prisma: PrismaClient) {}
 
+  private readonly sync = new SincronizadorContas()
+
   async listar(planoId: string) {
     return this.prisma.contaReceita.findMany({ where: { planoId }, orderBy: { codigo: 'asc' } })
   }
@@ -62,15 +65,19 @@ export class ContasReceitaService {
     }
 
     try {
-      return await this.prisma.contaReceita.create({
-        data: {
-          planoId: dados.planoId,
-          codigo: dados.codigo,
-          descricao: dados.descricao,
-          nivel,
-          admiteMovimento: dados.admiteMovimento ?? false,
-          parentId: dados.parentId ?? null,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const conta = await tx.contaReceita.create({
+          data: {
+            planoId: dados.planoId,
+            codigo: dados.codigo,
+            descricao: dados.descricao,
+            nivel,
+            admiteMovimento: dados.admiteMovimento ?? false,
+            parentId: dados.parentId ?? null,
+          },
+        })
+        await this.sync.contaCriada(tx, 'RECEITA', conta, { ano: plano.ano, modeloContabilId: plano.modeloContabilId })
+        return conta
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -93,7 +100,11 @@ export class ContasReceitaService {
     }
 
     try {
-      return await this.prisma.contaReceita.update({ where: { id }, data: dados })
+      return await this.prisma.$transaction(async (tx) => {
+        const atualizada = await tx.contaReceita.update({ where: { id }, data: dados })
+        await this.sync.contaAtualizada(tx, 'RECEITA', atualizada)
+        return atualizada
+      })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         if (e.code === 'P2002') throw new ErroNegocio('CONFLITO', 'Já existe uma conta com esse código neste plano.')
@@ -112,6 +123,9 @@ export class ContasReceitaService {
       throw new ErroNegocio('CONFLITO', `Conta com ${filhos} filho(s) não pode ser excluída.`)
     }
 
-    await this.prisma.contaReceita.delete({ where: { id } })
+    await this.prisma.$transaction(async (tx) => {
+      await this.sync.contaExcluida(tx, 'RECEITA', id)
+      await tx.contaReceita.delete({ where: { id } })
+    })
   }
 }

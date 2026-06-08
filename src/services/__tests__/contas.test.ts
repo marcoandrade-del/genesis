@@ -240,3 +240,32 @@ describe('ContasService.excluir', () => {
     await expect(service.excluir('c1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
 })
+
+// Fiação com o SincronizadorContas (a lógica detalhada está em sincronizador-contas.test.ts).
+describe('ContasService — propagação modelo→entidades', () => {
+  it('criar propaga a cópia para a entidade que tem a árvore do pai', async () => {
+    prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 3, admiteMovimento: false })
+    const nova = { id: 'cN', codigo: '1.1.1', descricao: 'X', nivel: 4, admiteMovimento: true, planoId: 'p1', parentId: 'c-pai' }
+    prisma.conta.create.mockResolvedValue(nova)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([{ id: 'pe1', entidadeId: 'e1', ano: 2026 }])
+    await service.criar({ planoId: 'p1', codigo: '1.1.1', descricao: 'X', parentId: 'c-pai', admiteMovimento: true })
+    expect(prisma.contaContabilEntidade.createMany).toHaveBeenCalledWith({
+      data: [
+        { entidadeId: 'e1', ano: 2026, codigo: '1.1.1', descricao: 'X', nivel: 4, admiteMovimento: true, origem: 'MODELO', modeloContaId: 'cN', parentId: 'pe1' },
+      ],
+    })
+  })
+
+  it('excluir é bloqueado quando alguma entidade desdobrou abaixo (e não apaga no modelo)', async () => {
+    prisma.conta.findUnique.mockResolvedValue(RAIZ)
+    prisma.conta.count.mockResolvedValue(0)
+    prisma.lancamentoItem.count.mockResolvedValue(0)
+    prisma.resumoMensalConta.count.mockResolvedValue(0)
+    prisma.saldoInicialAno.count.mockResolvedValue(0)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([{ id: 'cope1' }])
+    prisma.contaContabilEntidade.count.mockResolvedValue(1) // há desdobramento
+    await expect(service.excluir('c1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.conta.delete).not.toHaveBeenCalled()
+  })
+})
