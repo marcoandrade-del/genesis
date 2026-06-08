@@ -72,7 +72,8 @@ export const ESCOPO: readonly AreaEscopo[] = [
       {
         titulo: 'Painel de escopo (este)',
         descricao: 'Visualização HTML do roadmap: o que é, o que foi feito, o que falta.',
-        status: 'EM_ANDAMENTO',
+        status: 'PRONTO',
+        ref: '#57',
       },
     ],
   },
