@@ -158,6 +158,33 @@ describe('adminEntidadesRoutes', () => {
       })
       expect(res.body).toContain('Erro ao criar entidade')
     })
+
+    it('passa brasao (logotipo) quando é data URL válido', async () => {
+      criarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'POST', url: '/',
+        ...form({ municipioId: 'mun1', nome: 'Pref', tipo: 'PREFEITURA', ano: '2026', cnpj: '', brasao: 'data:image/png;base64,AAAA' }),
+      })
+      expect(criarMock).toHaveBeenCalledWith(expect.objectContaining({ brasao: 'data:image/png;base64,AAAA' }))
+    })
+
+    it('rejeita brasao que não é imagem', async () => {
+      const res = await app.inject({
+        method: 'POST', url: '/',
+        ...form({ municipioId: 'mun1', nome: 'Pref', tipo: 'PREFEITURA', ano: '2026', cnpj: '', brasao: 'javascript:alert(1)' }),
+      })
+      expect(res.body).toContain('Brasão inválido')
+      expect(criarMock).not.toHaveBeenCalled()
+    })
+
+    it('brasao vazio vira null (sem logotipo)', async () => {
+      criarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'POST', url: '/',
+        ...form({ municipioId: 'mun1', nome: 'Pref', tipo: 'PREFEITURA', ano: '2026', cnpj: '', brasao: '' }),
+      })
+      expect(criarMock).toHaveBeenCalledWith(expect.objectContaining({ brasao: null }))
+    })
   })
 
   describe('PUT /:id', () => {
@@ -177,6 +204,32 @@ describe('adminEntidadesRoutes', () => {
         method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11' }),
       })
       expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11', ativo: false })
+    })
+
+    it('atualiza definindo o brasao (logotipo)', async () => {
+      atualizarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'PUT', url: '/ent1',
+        ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', brasao: 'data:image/jpeg;base64,/9j/AAAA' }),
+      })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ brasao: 'data:image/jpeg;base64,/9j/AAAA' }))
+    })
+
+    it('remove o brasao quando enviado vazio', async () => {
+      atualizarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', brasao: '' }),
+      })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ brasao: null }))
+    })
+
+    it('rejeita brasao inválido no update', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      const res = await app.inject({
+        method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', brasao: 'not-an-image' }),
+      })
+      expect(res.body).toContain('Brasão inválido')
+      expect(atualizarMock).not.toHaveBeenCalled()
     })
 
     it('erro quando nome vazio', async () => {

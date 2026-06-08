@@ -8,6 +8,8 @@ export type DadosCriarEntidade = {
   tipo: TipoEntidade
   ano: number
   cnpj?: string
+  /** Brasão/logotipo como data URL base64 (ex.: `data:image/png;base64,...`). */
+  brasao?: string | null
 }
 
 export type DadosAtualizarEntidade = {
@@ -15,6 +17,8 @@ export type DadosAtualizarEntidade = {
   tipo?: TipoEntidade
   cnpj?: string | null
   ativo?: boolean
+  /** Brasão/logotipo como data URL base64; `null` remove o atual. */
+  brasao?: string | null
 }
 
 type ContaModelo = {
@@ -98,6 +102,7 @@ export class EntidadeService {
             nome: dados.nome,
             tipo: dados.tipo,
             ...(dados.cnpj ? { cnpj: dados.cnpj } : {}),
+            ...(dados.brasao ? { brasao: dados.brasao } : {}),
           },
         })
         if (contasCont.length) await tx.contaContabilEntidade.createMany({ data: copiarArvore(contasCont, entidade.id, dados.ano) })
