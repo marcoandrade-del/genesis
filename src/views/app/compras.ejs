@@ -20,14 +20,18 @@
   </nav>
 
   <div class="d-flex justify-content-between align-items-center mb-1">
-    <h2 class="h4 fw-bold mb-0">Compras — Planejamento <span class="font-monospace"><%= ano %></span></h2>
+    <h2 class="h4 fw-bold mb-0">Compras <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
     <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-eye me-1"></i>Somente leitura</span>
   </div>
   <p class="text-muted small mb-4">
-    Fase interna da Lei 14.133 — escopo: <strong><%= entidade.nome %></strong>, exercício <strong><%= ano %></strong>.
+    Fluxo da Lei 14.133 — escopo: <strong><%= entidade.nome %></strong>, exercício <strong><%= ano %></strong>.
   </p>
 
-  <div class="row g-3">
+  <%# ── Fase 1: Planejamento ──────────────────────────────────────────────── %>
+  <h3 class="h6 fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.04em">
+    <i class="bi bi-1-circle me-1"></i>Planejamento
+  </h3>
+  <div class="row g-3 mb-4">
     <div class="col-md-6 col-lg-3">
       <a href="/app/compras/catalogo" class="text-decoration-none">
         <div class="card border-0 shadow-sm h-100"><div class="card-body">
@@ -65,6 +69,83 @@
           <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-bookmark-check fs-4 text-primary"></i><span class="fw-semibold text-dark">Reservas</span></div>
           <div class="small text-muted">Pré-empenho (dotação)</div>
           <div class="h4 fw-bold mb-0 mt-1"><%= counts.reservas %></div>
+        </div></div>
+      </a>
+    </div>
+  </div>
+
+  <%# ── Fase 2: Seleção ───────────────────────────────────────────────────── %>
+  <h3 class="h6 fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.04em">
+    <i class="bi bi-2-circle me-1"></i>Seleção do fornecedor
+  </h3>
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/fornecedores" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-truck fs-4 text-primary"></i><span class="fw-semibold text-dark">Fornecedores</span></div>
+          <div class="small text-muted">Cadastro global</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.fornecedores %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/processos" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-gavel fs-4 text-primary"></i><span class="fw-semibold text-dark">Processos</span></div>
+          <div class="small text-muted">Licitações da entidade</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.processos %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/contratos" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-file-earmark-ruled fs-4 text-primary"></i><span class="fw-semibold text-dark">Contratos</span></div>
+          <div class="small text-muted">Instrumentos contratuais</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.contratos %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-3">
+      <a href="/app/compras/atas" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-journal-bookmark fs-4 text-primary"></i><span class="fw-semibold text-dark">Atas (ARP)</span></div>
+          <div class="small text-muted">Registro de preço</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.atas %></div>
+        </div></div>
+      </a>
+    </div>
+  </div>
+
+  <%# ── Fase 3: Execução ──────────────────────────────────────────────────── %>
+  <h3 class="h6 fw-bold text-uppercase text-muted mb-2" style="letter-spacing:.04em">
+    <i class="bi bi-3-circle me-1"></i>Execução financeira
+  </h3>
+  <div class="row g-3">
+    <div class="col-md-6 col-lg-4">
+      <a href="/app/compras/empenhos" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-pen fs-4 text-primary"></i><span class="fw-semibold text-dark">Empenhos</span></div>
+          <div class="small text-muted">1º estágio — reserva do orçamento</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.empenhos %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="/app/compras/liquidacoes" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-clipboard-check fs-4 text-primary"></i><span class="fw-semibold text-dark">Liquidações</span></div>
+          <div class="small text-muted">2º estágio — ateste de entrega</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.liquidacoes %></div>
+        </div></div>
+      </a>
+    </div>
+    <div class="col-md-6 col-lg-4">
+      <a href="/app/compras/ordens-pagamento" class="text-decoration-none">
+        <div class="card border-0 shadow-sm h-100"><div class="card-body">
+          <div class="d-flex align-items-center gap-2 mb-2"><i class="bi bi-cash-coin fs-4 text-primary"></i><span class="fw-semibold text-dark">Ordens de Pagamento</span></div>
+          <div class="small text-muted">3º estágio — pagamento</div>
+          <div class="h4 fw-bold mb-0 mt-1"><%= counts.ordensPagamento %></div>
         </div></div>
       </a>
     </div>
