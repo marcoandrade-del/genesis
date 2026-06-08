@@ -71,6 +71,30 @@
         placeholder="00.000.000/0000-00" maxlength="20">
     </div>
 
+    <div class="mb-3">
+      <label class="form-label small fw-semibold">Brasão / Logotipo</label>
+      <input type="hidden" name="brasao" id="ent-bras-val"
+        value="<%= entidade && entidade.brasao ? entidade.brasao : '' %>">
+      <div class="d-flex align-items-center gap-3">
+        <img id="ent-bras-preview" alt="Brasão"
+          <% if (entidade && entidade.brasao) { %>src="<%= entidade.brasao %>"<% } %>
+          class="border rounded bg-light p-1 <%= entidade && entidade.brasao ? '' : 'd-none' %>"
+          style="height:56px;max-width:120px;object-fit:contain">
+        <div class="flex-grow-1">
+          <input type="file" id="ent-bras-file" class="form-control form-control-sm"
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            onchange="entBrasaoSelecionar(this)">
+          <button type="button" id="ent-bras-remover"
+            class="btn btn-sm btn-link text-danger p-0 mt-1 <%= entidade && entidade.brasao ? '' : 'd-none' %>"
+            onclick="entBrasaoRemover()">
+            <i class="bi bi-x-lg me-1"></i>Remover brasão
+          </button>
+        </div>
+      </div>
+      <div class="form-text">PNG, JPG, GIF ou WEBP até 1 MB. Aparece nos cabeçalhos de relatório.</div>
+      <div id="ent-bras-erro" class="small text-danger mt-1 d-none"></div>
+    </div>
+
     <% if (entidade) { %>
       <div class="form-check">
         <input type="hidden" name="ativo" value="<%= entidade.ativo ? 'true' : 'false' %>" id="ent-ativo-val">
@@ -90,3 +114,51 @@
     </button>
   </div>
 </form>
+
+<script>
+// Lê o arquivo escolhido como data URL base64 e guarda no hidden `brasao`, que é
+// o formato que o gerador de relatórios consome (<img src="data:image/...">).
+function entBrasaoErro(msg) {
+  var el = document.getElementById('ent-bras-erro')
+  el.textContent = msg || ''
+  el.classList.toggle('d-none', !msg)
+}
+function entBrasaoDefinir(dataUrl) {
+  document.getElementById('ent-bras-val').value = dataUrl || ''
+  var img = document.getElementById('ent-bras-preview')
+  var btn = document.getElementById('ent-bras-remover')
+  if (dataUrl) {
+    img.src = dataUrl
+    img.classList.remove('d-none')
+    btn.classList.remove('d-none')
+  } else {
+    img.removeAttribute('src')
+    img.classList.add('d-none')
+    btn.classList.add('d-none')
+  }
+}
+function entBrasaoSelecionar(input) {
+  entBrasaoErro('')
+  var file = input.files && input.files[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) {
+    entBrasaoErro('Formato não suportado. Use PNG, JPG, GIF ou WEBP.')
+    input.value = ''
+    return
+  }
+  if (file.size > 1024 * 1024) {
+    entBrasaoErro('Imagem muito grande (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Máximo 1 MB.')
+    input.value = ''
+    return
+  }
+  var reader = new FileReader()
+  reader.onload = function () { entBrasaoDefinir(reader.result) }
+  reader.onerror = function () { entBrasaoErro('Falha ao ler o arquivo.') }
+  reader.readAsDataURL(file)
+}
+function entBrasaoRemover() {
+  document.getElementById('ent-bras-file').value = ''
+  entBrasaoErro('')
+  entBrasaoDefinir('')
+}
+</script>

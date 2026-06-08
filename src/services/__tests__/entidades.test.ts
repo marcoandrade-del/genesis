@@ -99,6 +99,22 @@ describe('EntidadeService.criar', () => {
     })
   })
 
+  it('inclui brasao (logotipo) quando informado', async () => {
+    planosOk()
+    await service.criar({ municipioId: 'mun1', nome: 'Prefeitura', tipo: 'PREFEITURA', ano: 2026, brasao: 'data:image/png;base64,AAAA' })
+    expect(prisma.entidade.create).toHaveBeenCalledWith({
+      data: { municipioId: 'mun1', nome: 'Prefeitura', tipo: 'PREFEITURA', brasao: 'data:image/png;base64,AAAA' },
+    })
+  })
+
+  it('omite brasao quando null', async () => {
+    planosOk()
+    await service.criar({ municipioId: 'mun1', nome: 'Prefeitura', tipo: 'PREFEITURA', ano: 2026, brasao: null })
+    expect(prisma.entidade.create).toHaveBeenCalledWith({
+      data: { municipioId: 'mun1', nome: 'Prefeitura', tipo: 'PREFEITURA' },
+    })
+  })
+
   it('usa modelo herdado do estado quando município não tem modelo próprio', async () => {
     prisma.municipio.findUnique.mockResolvedValue({ ...MUNICIPIO, modeloContabilId: null })
     prisma.planoDeContas.findFirst.mockResolvedValue(null)
@@ -158,6 +174,14 @@ describe('EntidadeService.atualizar', () => {
     const r = await service.atualizar('ent1', { nome: 'Novo', ativo: false })
     expect(r.nome).toBe('Novo')
     expect(prisma.entidade.update).toHaveBeenCalledWith({ where: { id: 'ent1' }, data: { nome: 'Novo', ativo: false } })
+  })
+
+  it('repassa brasao no update (define ou remove com null)', async () => {
+    prisma.entidade.update.mockResolvedValue(ENTIDADE)
+    await service.atualizar('ent1', { brasao: 'data:image/png;base64,AAAA' })
+    expect(prisma.entidade.update).toHaveBeenCalledWith({ where: { id: 'ent1' }, data: { brasao: 'data:image/png;base64,AAAA' } })
+    await service.atualizar('ent1', { brasao: null })
+    expect(prisma.entidade.update).toHaveBeenLastCalledWith({ where: { id: 'ent1' }, data: { brasao: null } })
   })
 
   it('lança CONFLITO em P2002', async () => {
