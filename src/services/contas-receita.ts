@@ -11,7 +11,6 @@ export type DadosCriarContaReceita = {
   codigo: string
   descricao: string
   parentId?: string | null
-  admiteMovimento?: boolean
 }
 
 export type DadosAtualizarContaReceita = {
@@ -25,11 +24,10 @@ export type DadosAtualizarContaReceita = {
  *
  * Invariantes:
  *  1. nível 1..NIVEL_MAX_RECEITA, derivado do parent.
- *  2. admiteMovimento=true (analítica) ⟹ conta é folha (sem filhos).
- *  3. Proibido filho em conta que admite movimento; proibido marcar
- *     admiteMovimento em conta com filhos.
- *  4. Exclusão proibida quando há filhos.
- *  5. Código único por plano (FK do DB via @@unique).
+ *  2. Nasce ANALÍTICA; ganha filho → SINTÉTICA; perde o último filho → volta a
+ *     analítica (admiteMovimento=true ⟺ sem filhos).
+ *  3. Exclusão proibida quando há filhos.
+ *  4. Código único por plano (FK do DB via @@unique).
  */
 export class ContasReceitaService {
   constructor(private prisma: PrismaClient) {}
@@ -55,9 +53,6 @@ export class ContasReceitaService {
       if (parent.planoId !== dados.planoId) {
         throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta pai pertence a outro plano.')
       }
-      if (parent.admiteMovimento) {
-        throw new ErroNegocio('CONFLITO', 'Não é possível adicionar filho a uma conta que admite movimento.')
-      }
       nivel = parent.nivel + 1
       if (nivel > NIVEL_MAX_RECEITA) {
         throw new ErroNegocio('CONFLITO', `Profundidade máxima de ${NIVEL_MAX_RECEITA} níveis excedida.`)
@@ -72,10 +67,11 @@ export class ContasReceitaService {
             codigo: dados.codigo,
             descricao: dados.descricao,
             nivel,
-            admiteMovimento: dados.admiteMovimento ?? false,
+            admiteMovimento: true, // toda conta nasce analítica
             parentId: dados.parentId ?? null,
           },
         })
+        if (conta.parentId) await tx.contaReceita.update({ where: { id: conta.parentId }, data: { admiteMovimento: false } })
         await this.sync.contaCriada(tx, 'RECEITA', conta, { ano: plano.ano, modeloContabilId: plano.modeloContabilId })
         return conta
       })
@@ -126,6 +122,13 @@ export class ContasReceitaService {
     await this.prisma.$transaction(async (tx) => {
       await this.sync.contaExcluida(tx, 'RECEITA', id)
       await tx.contaReceita.delete({ where: { id } })
+      if (conta.parentId) {
+        const irmaos = await tx.contaReceita.count({ where: { parentId: conta.parentId } })
+        if (irmaos === 0) {
+          await tx.contaReceita.update({ where: { id: conta.parentId }, data: { admiteMovimento: true } })
+          await this.sync.contaReanalitizada(tx, 'RECEITA', conta.parentId)
+        }
+      }
     })
   }
 }

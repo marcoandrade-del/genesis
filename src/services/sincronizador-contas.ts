@@ -92,11 +92,18 @@ export class SincronizadorContas {
           data: pais.map((p) => linha(p['entidadeId'] as string, p['ano'] as number, p['id'] as string)),
         })
       }
+      // O pai virou sintética no modelo (ganhou um filho) → reflete nas cópias.
+      await d.updateMany({ where: { modeloContaId: conta.parentId, origem: 'MODELO' }, data: { admiteMovimento: false } })
     } else {
       // Conta raiz: resolve entidades sob o modelo que já têm árvore no ano.
       const ids = await this.entidadesComArvore(tx, tipo, plano)
       if (ids.length) await d.createMany({ data: ids.map((eid) => linha(eid, plano.ano, null)) })
     }
+  }
+
+  /** Pai voltou a ser analítica (perdeu o último filho) no modelo → reflete nas cópias. */
+  async contaReanalitizada(tx: Tx, tipo: TipoConta, parentId: string): Promise<void> {
+    await del(tx, tipo).updateMany({ where: { modeloContaId: parentId, origem: 'MODELO' }, data: { admiteMovimento: true } })
   }
 
   /** Conta editada no modelo → atualiza as cópias (bloqueia se houver desdobramento). */

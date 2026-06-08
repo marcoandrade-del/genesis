@@ -202,7 +202,7 @@ describe('adminContasRoutes', () => {
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/contas?planoId=p1')
       expect(criarMock).toHaveBeenCalledWith({
-        planoId: 'p1', codigo: '1', descricao: 'ATIVO', admiteMovimento: false,
+        planoId: 'p1', codigo: '1', descricao: 'ATIVO',
       })
     })
 
@@ -213,7 +213,7 @@ describe('adminContasRoutes', () => {
         ...form({ planoId: 'p1', parentId: 'c1', codigo: '1.1', descricao: 'X', admiteMovimento: 'true' }),
       })
       expect(criarMock).toHaveBeenCalledWith({
-        planoId: 'p1', codigo: '1.1', descricao: 'X', parentId: 'c1', admiteMovimento: true,
+        planoId: 'p1', codigo: '1.1', descricao: 'X', parentId: 'c1',
       })
     })
 
@@ -274,16 +274,16 @@ describe('adminContasRoutes', () => {
   })
 
   describe('PUT /:id', () => {
-    it('atualiza descricao + admiteMovimento e redireciona', async () => {
+    it('atualiza descricao e redireciona', async () => {
       atualizarMock.mockResolvedValue(RAIZ)
       prisma.conta.findUnique.mockResolvedValue({ planoId: 'p1' })
       const res = await app.inject({
         method: 'PUT', url: '/c1',
-        ...form({ descricao: 'NOVA', admiteMovimento: 'true' }),
+        ...form({ descricao: 'NOVA' }),
       })
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/contas?planoId=p1')
-      expect(atualizarMock).toHaveBeenCalledWith('c1', { descricao: 'NOVA', admiteMovimento: true })
+      expect(atualizarMock).toHaveBeenCalledWith('c1', { descricao: 'NOVA' })
     })
 
     it('404 quando conta some entre validação e update', async () => {

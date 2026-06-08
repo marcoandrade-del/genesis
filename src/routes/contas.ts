@@ -22,7 +22,7 @@ export async function contasRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { planoId: string }
-    Body: { codigo: string; descricao: string; parentId?: string; admiteMovimento?: boolean }
+    Body: { codigo: string; descricao: string; parentId?: string }
   }>(
     '/planos-de-contas/:planoId/contas',
     { schema: sCriarConta },

@@ -12,7 +12,6 @@ export type DadosCriarConta = {
   codigo: string
   descricao: string
   parentId?: string | null
-  admiteMovimento?: boolean
 }
 
 export type DadosAtualizarConta = {
@@ -24,14 +23,14 @@ export type DadosAtualizarConta = {
 /**
  * Service do plano de contas — núcleo das regras de hierarquia.
  *
- * Invariantes mantidos pelas validações:
+ * Invariantes:
  *  1. nível 1..NIVEL_MAX, derivado do parent.
- *  2. admiteMovimento=true ⟹ conta é folha (sem filhos).
- *  3. Adicionar filho a uma conta com admiteMovimento=true: proibido.
- *  4. Marcar admiteMovimento=true em conta com filhos: proibido.
- *  5. Exclusão proibida quando há filhos OU LancamentoItem OU
+ *  2. Toda conta NASCE ANALÍTICA (admiteMovimento=true). Ao ganhar o primeiro
+ *     filho vira SINTÉTICA (admiteMovimento=false); ao perder o último filho,
+ *     volta a analítica. Ou seja: admiteMovimento=true ⟺ não tem filhos.
+ *  3. Exclusão proibida quando há filhos OU LancamentoItem OU
  *     ResumoMensalConta != 0 OU SaldoInicialAno != 0.
- *  6. Código único por plano (FK do DB via @@unique).
+ *  4. Código único por plano (FK do DB via @@unique).
  */
 export class ContasService {
   constructor(private prisma: PrismaClient) {}
@@ -60,9 +59,6 @@ export class ContasService {
       if (parent.planoId !== dados.planoId) {
         throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta pai pertence a outro plano.')
       }
-      if (parent.admiteMovimento) {
-        throw new ErroNegocio('CONFLITO', 'Não é possível adicionar filho a uma conta que admite movimento.')
-      }
       nivel = parent.nivel + 1
       if (nivel > NIVEL_MAX) {
         throw new ErroNegocio('CONFLITO', `Profundidade máxima de ${NIVEL_MAX} níveis excedida.`)
@@ -77,10 +73,12 @@ export class ContasService {
             codigo: dados.codigo,
             descricao: dados.descricao,
             nivel,
-            admiteMovimento: dados.admiteMovimento ?? false,
+            admiteMovimento: true, // toda conta nasce analítica
             parentId: dados.parentId ?? null,
           },
         })
+        // ao ganhar um filho, o pai deixa de admitir movimento (vira sintética)
+        if (conta.parentId) await tx.conta.update({ where: { id: conta.parentId }, data: { admiteMovimento: false } })
         await this.sync.contaCriada(tx, 'CONTABIL', conta, { ano: plano.ano, modeloContabilId: plano.modeloContabilId })
         return conta
       })
@@ -100,7 +98,7 @@ export class ContasService {
     const conta = await this.prisma.conta.findUnique({ where: { id } })
     if (!conta) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
 
-    // Marcar admiteMovimento=true exige que a conta seja folha (sem filhos).
+    // Marcar admiteMovimento=true (analítica) exige que a conta não tenha filhos.
     if (dados.admiteMovimento === true && conta.admiteMovimento === false) {
       const filhos = await this.prisma.conta.count({ where: { parentId: id } })
       if (filhos > 0) {
@@ -147,6 +145,14 @@ export class ContasService {
     await this.prisma.$transaction(async (tx) => {
       await this.sync.contaExcluida(tx, 'CONTABIL', id)
       await tx.conta.delete({ where: { id } })
+      // se o pai ficou sem filhos, volta a ser analítica
+      if (conta.parentId) {
+        const irmaos = await tx.conta.count({ where: { parentId: conta.parentId } })
+        if (irmaos === 0) {
+          await tx.conta.update({ where: { id: conta.parentId }, data: { admiteMovimento: true } })
+          await this.sync.contaReanalitizada(tx, 'CONTABIL', conta.parentId)
+        }
+      }
     })
   }
 }

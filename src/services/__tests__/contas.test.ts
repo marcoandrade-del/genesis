@@ -49,7 +49,7 @@ describe('ContasService.criar', () => {
     expect(prisma.conta.create).toHaveBeenCalledWith({
       data: {
         planoId: 'p1', codigo: '1', descricao: 'Ativo',
-        nivel: 1, admiteMovimento: false, parentId: null,
+        nivel: 1, admiteMovimento: true, parentId: null,
       },
     })
   })
@@ -66,14 +66,15 @@ describe('ContasService.criar', () => {
     expect(data.parentId).toBe('c-pai')
   })
 
-  it('respeita admiteMovimento=true ao criar', async () => {
+  it('toda conta nasce analítica; criar filho torna o pai sintética', async () => {
     prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
-    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 5, admiteMovimento: false })
-    prisma.conta.create.mockResolvedValue({})
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, nivel: 5, admiteMovimento: true }) // pai analítico
+    prisma.conta.create.mockResolvedValue({ id: 'cN', parentId: 'c-pai', nivel: 6, admiteMovimento: true })
 
-    await service.criar({ planoId: 'p1', codigo: '1.1.1.01.001', descricao: 'Caixa', parentId: 'c-pai', admiteMovimento: true })
+    await service.criar({ planoId: 'p1', codigo: '1.1.1.01.001', descricao: 'Caixa', parentId: 'c-pai' })
 
-    expect(prisma.conta.create.mock.calls[0][0].data.admiteMovimento).toBe(true)
+    expect(prisma.conta.create.mock.calls[0][0].data.admiteMovimento).toBe(true) // filho nasce analítico
+    expect(prisma.conta.update).toHaveBeenCalledWith({ where: { id: 'c-pai' }, data: { admiteMovimento: false } }) // pai vira sintética
   })
 
   it('lança RECURSO_NAO_ENCONTRADO quando plano não existe', async () => {
@@ -94,14 +95,6 @@ describe('ContasService.criar', () => {
     prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, planoId: 'p-outro' })
     await expect(service.criar({ planoId: 'p1', codigo: '1.1', descricao: 'X', parentId: 'c-pai' }))
       .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
-  })
-
-  it('lança CONFLITO ao tentar criar filho de conta que admite movimento', async () => {
-    prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
-    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, admiteMovimento: true, nivel: 3 })
-    await expect(service.criar({ planoId: 'p1', codigo: '1.1.1.001', descricao: 'X', parentId: 'c-pai' }))
-      .rejects.toMatchObject({ code: 'CONFLITO' })
-    expect(prisma.conta.create).not.toHaveBeenCalled()
   })
 
   it('lança CONFLITO quando excede NIVEL_MAX (parent.nivel=9 → filho seria nivel 10)', async () => {
@@ -267,5 +260,26 @@ describe('ContasService — propagação modelo→entidades', () => {
     prisma.contaContabilEntidade.count.mockResolvedValue(1) // há desdobramento
     await expect(service.excluir('c1')).rejects.toMatchObject({ code: 'CONFLITO' })
     expect(prisma.conta.delete).not.toHaveBeenCalled()
+  })
+
+  it('excluir a última filha devolve o pai a analítica (e propaga)', async () => {
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, id: 'c5', parentId: 'c-pai' })
+    prisma.conta.count.mockResolvedValue(0) // sem filhos (pré-check) e sem irmãos (pós-delete)
+    prisma.lancamentoItem.count.mockResolvedValue(0)
+    prisma.resumoMensalConta.count.mockResolvedValue(0)
+    prisma.saldoInicialAno.count.mockResolvedValue(0)
+    await service.excluir('c5')
+    expect(prisma.conta.update).toHaveBeenCalledWith({ where: { id: 'c-pai' }, data: { admiteMovimento: true } })
+    expect(prisma.contaContabilEntidade.updateMany).toHaveBeenCalledWith({ where: { modeloContaId: 'c-pai', origem: 'MODELO' }, data: { admiteMovimento: true } })
+  })
+
+  it('excluir uma filha quando o pai ainda tem outras NÃO reanalitiza', async () => {
+    prisma.conta.findUnique.mockResolvedValue({ ...RAIZ, id: 'c5', parentId: 'c-pai' })
+    prisma.conta.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2) // filhos(pré)=0; irmãos(pós-delete)=2
+    prisma.lancamentoItem.count.mockResolvedValue(0)
+    prisma.resumoMensalConta.count.mockResolvedValue(0)
+    prisma.saldoInicialAno.count.mockResolvedValue(0)
+    await service.excluir('c5')
+    expect(prisma.conta.update).not.toHaveBeenCalled() // pai continua sintética
   })
 })

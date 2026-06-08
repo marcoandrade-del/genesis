@@ -57,15 +57,8 @@
         required maxlength="200">
     </div>
 
-    <div class="form-check">
-      <input type="hidden" name="admiteMovimento" id="ct-mov-val"
-        value="<%= conta && conta.admiteMovimento ? 'true' : 'false' %>">
-      <input type="checkbox" class="form-check-input" id="ct-chk-mov"
-        <%= conta && conta.admiteMovimento ? 'checked' : '' %>
-        onchange="document.getElementById('ct-mov-val').value = this.checked ? 'true' : 'false'">
-      <label for="ct-chk-mov" class="form-check-label small">
-        Admite movimento (conta analítica/folha)
-      </label>
+    <div class="form-text small text-muted">
+      <i class="bi bi-info-circle me-1"></i>A conta nasce <strong>analítica</strong> (recebe lançamentos). Ao ganhar um filho/desdobramento vira <strong>sintética</strong> automaticamente.
     </div>
   </div>
 
