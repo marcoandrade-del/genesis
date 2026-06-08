@@ -134,6 +134,9 @@
   /* Padrões com bg-opacity-75 já em uso (status débito/crédito) — força contraste */
   .bg-danger.bg-opacity-75 { color: white !important; }
   .bg-success.bg-opacity-75 { color: white !important; }
+  /* Badge "Analítica" (bg-success + opacity-75): com texto branco forçado acima, o
+     fundo pálido do `.badge.bg-success` fica ilegível — usa o verde sólido. */
+  .badge.bg-success.bg-opacity-75 { background-color: var(--positive) !important; }
 
   /* ── bg utilities ─────────────────────────────────────────────────── */
   .bg-light { background-color: var(--canvas-soft) !important; }
