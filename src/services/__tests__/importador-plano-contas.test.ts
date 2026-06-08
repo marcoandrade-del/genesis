@@ -6,6 +6,9 @@ import {
   parseCSVLine,
   parseBoolean,
   validar,
+  mapearNaturezaInformacao,
+  mapearNaturezaSaldo,
+  mapearSuperavitFinanceiro,
 } from '../importador-plano-contas.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 
@@ -59,6 +62,44 @@ describe('parseBoolean', () => {
     ['qualquer-coisa', false],
   ])('parseBoolean(%j) → %s', (entrada, esperado) => {
     expect(parseBoolean(entrada as string | undefined)).toBe(esperado)
+  })
+})
+
+describe('mapeadores de atributos PCASP', () => {
+  it.each([
+    ['P', 'PATRIMONIAL'],
+    ['O', 'ORCAMENTARIA'],
+    ['C', 'CONTROLE'],
+    ['p', 'PATRIMONIAL'],
+    [' c ', 'CONTROLE'],
+    ['', null],
+    [undefined, null],
+    ['Z', null],
+  ])('mapearNaturezaInformacao(%j) → %s', (raw, esperado) => {
+    expect(mapearNaturezaInformacao(raw as string | undefined)).toBe(esperado)
+  })
+
+  it.each([
+    ['D', 'DEVEDORA'],
+    ['C', 'CREDORA'],
+    ['X', 'MISTA'],
+    ['', null],
+    [undefined, null],
+    ['Z', null],
+  ])('mapearNaturezaSaldo(%j) → %s', (raw, esperado) => {
+    expect(mapearNaturezaSaldo(raw as string | undefined)).toBe(esperado)
+  })
+
+  it.each([
+    ['F', 'FINANCEIRO'],
+    ['P', 'PATRIMONIAL'],
+    ['X', 'MISTA'],
+    ['O', 'OUTROS_CONTROLES'],
+    ['', null],
+    [undefined, null],
+    ['Z', null],
+  ])('mapearSuperavitFinanceiro(%j) → %s', (raw, esperado) => {
+    expect(mapearSuperavitFinanceiro(raw as string | undefined)).toBe(esperado)
   })
 })
 
@@ -119,6 +160,37 @@ describe('parseCSV', () => {
     const csv = `codigo,descricao,codigoPai,admiteMovimento\n1,Ativo`
     const r = parseCSV(csv)
     expect(r).toEqual([{ codigo: '1', descricao: 'Ativo', codigoPai: null, admiteMovimento: false }])
+  })
+
+  it('lê as colunas PCASP quando presentes (código bruto)', () => {
+    const csv = `codigo,descricao,codigoPai,admiteMovimento,naturezaSaldo,naturezaInformacao,superavitFinanceiro,funcao
+1.1.1.1,Caixa,,true,D,P,F,"Compreende o caixa, etc."`
+    const r = parseCSV(csv)
+    expect(r[0]).toEqual({
+      codigo: '1.1.1.1',
+      descricao: 'Caixa',
+      codigoPai: null,
+      admiteMovimento: true,
+      naturezaSaldo: 'D',
+      naturezaInformacao: 'P',
+      superavitFinanceiro: 'F',
+      funcao: 'Compreende o caixa, etc.',
+    })
+  })
+
+  it('com header PCASP parcial, lê o que existe e deixa o resto vazio', () => {
+    const csv = `codigo,descricao,codigoPai,admiteMovimento,naturezaSaldo\n1,Ativo,,false,D`
+    const r = parseCSV(csv)
+    expect(r[0]).toEqual({
+      codigo: '1',
+      descricao: 'Ativo',
+      codigoPai: null,
+      admiteMovimento: false,
+      naturezaSaldo: 'D',
+      naturezaInformacao: '',
+      superavitFinanceiro: '',
+      funcao: '',
+    })
   })
 })
 
@@ -201,6 +273,34 @@ describe('ImportadorPlanoContasService.importar', () => {
     expect(dados[1].parentId).toBe(dados[0].id)
     expect(dados[2].parentId).toBe(dados[1].id)
     expect(dados[2]).toMatchObject({ admiteMovimento: true, nivel: 3 })
+  })
+
+  it('mapeia e grava os atributos PCASP quando o CSV os traz', async () => {
+    prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+    prisma.conta.createMany.mockResolvedValue({ count: 1 })
+    const csv = `codigo,descricao,codigoPai,admiteMovimento,naturezaSaldo,naturezaInformacao,superavitFinanceiro,funcao
+1.1.1.1,Caixa,,true,D,P,F,Compreende o caixa`
+    await service.importar('p1', csv)
+    const dados = prisma.conta.createMany.mock.calls[0][0].data
+    expect(dados[0]).toMatchObject({
+      naturezaInformacao: 'PATRIMONIAL',
+      naturezaSaldo: 'DEVEDORA',
+      superavitFinanceiro: 'FINANCEIRO',
+      funcao: 'Compreende o caixa',
+    })
+  })
+
+  it('grava atributos PCASP nulos quando o CSV não os traz', async () => {
+    prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
+    prisma.conta.createMany.mockResolvedValue({ count: 3 })
+    await service.importar('p1', CSV_BASE)
+    const dados = prisma.conta.createMany.mock.calls[0][0].data
+    expect(dados[0]).toMatchObject({
+      naturezaInformacao: null,
+      naturezaSaldo: null,
+      superavitFinanceiro: null,
+      funcao: null,
+    })
   })
 
   it('lança RECURSO_NAO_ENCONTRADO quando plano não existe', async () => {

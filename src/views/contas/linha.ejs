@@ -25,6 +25,27 @@
     </td>
     <td><%= c.descricao %></td>
     <td class="text-center">
+      <%
+        const NAT_INFO = { PATRIMONIAL: ['Patrimonial','bg-primary'], ORCAMENTARIA: ['Orçamentária','bg-info'], CONTROLE: ['Controle','bg-secondary'] }
+        const NAT_SALDO = { DEVEDORA: ['D','Devedora'], CREDORA: ['C','Credora'], MISTA: ['X','Mista (admite inversão)'] }
+        const SUP_FIN = { FINANCEIRO: 'Financeiro', PATRIMONIAL: 'Patrimonial', MISTA: 'Mista/Híbrida', OUTROS_CONTROLES: 'Outros controles' }
+      %>
+      <% if (c.naturezaInformacao) { const ni = NAT_INFO[c.naturezaInformacao] %>
+        <span class="badge rounded-pill <%= ni[1] %> bg-opacity-75" title="Natureza da informação"><%= ni[0] %></span>
+        <% if (c.naturezaSaldo) { const ns = NAT_SALDO[c.naturezaSaldo] %>
+          <span class="badge rounded-pill bg-light text-dark border" title="Natureza de saldo: <%= ns[1] %>"><%= ns[0] %></span>
+        <% } %>
+        <% if (c.superavitFinanceiro) { %>
+          <i class="bi bi-droplet-half text-muted small" title="Superávit: <%= SUP_FIN[c.superavitFinanceiro] %>"></i>
+        <% } %>
+        <% if (c.funcao) { %>
+          <i class="bi bi-info-circle text-muted small" title="<%= c.funcao %>"></i>
+        <% } %>
+      <% } else { %>
+        <span class="text-muted">—</span>
+      <% } %>
+    </td>
+    <td class="text-center">
       <% if (c.admiteMovimento) { %>
         <span class="badge rounded-pill bg-success bg-opacity-75">Analítica</span>
       <% } else { %>

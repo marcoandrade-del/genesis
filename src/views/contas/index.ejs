@@ -41,13 +41,14 @@
             <th style="width:50px"></th>
             <th class="ps-3" style="width:200px">Código</th>
             <th>Descrição</th>
+            <th class="text-center" style="width:180px">Natureza (PCASP)</th>
             <th class="text-center" style="width:120px">Movimento</th>
             <th class="text-end pe-3" style="width:180px">Ações</th>
           </tr>
         </thead>
         <tbody id="contas-tbody">
           <% if (raizes.length === 0) { %>
-            <tr><td colspan="5" class="text-center text-muted py-5">
+            <tr><td colspan="6" class="text-center text-muted py-5">
               <i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano sem contas cadastradas.
               Use o botão "Importar CSV" em Planos de Contas para popular.
             </td></tr>

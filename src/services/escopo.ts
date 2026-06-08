@@ -140,8 +140,9 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Atributos PCASP no plano',
-        descricao: 'Natureza da Informação (1-4/5/6/7-8), natureza de saldo e função das contas.',
-        status: 'A_FAZER',
+        descricao: 'Natureza da Informação, natureza de saldo, superávit financeiro e função das contas (dados TCE-PR); coluna na árvore contábil.',
+        status: 'PRONTO',
+        ref: '#60',
       },
     ],
   },
