@@ -199,8 +199,9 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Compras no /app — Seleção e Execução',
-        descricao: 'Trazer as fases de seleção e execução para a área do operador, escopadas ao contexto.',
-        status: 'A_FAZER',
+        descricao: 'Consulta read-only das fases de seleção (fornecedores, processos, contratos, atas) e execução (empenhos, liquidações, OPs) na área do operador, escopada ao contexto.',
+        status: 'PRONTO',
+        ref: '#59',
       },
     ],
   },
