@@ -20,7 +20,7 @@
     <td><%= c.descricao %></td>
     <td class="text-center">
       <% if (c.admiteMovimento) { %>
-        <span class="badge rounded-pill bg-success bg-opacity-75">Folha</span>
+        <span class="badge rounded-pill bg-success bg-opacity-75">Analítica</span>
       <% } else { %>
         <span class="badge rounded-pill bg-secondary bg-opacity-50">Sintética</span>
       <% } %>
@@ -39,6 +39,14 @@
           hx-target="#modal-body" hx-swap="innerHTML"
           title="Desdobrar (criar conta-filha analítica)">
           <i class="bi bi-diagram-2 me-1"></i>Desdobrar
+        </button>
+      <% } %>
+      <% if (c.origem === 'DESDOBRAMENTO' && !c.temFilhos) { %>
+        <button class="btn btn-sm btn-outline-danger ms-1"
+          hx-delete="/admin/contas-contabil-entidade/<%= c.id %>"
+          hx-confirm="Excluir o desdobramento «<%= c.descricao %>» (<%= c.codigo %>)?"
+          title="Excluir desdobramento">
+          <i class="bi bi-trash"></i>
         </button>
       <% } %>
     </td>

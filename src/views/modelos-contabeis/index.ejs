@@ -32,13 +32,27 @@
             <td class="ps-3 fw-semibold"><%= m.descricao %></td>
             <td class="text-muted small"><%= m._count.estados %></td>
             <td class="text-muted small"><%= m._count.municipios %></td>
-            <td class="text-muted small"><%= m._count.planos %></td>
+            <td class="small">
+              <a href="/admin/planos-de-contas?modeloContabilId=<%= m.id %>" class="text-decoration-none" title="Planos contábeis deste modelo"><%= m._count.planos %></a>
+            </td>
             <td>
               <span class="badge rounded-pill <%= m.ativo ? 'bg-success' : 'bg-secondary' %> bg-opacity-75">
                 <%= m.ativo ? 'Ativo' : 'Inativo' %>
               </span>
             </td>
             <td class="text-end pe-3">
+              <div class="btn-group me-1">
+                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Planos de contas deste modelo">
+                  <i class="bi bi-diagram-3 me-1"></i>Planos
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><h6 class="dropdown-header">Planos deste modelo</h6></li>
+                  <li><a class="dropdown-item" href="/admin/planos-de-contas?modeloContabilId=<%= m.id %>"><i class="bi bi-bank me-2"></i>Contábil (PCASP)</a></li>
+                  <li><a class="dropdown-item" href="/admin/planos-contas-receita?modeloContabilId=<%= m.id %>"><i class="bi bi-graph-down-arrow me-2"></i>Receita</a></li>
+                  <li><a class="dropdown-item" href="/admin/planos-contas-despesa?modeloContabilId=<%= m.id %>"><i class="bi bi-graph-up-arrow me-2"></i>Despesa</a></li>
+                  <li><a class="dropdown-item" href="/admin/fontes-recurso?modeloContabilId=<%= m.id %>"><i class="bi bi-cash-stack me-2"></i>Fontes de Recurso</a></li>
+                </ul>
+              </div>
               <button class="btn btn-sm btn-outline-secondary me-1"
                 hx-get="/admin/modelos-contabeis/<%= m.id %>/form"
                 hx-target="#modal-body"

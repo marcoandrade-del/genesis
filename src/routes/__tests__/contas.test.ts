@@ -65,14 +65,16 @@ describe('contasRoutes', () => {
     expect(res.statusCode).toBe(404)
   })
 
-  it('POST trata 409 (parent admite movimento)', async () => {
+  it('POST cria filha de conta analítica e torna o pai sintética (201)', async () => {
     prisma.planoDeContas.findUnique.mockResolvedValue(PLANO)
     prisma.conta.findUnique.mockResolvedValue({ ...CONTA, admiteMovimento: true, nivel: 2 })
+    prisma.conta.create.mockResolvedValue({ ...CONTA, id: 'cN', nivel: 3, admiteMovimento: true, parentId: '00000000-0000-0000-0000-000000000001' })
     const res = await app.inject({
       method: 'POST', url: '/planos-de-contas/p1/contas', headers: auth,
       payload: { codigo: '1.1', descricao: 'X', parentId: '00000000-0000-0000-0000-000000000001' },
     })
-    expect(res.statusCode).toBe(409)
+    expect(res.statusCode).toBe(201)
+    expect(prisma.conta.update).toHaveBeenCalledWith({ where: { id: '00000000-0000-0000-0000-000000000001' }, data: { admiteMovimento: false } })
   })
 
   it('PUT atualiza com 200', async () => {

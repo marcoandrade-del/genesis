@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { SincronizadorContas } from './sincronizador-contas.js'
 
 // A Natureza da Receita do MCASP tem 8 dígitos base, mas os TCEs estaduais
 // estendem o detalhamento (o PR chega a ~12 segmentos). Teto generoso.
@@ -10,7 +11,6 @@ export type DadosCriarContaReceita = {
   codigo: string
   descricao: string
   parentId?: string | null
-  admiteMovimento?: boolean
 }
 
 export type DadosAtualizarContaReceita = {
@@ -24,14 +24,15 @@ export type DadosAtualizarContaReceita = {
  *
  * Invariantes:
  *  1. nível 1..NIVEL_MAX_RECEITA, derivado do parent.
- *  2. admiteMovimento=true (analítica) ⟹ conta é folha (sem filhos).
- *  3. Proibido filho em conta que admite movimento; proibido marcar
- *     admiteMovimento em conta com filhos.
- *  4. Exclusão proibida quando há filhos.
- *  5. Código único por plano (FK do DB via @@unique).
+ *  2. Nasce ANALÍTICA; ganha filho → SINTÉTICA; perde o último filho → volta a
+ *     analítica (admiteMovimento=true ⟺ sem filhos).
+ *  3. Exclusão proibida quando há filhos.
+ *  4. Código único por plano (FK do DB via @@unique).
  */
 export class ContasReceitaService {
   constructor(private prisma: PrismaClient) {}
+
+  private readonly sync = new SincronizadorContas()
 
   async listar(planoId: string) {
     return this.prisma.contaReceita.findMany({ where: { planoId }, orderBy: { codigo: 'asc' } })
@@ -52,9 +53,6 @@ export class ContasReceitaService {
       if (parent.planoId !== dados.planoId) {
         throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta pai pertence a outro plano.')
       }
-      if (parent.admiteMovimento) {
-        throw new ErroNegocio('CONFLITO', 'Não é possível adicionar filho a uma conta que admite movimento.')
-      }
       nivel = parent.nivel + 1
       if (nivel > NIVEL_MAX_RECEITA) {
         throw new ErroNegocio('CONFLITO', `Profundidade máxima de ${NIVEL_MAX_RECEITA} níveis excedida.`)
@@ -62,15 +60,20 @@ export class ContasReceitaService {
     }
 
     try {
-      return await this.prisma.contaReceita.create({
-        data: {
-          planoId: dados.planoId,
-          codigo: dados.codigo,
-          descricao: dados.descricao,
-          nivel,
-          admiteMovimento: dados.admiteMovimento ?? false,
-          parentId: dados.parentId ?? null,
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const conta = await tx.contaReceita.create({
+          data: {
+            planoId: dados.planoId,
+            codigo: dados.codigo,
+            descricao: dados.descricao,
+            nivel,
+            admiteMovimento: true, // toda conta nasce analítica
+            parentId: dados.parentId ?? null,
+          },
+        })
+        if (conta.parentId) await tx.contaReceita.update({ where: { id: conta.parentId }, data: { admiteMovimento: false } })
+        await this.sync.contaCriada(tx, 'RECEITA', conta, { ano: plano.ano, modeloContabilId: plano.modeloContabilId })
+        return conta
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -93,7 +96,11 @@ export class ContasReceitaService {
     }
 
     try {
-      return await this.prisma.contaReceita.update({ where: { id }, data: dados })
+      return await this.prisma.$transaction(async (tx) => {
+        const atualizada = await tx.contaReceita.update({ where: { id }, data: dados })
+        await this.sync.contaAtualizada(tx, 'RECEITA', atualizada)
+        return atualizada
+      })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError) {
         if (e.code === 'P2002') throw new ErroNegocio('CONFLITO', 'Já existe uma conta com esse código neste plano.')
@@ -112,6 +119,16 @@ export class ContasReceitaService {
       throw new ErroNegocio('CONFLITO', `Conta com ${filhos} filho(s) não pode ser excluída.`)
     }
 
-    await this.prisma.contaReceita.delete({ where: { id } })
+    await this.prisma.$transaction(async (tx) => {
+      await this.sync.contaExcluida(tx, 'RECEITA', id)
+      await tx.contaReceita.delete({ where: { id } })
+      if (conta.parentId) {
+        const irmaos = await tx.contaReceita.count({ where: { parentId: conta.parentId } })
+        if (irmaos === 0) {
+          await tx.contaReceita.update({ where: { id: conta.parentId }, data: { admiteMovimento: true } })
+          await this.sync.contaReanalitizada(tx, 'RECEITA', conta.parentId)
+        }
+      }
+    })
   }
 }

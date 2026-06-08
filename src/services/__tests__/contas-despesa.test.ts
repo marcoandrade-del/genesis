@@ -49,7 +49,7 @@ describe('ContasDespesaService.criar', () => {
     expect(prisma.contaDespesa.create).toHaveBeenCalledWith({
       data: {
         planoId: 'pd1', codigo: '3', descricao: 'Despesas Correntes',
-        nivel: 1, admiteMovimento: false, parentId: null,
+        nivel: 1, admiteMovimento: true, parentId: null,
       },
     })
   })
@@ -66,14 +66,15 @@ describe('ContasDespesaService.criar', () => {
     expect(data.parentId).toBe('c-pai')
   })
 
-  it('respeita admiteMovimento=true ao criar', async () => {
+  it('toda conta nasce analítica; criar filho torna o pai sintética', async () => {
     prisma.planoContasDespesa.findUnique.mockResolvedValue(PLANO)
-    prisma.contaDespesa.findUnique.mockResolvedValue({ ...RAIZ, nivel: 4, admiteMovimento: false })
-    prisma.contaDespesa.create.mockResolvedValue({})
+    prisma.contaDespesa.findUnique.mockResolvedValue({ ...RAIZ, nivel: 4, admiteMovimento: true })
+    prisma.contaDespesa.create.mockResolvedValue({ id: 'cN', parentId: 'c-pai', nivel: 5, admiteMovimento: true })
 
-    await service.criar({ planoId: 'pd1', codigo: '3.1.20.41.01', descricao: 'Contribuições', parentId: 'c-pai', admiteMovimento: true })
+    await service.criar({ planoId: 'pd1', codigo: '3.1.20.41.01', descricao: 'Contribuições', parentId: 'c-pai' })
 
     expect(prisma.contaDespesa.create.mock.calls[0][0].data.admiteMovimento).toBe(true)
+    expect(prisma.contaDespesa.update).toHaveBeenCalledWith({ where: { id: 'c-pai' }, data: { admiteMovimento: false } })
   })
 
   it('lança RECURSO_NAO_ENCONTRADO quando plano não existe', async () => {
@@ -94,14 +95,6 @@ describe('ContasDespesaService.criar', () => {
     prisma.contaDespesa.findUnique.mockResolvedValue({ ...RAIZ, planoId: 'p-outro' })
     await expect(service.criar({ planoId: 'pd1', codigo: '3.1', descricao: 'X', parentId: 'c-pai' }))
       .rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
-  })
-
-  it('lança CONFLITO ao tentar criar filho de conta que admite movimento', async () => {
-    prisma.planoContasDespesa.findUnique.mockResolvedValue(PLANO)
-    prisma.contaDespesa.findUnique.mockResolvedValue({ ...RAIZ, admiteMovimento: true, nivel: 3 })
-    await expect(service.criar({ planoId: 'pd1', codigo: '3.1.20.001', descricao: 'X', parentId: 'c-pai' }))
-      .rejects.toMatchObject({ code: 'CONFLITO' })
-    expect(prisma.contaDespesa.create).not.toHaveBeenCalled()
   })
 
   it('lança CONFLITO quando excede NIVEL_MAX_DESPESA (parent.nivel=10 → filho 11)', async () => {

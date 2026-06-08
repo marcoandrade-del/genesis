@@ -103,3 +103,34 @@ describe('desdobrar', () => {
     await expect(service.desdobrar('p1', { codigo: '3.1.90.11.01', descricao: 'X' })).rejects.toThrow('boom')
   })
 })
+
+describe('excluir', () => {
+  const DESD = { id: 'd1', entidadeId: 'e1', ano: 2026, codigo: '3.1.90.11.01', descricao: 'Sub', nivel: 5, admiteMovimento: true, origem: 'DESDOBRAMENTO', parentId: 'p1' }
+  it('exclui desdobramento folha e reverte o pai a analítica', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaDespesaEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0)
+    const r = await service.excluir('d1')
+    expect(prisma.contaDespesaEntidade.delete).toHaveBeenCalledWith({ where: { id: 'd1' } })
+    expect(prisma.contaDespesaEntidade.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { admiteMovimento: true } })
+    expect(r).toEqual(DESD)
+  })
+  it('não reverte o pai quando há irmãos', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaDespesaEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2)
+    await service.excluir('d1')
+    expect(prisma.contaDespesaEntidade.update).not.toHaveBeenCalled()
+  })
+  it('bloqueia MODELO / com filhos / P2003 / não encontrada', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue({ ...DESD, origem: 'MODELO' })
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaDespesaEntidade.count.mockResolvedValue(1)
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaDespesaEntidade.count.mockReset()
+    prisma.contaDespesaEntidade.count.mockResolvedValue(0)
+    prisma.contaDespesaEntidade.delete.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('fk', { code: 'P2003', clientVersion: '7.0.0' }))
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(null)
+    await expect(service.excluir('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+})

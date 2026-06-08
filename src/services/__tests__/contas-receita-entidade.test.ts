@@ -80,3 +80,34 @@ describe('desdobrar', () => {
     await expect(service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'X' })).rejects.toThrow('boom')
   })
 })
+
+describe('excluir', () => {
+  const DESD = { id: 'd1', entidadeId: 'e1', ano: 2026, codigo: '1.1.1.01', descricao: 'Sub', nivel: 4, admiteMovimento: true, origem: 'DESDOBRAMENTO', parentId: 'p1' }
+  it('exclui desdobramento folha e reverte o pai a analítica', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaReceitaEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0)
+    const r = await service.excluir('d1')
+    expect(prisma.contaReceitaEntidade.delete).toHaveBeenCalledWith({ where: { id: 'd1' } })
+    expect(prisma.contaReceitaEntidade.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { admiteMovimento: true } })
+    expect(r).toEqual(DESD)
+  })
+  it('não reverte o pai quando há irmãos', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaReceitaEntidade.count.mockResolvedValueOnce(0).mockResolvedValueOnce(2)
+    await service.excluir('d1')
+    expect(prisma.contaReceitaEntidade.update).not.toHaveBeenCalled()
+  })
+  it('bloqueia MODELO / com filhos / P2003 / não encontrada', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue({ ...DESD, origem: 'MODELO' })
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaReceitaEntidade.count.mockResolvedValue(1)
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaReceitaEntidade.count.mockReset()
+    prisma.contaReceitaEntidade.count.mockResolvedValue(0)
+    prisma.contaReceitaEntidade.delete.mockRejectedValue(new Prisma.PrismaClientKnownRequestError('fk', { code: 'P2003', clientVersion: '7.0.0' }))
+    await expect(service.excluir('d1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(null)
+    await expect(service.excluir('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+})

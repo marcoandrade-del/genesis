@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { SincronizadorContas } from './sincronizador-contas.js'
 
 export type DadosCriarFonteRecurso = {
   modeloContabilId: string
@@ -29,6 +30,8 @@ export type FiltrosFonteRecurso = { modeloContabilId?: string; ano?: number }
 export class FontesRecursoService {
   constructor(private prisma: PrismaClient) {}
 
+  private readonly sync = new SincronizadorContas()
+
   listar(filtros: FiltrosFonteRecurso = {}) {
     const where: Prisma.FonteRecursoWhereInput = {}
     if (filtros.modeloContabilId) where.modeloContabilId = filtros.modeloContabilId
@@ -45,16 +48,20 @@ export class FontesRecursoService {
     if (!modelo) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Modelo contábil não encontrado.')
 
     try {
-      return await this.prisma.fonteRecurso.create({
-        data: {
-          modeloContabilId: dados.modeloContabilId,
-          ano: dados.ano,
-          codigo: dados.codigo,
-          nomenclatura: dados.nomenclatura,
-          vinculada: dados.vinculada ?? true,
-          ...(dados.especificacao ? { especificacao: dados.especificacao } : {}),
-          ...(dados.grupo ? { grupo: dados.grupo } : {}),
-        },
+      return await this.prisma.$transaction(async (tx) => {
+        const fonte = await tx.fonteRecurso.create({
+          data: {
+            modeloContabilId: dados.modeloContabilId,
+            ano: dados.ano,
+            codigo: dados.codigo,
+            nomenclatura: dados.nomenclatura,
+            vinculada: dados.vinculada ?? true,
+            ...(dados.especificacao ? { especificacao: dados.especificacao } : {}),
+            ...(dados.grupo ? { grupo: dados.grupo } : {}),
+          },
+        })
+        await this.sync.fonteCriada(tx, fonte)
+        return fonte
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -66,7 +73,11 @@ export class FontesRecursoService {
 
   async atualizar(id: string, dados: DadosAtualizarFonteRecurso) {
     try {
-      return await this.prisma.fonteRecurso.update({ where: { id }, data: dados })
+      return await this.prisma.$transaction(async (tx) => {
+        const fonte = await tx.fonteRecurso.update({ where: { id }, data: dados })
+        await this.sync.fonteAtualizada(tx, fonte)
+        return fonte
+      })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2025') {
         throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Fonte de recurso não encontrada.')
@@ -78,6 +89,9 @@ export class FontesRecursoService {
   async excluir(id: string) {
     const fonte = await this.prisma.fonteRecurso.findUnique({ where: { id } })
     if (!fonte) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Fonte de recurso não encontrada.')
-    await this.prisma.fonteRecurso.delete({ where: { id } })
+    await this.prisma.$transaction(async (tx) => {
+      await this.sync.fonteExcluida(tx, id)
+      await tx.fonteRecurso.delete({ where: { id } })
+    })
   }
 }

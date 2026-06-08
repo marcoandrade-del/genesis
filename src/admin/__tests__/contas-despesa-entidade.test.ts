@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock } = vi.hoisted(() => ({
+const { listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock, excluirMock } = vi.hoisted(() => ({
   listarRaizesMock: vi.fn(),
   listarFilhosMock: vi.fn(),
   buscarMock: vi.fn(),
   sugerirMock: vi.fn(),
   desdobrarMock: vi.fn(),
+  excluirMock: vi.fn(),
 }))
 
 vi.mock('../../services/contas-despesa-entidade.js', () => ({
@@ -15,6 +16,7 @@ vi.mock('../../services/contas-despesa-entidade.js', () => ({
     buscarPorId = buscarMock
     sugerirCodigo = sugerirMock
     desdobrar = desdobrarMock
+    excluir = excluirMock
   },
 }))
 
@@ -35,7 +37,7 @@ describe('adminContasDespesaEntidadeRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock].forEach((m) => m.mockReset())
+    ;[listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock, excluirMock].forEach((m) => m.mockReset())
     listarRaizesMock.mockResolvedValue([])
     listarFilhosMock.mockResolvedValue([])
     ;({ app, prisma } = await criarApp({
@@ -151,6 +153,27 @@ describe('adminContasDespesaEntidadeRoutes', () => {
       sugerirMock.mockResolvedValue('3.1.02')
       const res = await app.inject({ method: 'POST', url: '/c1/desdobrar', ...form({ codigo: '3.1', descricao: 'X' }) })
       expect(res.body).toContain('Erro ao desdobrar')
+    })
+  })
+
+  describe('DELETE /:id', () => {
+    it('exclui e redireciona', async () => {
+      excluirMock.mockResolvedValue({ entidadeId: 'e1', ano: 2026 })
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.statusCode).toBe(204)
+      expect(res.headers['hx-redirect']).toBe('/admin/contas-despesa-entidade?entidadeId=e1&ano=2026')
+    })
+    it('erro vira modal (mostrarInfo) sem swap', async () => {
+      excluirMock.mockRejectedValue(new Error('Conta com movimentação não pode ser excluída.'))
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['hx-reswap']).toBe('none')
+      expect(res.headers['hx-trigger']).toContain('mostrarInfo')
+    })
+    it('mensagem default p/ erro não-Error', async () => {
+      excluirMock.mockRejectedValue('boom')
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.headers['hx-trigger']).toContain('Erro ao excluir')
     })
   })
 })

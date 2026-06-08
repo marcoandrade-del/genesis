@@ -67,4 +67,35 @@ export class ContasContabilEntidadeService {
       throw e
     }
   }
+
+  /**
+   * Exclui um DESDOBRAMENTO da entidade (cópias do modelo não se excluem aqui —
+   * são geridas no plano-modelo). Bloqueia se tem filhos ou movimentação. Ao
+   * remover o último filho, o pai volta a ser analítica.
+   */
+  async excluir(id: string) {
+    const conta = await this.prisma.contaContabilEntidade.findUnique({ where: { id } })
+    if (!conta) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
+    if (conta.origem !== 'DESDOBRAMENTO') {
+      throw new ErroNegocio('CONFLITO', 'Só desdobramentos podem ser excluídos. Contas do modelo são geridas no plano-modelo.')
+    }
+    const filhos = await this.prisma.contaContabilEntidade.count({ where: { parentId: id } })
+    if (filhos > 0) throw new ErroNegocio('CONFLITO', `Conta com ${filhos} filho(s) não pode ser excluída.`)
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.contaContabilEntidade.delete({ where: { id } })
+        if (conta.parentId) {
+          const irmaos = await tx.contaContabilEntidade.count({ where: { parentId: conta.parentId } })
+          if (irmaos === 0) await tx.contaContabilEntidade.update({ where: { id: conta.parentId }, data: { admiteMovimento: true } })
+        }
+      })
+    } catch (e) {
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2003') {
+        throw new ErroNegocio('CONFLITO', 'Conta com movimentação não pode ser excluída.')
+      }
+      throw e
+    }
+    return conta
+  }
 }

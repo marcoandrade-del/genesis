@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock } = vi.hoisted(() => ({
-  listarRaizesMock: vi.fn(), listarFilhosMock: vi.fn(), buscarMock: vi.fn(), sugerirMock: vi.fn(), desdobrarMock: vi.fn(),
+const { listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock, excluirMock } = vi.hoisted(() => ({
+  listarRaizesMock: vi.fn(), listarFilhosMock: vi.fn(), buscarMock: vi.fn(), sugerirMock: vi.fn(), desdobrarMock: vi.fn(), excluirMock: vi.fn(),
 }))
 
 vi.mock('../../services/contas-contabil-entidade.js', () => ({
@@ -11,6 +11,7 @@ vi.mock('../../services/contas-contabil-entidade.js', () => ({
     buscarPorId = buscarMock
     sugerirCodigo = sugerirMock
     desdobrar = desdobrarMock
+    excluir = excluirMock
   },
 }))
 
@@ -31,7 +32,7 @@ describe('adminContasContabilEntidadeRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock].forEach((m) => m.mockReset())
+    ;[listarRaizesMock, listarFilhosMock, buscarMock, sugerirMock, desdobrarMock, excluirMock].forEach((m) => m.mockReset())
     listarRaizesMock.mockResolvedValue([]); listarFilhosMock.mockResolvedValue([])
     ;({ app, prisma } = await criarApp({ registrar: adminContasContabilEntidadeRoutes, comView: true, simularAdmin: { sub: 'a1', email: 'a@x.com' } }))
     prisma.entidade.findMany.mockResolvedValue([ENTIDADE])
@@ -116,6 +117,28 @@ describe('adminContasContabilEntidadeRoutes', () => {
       desdobrarMock.mockRejectedValue('boom'); buscarMock.mockResolvedValue(CONTA); sugerirMock.mockResolvedValue('1.1.02')
       const res = await app.inject({ method: 'POST', url: '/c1/desdobrar', ...form({ codigo: '1', descricao: 'X' }) })
       expect(res.body).toContain('Erro ao desdobrar')
+    })
+  })
+
+  describe('DELETE /:id', () => {
+    it('exclui e redireciona (HX-Redirect)', async () => {
+      excluirMock.mockResolvedValue({ entidadeId: 'e1', ano: 2026 })
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.statusCode).toBe(204)
+      expect(res.headers['hx-redirect']).toBe('/admin/contas-contabil-entidade?entidadeId=e1&ano=2026')
+    })
+    it('erro vira modal (HX-Trigger mostrarInfo) sem swap', async () => {
+      excluirMock.mockRejectedValue(new Error('Conta com movimentação não pode ser excluída.'))
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['hx-reswap']).toBe('none')
+      expect(res.headers['hx-trigger']).toContain('mostrarInfo')
+      expect(res.headers['hx-trigger']).toContain('movimentação')
+    })
+    it('mensagem default para erro não-Error', async () => {
+      excluirMock.mockRejectedValue('boom')
+      const res = await app.inject({ method: 'DELETE', url: '/d1' })
+      expect(res.headers['hx-trigger']).toContain('Erro ao excluir')
     })
   })
 })

@@ -120,10 +120,10 @@ export async function adminContasRoutes(app: FastifyInstance) {
   })
 
   // ── Criar ───────────────────────────────────────────────────────────────────
-  app.post<{ Body: { planoId: string; parentId?: string; codigo: string; descricao: string; admiteMovimento?: string } }>(
+  app.post<{ Body: { planoId: string; parentId?: string; codigo: string; descricao: string } }>(
     '/',
     async (req, reply) => {
-      const { planoId, parentId, codigo, descricao, admiteMovimento } = req.body
+      const { planoId, parentId, codigo, descricao } = req.body
       const reRenderErro = async (erro: string) => {
         const plano = await app.prisma.planoDeContas.findUnique({
           where: { id: planoId },
@@ -143,7 +143,6 @@ export async function adminContasRoutes(app: FastifyInstance) {
           codigo: codigo.trim(),
           descricao: descricao.trim(),
           ...(parentId?.trim() ? { parentId } : {}),
-          admiteMovimento: admiteMovimento === 'true',
         })
         return reply.header('HX-Redirect', `/admin/contas?planoId=${planoId}`).status(204).send()
       } catch (e: unknown) {
@@ -152,11 +151,11 @@ export async function adminContasRoutes(app: FastifyInstance) {
     },
   )
 
-  // ── Atualizar (descricao + admiteMovimento) ────────────────────────────────
-  app.put<{ Params: { id: string }; Body: { descricao: string; admiteMovimento?: string } }>(
+  // ── Atualizar (descricao) ──────────────────────────────────────────────────
+  app.put<{ Params: { id: string }; Body: { descricao: string } }>(
     '/:id',
     async (req, reply) => {
-      const { descricao, admiteMovimento } = req.body
+      const { descricao } = req.body
       const reRenderErro = async (erro: string) => {
         const conta = await app.prisma.conta.findUnique({
           where: { id: req.params.id },
@@ -174,7 +173,6 @@ export async function adminContasRoutes(app: FastifyInstance) {
         if (!conta) return reply.status(404).send('Conta não encontrada.')
         await service.atualizar(req.params.id, {
           descricao: descricao.trim(),
-          admiteMovimento: admiteMovimento === 'true',
         })
         return reply.header('HX-Redirect', `/admin/contas?planoId=${conta.planoId}`).status(204).send()
       } catch (e: unknown) {
