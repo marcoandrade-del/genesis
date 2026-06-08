@@ -8,7 +8,8 @@ import {
 import { MeusRelatoriosService } from '../services/meus-relatorios.js'
 import { MeusRelatoriosOrgService } from '../services/meus-relatorios-org.js'
 import { criarExecutorPadrao } from '../services/relatorio-executor.js'
-import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf } from '../services/relatorio-pdf.js'
+import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf, type Faixa } from '../services/relatorio-pdf.js'
+import { exportarResultado, formatoValido, nomeArquivo, FORMATOS } from '../services/relatorio-export.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
@@ -383,6 +384,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       relatorio: reg,
       cabecalho: reg.cabecalho,
       rodape: reg.rodape,
+      formatos: FORMATOS,
       resultado,
       erro,
       geradoEm: new Date(),
@@ -440,25 +442,10 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     }
     try {
       const resultado = await executor.executar(reg.query ?? '', { entidadeId, ano })
-      const geradoEm = new Date()
-      const dadosFaixa = {
-        nomeEntidade: entidade.nome,
-        enderecoEntidade: entidade.endereco ?? '',
-        nomeRelatorio: reg.nome,
-        brasao: entidade.brasao ?? null,
-        dataGeracao: geradoEm.toLocaleDateString('pt-BR'),
-        horaGeracao: geradoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      }
-      const pdf = await gerarPdf({
-        corpoHtml: montarCorpoHtml({ colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome),
-        header: montarTemplateFaixa(reg.cabecalho, dadosFaixa),
-        footer: montarTemplateFaixa(reg.rodape, dadosFaixa),
-        margemTopoMm: margemParaFaixa(reg.cabecalho, 12),
-        margemRodapeMm: margemParaFaixa(reg.rodape, 12),
-      })
+      const pdf = await montarPdfBuffer(reg, resultado, entidade)
       return reply
         .header('Content-Type', 'application/pdf')
-        .header('Content-Disposition', 'inline; filename="relatorio.pdf"')
+        .header('Content-Disposition', `inline; filename="${nomeArquivo(reg.nome, 'pdf')}"`)
         .send(pdf)
     } catch (e) {
       if (e instanceof ErroNegocio) {
@@ -466,6 +453,67 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       }
       throw e
     }
+  })
+
+  // ── Exportar em vários formatos (HTML/TXT/PDF/CSV/XLS/DOC/XML/JSON) ──
+  // LEITURA pode (é leitura). PDF reaproveita o Playwright; o resto, o módulo
+  // de exportação. Formatos de dados baixam como anexo; HTML/PDF abrem na aba.
+  app.get<{ Params: { id: string; formato: string } }>('/relatorios/meus/:id/exportar/:formato', async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    const formato = req.params.formato
+    if (!formatoValido(formato)) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Formato de exportação inválido.', status: 400 })
+    }
+    const reg = await meus.buscar(req.params.id)
+    if (!reg || reg.usuarioId !== req.user.sub || reg.entidadeId !== entidadeId) {
+      return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: 'Relatório não encontrado.', status: 404 })
+    }
+    try {
+      const resultado = await executor.executar(reg.query ?? '', { entidadeId, ano })
+      if (formato === 'pdf') {
+        const pdf = await montarPdfBuffer(reg, resultado, entidade)
+        return reply
+          .header('Content-Type', 'application/pdf')
+          .header('Content-Disposition', `inline; filename="${nomeArquivo(reg.nome, 'pdf')}"`)
+          .send(pdf)
+      }
+      const arq = await exportarResultado(formato, { colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome)
+      return reply
+        .header('Content-Type', arq.mime)
+        .header('Content-Disposition', `${arq.download ? 'attachment' : 'inline'}; filename="${nomeArquivo(reg.nome, arq.ext)}"`)
+        .send(arq.conteudo)
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
+  })
+}
+
+/** Monta o PDF (A4 com cabeçalho/rodapé repetidos) a partir do resultado. */
+async function montarPdfBuffer(
+  reg: { nome: string; cabecalho: Faixa; rodape: Faixa },
+  resultado: { colunas: string[]; linhas: unknown[][] },
+  entidade: { nome: string; endereco: string | null; brasao: string | null },
+): Promise<Buffer> {
+  const geradoEm = new Date()
+  const dadosFaixa = {
+    nomeEntidade: entidade.nome,
+    enderecoEntidade: entidade.endereco ?? '',
+    nomeRelatorio: reg.nome,
+    brasao: entidade.brasao ?? null,
+    dataGeracao: geradoEm.toLocaleDateString('pt-BR'),
+    horaGeracao: geradoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+  }
+  return gerarPdf({
+    corpoHtml: montarCorpoHtml({ colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome),
+    header: montarTemplateFaixa(reg.cabecalho, dadosFaixa),
+    footer: montarTemplateFaixa(reg.rodape, dadosFaixa),
+    margemTopoMm: margemParaFaixa(reg.cabecalho, 12),
+    margemRodapeMm: margemParaFaixa(reg.rodape, 12),
   })
 }
 
