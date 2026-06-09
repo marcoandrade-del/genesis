@@ -7,7 +7,7 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
   // Lista filtrada por estado. Brasil tem 5570 municípios — sempre exige seleção.
   app.get<{ Querystring: { estadoId?: string } }>('/', async (req, reply) => {
     const { estadoId } = req.query
-    const [estados, municipios] = await Promise.all([
+    const [estados, municipios, municipiosComEntidadeRaw] = await Promise.all([
       app.prisma.estado.findMany({
         orderBy: { nome: 'asc' },
         include: { modeloContabil: { select: { id: true, descricao: true } } },
@@ -19,7 +19,15 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
             include: { modeloContabil: { select: { id: true, descricao: true } } },
           })
         : Promise.resolve([]),
+      // Municípios do estado com ≥1 entidade ativa e plano contábil copiado.
+      estadoId
+        ? app.prisma.municipio.findMany({
+            where: { estadoId, entidades: { some: { ativo: true, contasContabil: { some: {} } } } },
+            select: { id: true },
+          })
+        : Promise.resolve([]),
     ])
+    const municipiosComEntidade = municipiosComEntidadeRaw.map((m) => m.id)
     const estadoSelecionado = estados.find((e) => e.id === estadoId) ?? null
     return reply.view(
       'municipios/index',
@@ -29,6 +37,7 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
         userEmail: req.user.email,
         estados,
         municipios,
+        municipiosComEntidade,
         estadoSelecionado,
       },
       { layout: 'layouts/main' },
