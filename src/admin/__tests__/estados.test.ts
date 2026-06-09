@@ -56,6 +56,16 @@ describe('adminEstadosRoutes', () => {
       })
       expect(res.body).toContain('PCASP-MG')
       expect(res.body).toContain('Minas Gerais')
+      // drill-down para municípios do estado + Planos ▾ do modelo
+      expect(res.body).toContain('/admin/municipios?estadoId=e1')
+      expect(res.body).toContain('/admin/planos-de-contas?modeloContabilId=m1')
+      expect(res.body).toContain('/admin/planos-contas-receita?modeloContabilId=m1')
+    })
+
+    it('não mostra Planos quando o estado não tem modelo', async () => {
+      prisma.estado.findMany.mockResolvedValue([ESTADO_SEM_MODELO])
+      const res = await app.inject({ method: 'GET', url: '/' })
+      expect(res.body).not.toContain('planos-de-contas?modeloContabilId=')
     })
 
     it('mostra "Não atribuído" para estado sem modelo', async () => {

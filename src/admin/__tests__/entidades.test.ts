@@ -21,7 +21,7 @@ import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js
 
 const MUNICIPIO = { id: 'mun1', nome: 'Curitiba', estado: { sigla: 'PR' } }
 const ENTIDADE = {
-  id: 'ent1', nome: 'Prefeitura de Curitiba', tipo: 'PREFEITURA', cnpj: null, municipioId: 'mun1', ativo: true,
+  id: 'ent1', nome: 'Prefeitura de Curitiba', tipo: 'PREFEITURA', cnpj: null, municipioId: 'mun1', ano: 2026, ativo: true,
   municipio: { nome: 'Curitiba', estado: { sigla: 'PR' } },
 }
 
@@ -52,6 +52,10 @@ describe('adminEntidadesRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/' })
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Prefeitura de Curitiba')
+      // Planos ▾ → cópias da entidade com entidadeId + ano
+      expect(res.body).toContain('/admin/contas-contabil-entidade?entidadeId=ent1&ano=2026')
+      expect(res.body).toContain('/admin/contas-receita-entidade?entidadeId=ent1&ano=2026')
+      expect(res.body).toContain('/admin/contas-despesa-entidade?entidadeId=ent1&ano=2026')
       expect(prisma.entidade.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: undefined }))
     })
 

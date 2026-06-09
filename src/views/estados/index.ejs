@@ -15,7 +15,7 @@
           <th>Nome</th>
           <th>Modelo Contábil</th>
           <th class="text-end" style="width: 120px;">Municípios</th>
-          <th class="text-end pe-3" style="width: 100px;">Ações</th>
+          <th class="text-end pe-3" style="width: 220px;">Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -30,8 +30,25 @@
                 <span class="text-muted small fst-italic">Não atribuído</span>
               <% } %>
             </td>
-            <td class="text-end text-muted small"><%= e._count.municipios %></td>
+            <td class="text-end">
+              <a href="/admin/municipios?estadoId=<%= e.id %>" class="text-decoration-none" title="Ver municípios de <%= e.sigla %>">
+                <%= e._count.municipios %> <i class="bi bi-chevron-right small"></i>
+              </a>
+            </td>
             <td class="text-end pe-3">
+              <% if (e.modeloContabil) { %>
+                <div class="btn-group me-1">
+                  <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Planos do modelo deste estado">
+                    <i class="bi bi-diagram-3 me-1"></i>Planos
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><h6 class="dropdown-header">Padrão de <%= e.sigla %> · <%= e.modeloContabil.descricao %></h6></li>
+                    <li><a class="dropdown-item" href="/admin/planos-de-contas?modeloContabilId=<%= e.modeloContabil.id %>"><i class="bi bi-bank me-2"></i>Plano de Contas (PCASP)</a></li>
+                    <li><a class="dropdown-item" href="/admin/planos-contas-receita?modeloContabilId=<%= e.modeloContabil.id %>"><i class="bi bi-graph-down-arrow me-2"></i>Plano de Receita</a></li>
+                    <li><a class="dropdown-item" href="/admin/planos-contas-despesa?modeloContabilId=<%= e.modeloContabil.id %>"><i class="bi bi-graph-up-arrow me-2"></i>Plano de Despesa</a></li>
+                  </ul>
+                </div>
+              <% } %>
               <button class="btn btn-sm btn-outline-secondary"
                 hx-get="/admin/estados/<%= e.id %>/form"
                 hx-target="#modal-body"
