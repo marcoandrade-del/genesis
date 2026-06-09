@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { EstadosService } from '../services/estados.js'
+import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
 
 export async function adminEstadosRoutes(app: FastifyInstance) {
   const service = new EstadosService(app.prisma)
@@ -80,4 +81,19 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // Ressincroniza TODAS as entidades dos municípios deste estado com o modelo
+  // atual (recopia o plano-MODELO; desdobramentos/execução são preservados).
+  app.post<{ Params: { id: string } }>('/:id/ressincronizar', async (req, reply) => {
+    try {
+      const resumo = await new RessincronizadorModelo(app.prisma).ressincronizarEstado(req.params.id)
+      return reply
+        .header('HX-Trigger', JSON.stringify({ mostrarInfo: { titulo: 'Ressincronização concluída', texto: descreverResumo(resumo) } }))
+        .status(204)
+        .send()
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Erro ao ressincronizar entidades.'
+      return reply.status(400).send(msg)
+    }
+  })
 }

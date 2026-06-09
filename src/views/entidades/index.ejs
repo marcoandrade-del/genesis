@@ -1,6 +1,11 @@
 <% const TIPO_LABEL = { PREFEITURA: 'Prefeitura', CAMARA: 'Câmara', ADM_INDIRETA: 'Adm. Indireta' } %>
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="h5 fw-bold mb-0">Entidades</h2>
+  <div class="d-flex align-items-center gap-2">
+    <a href="<%= voltarUrl %>" class="btn btn-sm btn-outline-secondary" title="Voltar">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <h2 class="h5 fw-bold mb-0">Entidades</h2>
+  </div>
   <button class="btn btn-primary btn-sm"
     hx-get="/admin/entidades/form"
     hx-target="#modal-body"

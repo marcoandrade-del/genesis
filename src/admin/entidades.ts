@@ -46,6 +46,10 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
         include: { municipio: { include: { estado: { select: { sigla: true } } } } },
       }),
     ])
+    // "Voltar" segue o drill-down: filtrado por município → lista de municípios do
+    // estado dele; sem filtro → lista de estados.
+    const municipioFiltro = municipioId ? municipios.find((m) => m.id === municipioId) : null
+    const voltarUrl = municipioFiltro ? `/admin/municipios?estadoId=${municipioFiltro.estadoId}` : '/admin/estados'
     return reply.view(
       'entidades/index',
       {
@@ -55,6 +59,7 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
         municipios,
         entidades,
         municipioSelecionado: municipioId,
+        voltarUrl,
       },
       { layout: 'layouts/main' },
     )

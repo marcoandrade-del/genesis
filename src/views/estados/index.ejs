@@ -1,5 +1,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="h5 fw-bold mb-0">Estados</h2>
+  <div class="d-flex align-items-center gap-2">
+    <a href="/admin" class="btn btn-sm btn-outline-secondary" title="Voltar ao painel">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <h2 class="h5 fw-bold mb-0">Estados</h2>
+  </div>
   <div class="text-muted small">
     <i class="bi bi-info-circle me-1"></i>
     27 UFs do Brasil. Atribuir um modelo propaga automaticamente para os municípios.
@@ -23,7 +28,7 @@
           <th>Nome</th>
           <th>Modelo Contábil</th>
           <th class="text-end" style="width: 120px;">Municípios</th>
-          <th class="text-end pe-3" style="width: 220px;">Ações</th>
+          <th class="text-end pe-3" style="width: 260px;">Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -44,6 +49,15 @@
               </a>
             </td>
             <td class="text-end pe-3">
+              <% if (e.modeloContabil && estadosComEntidade.includes(e.id)) { %>
+                <button class="btn btn-sm btn-outline-success me-1"
+                  hx-post="/admin/estados/<%= e.id %>/ressincronizar"
+                  hx-swap="none"
+                  hx-confirm="Ressincronizar TODAS as entidades de <%= e.sigla %> com o modelo &quot;<%= e.modeloContabil.descricao %>&quot;? As cópias do modelo serão recriadas a partir do plano atual. Entidades com desdobramento ou execução são preservadas (puladas)."
+                  title="Ressincronizar entidades com o modelo do estado">
+                  <i class="bi bi-arrow-repeat"></i>
+                </button>
+              <% } %>
               <% if (e.modeloContabil) { %>
                 <div class="btn-group me-1">
                   <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Planos do modelo deste estado">
