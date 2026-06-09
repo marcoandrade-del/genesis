@@ -139,6 +139,12 @@ export const ESCOPO: readonly AreaEscopo[] = [
         ref: '#55',
       },
       {
+        titulo: 'Ressincronização em massa modelo→entidades',
+        descricao: 'Botões "Ressincronizar" no Estado (todas as entidades) e no Município (entidades do município) recopiam o plano-MODELO atual; preservam desdobramentos/execução. Cobre a defasagem deixada pela importação em massa do modelo.',
+        status: 'PRONTO',
+        ref: '#65',
+      },
+      {
         titulo: 'Atributos PCASP no plano',
         descricao: 'Natureza da Informação, natureza de saldo, superávit financeiro e função das contas (dados TCE-PR); coluna na árvore contábil.',
         status: 'PRONTO',
