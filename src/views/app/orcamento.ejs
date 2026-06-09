@@ -39,11 +39,16 @@
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h2 class="h4 fw-bold mb-0">Orçamento (LOA) — <span class="font-monospace"><%= ano %></span></h2>
-    <% if (orcamento) { %>
-      <% if (orcamento.status === 'RASCUNHO') { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
-      <% } else if (orcamento.status === 'APROVADO') { %><span class="badge bg-primary bg-opacity-10 text-primary">Aprovado</span>
-      <% } else { %><span class="badge bg-success bg-opacity-10 text-success">Em Execução</span><% } %>
-    <% } %>
+    <div class="d-flex align-items-center gap-2">
+      <% if (orcamento) { %>
+        <% if (orcamento.status === 'RASCUNHO') { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
+        <% } else if (orcamento.status === 'APROVADO') { %><span class="badge bg-primary bg-opacity-10 text-primary">Aprovado</span>
+        <% } else { %><span class="badge bg-success bg-opacity-10 text-success">Em Execução</span><% } %>
+      <% } %>
+      <a href="/app/orcamento/saldo" class="btn btn-sm btn-outline-primary">
+        <i class="bi bi-wallet2 me-1"></i>Ver saldos
+      </a>
+    </div>
   </div>
 
   <% if (!orcamento) { %>

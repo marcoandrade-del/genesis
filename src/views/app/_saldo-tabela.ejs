@@ -1,0 +1,36 @@
+<%# Tabela de saldo agregado. Params: titulo, icone, rotuloCol, linhas (LinhaSaldo[]),
+    arvore (bool — indenta rótulo por nível). %>
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white border-bottom py-2">
+    <span class="fw-semibold small"><i class="bi bi-<%= icone %> me-2"></i><%= titulo %></span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width:140px">Código</th>
+          <th><%= rotuloCol %></th>
+          <th class="text-end">Autorizado</th>
+          <th class="text-end">Reservado</th>
+          <th class="text-end">Empenhado</th>
+          <th class="text-end pe-3">Disponível</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (linhas.length === 0) { %>
+          <tr><td colspan="6" class="text-center text-muted py-3">Sem dotações.</td></tr>
+        <% } %>
+        <% linhas.forEach(function(l) { %>
+          <tr>
+            <td class="ps-3 font-monospace small"><%= l.codigo %></td>
+            <td class="small" <% if (arvore) { %>style="padding-left: calc(<%= (l.nivel - 1) * 1.1 %>rem + 0.5rem)"<% } %>><%= l.rotulo %></td>
+            <td class="text-end font-monospace small"><%= Number(l.autorizado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            <td class="text-end font-monospace small text-muted"><%= Number(l.reservado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            <td class="text-end font-monospace small text-muted"><%= Number(l.empenhado).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            <td class="text-end font-monospace small pe-3 fw-semibold <%= l.disponivel < 0 ? 'text-danger' : '' %>"><%= Number(l.disponivel).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
