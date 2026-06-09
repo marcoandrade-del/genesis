@@ -1,9 +1,38 @@
-<%# Barra superior do /app (marca + contexto entidade/exercício + trocar contexto/sair).
-    Requer: entidade (com municipio.estado) e ano no escopo da view. %>
+<%# Barra superior do /app: marca + navegação DINÂMICA (menu do core, em reply.locals.menuApp)
+    + contexto entidade/exercício + ações. Requer: entidade (com municipio.estado), ano.
+    Opcional: menuApp (árvore de navegação permitida); ausente em telas fora do escopo autenticado. %>
 <nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
-  <a class="navbar-brand fw-bold fs-6" href="/app">
-    <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
-  </a>
+  <div class="d-flex align-items-center">
+    <a class="navbar-brand fw-bold fs-6 me-2" href="/app">
+      <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
+    </a>
+    <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
+      <ul class="navbar-nav flex-row align-items-center mb-0">
+        <% menuApp.forEach(function (area) { %>
+          <% if (area.filhos && area.filhos.length) { %>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi <%= area.icone || 'bi-grid' %> me-1"></i><%= area.nome %>
+              </a>
+              <ul class="dropdown-menu dropdown-menu-dark">
+                <% if (area.rota) { %>
+                  <li><a class="dropdown-item" href="<%= area.rota %>"><i class="bi <%= area.icone || 'bi-grid' %> me-2"></i><%= area.nome %> · visão geral</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                <% } %>
+                <% area.filhos.forEach(function (f) { %>
+                  <li><a class="dropdown-item" href="<%= f.rota || '#' %>"><i class="bi <%= f.icone || 'bi-dot' %> me-2"></i><%= f.nome %></a></li>
+                <% }) %>
+              </ul>
+            </li>
+          <% } else { %>
+            <li class="nav-item">
+              <a class="nav-link px-2" href="<%= area.rota || '#' %>"><i class="bi <%= area.icone || 'bi-grid' %> me-1"></i><%= area.nome %></a>
+            </li>
+          <% } %>
+        <% }) %>
+      </ul>
+    <% } %>
+  </div>
   <div class="d-flex align-items-center gap-3">
     <span class="text-white-50 small">
       <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> ·
@@ -18,3 +47,7 @@
     </a>
   </div>
 </nav>
+<% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
+<%# Bundle Bootstrap (Popper + dropdowns). As views do /app só carregam o CSS; o JS entra aqui. %>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<% } %>
