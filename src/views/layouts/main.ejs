@@ -617,18 +617,23 @@ function confirmarExclusao(tipo, id, nome, qtdFilhos, opcoes) {
   }
 }
 
-// ── Bloqueio por inatividade (2 minutos) ─────────────────────────────────────
-const TIMEOUT_MS = 2 * 60 * 1000
+// ── Bloqueio por inatividade (5 min de inatividade REAL, compartilhada entre abas) ──
+// Inatividade é GLOBAL: qualquer atividade do usuário (em qualquer aba) grava um
+// timestamp em localStorage. Um verificador periódico só bloqueia se ninguém interagiu
+// por TIMEOUT_MS. Assim uma aba ociosa não trava a aba que está em uso.
+const TIMEOUT_MS = 5 * 60 * 1000
 const LOCK_KEY = 'genesis_tela_bloqueada'
-let _timerBloqueio = null
+const ATIV_KEY = 'genesis_ultima_atividade'
 const _overlay = document.getElementById('bloqueio-overlay')
 
 const _userEmail = (document.getElementById('nav-user-email') || {}).textContent || ''
 document.getElementById('bloqueio-email').value = _userEmail.trim()
 
-function resetarTimer() {
-  clearTimeout(_timerBloqueio)
-  _timerBloqueio = setTimeout(bloquearTela, TIMEOUT_MS)
+function marcarAtividade() {
+  // Throttle: grava no máx. a cada 5s para não martelar o localStorage a cada mousemove.
+  const agora = Date.now()
+  const ultima = parseInt(localStorage.getItem(ATIV_KEY) || '0', 10)
+  if (agora - ultima > 5000) localStorage.setItem(ATIV_KEY, String(agora))
 }
 
 function bloquearTela() {
@@ -641,24 +646,35 @@ function bloquearTela() {
 
 function desbloquearTela() {
   localStorage.removeItem(LOCK_KEY)
+  localStorage.setItem(ATIV_KEY, String(Date.now()))
   _overlay.classList.remove('ativo')
-  resetarTimer()
 }
 
-// Aplicar bloqueio imediatamente se outra aba ou navegação prévia bloqueou
+function verificarInatividade() {
+  if (localStorage.getItem(LOCK_KEY) === '1') return
+  const ultima = parseInt(localStorage.getItem(ATIV_KEY) || '0', 10)
+  if (ultima && Date.now() - ultima >= TIMEOUT_MS) bloquearTela()
+}
+
+// Carregar a página conta como atividade (o usuário navegou até aqui).
+localStorage.setItem(ATIV_KEY, String(Date.now()))
+
+// Aplicar bloqueio imediatamente se outra aba ou navegação prévia bloqueou.
 if (localStorage.getItem(LOCK_KEY) === '1') bloquearTela()
 
-// Sincronizar bloqueio/desbloqueio entre abas
+// Sincronizar bloqueio/desbloqueio entre abas.
 window.addEventListener('storage', function(e) {
   if (e.key !== LOCK_KEY) return
   if (e.newValue === '1') bloquearTela()
-  else if (!e.newValue) { _overlay.classList.remove('ativo'); resetarTimer() }
+  else if (!e.newValue) _overlay.classList.remove('ativo')
 })
 
 ;['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(function(ev) {
-  document.addEventListener(ev, resetarTimer, { passive: true })
+  document.addEventListener(ev, marcarAtividade, { passive: true })
 })
-resetarTimer()
+
+// Verifica a cada 15s; só bloqueia após TIMEOUT_MS de inatividade global.
+setInterval(verificarInatividade, 15000)
 
 document.getElementById('bloqueio-btn-entrar').addEventListener('click', async function () {
   const email = document.getElementById('bloqueio-email').value

@@ -5,16 +5,24 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
   const service = new EstadosService(app.prisma)
 
   app.get('/', async (req, reply) => {
-    const estados = await app.prisma.estado.findMany({
-      orderBy: { nome: 'asc' },
-      include: {
-        modeloContabil: { select: { id: true, descricao: true } },
-        _count: { select: { municipios: true } },
-      },
-    })
+    const [estados, municipiosComEntidade] = await Promise.all([
+      app.prisma.estado.findMany({
+        orderBy: { nome: 'asc' },
+        include: {
+          modeloContabil: { select: { id: true, descricao: true } },
+          _count: { select: { municipios: true } },
+        },
+      }),
+      // Estados que têm ≥1 entidade ativa com plano contábil copiado (via seus municípios).
+      app.prisma.municipio.findMany({
+        where: { entidades: { some: { ativo: true, contasContabil: { some: {} } } } },
+        select: { estadoId: true },
+      }),
+    ])
+    const estadosComEntidade = [...new Set(municipiosComEntidade.map((m) => m.estadoId))]
     return reply.view(
       'estados/index',
-      { title: 'Estados — Gênesis Admin', active: 'estados', userEmail: req.user.email, estados },
+      { title: 'Estados — Gênesis Admin', active: 'estados', userEmail: req.user.email, estados, estadosComEntidade },
       { layout: 'layouts/main' },
     )
   })

@@ -7,6 +7,14 @@
 </div>
 
 <div class="card border-0 shadow-sm">
+  <div class="card-header bg-white border-bottom py-2 px-3">
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" id="filtro-com-entidade" onchange="filtrarComEntidade(this.checked)">
+      <label class="form-check-label small" for="filtro-com-entidade">
+        Somente com entidades ativas <span class="text-muted">(plano contábil cadastrado)</span>
+      </label>
+    </div>
+  </div>
   <div class="card-body p-0">
     <table class="table table-hover align-middle mb-0">
       <thead class="table-light">
@@ -20,7 +28,7 @@
       </thead>
       <tbody>
         <% estados.forEach(function(e) { %>
-          <tr>
+          <tr data-tem-entidade="<%= estadosComEntidade.includes(e.id) %>">
             <td class="ps-3 fw-semibold font-monospace"><%= e.sigla %></td>
             <td><%= e.nome %></td>
             <td>
@@ -63,3 +71,13 @@
     </table>
   </div>
 </div>
+
+<script>
+  // Toggle client-side: esconde linhas sem entidade ativa (plano contábil) quando marcado.
+  function filtrarComEntidade(ativo) {
+    document.querySelectorAll('tr[data-tem-entidade]').forEach(function (tr) {
+      var tem = tr.getAttribute('data-tem-entidade') === 'true'
+      tr.style.display = ativo && !tem ? 'none' : ''
+    })
+  }
+</script>
