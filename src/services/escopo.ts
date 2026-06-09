@@ -144,6 +144,11 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
         ref: '#60',
       },
+      {
+        titulo: 'Navegação encadeada Estado → Município → Entidade',
+        descricao: 'Drill-down por linha (municípios do estado, entidades do município) + acesso aos planos de contas/receita/despesa por linha em cada nível.',
+        status: 'PRONTO',
+      },
     ],
   },
   {

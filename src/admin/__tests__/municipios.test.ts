@@ -69,6 +69,9 @@ describe('adminMunicipiosRoutes', () => {
         orderBy: { nome: 'asc' },
         include: { modeloContabil: { select: { id: true, descricao: true } } },
       })
+      // drill-down para entidades + Planos ▾ usando o modelo HERDADO do estado (m1)
+      expect(res.body).toContain('/admin/entidades?municipioId=mun1')
+      expect(res.body).toContain('/admin/planos-de-contas?modeloContabilId=m1')
     })
 
     it('mostra "Herdado de UF" para município sem modelo próprio', async () => {

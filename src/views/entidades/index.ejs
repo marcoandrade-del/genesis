@@ -33,7 +33,7 @@
           <th style="width:160px">Município</th>
           <th style="width:180px">CNPJ</th>
           <th class="text-center" style="width:90px">Status</th>
-          <th class="text-end pe-3" style="width:120px">Ações</th>
+          <th class="text-end pe-3" style="width:220px">Ações</th>
         </tr>
       </thead>
       <tbody>
@@ -54,6 +54,17 @@
               </span>
             </td>
             <td class="text-end pe-3">
+              <div class="btn-group me-1">
+                <button type="button" class="btn btn-sm btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Planos de contas desta entidade">
+                  <i class="bi bi-diagram-3 me-1"></i>Planos
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                  <li><h6 class="dropdown-header">Cópias da entidade · <%= e.ano %></h6></li>
+                  <li><a class="dropdown-item" href="/admin/contas-contabil-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-bank me-2"></i>Plano de Contas (PCASP)</a></li>
+                  <li><a class="dropdown-item" href="/admin/contas-receita-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-graph-down-arrow me-2"></i>Plano de Receita</a></li>
+                  <li><a class="dropdown-item" href="/admin/contas-despesa-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-graph-up-arrow me-2"></i>Plano de Despesa</a></li>
+                </ul>
+              </div>
               <button class="btn btn-sm btn-outline-secondary me-1"
                 hx-get="/admin/entidades/<%= e.id %>/form"
                 hx-target="#modal-body"
