@@ -9,6 +9,7 @@ import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
 import { appRelatoriosRoutes } from './relatorios.js'
 import { appComprasRoutes } from './compras.js'
+import { MenuAppService, type MenuAppNode } from '../services/menu-app.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
 // escolheu na sessão atual). Injetado pelo middleware antes de qualquer rota
@@ -20,6 +21,11 @@ declare module 'fastify' {
       ano: number
       nivel: 'LEITURA' | 'ESCRITA' | 'ADMIN'
     }
+  }
+  // `reply.locals` é decorado pelo @fastify/view e mesclado em todo reply.view.
+  // Usamos para injetar a navegação dinâmica (menuApp) sem cada rota passar.
+  interface FastifyReply {
+    locals?: Record<string, unknown> & { menuApp?: MenuAppNode[] }
   }
 }
 
@@ -94,6 +100,14 @@ export async function appRoutes(app: FastifyInstance) {
   app.register(async (autenticado) => {
     autenticado.addHook('onRequest', appAuthMiddleware)
     autenticado.addHook('onRequest', appContextoMiddleware)
+
+    // Navegação dinâmica: calcula a árvore de menu permitida do usuário (1×/request)
+    // e injeta em reply.locals — aparece em toda view via @fastify/view. Roda em
+    // preHandler para garantir que req.user já foi populado pelo appAuthMiddleware.
+    autenticado.addHook('preHandler', async (req, reply) => {
+      const menu = new MenuAppService(req.server.prisma)
+      reply.locals = { ...(reply.locals ?? {}), menuApp: await menu.arvorePermitida(req.user.sub) }
+    })
 
     autenticado.register(appContextoRoutes)
     autenticado.register(appDashboardRoutes)

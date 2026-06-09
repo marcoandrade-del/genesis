@@ -10,6 +10,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import 'dotenv/config'
 import { semearEstados } from '../src/services/estados.js'
+import { semearMenusApp } from '../src/services/seed-menu-app.js'
 
 async function main() {
   const url = process.env['DATABASE_URL']
@@ -21,6 +22,9 @@ async function main() {
   try {
     const inseridos = await semearEstados(prisma)
     console.log(`[seed] estados: ${inseridos} novo(s) inserido(s); existentes preservados.`)
+
+    const menu = await semearMenusApp(prisma)
+    console.log(`[seed] menu /app: sistema=${menu.sistemaId} itens novos=${menu.itens} grants novos=${menu.grants}.`)
   } finally {
     await prisma.$disconnect()
   }

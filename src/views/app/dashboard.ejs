@@ -10,24 +10,7 @@
 </head>
 <body class="bg-light">
 
-<nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
-  <a class="navbar-brand fw-bold fs-6" href="/app">
-    <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
-  </a>
-  <div class="d-flex align-items-center gap-3">
-    <span class="text-white-50 small">
-      <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> ·
-      <strong class="text-white"><%= entidade.nome %></strong> ·
-      <strong class="text-white font-monospace"><%= ano %></strong>
-    </span>
-    <a href="/app/contexto" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-arrow-left-right me-1"></i>Trocar contexto
-    </a>
-    <a href="/app/logout" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-box-arrow-right me-1"></i>Sair
-    </a>
-  </div>
-</nav>
+<%- include('_navbar') %>
 
 <div class="container py-4" style="max-width:960px">
   <div class="d-flex justify-content-between align-items-center mb-4">
@@ -48,71 +31,21 @@
 
   <h3 class="h6 fw-bold text-muted text-uppercase mb-2" style="letter-spacing:.05em">Áreas de trabalho</h3>
   <div class="row g-3 mb-4">
-    <div class="col-md-3 col-sm-6">
-      <a href="/app/orcamento" class="text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <i class="bi bi-journal-bookmark fs-3 text-primary"></i>
-            <div>
-              <div class="fw-semibold text-dark">Orçamento (LOA)</div>
-              <div class="small text-muted">Dotações e previsões</div>
+    <% (typeof menuApp !== 'undefined' ? menuApp : []).forEach(function (area) { %>
+      <div class="col-md-3 col-sm-6">
+        <a href="<%= area.rota || '#' %>" class="text-decoration-none">
+          <div class="card border-0 shadow-sm h-100">
+            <div class="card-body d-flex align-items-center gap-3">
+              <i class="bi <%= area.icone || 'bi-grid' %> fs-3 text-primary"></i>
+              <div>
+                <div class="fw-semibold text-dark"><%= area.nome %></div>
+                <% if (area.descricao) { %><div class="small text-muted"><%= area.descricao %></div><% } %>
+              </div>
             </div>
           </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3 col-sm-6">
-      <a href="/app/lancamentos" class="text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <i class="bi bi-receipt fs-3 text-primary"></i>
-            <div>
-              <div class="fw-semibold text-dark">Lançamentos</div>
-              <div class="small text-muted">Execução contábil do exercício</div>
-            </div>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3 col-sm-6">
-      <a href="/app/contas" class="text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <i class="bi bi-diagram-3 fs-3 text-primary"></i>
-            <div>
-              <div class="fw-semibold text-dark">Plano de Contas</div>
-              <div class="small text-muted">Contas contábeis do exercício</div>
-            </div>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3 col-sm-6">
-      <a href="/app/relatorios" class="text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <i class="bi bi-file-earmark-bar-graph fs-3 text-primary"></i>
-            <div>
-              <div class="fw-semibold text-dark">Relatórios</div>
-              <div class="small text-muted">Cabeçalhos e rodapés</div>
-            </div>
-          </div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md-3 col-sm-6">
-      <a href="/app/compras" class="text-decoration-none">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body d-flex align-items-center gap-3">
-            <i class="bi bi-cart3 fs-3 text-primary"></i>
-            <div>
-              <div class="fw-semibold text-dark">Compras</div>
-              <div class="small text-muted">Planejamento (Lei 14.133)</div>
-            </div>
-          </div>
-        </div>
-      </a>
-    </div>
+        </a>
+      </div>
+    <% }) %>
   </div>
 
   <div class="row g-3">

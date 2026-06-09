@@ -10,24 +10,7 @@
 </head>
 <body class="bg-light">
 
-<nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
-  <a class="navbar-brand fw-bold fs-6" href="/app">
-    <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
-  </a>
-  <div class="d-flex align-items-center gap-3">
-    <span class="text-white-50 small">
-      <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> ·
-      <strong class="text-white"><%= entidade.nome %></strong> ·
-      <strong class="text-white font-monospace"><%= ano %></strong>
-    </span>
-    <a href="/app/contexto" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-arrow-left-right me-1"></i>Trocar contexto
-    </a>
-    <a href="/app/logout" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-box-arrow-right me-1"></i>Sair
-    </a>
-  </div>
-</nav>
+<%- include('_navbar') %>
 
 <div class="container py-4" style="max-width:1100px">
   <nav aria-label="breadcrumb">
