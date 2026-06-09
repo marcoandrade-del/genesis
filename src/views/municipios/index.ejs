@@ -1,5 +1,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
-  <h2 class="h5 fw-bold mb-0">Municípios</h2>
+  <div class="d-flex align-items-center gap-2">
+    <a href="/admin/estados" class="btn btn-sm btn-outline-secondary" title="Voltar aos estados">
+      <i class="bi bi-arrow-left me-1"></i>Voltar
+    </a>
+    <h2 class="h5 fw-bold mb-0">Municípios</h2>
+  </div>
   <% if (estadoSelecionado) { %>
     <button class="btn btn-primary btn-sm"
       hx-get="/admin/municipios/form?estadoId=<%= estadoSelecionado.id %>"
@@ -47,7 +52,7 @@
           <tr>
             <th class="ps-3">Nome</th>
             <th>Modelo Contábil</th>
-            <th class="text-end pe-3" style="width: 280px;">Ações</th>
+            <th class="text-end pe-3" style="width: 340px;">Ações</th>
           </tr>
         </thead>
         <tbody>
@@ -74,6 +79,15 @@
               </td>
               <td class="text-end pe-3">
                 <% const modeloEfetivo = m.modeloContabil || estadoSelecionado.modeloContabil %>
+                <% if (modeloEfetivo && municipiosComEntidade.includes(m.id)) { %>
+                  <button class="btn btn-sm btn-outline-success me-1"
+                    hx-post="/admin/municipios/<%= m.id %>/ressincronizar"
+                    hx-swap="none"
+                    hx-confirm="Ressincronizar as entidades de <%= m.nome %> com o modelo &quot;<%= modeloEfetivo.descricao %>&quot; do estado? As cópias do modelo serão recriadas a partir do plano atual. Entidades com desdobramento ou execução são preservadas (puladas)."
+                    title="Ressincronizar entidades com o modelo do estado">
+                    <i class="bi bi-arrow-repeat"></i>
+                  </button>
+                <% } %>
                 <a href="/admin/entidades?municipioId=<%= m.id %>" class="btn btn-sm btn-outline-secondary me-1" title="Ver entidades deste município">
                   <i class="bi bi-building me-1"></i>Entidades
                 </a>
