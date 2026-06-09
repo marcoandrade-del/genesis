@@ -922,6 +922,7 @@ model Orcamento {
   entidade      Entidade          @relation(fields: [entidadeId], references: [id])
   dotacoes      DotacaoDespesa[]
   previsoes     PrevisaoReceita[]
+  creditos      CreditoAdicional[]
 
   @@unique([entidadeId, ano])
   @@index([entidadeId])
@@ -958,6 +959,7 @@ model DotacaoDespesa {
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
   reservas               ReservaDotacao[]
   empenhos               Empenho[]
+  creditosItens          CreditoAdicionalItem[]
 
   @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
   @@index([orcamentoId])
@@ -981,6 +983,54 @@ model PrevisaoReceita {
   @@unique([orcamentoId, contaReceitaEntidadeId, fonteRecursoEntidadeId], name: "previsao_unica")
   @@index([orcamentoId])
   @@map("previsoes_receita")
+}
+
+/// Crédito adicional (Lei 4.320/1964): altera o orçamento já aprovado/em
+/// execução. Aplicado de imediato na criação — cada item reforça (+) a dotação
+/// alvo ou anula (−) saldo de uma dotação-fonte. valorTotal = soma dos reforços.
+model CreditoAdicional {
+  id            String               @id @default(uuid())
+  orcamentoId   String
+  tipo          CreditoAdicionalTipo
+  numero        String
+  data          DateTime             @db.Date
+  atoLegal      String // lei/decreto que autorizou
+  justificativa String?
+  valorTotal    Decimal              @db.Decimal(18, 2)
+  criadoEm      DateTime             @default(now())
+  atualizadoEm  DateTime             @updatedAt
+  orcamento     Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  itens         CreditoAdicionalItem[]
+
+  @@unique([orcamentoId, numero])
+  @@index([orcamentoId])
+  @@map("creditos_adicionais")
+}
+
+model CreditoAdicionalItem {
+  id                 String           @id @default(uuid())
+  creditoAdicionalId String
+  dotacaoDespesaId   String
+  operacao           CreditoOperacao
+  valor              Decimal          @db.Decimal(18, 2)
+  credito            CreditoAdicional @relation(fields: [creditoAdicionalId], references: [id], onDelete: Cascade)
+  dotacaoDespesa     DotacaoDespesa   @relation(fields: [dotacaoDespesaId], references: [id], onDelete: Cascade)
+
+  @@index([creditoAdicionalId])
+  @@map("creditos_adicionais_itens")
+}
+
+/// Tipos legais de crédito adicional (Lei 4.320, art. 41).
+enum CreditoAdicionalTipo {
+  SUPLEMENTAR
+  ESPECIAL
+  EXTRAORDINARIO
+}
+
+/// Operação de um item de crédito sobre a dotação alvo.
+enum CreditoOperacao {
+  REFORCO
+  ANULACAO
 }
 
 // ─── Acesso de Usuário a Entidade ────────────────────────────────────────────
