@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Créditos Adicionais · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  const TIPO = { SUPLEMENTAR: 'Suplementar', ESPECIAL: 'Especial', EXTRAORDINARIO: 'Extraordinário' }
+%>
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/orcamento" class="text-decoration-none">Orçamento</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Créditos Adicionais</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="h4 fw-bold mb-0">Créditos Adicionais <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
+    <% if (podeEscrever && orcamento) { %>
+      <a href="/app/orcamento/creditos/novo" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Novo crédito</a>
+    <% } %>
+  </div>
+
+  <% if (typeof erro !== 'undefined' && erro) { %>
+    <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
+  <% } %>
+
+  <% if (!orcamento) { %>
+    <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Não há orçamento (LOA) cadastrado para este exercício.</div>
+  <% } else { %>
+    <p class="text-muted small mb-3">Alteram o orçamento já aprovado — aplicados de imediato ao <strong>valorAutorizado</strong> das dotações. <%= creditos.length %> crédito(s).</p>
+    <div class="card border-0 shadow-sm"><div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light"><tr><th class="ps-3">Nº</th><th>Tipo</th><th>Data</th><th>Ato legal</th><th class="text-center">Itens</th><th class="text-end pe-3">Valor R$</th></tr></thead>
+        <tbody>
+          <% if (creditos.length === 0) { %><tr><td colspan="6" class="text-center text-muted py-4">Nenhum crédito lançado.</td></tr><% } %>
+          <% creditos.forEach(function(c) { %>
+            <tr style="cursor:pointer" onclick="location.href='/app/orcamento/creditos/<%= c.id %>'">
+              <td class="ps-3 font-monospace"><%= c.numero %></td>
+              <td><span class="badge bg-primary bg-opacity-10 text-primary"><%= TIPO[c.tipo] || c.tipo %></span></td>
+              <td class="small text-muted"><%= new Date(c.data).toLocaleDateString('pt-BR') %></td>
+              <td class="small"><%= c.atoLegal %></td>
+              <td class="text-center"><%= c._count.itens %></td>
+              <td class="text-end pe-3 font-monospace fw-semibold"><%= Number(c.valorTotal).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div></div>
+  <% } %>
+</div>
+</body>
+</html>
