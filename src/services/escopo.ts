@@ -164,8 +164,9 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Execução orçamentária',
-        descricao: 'Empenho → liquidação → pagamento e créditos adicionais; saldo por conta × fonte com rollup.',
-        status: 'A_FAZER',
+        descricao: 'Fluxo empenho → liquidação → pagamento pronto (via Compras); consulta de saldo com roll-up entregue. Faltam créditos adicionais e arrecadação da receita.',
+        status: 'EM_ANDAMENTO',
+        ref: '#61',
       },
     ],
   },
