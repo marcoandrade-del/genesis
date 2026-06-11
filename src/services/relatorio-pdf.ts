@@ -1,5 +1,5 @@
 import { chromium, type Browser } from 'playwright'
-import { montarRender } from './relatorio-totais.js'
+import { montarRender, type TotaisConfig } from './relatorio-totais.js'
 
 export type DadosFaixa = {
   nomeEntidade: string
@@ -44,18 +44,20 @@ export function montarTemplateFaixa(faixa: Faixa, dados: DadosFaixa): string {
 }
 
 /**
- * Documento HTML (corpo do PDF) com a tabela do resultado. Quando há colunas de
- * valor, insere subtotal por página (com quebra de página entre elas) e o total
- * geral no fim. `porPagina` = linhas-detalhe por página (0 = sem subtotais, só
- * total geral). O `<thead>` se repete em cada página (comportamento do Chromium).
+ * Documento HTML (corpo do PDF) com a tabela do resultado. Insere subtotal de
+ * soma por página (com quebra de página entre elas, quando ligado na config) e
+ * o bloco de resumo no fim — uma linha rotulada por agregação configurada.
+ * `porPagina` = linhas-detalhe por página (0 = sem subtotais). O `<thead>` se
+ * repete em cada página (comportamento do Chromium).
  */
-export function montarCorpoHtml(resultado: ResultadoPdf, titulo: string, porPagina = 0): string {
+export function montarCorpoHtml(resultado: ResultadoPdf, titulo: string, porPagina = 0, cfg: TotaisConfig | null = null): string {
   const ths = resultado.colunas.map((c) => `<th>${esc(c)}</th>`).join('')
+  const render = montarRender(resultado, porPagina > 0 ? porPagina : resultado.linhas.length + 1, cfg)
   let trs: string
   if (resultado.linhas.length === 0) {
     trs = `<tr><td colspan="${resultado.colunas.length || 1}" style="text-align:center;color:#888">Sem resultados.</td></tr>`
   } else {
-    const { linhas } = montarRender(resultado, porPagina > 0 ? porPagina : resultado.linhas.length + 1)
+    const { linhas } = render
     const idxSubs = linhas.flatMap((l, i) => (l.tipo === 'subtotal' ? [i] : []))
     const ultimoSub = idxSubs.length ? idxSubs[idxSubs.length - 1] : -1
     trs = linhas
@@ -67,16 +69,24 @@ export function montarCorpoHtml(resultado: ResultadoPdf, titulo: string, porPagi
       })
       .join('')
   }
+  const resumo = render.resumo.length
+    ? `<div class="resumo" style="break-inside:avoid">${render.resumo
+        .map((it) => `<div>${esc(it.rotulo)}: <strong>${esc(it.texto)}</strong></div>`)
+        .join('')}${render.parcial ? '<div class="parcial">Valores parciais — o resultado foi truncado.</div>' : ''}</div>`
+    : ''
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>
     body{font-family:sans-serif;font-size:11px;color:#111;margin:0}
     h1{font-size:14px;margin:0 0 8px}
     table{width:100%;border-collapse:collapse}
     th,td{border:1px solid #ccc;padding:3px 6px;text-align:left;font-family:monospace}
     th{background:#f2f2f2}
-    tr.subtotal td,tr.total td{font-weight:bold;background:#f2f2f2}
+    tr.subtotal td{font-weight:bold;background:#f2f2f2}
+    .resumo{margin-top:8px;font-family:monospace;font-size:11px}
+    .resumo .parcial{color:#888;font-style:italic}
   </style></head><body>
     <h1>${esc(titulo)}</h1>
     <table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>
+    ${resumo}
   </body></html>`
 }
 

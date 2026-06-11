@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { validarQuery } from './relatorio-executor.js'
+import { validarTotaisConfig } from './relatorio-totais.js'
 
 type DadosRelatorio = {
   nome?: unknown
@@ -90,6 +91,25 @@ export class MeusRelatoriosService {
       where: { id },
       data: { nome, descricao: normDescricao(dados.descricao), query, cabecalhoId, rodapeId },
     })
+  }
+
+  /**
+   * Salva a configuração de totais do relatório em `configuracao.totais`
+   * (preservando o resto do JSON). `raw` null/'' volta ao automático
+   * (remove a chave). Valida estrutura e ownership.
+   */
+  async salvarTotais(id: string, usuarioId: string, entidadeId: string, raw: unknown) {
+    const atual = await this.prisma.relatorioPersonalizado.findUnique({ where: { id } })
+    if (!atual || atual.usuarioId !== usuarioId || atual.entidadeId !== entidadeId) {
+      throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.')
+    }
+    const cfg = validarTotaisConfig(raw)
+    const base = (atual.configuracao && typeof atual.configuracao === 'object' && !Array.isArray(atual.configuracao)
+      ? (atual.configuracao as Record<string, unknown>)
+      : {})
+    const { totais: _antiga, ...resto } = base
+    const configuracao = cfg ? { ...resto, totais: cfg } : resto
+    return this.prisma.relatorioPersonalizado.update({ where: { id }, data: { configuracao } })
   }
 
   async excluir(id: string, usuarioId: string, entidadeId: string) {

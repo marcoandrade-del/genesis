@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   criar: vi.fn(),
   atualizar: vi.fn(),
   excluir: vi.fn(),
+  salvarTotais: vi.fn(),
   executar: vi.fn(),
   listarViews: vi.fn(),
 }))
@@ -17,6 +18,7 @@ vi.mock('../../services/meus-relatorios.js', () => ({
     criar = m.criar
     atualizar = m.atualizar
     excluir = m.excluir
+    salvarTotais = m.salvarTotais
   },
 }))
 
@@ -247,6 +249,85 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1/executar' })
     expect(res.statusCode).toBe(409)
     expect(res.body).toContain('Sandbox não configurado.')
+  })
+
+  it('GET executar (default): resumo "Total de <coluna>" + painel de totais (ESCRITA)', async () => {
+    m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', query: 'select 1', cabecalho: null, rodape: null })
+    m.executar.mockResolvedValue({ colunas: ['nivel', 'valor'], linhas: [['1', '10.00'], ['2', '5.00']], total: 2, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1/executar' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Total de nivel') // default automático soma TODA coluna numérica…
+    expect(res.body).toContain('Total de valor')
+    expect(res.body).toContain('painel-totais') // …e o painel permite desligar
+    expect(res.body).toContain('/app/relatorios/meus/rp1/totais')
+  })
+
+  it('GET executar com config salva: rótulo do usuário e sem os totais desmarcados', async () => {
+    m.buscar.mockResolvedValue({
+      id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', query: 'select 1', cabecalho: null, rodape: null,
+      configuracao: { totais: { subtotalPagina: false, itens: [{ coluna: 'valor', agg: 'SOMA', rotulo: 'Total dos impostos' }] } },
+    })
+    m.executar.mockResolvedValue({ colunas: ['nivel', 'valor'], linhas: [['1', '10.00'], ['2', '5.00']], total: 2, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1/executar' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Total dos impostos: <strong>15.00</strong>')
+    expect(res.body).not.toContain('Total de nivel: <strong>') // desmarcado na config (o default só vive no painel)
+    expect(res.body).toContain('personalizado')
+  })
+
+  it('GET executar para LEITURA não mostra o painel de totais', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'LEITURA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', query: 'select 1', cabecalho: null, rodape: null })
+    m.executar.mockResolvedValue({ colunas: ['valor'], linhas: [['10.00']], total: 1, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1/executar' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Total de valor') // resumo aparece
+    expect(res.body).not.toContain('painel-totais') // painel não
+  })
+
+  // ── Salvar configuração de totais ─────────────────────────────
+  it('POST meus/:id/totais salva e redireciona para o executar', async () => {
+    m.salvarTotais.mockResolvedValue({ id: 'rp1' })
+    const cfg = JSON.stringify({ subtotalPagina: true, itens: [{ coluna: 'valor', agg: 'SOMA' }] })
+    const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: cfg }))
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/relatorios/meus/rp1/executar')
+    expect(m.salvarTotais).toHaveBeenCalledWith('rp1', 'u1', 'ent1', { subtotalPagina: true, itens: [{ coluna: 'valor', agg: 'SOMA' }] })
+  })
+
+  it('POST totais vazio volta ao automático (raw vazio chega ao service)', async () => {
+    m.salvarTotais.mockResolvedValue({ id: 'rp1' })
+    const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '' }))
+    expect(res.statusCode).toBe(302)
+    expect(m.salvarTotais).toHaveBeenCalledWith('rp1', 'u1', 'ent1', '')
+  })
+
+  it('POST totais com JSON malformado → 400 no hub, sem gravar', async () => {
+    const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '{lixo' }))
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toContain('JSON malformado')
+    expect(m.salvarTotais).not.toHaveBeenCalled()
+  })
+
+  it('POST totais com ErroNegocio do service volta ao hub com o status', async () => {
+    m.salvarTotais.mockRejectedValue(new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Relatório não encontrado.'))
+    const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '' }))
+    expect(res.statusCode).toBe(404)
+    expect(res.body).toContain('Relatório não encontrado.')
+  })
+
+  it('POST totais bloqueado para LEITURA; redireciona se entidade sumiu; propaga erro inesperado', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'LEITURA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    expect((await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '' }))).statusCode).toBe(403)
+    ;({ app, prisma } = await montar())
+    prisma.entidade.findUnique.mockResolvedValue(null)
+    expect((await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '' }))).statusCode).toBe(302)
+    ;({ app, prisma } = await montar())
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    m.salvarTotais.mockRejectedValue(new Error('boom'))
+    expect((await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '' }))).statusCode).toBe(500)
   })
 
   it('GET executar é permitido para LEITURA (executar é leitura)', async () => {

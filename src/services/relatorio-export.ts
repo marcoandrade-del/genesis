@@ -1,6 +1,6 @@
 import ExcelJS from 'exceljs'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, TextRun, HeadingLevel, WidthType } from 'docx'
-import { analisarColunas, totalGeralRow, rotuloGeral, indiceRotulo, type Totais } from './relatorio-totais.js'
+import { analisarColunas, configEfetiva, resumoTotais, type ResumoTotal, type TotaisConfig } from './relatorio-totais.js'
 
 export type ResultadoExport = { colunas: string[]; linhas: unknown[][]; truncado?: boolean }
 export type FormatoExport = 'html' | 'txt' | 'pdf' | 'csv' | 'xls' | 'doc' | 'xml' | 'json'
@@ -58,26 +58,38 @@ function esc(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }
 
-function gerarHtml(r: ResultadoExport, titulo: string, total: string[] | null): string {
+// Nota de truncamento — quando o resultado foi cortado, os totais são parciais.
+const NOTA_PARCIAL = 'Valores parciais — o resultado foi truncado.'
+const parcial = (r: ResultadoExport, resumo: ResumoTotal[]) => Boolean(r.truncado) && resumo.length > 0
+
+function gerarHtml(r: ResultadoExport, titulo: string, resumo: ResumoTotal[]): string {
   const ths = r.colunas.map((c) => `<th>${esc(c)}</th>`).join('')
   const trs = r.linhas.length
     ? r.linhas.map((row) => `<tr>${row.map((v) => `<td>${esc(celulaTexto(v))}</td>`).join('')}</tr>`).join('')
     : `<tr><td colspan="${r.colunas.length || 1}" style="text-align:center;color:#888">Sem resultados.</td></tr>`
-  const tot = total ? `<tr class="total">${total.map((v) => `<td>${esc(v)}</td>`).join('')}</tr>` : ''
+  const tot = resumo.length
+    ? `<div class="totais">${resumo.map((it) => `<div>${esc(it.rotulo)}: <strong>${esc(it.texto)}</strong></div>`).join('')}${
+        parcial(r, resumo) ? `<div class="parcial">${NOTA_PARCIAL}</div>` : ''
+      }</div>`
+    : ''
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${esc(titulo)}</title><style>
     body{font-family:sans-serif;font-size:13px;color:#111;margin:24px}
     h1{font-size:18px;margin:0 0 12px}
     table{width:100%;border-collapse:collapse}
     th,td{border:1px solid #ccc;padding:4px 8px;text-align:left}
     th{background:#f2f2f2}
-    tr.total td{font-weight:bold;background:#f2f2f2}
+    .totais{margin-top:10px}
+    .totais .parcial{color:#888;font-style:italic}
   </style></head><body><h1>${esc(titulo)}</h1>
-  <table><thead><tr>${ths}</tr></thead><tbody>${trs}${tot}</tbody></table></body></html>`
+  <table><thead><tr>${ths}</tr></thead><tbody>${trs}</tbody></table>${tot}</body></html>`
 }
 
-function gerarTxt(r: ResultadoExport, titulo: string, total: string[] | null): string {
+function gerarTxt(r: ResultadoExport, titulo: string, resumo: ResumoTotal[]): string {
   const linhas = [titulo, '', r.colunas.join('\t'), ...r.linhas.map((row) => row.map(celulaTexto).join('\t'))]
-  if (total) linhas.push('', total.join('\t'))
+  if (resumo.length) {
+    linhas.push('', ...resumo.map((it) => `${it.rotulo}: ${it.texto}`))
+    if (parcial(r, resumo)) linhas.push(NOTA_PARCIAL)
+  }
   return linhas.join('\r\n')
 }
 
@@ -85,27 +97,27 @@ function campoCsv(v: unknown): string {
   const s = celulaTexto(v)
   return /[;"\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
-function gerarCsv(r: ResultadoExport, total: string[] | null): string {
+function gerarCsv(r: ResultadoExport, resumo: ResumoTotal[]): string {
   // Separador ';' + BOM UTF-8 = abre certinho no Excel pt-BR.
   const linhas = [r.colunas.map(campoCsv).join(';'), ...r.linhas.map((row) => row.map(campoCsv).join(';'))]
-  if (total) linhas.push(total.map(campoCsv).join(';'))
+  for (const it of resumo) linhas.push(`${campoCsv(it.rotulo)};${campoCsv(it.texto)}`)
   return '﻿' + linhas.join('\r\n')
 }
 
-function gerarXml(r: ResultadoExport, titulo: string, total: string[] | null): string {
+function gerarXml(r: ResultadoExport, titulo: string, resumo: ResumoTotal[]): string {
   const corpo = r.linhas
     .map((row) => {
       const campos = r.colunas.map((c, i) => `<campo nome="${esc(c)}">${esc(celulaTexto(row[i]))}</campo>`).join('')
       return `  <linha>${campos}</linha>`
     })
     .join('\n')
-  const tot = total
-    ? `\n  <total>${r.colunas.map((c, i) => `<campo nome="${esc(c)}">${esc(total[i] ?? '')}</campo>`).join('')}</total>`
+  const tot = resumo.length
+    ? `\n  <totais>${resumo.map((it) => `<total rotulo="${esc(it.rotulo)}">${esc(it.texto)}</total>`).join('')}</totais>`
     : ''
   return `<?xml version="1.0" encoding="UTF-8"?>\n<relatorio nome="${esc(titulo)}">\n${corpo}${tot}\n</relatorio>`
 }
 
-function gerarJson(r: ResultadoExport, titulo: string, t: Totais): string {
+function gerarJson(r: ResultadoExport, titulo: string, resumo: ResumoTotal[]): string {
   const linhas = r.linhas.map((row) => {
     const obj: Record<string, unknown> = {}
     r.colunas.forEach((c, i) => {
@@ -113,15 +125,11 @@ function gerarJson(r: ResultadoExport, titulo: string, t: Totais): string {
     })
     return obj
   })
-  const totalGeral: Record<string, number> = {}
-  r.colunas.forEach((c, i) => {
-    if (t.numericas[i]) totalGeral[c] = t.soma[i]!
-  })
-  const temTotal = r.linhas.length > 0 && t.algumaNumerica
-  return JSON.stringify({ relatorio: titulo, colunas: r.colunas, linhas, ...(temTotal ? { totalGeral } : {}) }, null, 2)
+  const totais = resumo.map((it) => ({ rotulo: it.rotulo, valor: it.numero }))
+  return JSON.stringify({ relatorio: titulo, colunas: r.colunas, linhas, ...(totais.length ? { totais } : {}) }, null, 2)
 }
 
-async function gerarXls(r: ResultadoExport, t: Totais): Promise<Buffer> {
+async function gerarXls(r: ResultadoExport, resumo: ResumoTotal[]): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
   const ws = wb.addWorksheet('Relatório')
   ws.addRow(r.colunas).font = { bold: true }
@@ -130,10 +138,10 @@ async function gerarXls(r: ResultadoExport, t: Totais): Promise<Buffer> {
     // código de conta com zero à esquerda, datas em dd/mm/aaaa etc.).
     ws.addRow(row.map((v) => (typeof v === 'number' ? v : celulaTexto(v))))
   }
-  if (r.linhas.length > 0 && t.algumaNumerica) {
-    const idx = indiceRotulo(t.numericas)
-    const linha = r.colunas.map((_, i) => (i === idx ? rotuloGeral(r.truncado) : t.numericas[i] ? t.soma[i]! : ''))
-    ws.addRow(linha).font = { bold: true }
+  if (resumo.length) {
+    ws.addRow([])
+    for (const it of resumo) ws.addRow([it.rotulo, it.numero]).font = { bold: true }
+    if (parcial(r, resumo)) ws.addRow([NOTA_PARCIAL]).font = { italic: true }
   }
   ws.columns.forEach((col) => {
     col.width = 22
@@ -141,7 +149,7 @@ async function gerarXls(r: ResultadoExport, t: Totais): Promise<Buffer> {
   return Buffer.from(await wb.xlsx.writeBuffer())
 }
 
-async function gerarDoc(r: ResultadoExport, titulo: string, total: string[] | null): Promise<Buffer> {
+async function gerarDoc(r: ResultadoExport, titulo: string, resumo: ResumoTotal[]): Promise<Buffer> {
   const linhaTabela = (celulas: string[], bold: boolean) =>
     new TableRow({
       children: celulas.map(
@@ -152,13 +160,17 @@ async function gerarDoc(r: ResultadoExport, titulo: string, total: string[] | nu
     linhaTabela(r.colunas, true),
     ...r.linhas.map((row) => linhaTabela(r.colunas.map((_, i) => celulaTexto(row[i])), false)),
   ]
-  if (total) rows.push(linhaTabela(total, true))
+  const finais = resumo.map(
+    (it) => new Paragraph({ children: [new TextRun({ text: `${it.rotulo}: ${it.texto}`, bold: true })] }),
+  )
+  if (parcial(r, resumo)) finais.push(new Paragraph({ children: [new TextRun({ text: NOTA_PARCIAL, italics: true })] }))
   const doc = new Document({
     sections: [
       {
         children: [
           new Paragraph({ text: titulo, heading: HeadingLevel.HEADING_1 }),
           new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }),
+          ...finais,
         ],
       },
     ],
@@ -169,36 +181,38 @@ async function gerarDoc(r: ResultadoExport, titulo: string, total: string[] | nu
 /**
  * Gera o arquivo de exportação no formato pedido (exceto PDF, tratado na rota
  * pois precisa do cabeçalho/rodapé + paginação Playwright). `titulo` = nome do
- * relatório. Toda coluna de valor recebe automaticamente a linha de TOTAL GERAL.
+ * relatório. Os totais do fim seguem a config do relatório (uma linha rotulada
+ * por agregação); sem config, soma automática das colunas de valor.
  */
 export async function exportarResultado(
   formato: Exclude<FormatoExport, 'pdf'>,
   r: ResultadoExport,
   titulo: string,
+  cfgSalva: TotaisConfig | null = null,
 ): Promise<ArquivoExport> {
   const t = analisarColunas(r)
-  const total = totalGeralRow(r, t) // string[] | null
+  const resumo = resumoTotais(r, configEfetiva(r, cfgSalva, t), t)
   switch (formato) {
     case 'html':
-      return { conteudo: gerarHtml(r, titulo, total), mime: 'text/html; charset=utf-8', ext: 'html', download: false }
+      return { conteudo: gerarHtml(r, titulo, resumo), mime: 'text/html; charset=utf-8', ext: 'html', download: false }
     case 'txt':
-      return { conteudo: gerarTxt(r, titulo, total), mime: 'text/plain; charset=utf-8', ext: 'txt', download: true }
+      return { conteudo: gerarTxt(r, titulo, resumo), mime: 'text/plain; charset=utf-8', ext: 'txt', download: true }
     case 'csv':
-      return { conteudo: gerarCsv(r, total), mime: 'text/csv; charset=utf-8', ext: 'csv', download: true }
+      return { conteudo: gerarCsv(r, resumo), mime: 'text/csv; charset=utf-8', ext: 'csv', download: true }
     case 'xml':
-      return { conteudo: gerarXml(r, titulo, total), mime: 'application/xml; charset=utf-8', ext: 'xml', download: true }
+      return { conteudo: gerarXml(r, titulo, resumo), mime: 'application/xml; charset=utf-8', ext: 'xml', download: true }
     case 'json':
-      return { conteudo: gerarJson(r, titulo, t), mime: 'application/json; charset=utf-8', ext: 'json', download: true }
+      return { conteudo: gerarJson(r, titulo, resumo), mime: 'application/json; charset=utf-8', ext: 'json', download: true }
     case 'xls':
       return {
-        conteudo: await gerarXls(r, t),
+        conteudo: await gerarXls(r, resumo),
         mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         ext: 'xlsx',
         download: true,
       }
     case 'doc':
       return {
-        conteudo: await gerarDoc(r, titulo, total),
+        conteudo: await gerarDoc(r, titulo, resumo),
         mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         ext: 'docx',
         download: true,
