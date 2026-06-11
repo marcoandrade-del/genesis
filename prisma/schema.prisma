@@ -974,15 +974,40 @@ model PrevisaoReceita {
   contaReceitaEntidadeId String
   fonteRecursoEntidadeId String
   valorPrevisto          Decimal              @db.Decimal(18, 2)
+  /// Materializado: soma das arrecadações − estornos (atualizado na mesma transação do movimento).
+  valorArrecadado        Decimal              @default(0) @db.Decimal(18, 2)
   criadoEm               DateTime             @default(now())
   atualizadoEm           DateTime             @updatedAt
   orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   contaReceita           ContaReceitaEntidade @relation(fields: [contaReceitaEntidadeId], references: [id])
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+  arrecadacoes           Arrecadacao[]
 
   @@unique([orcamentoId, contaReceitaEntidadeId, fonteRecursoEntidadeId], name: "previsao_unica")
   @@index([orcamentoId])
   @@map("previsoes_receita")
+}
+
+/// Movimento de arrecadação da receita (gap #5 PR-3): incide sobre uma
+/// previsão (conta analítica × fonte) do orçamento APROVADO. ESTORNO reverte
+/// arrecadação já registrada. Imutável após criado — correção é por estorno.
+model Arrecadacao {
+  id         String          @id @default(uuid())
+  previsaoId String
+  tipo       ArrecadacaoTipo
+  data       DateTime        @db.Date
+  valor      Decimal         @db.Decimal(18, 2)
+  historico  String?
+  criadoEm   DateTime        @default(now())
+  previsao   PrevisaoReceita @relation(fields: [previsaoId], references: [id])
+
+  @@index([previsaoId])
+  @@map("arrecadacoes")
+}
+
+enum ArrecadacaoTipo {
+  ARRECADACAO
+  ESTORNO
 }
 
 /// Crédito adicional (Lei 4.320/1964): altera o orçamento já aprovado/em

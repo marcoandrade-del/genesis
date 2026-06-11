@@ -5,6 +5,7 @@ import { appContextoRoutes, parseContextoCookie } from './contexto.js'
 import { appDashboardRoutes } from './dashboard.js'
 import { appOrcamentoRoutes } from './orcamento.js'
 import { appCreditosAdicionaisRoutes } from './creditos-adicionais.js'
+import { appArrecadacaoRoutes } from './arrecadacao.js'
 import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
 import { appRelatoriosRoutes } from './relatorios.js'
@@ -113,6 +114,7 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appDashboardRoutes)
     autenticado.register(appOrcamentoRoutes)
     autenticado.register(appCreditosAdicionaisRoutes)
+    autenticado.register(appArrecadacaoRoutes)
     autenticado.register(appLancamentosRoutes)
     autenticado.register(appContasRoutes)
     autenticado.register(appRelatoriosRoutes)
