@@ -240,6 +240,11 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
         ref: '#53/#54',
       },
+      {
+        titulo: 'Picker de view/colunas no editor de query',
+        descricao: 'Escolher uma view rel_* e marcar colunas para montar o SELECT sem digitar SQL.',
+        status: 'PRONTO',
+      },
     ],
   },
 ]

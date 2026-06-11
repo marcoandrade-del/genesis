@@ -74,8 +74,33 @@
       </div>
     </div>
 
+    <% if (views.length) { %>
+    <div class="card mb-3">
+      <div class="card-body py-3">
+        <label class="form-label small fw-semibold mb-1"><i class="bi bi-magic me-1"></i>Montar a query a partir de uma view</label>
+        <div class="form-text mt-0 mb-2">Escolha uma view, marque as colunas desejadas e clique em "Usar na query".</div>
+        <div class="row g-2">
+          <div class="col-md-5">
+            <select class="form-select" id="picker-view">
+              <option value="">— escolha uma view —</option>
+              <% views.forEach(function(v) { %>
+                <option value="<%= v.nome %>"><%= v.nome %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-7">
+            <div id="picker-colunas" class="d-none border rounded p-2 bg-white" style="max-height:180px;overflow-y:auto"></div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-primary mt-2 d-none" id="picker-usar">
+          <i class="bi bi-arrow-down-square me-1"></i>Usar na query
+        </button>
+      </div>
+    </div>
+    <% } %>
+
     <label class="form-label small fw-semibold">Query (somente leitura)</label>
-    <textarea class="form-control font-monospace" name="query" rows="8" required placeholder="SELECT data, historico, valor FROM rel_lancamentos ORDER BY data"><%= reg.query || '' %></textarea>
+    <textarea class="form-control font-monospace" name="query" id="campo-query" rows="8" required placeholder="SELECT data, historico, valor FROM rel_lancamentos ORDER BY data"><%= reg.query || '' %></textarea>
     <div class="form-text">
       Consulte apenas as <strong>views de relatório</strong> (já filtradas pela sua entidade):
       <code>rel_lancamentos</code>, <code>rel_contas_contabeis</code>, <code>rel_orcamento_dotacoes</code>, <code>rel_orcamento_previsoes</code>.
@@ -88,5 +113,60 @@
     </div>
   </form>
 </div>
+
+<% if (views.length) { %>
+<script>
+  (function () {
+    var VIEWS = <%- JSON.stringify(views) %>
+    var sel = document.getElementById('picker-view')
+    var painel = document.getElementById('picker-colunas')
+    var botao = document.getElementById('picker-usar')
+    var campo = document.getElementById('campo-query')
+
+    function montarCheckbox(col, i) {
+      var div = document.createElement('div')
+      div.className = 'form-check'
+      var input = document.createElement('input')
+      input.className = 'form-check-input'
+      input.type = 'checkbox'
+      input.checked = true
+      input.value = col.nome
+      input.id = 'picker-col-' + i
+      var label = document.createElement('label')
+      label.className = 'form-check-label small font-monospace'
+      label.htmlFor = input.id
+      label.textContent = col.nome + ' '
+      var tipo = document.createElement('span')
+      tipo.className = 'text-muted'
+      tipo.textContent = '(' + col.tipo + ')'
+      label.appendChild(tipo)
+      div.appendChild(input)
+      div.appendChild(label)
+      return div
+    }
+
+    sel.addEventListener('change', function () {
+      var view = VIEWS.find(function (v) { return v.nome === sel.value })
+      painel.replaceChildren()
+      painel.classList.toggle('d-none', !view)
+      botao.classList.toggle('d-none', !view)
+      if (!view) return
+      view.colunas.forEach(function (c, i) { painel.appendChild(montarCheckbox(c, i)) })
+    })
+
+    botao.addEventListener('click', function () {
+      var cols = Array.prototype.slice.call(painel.querySelectorAll('input:checked'))
+        .map(function (el) { return el.value })
+      if (!cols.length) {
+        alert('Marque ao menos uma coluna.')
+        return
+      }
+      if (campo.value.trim() && !confirm('Substituir a query atual pela gerada?')) return
+      campo.value = 'SELECT ' + cols.join(', ') + '\nFROM ' + sel.value
+      campo.focus()
+    })
+  })()
+</script>
+<% } %>
 </body>
 </html>
