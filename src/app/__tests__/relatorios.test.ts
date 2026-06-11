@@ -101,6 +101,30 @@ describe('appRelatoriosRoutes', () => {
     expect(res.body).toContain('action="/app/relatorios/cabecalhos"')
   })
 
+  it('editor traz réguas e painel de formatação (Frente D)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/relatorios/cabecalhos/novo' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('id="regua-h"')
+    expect(res.body).toContain('id="regua-v"')
+    expect(res.body).toContain('id="props-fonte"')
+    expect(res.body).toContain('id="props-tamanho"')
+    expect(res.body).toContain('id="props-alinhamento"')
+    expect(res.body).toContain('id="props-brasao"')
+  })
+
+  it('editor de edição repreenche o layout COM a formatação salva', async () => {
+    m.buscarCabecalho.mockResolvedValue({
+      id: 'c1', entidadeId: 'ent1', nome: 'Meu Cab', altura: 150,
+      layout: [{ tipo: 'NOME_ENTIDADE', x: 50, y: 10, fonte: 'serif', tamanho: 18, negrito: true, alinhamento: 'centro' }],
+    })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/cabecalhos/c1' })
+    expect(res.statusCode).toBe(200)
+    // o JSON embutido p/ o canvas precisa carregar a formatação
+    expect(res.body).toContain('"fonte":"serif"')
+    expect(res.body).toContain('"tamanho":18')
+    expect(res.body).toContain('"alinhamento":"centro"')
+  })
+
   it('editor de edição posta para /app/...//:id (prefixo /app preservado)', async () => {
     m.buscarCabecalho.mockResolvedValue({ id: 'c1', entidadeId: 'ent1', nome: 'Meu Cab', altura: 150, layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] })
     const res = await app.inject({ method: 'GET', url: '/relatorios/cabecalhos/c1' })

@@ -250,6 +250,11 @@ export const ESCOPO: readonly AreaEscopo[] = [
         descricao: 'Soma/média/contagem/menor/maior por coluna, uma linha rotulada por agregação (rótulo editável); subtotal de página opcional.',
         status: 'PRONTO',
       },
+      {
+        titulo: 'Formatação rica de cabeçalho/rodapé',
+        descricao: 'Fonte, tamanho, negrito/itálico/sublinhado e alinhamento por elemento; réguas no editor; brasão redimensionável.',
+        status: 'PRONTO',
+      },
     ],
   },
 ]

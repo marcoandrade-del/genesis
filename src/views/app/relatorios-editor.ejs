@@ -17,10 +17,23 @@
   <style>
     #canvas { position: relative; border: 1px dashed var(--bs-border-color, #ccc); background: #fff; overflow: hidden; }
     #canvas .el { position: absolute; cursor: move; padding: 2px 6px; white-space: nowrap; font-size: 13px; background: rgba(159,232,112,.12); border: 1px solid rgba(0,0,0,.12); border-radius: 4px; user-select: none; touch-action: none; }
+    #canvas .el.sel { border: 2px solid var(--bs-primary, #0d6efd); background: rgba(159,232,112,.25); }
     #canvas .el .rm { margin-left: 6px; color: #c00; cursor: pointer; font-weight: bold; }
     #canvas .el .ph { color: #999; font-style: italic; }
     .paleta .chip { cursor: pointer; }
     .paleta .chip.ativo { opacity: .4; pointer-events: none; }
+    /* Réguas: horizontal em % da largura, vertical em px da faixa. */
+    #wrap { position: relative; padding-left: 30px; padding-top: 22px; }
+    #regua-h { position: absolute; top: 0; left: 30px; right: 0; height: 22px; }
+    #regua-v { position: absolute; top: 22px; left: 0; width: 30px; }
+    .regua { background: #f4f5f3; border: 1px solid var(--bs-border-color, #ccc); font-size: 9px; color: #888; overflow: hidden; }
+    .regua .tick { position: absolute; background: #bbb; }
+    #regua-h .tick { bottom: 0; width: 1px; height: 6px; }
+    #regua-h .tick.maior { height: 10px; background: #999; }
+    #regua-h .num { position: absolute; bottom: 9px; transform: translateX(-50%); }
+    #regua-v .tick { right: 0; height: 1px; width: 6px; }
+    #regua-v .tick.maior { width: 10px; background: #999; }
+    #regua-v .num { position: absolute; right: 12px; transform: translateY(-50%); }
   </style>
 </head>
 <body class="bg-light">
@@ -80,7 +93,63 @@
     </div>
 
     <label class="form-label small fw-semibold">Pré-visualização da faixa</label>
-    <div id="canvas" style="height: <%= alturaAtual %>px"></div>
+    <div id="wrap">
+      <div id="regua-h" class="regua" title="Largura da página (%)"></div>
+      <div id="regua-v" class="regua" title="Altura da faixa (px)"></div>
+      <div id="canvas" style="height: <%= alturaAtual %>px"></div>
+    </div>
+    <div class="form-text mb-2">Régua horizontal em % da largura da página; vertical em px da faixa. Clique num elemento para formatar.</div>
+
+    <div id="props" class="card mb-3 d-none">
+      <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+          <div class="col-12 col-lg-auto me-lg-2">
+            <div class="small text-muted">Elemento selecionado</div>
+            <div class="fw-semibold small" id="props-nome"></div>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0">X (%)</label>
+            <input type="number" class="form-control form-control-sm" id="props-x" min="0" max="100" step="0.5" style="width:84px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0">Y (%)</label>
+            <input type="number" class="form-control form-control-sm" id="props-y" min="0" max="100" step="0.5" style="width:84px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0">Fonte</label>
+            <select class="form-select form-select-sm" id="props-fonte" style="width:120px">
+              <option value="">Padrão</option>
+              <option value="serif">Serifada</option>
+              <option value="mono">Monoespaçada</option>
+            </select>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0">Tamanho (px)</label>
+            <input type="number" class="form-control form-control-sm" id="props-tamanho" min="8" max="40" placeholder="padrão" style="width:96px">
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0 d-block">Ênfase</label>
+            <div class="btn-group btn-group-sm" role="group">
+              <button type="button" class="btn btn-outline-secondary fw-bold" id="props-negrito" title="Negrito">N</button>
+              <button type="button" class="btn btn-outline-secondary fst-italic" id="props-italico" title="Itálico">I</button>
+              <button type="button" class="btn btn-outline-secondary text-decoration-underline" id="props-sublinhado" title="Sublinhado">S</button>
+            </div>
+          </div>
+          <div class="col-auto">
+            <label class="form-label small mb-0 d-block">Alinhamento <span class="text-muted">(âncora do X)</span></label>
+            <div class="btn-group btn-group-sm" role="group" id="props-alinhamento">
+              <button type="button" class="btn btn-outline-secondary" data-al="esq" title="X é a borda esquerda"><i class="bi bi-text-left"></i></button>
+              <button type="button" class="btn btn-outline-secondary" data-al="centro" title="X é o centro"><i class="bi bi-text-center"></i></button>
+              <button type="button" class="btn btn-outline-secondary" data-al="dir" title="X é a borda direita"><i class="bi bi-text-right"></i></button>
+            </div>
+          </div>
+          <div class="col-auto d-none" id="props-brasao-wrap">
+            <label class="form-label small mb-0">Altura do brasão (px)</label>
+            <input type="number" class="form-control form-control-sm" id="props-brasao" min="16" max="200" style="width:96px">
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="form-text mb-3">As posições são relativas à faixa, então o modelo se adapta à largura da página na geração.</div>
 
     <div class="d-flex gap-2">
@@ -101,22 +170,33 @@
   const paleta = document.getElementById('paleta')
   const inputAltura = document.getElementById('altura')
 
-  // Estado: lista de { tipo, x, y } (x/y em % da faixa). Fonte da verdade.
+  // Estado: lista de { tipo, x, y, fonte?, tamanho?, negrito?, italico?,
+  // sublinhado?, alinhamento?, altura? } (x/y em % da faixa). Fonte da verdade.
   let layout = Array.isArray(DADOS.layout) ? DADOS.layout.map(function(e) {
-    return { tipo: e.tipo, x: Number(e.x) || 0, y: Number(e.y) || 0 }
+    const item = { tipo: e.tipo, x: Number(e.x) || 0, y: Number(e.y) || 0 }
+    if (e.fonte === 'serif' || e.fonte === 'mono') item.fonte = e.fonte
+    if (Number(e.tamanho)) item.tamanho = Number(e.tamanho)
+    if (e.negrito) item.negrito = true
+    if (e.italico) item.italico = true
+    if (e.sublinhado) item.sublinhado = true
+    if (e.alinhamento === 'centro' || e.alinhamento === 'dir') item.alinhamento = e.alinhamento
+    if (e.tipo === 'BRASAO' && Number(e.altura)) item.altura = Number(e.altura)
+    return item
   }) : []
+  let selecionado = null // item do layout com o painel de propriedades aberto
 
   function placeholder(texto) {
     const s = document.createElement('span'); s.className = 'ph'; s.textContent = texto; return s
   }
 
   // Conteúdo de amostra de cada elemento (data/hora/página são exemplos).
-  function conteudo(tipo) {
+  function conteudo(item) {
+    const tipo = item.tipo
     const agora = new Date()
     if (tipo === 'BRASAO') {
       if (DADOS.entidade.brasao) {
         const img = document.createElement('img'); img.src = DADOS.entidade.brasao
-        img.style.maxHeight = '56px'; img.style.maxWidth = '120px'; img.alt = 'Brasão'
+        img.style.maxHeight = (item.altura || 56) + 'px'; img.alt = 'Brasão'
         return img
       }
       return placeholder('Brasão')
@@ -139,14 +219,28 @@
     if (chip) chip.classList.toggle('ativo', ativo)
   }
 
+  // Aplica posição + formatação no elemento do canvas (espelha o estilo do
+  // PDF/prévia: alinhamento muda a âncora do x via translateX).
+  function aplicarEstilo(el, item) {
+    el.style.left = item.x + '%'
+    el.style.top = item.y + '%'
+    el.style.transform = item.alinhamento === 'centro' ? 'translateX(-50%)'
+      : item.alinhamento === 'dir' ? 'translateX(-100%)' : ''
+    el.style.fontFamily = item.fonte === 'serif' ? 'serif' : item.fonte === 'mono' ? 'monospace' : ''
+    el.style.fontSize = item.tamanho ? item.tamanho + 'px' : ''
+    el.style.fontWeight = item.negrito ? 'bold' : ''
+    el.style.fontStyle = item.italico ? 'italic' : ''
+    el.style.textDecoration = item.sublinhado ? 'underline' : ''
+  }
+
   function render() {
     canvas.textContent = ''
     layout.forEach(function(item) {
       const el = document.createElement('div')
-      el.className = 'el'
-      el.style.left = item.x + '%'
-      el.style.top = item.y + '%'
-      el.appendChild(conteudo(item.tipo))
+      el.className = 'el' + (item === selecionado ? ' sel' : '')
+      el.dataset.tipo = item.tipo
+      el.appendChild(conteudo(item))
+      aplicarEstilo(el, item)
       const rm = document.createElement('span')
       rm.className = 'rm'; rm.textContent = '×'; rm.title = 'Remover'
       rm.addEventListener('pointerdown', function(ev) { ev.stopPropagation() })
@@ -164,30 +258,39 @@
 
   function adicionar(tipo) {
     if (layout.some(function(i) { return i.tipo === tipo })) return
-    layout.push({ tipo: tipo, x: 4, y: 40 })
+    const item = { tipo: tipo, x: 4, y: 40 }
+    layout.push(item)
     render()
+    selecionar(item)
   }
 
   function remover(tipo) {
     layout = layout.filter(function(i) { return i.tipo !== tipo })
     render()
+    if (selecionado && selecionado.tipo === tipo) selecionar(null)
   }
 
   function arrastavel(el, item) {
     el.addEventListener('pointerdown', function(ev) {
       ev.preventDefault()
+      if (item !== selecionado) selecionar(item)
       const rect = canvas.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
       const offX = ev.clientX - elRect.left
       const offY = ev.clientY - elRect.top
+      // Com âncora centro/dir, o x do item não é a borda esquerda do box —
+      // compensa pela largura para o elemento seguir o ponteiro sem pular.
+      const anchorPx = item.alinhamento === 'centro' ? elRect.width / 2
+        : item.alinhamento === 'dir' ? elRect.width : 0
       el.setPointerCapture(ev.pointerId)
       function mover(e) {
-        let x = (e.clientX - offX - rect.left) / rect.width * 100
+        let x = (e.clientX - offX - rect.left + anchorPx) / rect.width * 100
         let y = (e.clientY - offY - rect.top) / rect.height * 100
         item.x = Math.min(100, Math.max(0, Math.round(x * 100) / 100))
         item.y = Math.min(100, Math.max(0, Math.round(y * 100) / 100))
         el.style.left = item.x + '%'
         el.style.top = item.y + '%'
+        if (item === selecionado) { propsX.value = item.x; propsY.value = item.y }
         inputLayout.value = JSON.stringify(layout)
       }
       function soltar(e) {
@@ -207,14 +310,144 @@
 
   inputAltura.addEventListener('input', function() {
     const h = parseInt(inputAltura.value, 10)
-    if (Number.isFinite(h) && h >= 40 && h <= 400) canvas.style.height = h + 'px'
+    if (Number.isFinite(h) && h >= 40 && h <= 400) { canvas.style.height = h + 'px'; montarReguaV() }
   })
+
+  // ── Painel de propriedades ───────────────────────────────────
+  const props = document.getElementById('props')
+  const propsNome = document.getElementById('props-nome')
+  const propsX = document.getElementById('props-x')
+  const propsY = document.getElementById('props-y')
+  const propsFonte = document.getElementById('props-fonte')
+  const propsTamanho = document.getElementById('props-tamanho')
+  const propsBrasaoWrap = document.getElementById('props-brasao-wrap')
+  const propsBrasao = document.getElementById('props-brasao')
+  const botoesEnfase = {
+    negrito: document.getElementById('props-negrito'),
+    italico: document.getElementById('props-italico'),
+    sublinhado: document.getElementById('props-sublinhado'),
+  }
+  const grupoAlinhamento = document.getElementById('props-alinhamento')
+  const ROTULOS = <%- JSON.stringify(rotulos).replace(/</g, '\\u003c') %>;
+
+  // Seleciona SEM reconstruir o canvas (só alterna classes): o drag chama isto
+  // no pointerdown e reconstruir ali destruiria o elemento antes do
+  // setPointerCapture (InvalidStateError).
+  function selecionar(item) {
+    selecionado = item
+    props.classList.toggle('d-none', !item)
+    if (item) {
+      propsNome.textContent = ROTULOS[item.tipo] || item.tipo
+      propsX.value = item.x
+      propsY.value = item.y
+      propsFonte.value = item.fonte || ''
+      propsTamanho.value = item.tamanho || ''
+      Object.keys(botoesEnfase).forEach(function(k) { botoesEnfase[k].classList.toggle('active', !!item[k]) })
+      grupoAlinhamento.querySelectorAll('button').forEach(function(b) {
+        b.classList.toggle('active', (item.alinhamento || 'esq') === b.dataset.al)
+      })
+      propsBrasaoWrap.classList.toggle('d-none', item.tipo !== 'BRASAO')
+      if (item.tipo === 'BRASAO') propsBrasao.value = item.altura || ''
+    }
+    canvas.querySelectorAll('.el').forEach(function(el) {
+      el.classList.toggle('sel', !!item && el.dataset.tipo === item.tipo)
+    })
+  }
+
+  // Edição numérica de X/Y (posicionamento exato, complementa as réguas).
+  function numHandler(input, prop) {
+    input.addEventListener('input', function() {
+      if (!selecionado) return
+      const v = Number(input.value)
+      if (Number.isFinite(v)) { selecionado[prop] = Math.min(100, Math.max(0, v)); render() }
+    })
+  }
+  numHandler(propsX, 'x')
+  numHandler(propsY, 'y')
+
+  propsFonte.addEventListener('change', function() {
+    if (!selecionado) return
+    if (propsFonte.value) selecionado.fonte = propsFonte.value; else delete selecionado.fonte
+    render()
+  })
+  propsTamanho.addEventListener('input', function() {
+    if (!selecionado) return
+    const v = parseInt(propsTamanho.value, 10)
+    if (Number.isFinite(v) && v >= 8 && v <= 40) selecionado.tamanho = v
+    else delete selecionado.tamanho
+    render()
+  })
+  Object.keys(botoesEnfase).forEach(function(k) {
+    botoesEnfase[k].addEventListener('click', function() {
+      if (!selecionado) return
+      if (selecionado[k]) delete selecionado[k]; else selecionado[k] = true
+      botoesEnfase[k].classList.toggle('active', !!selecionado[k])
+      render()
+    })
+  })
+  grupoAlinhamento.addEventListener('click', function(ev) {
+    const b = ev.target.closest('button')
+    if (!b || !selecionado) return
+    if (b.dataset.al === 'esq') delete selecionado.alinhamento; else selecionado.alinhamento = b.dataset.al
+    grupoAlinhamento.querySelectorAll('button').forEach(function(x) {
+      x.classList.toggle('active', (selecionado.alinhamento || 'esq') === x.dataset.al)
+    })
+    render()
+  })
+  propsBrasao.addEventListener('input', function() {
+    if (!selecionado || selecionado.tipo !== 'BRASAO') return
+    const v = parseInt(propsBrasao.value, 10)
+    if (Number.isFinite(v) && v >= 16 && v <= 200) selecionado.altura = v
+    else delete selecionado.altura
+    render()
+  })
+
+  // Clicar fora de elemento limpa a seleção.
+  canvas.addEventListener('pointerdown', function(ev) {
+    if (ev.target === canvas) selecionar(null)
+  })
+
+  // ── Réguas ───────────────────────────────────────────────────
+  function montarReguaH() {
+    const r = document.getElementById('regua-h')
+    r.textContent = ''
+    for (let p = 0; p <= 100; p += 5) {
+      const t = document.createElement('div')
+      t.className = 'tick' + (p % 10 === 0 ? ' maior' : '')
+      t.style.left = p + '%'
+      r.appendChild(t)
+      if (p % 10 === 0 && p > 0 && p < 100) {
+        const n = document.createElement('span')
+        n.className = 'num'; n.style.left = p + '%'; n.textContent = p
+        r.appendChild(n)
+      }
+    }
+  }
+  function montarReguaV() {
+    const r = document.getElementById('regua-v')
+    const h = canvas.offsetHeight
+    r.style.height = h + 'px'
+    r.textContent = ''
+    for (let px = 0; px <= h; px += 10) {
+      const t = document.createElement('div')
+      t.className = 'tick' + (px % 50 === 0 ? ' maior' : '')
+      t.style.top = px + 'px'
+      r.appendChild(t)
+      if (px % 50 === 0 && px > 0) {
+        const n = document.createElement('span')
+        n.className = 'num'; n.style.top = px + 'px'; n.textContent = px
+        r.appendChild(n)
+      }
+    }
+  }
 
   // Garante o hidden preenchido mesmo se o usuário salvar sem mexer no canvas.
   document.getElementById('form').addEventListener('submit', function() {
     inputLayout.value = JSON.stringify(layout)
   })
 
+  montarReguaH()
+  montarReguaV()
   render()
 </script>
 </body>
