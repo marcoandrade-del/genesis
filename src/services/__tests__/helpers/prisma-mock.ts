@@ -401,6 +401,12 @@ export function criarPrismaMock() {
       create: vi.fn(),
       createMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    arrecadacao: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+    },
     acessoEntidade: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),

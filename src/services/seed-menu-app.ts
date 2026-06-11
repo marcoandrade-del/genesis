@@ -18,6 +18,7 @@ const AREAS: readonly ItemSeed[] = [
     filhos: [
       { rota: '/app/orcamento/saldo', nome: 'Saldos', icone: 'bi-wallet2', tipo: 'FUNCIONALIDADE' },
       { rota: '/app/orcamento/creditos', nome: 'Créditos adicionais', icone: 'bi-plus-square', tipo: 'FUNCIONALIDADE' },
+      { rota: '/app/orcamento/arrecadacao', nome: 'Arrecadação', icone: 'bi-cash-stack', tipo: 'FUNCIONALIDADE' },
     ],
   },
   { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício' },
