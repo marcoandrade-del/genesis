@@ -7,6 +7,7 @@ const m = vi.hoisted(() => ({
   atualizar: vi.fn(),
   excluir: vi.fn(),
   executar: vi.fn(),
+  listarViews: vi.fn(),
 }))
 
 vi.mock('../../services/meus-relatorios.js', () => ({
@@ -20,7 +21,7 @@ vi.mock('../../services/meus-relatorios.js', () => ({
 }))
 
 vi.mock('../../services/relatorio-executor.js', () => ({
-  criarExecutorPadrao: () => ({ executar: m.executar, configurado: true }),
+  criarExecutorPadrao: () => ({ executar: m.executar, listarViews: m.listarViews, configurado: true }),
 }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
@@ -57,6 +58,7 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
   beforeEach(async () => {
     Object.values(m).forEach((fn) => fn.mockReset())
     m.listar.mockResolvedValue([])
+    m.listarViews.mockResolvedValue([])
     ;({ app, prisma } = await montar())
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
   })
@@ -67,6 +69,32 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Novo relatório')
     expect(res.body).toContain('rel_lancamentos')
+  })
+
+  it('GET meus/novo sem views do sandbox não renderiza o picker', async () => {
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/novo' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).not.toContain('picker-view')
+  })
+
+  it('GET meus/novo renderiza o picker com as views e colunas do sandbox', async () => {
+    m.listarViews.mockResolvedValue([
+      { nome: 'rel_contas', colunas: [{ nome: 'codigo', tipo: 'text' }, { nome: 'nome', tipo: 'text' }] },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/novo' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('picker-view')
+    expect(res.body).toContain('<option value="rel_contas">')
+    // metadados embutidos para o JS do picker montar as colunas
+    expect(res.body).toContain('"colunas":[{"nome":"codigo","tipo":"text"}')
+  })
+
+  it('GET meus/novo degrada sem picker se o sandbox falhar ao listar views', async () => {
+    m.listarViews.mockRejectedValue(new Error('sandbox fora'))
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/novo' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Novo relatório')
+    expect(res.body).not.toContain('picker-view')
   })
 
   it('GET meus/novo bloqueado para LEITURA', async () => {

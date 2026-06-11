@@ -12,6 +12,7 @@ export type ResultadoExecucao = {
   total: number
   truncado: boolean
 }
+export type ViewRelatorio = { nome: string; colunas: { nome: string; tipo: string }[] }
 
 /**
  * Valida que a query é uma única instrução de leitura. NÃO é a barreira de
@@ -61,6 +62,45 @@ export class RelatorioExecutor {
 
   get configurado(): boolean {
     return this.pool !== null
+  }
+
+  /**
+   * Lista as views `rel_*` disponíveis no sandbox com suas colunas (via
+   * information_schema, que só mostra o que a role read-only enxerga). Usada
+   * pelo picker do editor de relatórios; sem sandbox configurado devolve [].
+   */
+  async listarViews(): Promise<ViewRelatorio[]> {
+    if (!this.pool) return []
+    const client = await this.pool.connect()
+    try {
+      await client.query('BEGIN READ ONLY')
+      await client.query(`SET LOCAL statement_timeout = ${TIMEOUT_MS}`)
+      const res = await client.query({
+        text: `SELECT table_name, column_name, data_type
+                 FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name LIKE 'rel\\_%'
+                ORDER BY table_name, ordinal_position`,
+      })
+      const porView = new Map<string, ViewRelatorio>()
+      for (const r of (res.rows ?? []) as { table_name: string; column_name: string; data_type: string }[]) {
+        let v = porView.get(r.table_name)
+        if (!v) {
+          v = { nome: r.table_name, colunas: [] }
+          porView.set(r.table_name, v)
+        }
+        v.colunas.push({ nome: r.column_name, tipo: r.data_type })
+      }
+      return [...porView.values()]
+    } catch (e) {
+      throw traduzErroPg(e)
+    } finally {
+      try {
+        await client.query('ROLLBACK')
+      } catch {
+        // conexão pode já estar inválida; ignorar
+      }
+      client.release()
+    }
   }
 
   async executar(query: string, ctx: ContextoExecucao): Promise<ResultadoExecucao> {

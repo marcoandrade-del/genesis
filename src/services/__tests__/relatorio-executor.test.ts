@@ -144,6 +144,55 @@ describe('RelatorioExecutor.executar', () => {
   })
 })
 
+describe('RelatorioExecutor.listarViews', () => {
+  const LINHAS_CATALOGO = [
+    { table_name: 'rel_contas', column_name: 'codigo', data_type: 'text' },
+    { table_name: 'rel_contas', column_name: 'nome', data_type: 'text' },
+    { table_name: 'rel_lancamentos', column_name: 'valor', data_type: 'numeric' },
+  ]
+  const catalogoImpl = (rows: unknown[]) => (arg: unknown) =>
+    typeof arg === 'string' ? Promise.resolve({}) : Promise.resolve({ rows })
+
+  it('devolve [] quando não configurado (sem abrir conexão)', async () => {
+    const ex = new RelatorioExecutor(null)
+    expect(await ex.listarViews()).toEqual([])
+  })
+
+  it('agrupa colunas por view, em transação read-only com rollback/release', async () => {
+    const { pool, client } = fakePool(catalogoImpl(LINHAS_CATALOGO))
+    const ex = new RelatorioExecutor(pool as never)
+    const views = await ex.listarViews()
+    expect(views).toEqual([
+      { nome: 'rel_contas', colunas: [{ nome: 'codigo', tipo: 'text' }, { nome: 'nome', tipo: 'text' }] },
+      { nome: 'rel_lancamentos', colunas: [{ nome: 'valor', tipo: 'numeric' }] },
+    ])
+    const sqls = client.query.mock.calls.map((c) => c[0])
+    expect(sqls).toContain('BEGIN READ ONLY')
+    const principal = sqls.find((s) => typeof s === 'object') as { text: string }
+    expect(principal.text).toMatch(/information_schema\.columns/)
+    expect(principal.text).toMatch(/rel\\_%/)
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK')
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('tolera resultado sem rows', async () => {
+    const { pool } = fakePool((arg) => Promise.resolve(typeof arg === 'string' ? {} : {}))
+    const ex = new RelatorioExecutor(pool as never)
+    expect(await ex.listarViews()).toEqual([])
+  })
+
+  it('traduz erro do Postgres e libera a conexão (ignorando falha no ROLLBACK)', async () => {
+    const { pool, client } = fakePool((arg) => {
+      if (typeof arg === 'object') return Promise.reject(Object.assign(new Error('boom'), { code: 'XX999' }))
+      if (arg === 'ROLLBACK') return Promise.reject(new Error('conn morta'))
+      return Promise.resolve({})
+    })
+    const ex = new RelatorioExecutor(pool as never)
+    await expect(ex.listarViews()).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(client.release).toHaveBeenCalled()
+  })
+})
+
 describe('criarExecutorPadrao', () => {
   const ORIG = process.env['REPORT_DB_URL']
   afterEach(() => {

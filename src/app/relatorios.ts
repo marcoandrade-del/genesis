@@ -252,6 +252,16 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
   // ── Meus Relatórios (relatório com query + cabeçalho/rodapé) ───
   const baseRel = '/relatorios/meus'
 
+  // Views rel_* para o picker do editor. Falha do sandbox não pode derrubar o
+  // editor (o picker é conveniência) — degrada para lista vazia.
+  async function listarViewsSeguro() {
+    try {
+      return await executor.listarViews()
+    } catch {
+      return []
+    }
+  }
+
   async function renderRelEditor(
     reply: FastifyReply,
     entidade: unknown,
@@ -261,7 +271,11 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     registro: CorpoRelatorio & { id?: string } | null,
     opts: { erro?: string; status?: number } = {},
   ) {
-    const [cabecalhos, rodapes] = await Promise.all([svc.listarCabecalhos(entidadeId), svc.listarRodapes(entidadeId)])
+    const [cabecalhos, rodapes, views] = await Promise.all([
+      svc.listarCabecalhos(entidadeId),
+      svc.listarRodapes(entidadeId),
+      listarViewsSeguro(),
+    ])
     if (opts.status) reply.code(opts.status)
     return reply.view('app/relatorios-relatorio-editor', {
       entidade,
@@ -270,6 +284,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       registro,
       cabecalhos,
       rodapes,
+      views,
       erro: opts.erro ?? null,
       layout: null,
     })
