@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa } from '../relatorio-pdf.js'
+import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, estiloElemento } from '../relatorio-pdf.js'
 
 const DADOS = {
   nomeEntidade: 'Prefeitura',
@@ -59,6 +59,41 @@ describe('montarTemplateFaixa', () => {
       { ...DADOS, nomeEntidade: undefined as never },
     )
     expect(html).toContain('left:0%;top:0%')
+  })
+
+  it('aplica a formatação do elemento e a altura do brasão', () => {
+    const html = montarTemplateFaixa(
+      {
+        altura: 100,
+        layout: [
+          { tipo: 'NOME_ENTIDADE', x: 50, y: 10, fonte: 'serif', tamanho: 18, negrito: true, italico: true, sublinhado: true, alinhamento: 'centro' },
+          { tipo: 'BRASAO', x: 2, y: 0, altura: 72 },
+        ],
+      },
+      DADOS,
+    )
+    expect(html).toContain('transform:translateX(-50%)')
+    expect(html).toContain('font-family:serif')
+    expect(html).toContain('font-size:18px')
+    expect(html).toContain('font-weight:bold')
+    expect(html).toContain('font-style:italic')
+    expect(html).toContain('text-decoration:underline')
+    expect(html).toContain('max-height:72px')
+  })
+})
+
+describe('estiloElemento', () => {
+  it('só posição quando não há formatação (forma antiga)', () => {
+    expect(estiloElemento({ tipo: 'NOME_ENTIDADE', x: 5, y: 10 })).toBe('position:absolute;left:5%;top:10%')
+  })
+  it('alinhamento muda a âncora via translateX', () => {
+    expect(estiloElemento({ tipo: 'X', x: 50, y: 0, alinhamento: 'centro' })).toContain('transform:translateX(-50%)')
+    expect(estiloElemento({ tipo: 'X', x: 100, y: 0, alinhamento: 'dir' })).toContain('transform:translateX(-100%)')
+    expect(estiloElemento({ tipo: 'X', x: 0, y: 0, alinhamento: 'esq' })).not.toContain('transform')
+  })
+  it('fonte mono vira monospace; fonte desconhecida é ignorada', () => {
+    expect(estiloElemento({ tipo: 'X', x: 0, y: 0, fonte: 'mono' })).toContain('font-family:monospace')
+    expect(estiloElemento({ tipo: 'X', x: 0, y: 0, fonte: 'comic' })).not.toContain('font-family')
   })
 })
 

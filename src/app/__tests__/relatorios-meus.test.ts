@@ -243,6 +243,26 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     expect(res.body).toContain('Rua X, 100') // ENDERECO no rodapé
   })
 
+  it('GET executar aplica a formatação dos elementos da faixa (Frente D)', async () => {
+    m.buscar.mockResolvedValue({
+      id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', query: 'select 1',
+      cabecalho: { altura: 120, layout: [
+        { tipo: 'NOME_ENTIDADE', x: 50, y: 10, fonte: 'serif', tamanho: 20, negrito: true, italico: true, sublinhado: true, alinhamento: 'centro' },
+        { tipo: 'BRASAO', x: 2, y: 0, altura: 72 },
+      ] },
+      rodape: null,
+    })
+    m.executar.mockResolvedValue({ colunas: ['a'], linhas: [], total: 0, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1/executar' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('transform:translateX(-50%)')
+    expect(res.body).toContain('font-family:serif')
+    expect(res.body).toContain('font-size:20px')
+    expect(res.body).toContain('font-weight:bold')
+    expect(res.body).toContain('text-decoration:underline')
+    expect(res.body).toContain('max-height:72px') // brasão redimensionado
+  })
+
   it('GET executar mostra erro do sandbox no preview', async () => {
     m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', query: 'select 1', cabecalho: null, rodape: null })
     m.executar.mockRejectedValue(new ErroNegocio('CONFLITO', 'Sandbox não configurado.'))

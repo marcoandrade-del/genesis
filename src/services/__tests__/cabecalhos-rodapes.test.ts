@@ -74,6 +74,59 @@ describe('CabecalhosRodapesService', () => {
       expect((prisma.cabecalhoRelatorio.create as any).mock.calls[0][0].data.altura).toBe(91)
     })
 
+    it('persiste a formatação opcional sanitizada do elemento', async () => {
+      prisma.cabecalhoRelatorio.create.mockResolvedValue({ id: 'c1' })
+      await svc.criarCabecalho('ent1', 'u1', {
+        nome: 'X',
+        layout: [{
+          tipo: 'NOME_ENTIDADE', x: 50, y: 10,
+          fonte: 'serif', tamanho: '18', negrito: true, italico: 'true', sublinhado: true, alinhamento: 'centro',
+        }],
+      })
+      expect((prisma.cabecalhoRelatorio.create as any).mock.calls[0][0].data.layout).toEqual([{
+        tipo: 'NOME_ENTIDADE', x: 50, y: 10,
+        fonte: 'serif', tamanho: 18, negrito: true, italico: true, sublinhado: true, alinhamento: 'centro',
+      }])
+    })
+
+    it('descarta defaults e valores desconhecidos (JSON enxuto; forma antiga preservada)', async () => {
+      prisma.cabecalhoRelatorio.create.mockResolvedValue({ id: 'c1' })
+      await svc.criarCabecalho('ent1', 'u1', {
+        nome: 'X',
+        layout: [{ tipo: 'NOME_ENTIDADE', x: 1, y: 1, fonte: 'comic-sans', alinhamento: 'esq', negrito: false, tamanho: '' }],
+      })
+      expect((prisma.cabecalhoRelatorio.create as any).mock.calls[0][0].data.layout).toEqual([
+        { tipo: 'NOME_ENTIDADE', x: 1, y: 1 },
+      ])
+    })
+
+    it('altura do brasão: persiste no BRASAO, ignora em outros tipos, valida faixa', async () => {
+      prisma.cabecalhoRelatorio.create.mockResolvedValue({ id: 'c1' })
+      await svc.criarCabecalho('ent1', 'u1', {
+        nome: 'X',
+        layout: [
+          { tipo: 'BRASAO', x: 0, y: 0, altura: 64.4 },
+          { tipo: 'NOME_ENTIDADE', x: 1, y: 1, altura: 64 },
+        ],
+      })
+      expect((prisma.cabecalhoRelatorio.create as any).mock.calls[0][0].data.layout).toEqual([
+        { tipo: 'BRASAO', x: 0, y: 0, altura: 64 },
+        { tipo: 'NOME_ENTIDADE', x: 1, y: 1 },
+      ])
+      await expect(
+        svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [{ tipo: 'BRASAO', x: 0, y: 0, altura: 500 }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    })
+
+    it('rejeita tamanho de fonte fora da faixa (8–40)', async () => {
+      await expect(
+        svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [{ tipo: 'BRASAO', x: 0, y: 0, tamanho: 4 }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+      await expect(
+        svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [{ tipo: 'BRASAO', x: 0, y: 0, tamanho: 'abc' }] }),
+      ).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    })
+
     it('rejeita entidade inexistente', async () => {
       prisma.entidade.findUnique.mockResolvedValue(null)
       await expect(svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout: [] })).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })

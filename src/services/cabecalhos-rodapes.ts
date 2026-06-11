@@ -31,7 +31,37 @@ export const ROTULOS_ELEMENTO: Record<string, string> = {
   ENDERECO_ENTIDADE: 'Endereço da entidade',
 }
 
-export type ElementoLayout = { tipo: string; x: number; y: number }
+/**
+ * Elemento da faixa. Além da posição (x/y em %), aceita formatação opcional —
+ * atributo ausente = comportamento padrão (a forma antiga `{tipo,x,y}` continua
+ * válida, então templates existentes não mudam):
+ * - fonte: família (sans/serif/mono)
+ * - tamanho: corpo da fonte em px
+ * - negrito/italico/sublinhado: ênfases
+ * - alinhamento: âncora do x — 'esq' (default, x é a borda esquerda),
+ *   'centro' (x é o centro) ou 'dir' (x é a borda direita; bom p/ alinhar
+ *   na margem direita da página)
+ * - altura: só BRASAO — altura da imagem em px
+ */
+export type ElementoLayout = {
+  tipo: string
+  x: number
+  y: number
+  fonte?: 'sans' | 'serif' | 'mono'
+  tamanho?: number
+  negrito?: boolean
+  italico?: boolean
+  sublinhado?: boolean
+  alinhamento?: 'centro' | 'dir'
+  altura?: number
+}
+
+export const FONTES_ELEMENTO = ['sans', 'serif', 'mono'] as const
+export const ALINHAMENTOS_ELEMENTO = ['esq', 'centro', 'dir'] as const
+export const TAMANHO_FONTE_MIN = 8
+export const TAMANHO_FONTE_MAX = 40
+export const ALTURA_BRASAO_MIN = 16
+export const ALTURA_BRASAO_MAX = 200
 
 type DadosTemplate = { nome?: unknown; altura?: unknown; layout?: unknown }
 
@@ -62,9 +92,21 @@ function clampPct(n: number): number {
   return Math.min(100, Math.max(0, Math.round(n * 100) / 100))
 }
 
+// Número opcional dentro de uma faixa: ausente → undefined; inválido → erro.
+function numOpcional(v: unknown, min: number, max: number, rotulo: string): number | undefined {
+  if (v === undefined || v === null || v === '') return undefined
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n) || n < min || n > max) {
+    throw new ErroNegocio('REQUISICAO_INVALIDA', `${rotulo} deve estar entre ${min} e ${max}.`)
+  }
+  return Math.round(n)
+}
+
 /**
  * Valida e normaliza a lista de elementos do layout. Cada `tipo` deve estar na
- * allowlist da faixa e aparecer no máximo uma vez; x/y são porcentagens.
+ * allowlist da faixa e aparecer no máximo uma vez; x/y são porcentagens. A
+ * formatação opcional é sanitizada e só persiste quando difere do default
+ * (mantém o JSON enxuto e os templates antigos intactos).
  */
 function validarLayout(permitidos: readonly string[], layout: unknown): ElementoLayout[] {
   if (!Array.isArray(layout)) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Layout inválido.')
@@ -73,7 +115,7 @@ function validarLayout(permitidos: readonly string[], layout: unknown): Elemento
     if (typeof el !== 'object' || el === null) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Elemento de layout inválido.')
     }
-    const { tipo, x, y } = el as Record<string, unknown>
+    const { tipo, x, y, fonte, tamanho, negrito, italico, sublinhado, alinhamento, altura } = el as Record<string, unknown>
     if (typeof tipo !== 'string' || !permitidos.includes(tipo)) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', `Elemento não permitido nesta faixa: ${String(tipo)}.`)
     }
@@ -84,7 +126,19 @@ function validarLayout(permitidos: readonly string[], layout: unknown): Elemento
     if (!Number.isFinite(nx) || !Number.isFinite(ny)) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Posição de elemento inválida.')
     }
-    return { tipo, x: clampPct(nx), y: clampPct(ny) }
+    const item: ElementoLayout = { tipo, x: clampPct(nx), y: clampPct(ny) }
+    if (fonte === 'serif' || fonte === 'mono') item.fonte = fonte
+    const tam = numOpcional(tamanho, TAMANHO_FONTE_MIN, TAMANHO_FONTE_MAX, 'Tamanho da fonte')
+    if (tam !== undefined) item.tamanho = tam
+    if (negrito === true || negrito === 'true') item.negrito = true
+    if (italico === true || italico === 'true') item.italico = true
+    if (sublinhado === true || sublinhado === 'true') item.sublinhado = true
+    if (alinhamento === 'centro' || alinhamento === 'dir') item.alinhamento = alinhamento
+    if (tipo === 'BRASAO') {
+      const alt = numOpcional(altura, ALTURA_BRASAO_MIN, ALTURA_BRASAO_MAX, 'Altura do brasão')
+      if (alt !== undefined) item.altura = alt
+    }
+    return item
   })
   if (itens.length === 0) {
     throw new ErroNegocio('REQUISICAO_INVALIDA', 'Adicione ao menos um elemento à faixa.')

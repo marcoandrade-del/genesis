@@ -10,7 +10,18 @@ export type DadosFaixa = {
   horaGeracao: string
 }
 export type Faixa = { altura: number; layout: unknown } | null
-type ElLayout = { tipo: string; x: number; y: number }
+type ElLayout = {
+  tipo: string
+  x: number
+  y: number
+  fonte?: string
+  tamanho?: number
+  negrito?: boolean
+  italico?: boolean
+  sublinhado?: boolean
+  alinhamento?: string
+  altura?: number
+}
 export type ResultadoPdf = { colunas: string[]; linhas: unknown[][]; truncado?: boolean }
 
 function esc(s: unknown): string {
@@ -19,10 +30,12 @@ function esc(s: unknown): string {
 
 // Conteúdo de um elemento de faixa no PDF. NUMERO_PAGINA usa os spans nativos do
 // Playwright (pageNumber/totalPages), que ele preenche por página.
-function conteudoEl(tipo: string, d: DadosFaixa): string {
-  switch (tipo) {
-    case 'BRASAO':
-      return d.brasao ? `<img src="${esc(d.brasao)}" style="max-height:40px;max-width:120px">` : ''
+function conteudoEl(el: ElLayout, d: DadosFaixa): string {
+  switch (el.tipo) {
+    case 'BRASAO': {
+      const h = Number(el.altura) || 40
+      return d.brasao ? `<img src="${esc(d.brasao)}" style="max-height:${h}px">` : ''
+    }
     case 'NOME_ENTIDADE': return esc(d.nomeEntidade)
     case 'NOME_RELATORIO': return esc(d.nomeRelatorio)
     case 'DATA_GERACAO': return esc(d.dataGeracao)
@@ -33,12 +46,31 @@ function conteudoEl(tipo: string, d: DadosFaixa): string {
   }
 }
 
+const FONTE_CSS: Record<string, string> = { serif: 'serif', mono: 'monospace' }
+
+/**
+ * Estilo CSS de um elemento da faixa: posição + formatação opcional. O
+ * `alinhamento` muda a âncora do x via translateX (centro/dir), permitindo
+ * centralizar ou encostar na margem direita com precisão.
+ */
+export function estiloElemento(el: ElLayout): string {
+  const partes = [`position:absolute`, `left:${Number(el.x) || 0}%`, `top:${Number(el.y) || 0}%`]
+  if (el.alinhamento === 'centro') partes.push('transform:translateX(-50%)')
+  else if (el.alinhamento === 'dir') partes.push('transform:translateX(-100%)')
+  if (FONTE_CSS[el.fonte ?? '']) partes.push(`font-family:${FONTE_CSS[el.fonte!]}`)
+  if (Number(el.tamanho)) partes.push(`font-size:${Number(el.tamanho)}px`)
+  if (el.negrito) partes.push('font-weight:bold')
+  if (el.italico) partes.push('font-style:italic')
+  if (el.sublinhado) partes.push('text-decoration:underline')
+  return partes.join(';')
+}
+
 /** Template de faixa (header/footer) do Playwright a partir do layout. */
 export function montarTemplateFaixa(faixa: Faixa, dados: DadosFaixa): string {
   if (!faixa) return '<span></span>'
   const lista: ElLayout[] = Array.isArray(faixa.layout) ? (faixa.layout as ElLayout[]) : []
   const els = lista
-    .map((el) => `<div style="position:absolute;left:${Number(el.x) || 0}%;top:${Number(el.y) || 0}%">${conteudoEl(el.tipo, dados)}</div>`)
+    .map((el) => `<div style="${estiloElemento(el)}">${conteudoEl(el, dados)}</div>`)
     .join('')
   return `<div style="position:relative;width:100%;height:${faixa.altura}px;font-size:10px;font-family:sans-serif;padding:0 12mm;box-sizing:border-box">${els}</div>`
 }
