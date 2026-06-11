@@ -92,7 +92,8 @@
               <td class="text-end pe-3">
                 <% if (podeEscrever) { %>
                   <a href="<%= sec.base %>/<%= t.id %>" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-                  <form method="post" action="<%= sec.base %>/<%= t.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o modelo «' + <%- JSON.stringify(t.nome) %> + '»?')">
+                  <%# o JSON.stringify precisa sair HTML-escapado: aspas literais terminariam o atributo onsubmit e matariam o confirm %>
+                  <form method="post" action="<%= sec.base %>/<%= t.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o modelo «' + <%= JSON.stringify(t.nome) %> + '»?')">
                     <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                   </form>
                 <% } else { %>

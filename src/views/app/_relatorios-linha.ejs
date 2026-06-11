@@ -14,7 +14,8 @@
           <% pastas.forEach(function(p) { %><option value="<%= p.id %>"<%= pastaAtual === p.id ? ' selected' : '' %>><%= p.nome %></option><% }) %>
         </select>
       </form>
-      <form method="post" action="/app/relatorios/meus/<%= r.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o relatório «' + <%- JSON.stringify(r.nome) %> + '»?')">
+      <%# o JSON.stringify precisa sair HTML-escapado: aspas literais terminariam o atributo onsubmit e matariam o confirm %>
+      <form method="post" action="/app/relatorios/meus/<%= r.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir o relatório «' + <%= JSON.stringify(r.nome) %> + '»?')">
         <button class="btn btn-sm btn-outline-danger py-0" title="Excluir"><i class="bi bi-trash"></i></button>
       </form>
     <% } %>

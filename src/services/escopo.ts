@@ -245,6 +245,11 @@ export const ESCOPO: readonly AreaEscopo[] = [
         descricao: 'Escolher uma view rel_* e marcar colunas para montar o SELECT sem digitar SQL.',
         status: 'PRONTO',
       },
+      {
+        titulo: 'Totais configuráveis por coluna',
+        descricao: 'Soma/média/contagem/menor/maior por coluna, uma linha rotulada por agregação (rótulo editável); subtotal de página opcional.',
+        status: 'PRONTO',
+      },
     ],
   },
 ]

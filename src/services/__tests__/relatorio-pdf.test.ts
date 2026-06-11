@@ -91,19 +91,35 @@ describe('montarCorpoHtml', () => {
     expect(html).toContain('&lt;i&gt;t&lt;/i&gt;')
   })
 
-  it('com coluna de valor e porPagina: subtotais (com quebra) + total geral', () => {
+  it('com coluna de valor e porPagina: subtotais (com quebra) + resumo no fim', () => {
     const r = { colunas: ['c', 'v'], linhas: [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4']] }
     const html = montarCorpoHtml(r, 'X', 2) // 2 linhas/página → 2 páginas
     expect((html.match(/class="subtotal"/g) || []).length).toBe(2)
     expect(html).toContain('break-after:page') // quebra entre páginas (não na última)
-    expect(html).toContain('class="total"')
+    expect(html).toContain('Total de v: <strong>10</strong>')
   })
 
-  it('sem porPagina, com coluna de valor: só total geral (sem subtotal)', () => {
+  it('sem porPagina, com coluna de valor: só o resumo (sem subtotal)', () => {
     const html = montarCorpoHtml({ colunas: ['c', 'v'], linhas: [['a', '10.5'], ['b', '4.5']] }, 'X')
-    expect(html).toContain('class="total"')
+    expect(html).toContain('class="resumo"')
     expect(html).not.toContain('class="subtotal"')
     expect(html).toContain('15.0') // 10.5 + 4.5, 1 casa
+  })
+
+  it('config do usuário: rótulo próprio, subtotal desligado e nota de parcial', () => {
+    const r = { colunas: ['c', 'v'], linhas: [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4']], truncado: true }
+    const cfg = { subtotalPagina: false, itens: [{ coluna: 'v', agg: 'MEDIA' as const, rotulo: 'Média dos impostos' }] }
+    const html = montarCorpoHtml(r, 'X', 2, cfg)
+    expect(html).not.toContain('class="subtotal"')
+    expect(html).toContain('Média dos impostos: <strong>2.50</strong>')
+    expect(html).toContain('Valores parciais')
+  })
+
+  it('config sem itens: nem subtotal nem resumo', () => {
+    const r = { colunas: ['c', 'v'], linhas: [['a', '1'], ['b', '2']] }
+    const html = montarCorpoHtml(r, 'X', 1, { subtotalPagina: true, itens: [] })
+    expect(html).not.toContain('class="subtotal"')
+    expect(html).not.toContain('class="resumo"')
   })
 })
 

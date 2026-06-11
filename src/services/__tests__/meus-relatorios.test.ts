@@ -121,6 +121,61 @@ describe('MeusRelatoriosService', () => {
     })
   })
 
+  describe('salvarTotais', () => {
+    const CFG = { subtotalPagina: false, itens: [{ coluna: 'valor', agg: 'SOMA', rotulo: 'Total dos impostos' }] }
+
+    it('grava em configuracao.totais preservando o resto do JSON', async () => {
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue({
+        id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', configuracao: { outra: 'chave' },
+      })
+      prisma.relatorioPersonalizado.update.mockResolvedValue({ id: 'rp1' })
+      await svc.salvarTotais('rp1', 'u1', 'ent1', CFG)
+      expect(prisma.relatorioPersonalizado.update).toHaveBeenCalledWith({
+        where: { id: 'rp1' },
+        data: { configuracao: { outra: 'chave', totais: CFG } },
+      })
+    })
+
+    it('null/vazio remove a chave (volta ao automático)', async () => {
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue({
+        id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', configuracao: { outra: 'chave', totais: CFG },
+      })
+      prisma.relatorioPersonalizado.update.mockResolvedValue({ id: 'rp1' })
+      await svc.salvarTotais('rp1', 'u1', 'ent1', null)
+      expect(prisma.relatorioPersonalizado.update).toHaveBeenCalledWith({
+        where: { id: 'rp1' },
+        data: { configuracao: { outra: 'chave' } },
+      })
+    })
+
+    it('tolera configuracao não-objeto (legado) — recomeça do zero', async () => {
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue({
+        id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', configuracao: null,
+      })
+      prisma.relatorioPersonalizado.update.mockResolvedValue({ id: 'rp1' })
+      await svc.salvarTotais('rp1', 'u1', 'ent1', CFG)
+      expect(prisma.relatorioPersonalizado.update).toHaveBeenCalledWith({
+        where: { id: 'rp1' },
+        data: { configuracao: { totais: CFG } },
+      })
+    })
+
+    it('rejeita config malformada sem gravar', async () => {
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', configuracao: {} })
+      await expect(svc.salvarTotais('rp1', 'u1', 'ent1', { itens: [{ coluna: 'v', agg: 'MODA' }] })).rejects.toMatchObject({
+        code: 'REQUISICAO_INVALIDA',
+      })
+      expect(prisma.relatorioPersonalizado.update).not.toHaveBeenCalled()
+    })
+
+    it('rejeita inexistente / de outro dono / de outra entidade', async () => {
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue(null)
+      await expect(svc.salvarTotais('rp1', 'u1', 'ent1', CFG)).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+      prisma.relatorioPersonalizado.findUnique.mockResolvedValue({ id: 'rp1', usuarioId: 'OUTRO', entidadeId: 'ent1' })
+      await expect(svc.salvarTotais('rp1', 'u1', 'ent1', CFG)).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+    })
+  })
+
   describe('excluir', () => {
     it('exclui relatório próprio sem favoritos', async () => {
       prisma.relatorioPersonalizado.findUnique.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1' })

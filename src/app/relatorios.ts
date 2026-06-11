@@ -10,7 +10,15 @@ import { MeusRelatoriosOrgService } from '../services/meus-relatorios-org.js'
 import { criarExecutorPadrao } from '../services/relatorio-executor.js'
 import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf, type Faixa } from '../services/relatorio-pdf.js'
 import { exportarResultado, formatoValido, nomeArquivo, FORMATOS } from '../services/relatorio-export.js'
-import { montarRender, linhasPorPagina } from '../services/relatorio-totais.js'
+import {
+  montarRender,
+  linhasPorPagina,
+  lerTotaisConfig,
+  configEfetiva,
+  rotuloPadrao,
+  AGG_TIPOS,
+  type TotaisConfig,
+} from '../services/relatorio-totais.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
@@ -394,6 +402,8 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       }
     }
     const porPagina = linhasPorPagina(margemParaFaixa(reg.cabecalho, 12), margemParaFaixa(reg.rodape, 12))
+    const cfgSalva = lerTotaisConfig(reg.configuracao)
+    const render = resultado ? montarRender(resultado, porPagina, cfgSalva) : null
     return reply.view('app/relatorios-preview', {
       entidade,
       ano,
@@ -403,11 +413,40 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       rodape: reg.rodape,
       formatos: FORMATOS,
       resultado,
-      render: resultado ? montarRender(resultado, porPagina) : null,
+      render,
+      totais: resultado && render ? montarPainelTotais(resultado, cfgSalva, render.numericas) : null,
+      podeEscrever: podeEscrever(nivel),
       erro,
       geradoEm: new Date(),
       layout: null,
     })
+  })
+
+  // POST salvar configuração de totais (do painel da prévia). Corpo: campo
+  // `totais` com o JSON da config; vazio = voltar ao automático.
+  app.post<{ Params: { id: string }; Body: { totais?: string } }>(`${baseRel}/:id/totais`, async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(entidadeId)
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+    if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
+    try {
+      const raw = req.body?.totais
+      let parsed: unknown = raw
+      if (typeof raw === 'string' && raw.trim()) {
+        try {
+          parsed = JSON.parse(raw)
+        } catch {
+          throw new ErroNegocio('REQUISICAO_INVALIDA', 'Configuração de totais inválida (JSON malformado).')
+        }
+      }
+      await meus.salvarTotais(req.params.id, req.user.sub, entidadeId, parsed)
+      return reply.redirect(`/app/relatorios/meus/${req.params.id}/executar`)
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
+      }
+      throw e
+    }
   })
 
   // Boilerplate comum às mutações: carrega entidade, exige escrita, redireciona
@@ -497,7 +536,12 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
           .header('Content-Disposition', `inline; filename="${nomeArquivo(reg.nome, 'pdf')}"`)
           .send(pdf)
       }
-      const arq = await exportarResultado(formato, { colunas: resultado.colunas, linhas: resultado.linhas }, reg.nome)
+      const arq = await exportarResultado(
+        formato,
+        { colunas: resultado.colunas, linhas: resultado.linhas, truncado: resultado.truncado },
+        reg.nome,
+        lerTotaisConfig(reg.configuracao),
+      )
       return reply
         .header('Content-Type', arq.mime)
         .header('Content-Disposition', `${arq.download ? 'attachment' : 'inline'}; filename="${nomeArquivo(reg.nome, arq.ext)}"`)
@@ -511,9 +555,26 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
   })
 }
 
+/** Dados do painel "Totais" da prévia: config efetiva + metadados p/ o form. */
+function montarPainelTotais(
+  resultado: { colunas: string[]; linhas: unknown[][] },
+  cfgSalva: TotaisConfig | null,
+  numericas: boolean[],
+) {
+  return {
+    cfg: configEfetiva(resultado, cfgSalva),
+    automatico: cfgSalva === null,
+    numericas,
+    aggTipos: AGG_TIPOS,
+    rotulosPadrao: Object.fromEntries(
+      resultado.colunas.map((c) => [c, Object.fromEntries(AGG_TIPOS.map((a) => [a.id, rotuloPadrao(a.id, c)]))]),
+    ),
+  }
+}
+
 /** Monta o PDF (A4 com cabeçalho/rodapé repetidos) a partir do resultado. */
 async function montarPdfBuffer(
-  reg: { nome: string; cabecalho: Faixa; rodape: Faixa },
+  reg: { nome: string; cabecalho: Faixa; rodape: Faixa; configuracao?: unknown },
   resultado: { colunas: string[]; linhas: unknown[][]; truncado?: boolean },
   entidade: { nome: string; endereco: string | null; brasao: string | null },
 ): Promise<Buffer> {
@@ -529,7 +590,7 @@ async function montarPdfBuffer(
   const margemTopoMm = margemParaFaixa(reg.cabecalho, 12)
   const margemRodapeMm = margemParaFaixa(reg.rodape, 12)
   return gerarPdf({
-    corpoHtml: montarCorpoHtml(resultado, reg.nome, linhasPorPagina(margemTopoMm, margemRodapeMm)),
+    corpoHtml: montarCorpoHtml(resultado, reg.nome, linhasPorPagina(margemTopoMm, margemRodapeMm), lerTotaisConfig(reg.configuracao)),
     header: montarTemplateFaixa(reg.cabecalho, dadosFaixa),
     footer: montarTemplateFaixa(reg.rodape, dadosFaixa),
     margemTopoMm,
