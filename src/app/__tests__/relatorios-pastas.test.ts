@@ -62,6 +62,27 @@ describe('appRelatoriosRoutes — Pastas e PDF', () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
   })
 
+  // Regressão: o JSON.stringify dos onsubmit (prompt de renomear / confirm de
+  // excluir) precisa sair HTML-escapado — aspas literais terminavam o atributo
+  // e o form submetia sem prompt/confirm nenhum (renomear "não funcionava" e
+  // excluir não pedia confirmação).
+  it('GET hub: onsubmit das pastas/relatórios sai com aspas escapadas (prompt/confirm vivos)', async () => {
+    m.arvore.mockResolvedValue({
+      raizes: [{ id: 'p1', nome: 'Minha pasta', relatorios: [{ id: 'r1', nome: 'Meu rel', descricao: null }], filhos: [] }],
+      semPasta: [],
+    })
+    m.listarPastas.mockResolvedValue([{ id: 'p1', nome: 'Minha pasta' }])
+    const res = await app.inject({ method: 'GET', url: '/relatorios' })
+    expect(res.statusCode).toBe(200)
+    // aspas do JSON escapadas como entidade dentro do atributo…
+    expect(res.body).toContain('&#34;Minha pasta&#34;')
+    expect(res.body).toContain('&#34;Meu rel&#34;')
+    // …e NUNCA cruas (quebrariam o onsubmit no parser de HTML)
+    expect(res.body).not.toMatch(/onsubmit="[^"]*prompt\('Novo nome da pasta:', $/m)
+    expect(res.body).not.toContain(`, "Minha pasta")`)
+    expect(res.body).not.toContain(`+ "Meu rel" +`)
+  })
+
   // ── Pastas (via helper comEscrita) ────────────────────────────
   it('POST pastas cria e redireciona', async () => {
     m.criarPasta.mockResolvedValue({ id: 'p1' })
