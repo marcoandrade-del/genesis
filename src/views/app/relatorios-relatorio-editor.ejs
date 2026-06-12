@@ -112,6 +112,12 @@
       <a href="/app/relatorios" class="btn btn-outline-secondary">Cancelar</a>
     </div>
   </form>
+
+  <%# Painel de totais no design: as colunas vêm da execução da query salva —
+      sem query válida (relatório novo/query quebrada) o painel não aparece. %>
+  <% if (totais) { %>
+    <%- include('_relatorios-painel-totais', { totais: totais, relatorioId: registro.id, voltar: 'editor' }) %>
+  <% } %>
 </div>
 
 <% if (views.length) { %>

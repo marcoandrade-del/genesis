@@ -306,6 +306,54 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     expect(res.body).not.toContain('painel-totais') // painel não
   })
 
+  // ── Painel de totais no DESIGN (editor) ───────────────────────
+  it('GET meus/:id com query válida mostra o painel de totais (voltar=editor)', async () => {
+    m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', descricao: null, query: 'select 1', cabecalhoId: null, rodapeId: null })
+    m.executar.mockResolvedValue({ colunas: ['nivel', 'valor'], linhas: [['1', '10.00']], total: 1, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('painel-totais')
+    expect(res.body).toContain('/app/relatorios/meus/rp1/totais')
+    expect(res.body).toContain('name="voltar" value="editor"') // POST volta ao design, não à prévia
+    expect(m.executar).toHaveBeenCalledWith('select 1', { entidadeId: 'ent1', ano: 2026 })
+  })
+
+  it('GET meus/:id com config salva marca "personalizado" no painel do design', async () => {
+    m.buscar.mockResolvedValue({
+      id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', descricao: null, query: 'select 1', cabecalhoId: null, rodapeId: null,
+      configuracao: { totais: { subtotalPagina: false, itens: [{ coluna: 'valor', agg: 'MEDIA', rotulo: 'Média dos impostos' }] } },
+    })
+    m.executar.mockResolvedValue({ colunas: ['valor'], linhas: [['10.00']], total: 1, truncado: false })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('personalizado')
+    expect(res.body).toContain('Média dos impostos')
+  })
+
+  it('GET meus/:id sem query não executa nem mostra o painel', async () => {
+    m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', descricao: null, query: null, cabecalhoId: null, rodapeId: null })
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).not.toContain('painel-totais')
+    expect(m.executar).not.toHaveBeenCalled()
+  })
+
+  it('GET meus/:id degrada sem painel quando a query falha (editor segue abrindo)', async () => {
+    m.buscar.mockResolvedValue({ id: 'rp1', usuarioId: 'u1', entidadeId: 'ent1', nome: 'Rel', descricao: null, query: 'select lixo', cabecalhoId: null, rodapeId: null })
+    m.executar.mockRejectedValue(new ErroNegocio('REQUISICAO_INVALIDA', 'Erro ao executar a consulta.'))
+    const res = await app.inject({ method: 'GET', url: '/relatorios/meus/rp1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Editar relatório')
+    expect(res.body).not.toContain('painel-totais')
+  })
+
+  it('POST totais com voltar=editor redireciona para o design', async () => {
+    m.salvarTotais.mockResolvedValue({ id: 'rp1' })
+    const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '', voltar: 'editor' }))
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/relatorios/meus/rp1')
+  })
+
   // ── Salvar configuração de totais ─────────────────────────────
   it('POST meus/:id/totais salva e redireciona para o executar', async () => {
     m.salvarTotais.mockResolvedValue({ id: 'rp1' })

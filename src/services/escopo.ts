@@ -252,7 +252,7 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Totais configuráveis por coluna',
-        descricao: 'Soma/média/contagem/menor/maior por coluna, uma linha rotulada por agregação (rótulo editável); subtotal de página opcional.',
+        descricao: 'Soma/média/contagem/menor/maior por coluna, uma linha rotulada por agregação (rótulo editável); subtotal de página opcional. Configurável no design do relatório e na prévia.',
         status: 'PRONTO',
       },
       {
