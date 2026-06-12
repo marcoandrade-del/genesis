@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { criarMock, atualizarMock, excluirMock } = vi.hoisted(() => ({
+const { criarMock, atualizarMock, excluirMock, abrirMock } = vi.hoisted(() => ({
   criarMock: vi.fn(),
   atualizarMock: vi.fn(),
   excluirMock: vi.fn(),
+  abrirMock: vi.fn(),
 }))
 
 vi.mock('../../services/entidades.js', () => ({
@@ -13,9 +14,15 @@ vi.mock('../../services/entidades.js', () => ({
     excluir = excluirMock
   },
 }))
+vi.mock('../../services/abertura-exercicio.js', () => ({
+  AberturaExercicioService: class {
+    abrir = abrirMock
+  },
+}))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
 import { adminEntidadesRoutes } from '../entidades.js'
+import { ErroNegocio } from '../../errors.js'
 import type { FastifyInstance } from 'fastify'
 import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
 
@@ -37,7 +44,7 @@ describe('adminEntidadesRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[criarMock, atualizarMock, excluirMock].forEach((m) => m.mockReset())
+    ;[criarMock, atualizarMock, excluirMock, abrirMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({
       registrar: adminEntidadesRoutes,
       comView: true,
@@ -47,16 +54,37 @@ describe('adminEntidadesRoutes', () => {
   })
 
   describe('GET /', () => {
-    it('lista sem filtro', async () => {
+    it('lista sem filtro com dropdown de planos POR exercício aberto', async () => {
       prisma.entidade.findMany.mockResolvedValue([ENTIDADE])
+      // exercícios com cópias vêm das tabelas de cópia (distinct entidadeId+ano)
+      prisma.contaContabilEntidade.findMany.mockResolvedValue([
+        { entidadeId: 'ent1', ano: 2026 },
+        { entidadeId: 'ent1', ano: 2027 },
+      ])
       const res = await app.inject({ method: 'GET', url: '/' })
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Prefeitura de Curitiba')
-      // Planos ▾ → cópias da entidade com entidadeId + ano
+      // Planos ▾ → um bloco por exercício, do mais novo para o mais antigo
+      expect(res.body).toContain('/admin/contas-contabil-entidade?entidadeId=ent1&ano=2027')
       expect(res.body).toContain('/admin/contas-contabil-entidade?entidadeId=ent1&ano=2026')
       expect(res.body).toContain('/admin/contas-receita-entidade?entidadeId=ent1&ano=2026')
       expect(res.body).toContain('/admin/contas-despesa-entidade?entidadeId=ent1&ano=2026')
+      expect(res.body.indexOf('ano=2027')).toBeLessThan(res.body.indexOf('ano=2026'))
       expect(prisma.entidade.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: undefined }))
+    })
+
+    it('entidade sem cópias mostra dropdown vazio e botão de abrir exercício', async () => {
+      prisma.entidade.findMany.mockResolvedValue([ENTIDADE])
+      const res = await app.inject({ method: 'GET', url: '/' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Nenhum exercício com cópias.')
+      expect(res.body).toContain('/admin/entidades/ent1/abrir-exercicio/form')
+    })
+
+    it('exibe a mensagem de sucesso vinda do redirect (?msg=)', async () => {
+      prisma.entidade.findMany.mockResolvedValue([])
+      const res = await app.inject({ method: 'GET', url: '/?msg=' + encodeURIComponent('Exercício 2027 aberto') })
+      expect(res.body).toContain('Exercício 2027 aberto')
     })
 
     it('filtra por município', async () => {
@@ -284,6 +312,68 @@ describe('adminEntidadesRoutes', () => {
       const res = await app.inject({ method: 'DELETE', url: '/ent1' })
       expect(res.statusCode).toBe(400)
       expect(res.body).toBe('Erro ao excluir.')
+    })
+  })
+
+  describe('Abrir exercício', () => {
+    beforeEach(() => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    })
+
+    it('GET form sugere o ano seguinte ao último exercício aberto', async () => {
+      prisma.contaContabilEntidade.findMany.mockResolvedValue([{ entidadeId: 'ent1', ano: 2026 }])
+      const res = await app.inject({ method: 'GET', url: '/ent1/abrir-exercicio/form' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Abrir exercício')
+      expect(res.body).toContain('value="2027"') // 2026 aberto → sugere 2027
+      expect(res.body).toContain('2026') // badge do exercício já aberto
+    })
+
+    it('GET form sem cópias sugere o ano corrente', async () => {
+      const res = await app.inject({ method: 'GET', url: '/ent1/abrir-exercicio/form' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain(`value="${new Date().getFullYear()}"`)
+      expect(res.body).toContain('ainda não tem nenhum exercício')
+    })
+
+    it('GET form 404 para entidade inexistente', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(null)
+      expect((await app.inject({ method: 'GET', url: '/x/abrir-exercicio/form' })).statusCode).toBe(404)
+    })
+
+    it('POST abre o exercício e redireciona com o resumo na mensagem', async () => {
+      abrirMock.mockResolvedValue({ entidadeId: 'ent1', nome: 'Prefeitura de Curitiba', ano: 2027, contabil: 8760, receita: 1808, despesa: 3902, fontes: 3 })
+      const res = await app.inject({ method: 'POST', url: '/ent1/abrir-exercicio', ...form({ ano: '2027' }) })
+      expect(res.statusCode).toBe(204)
+      expect(abrirMock).toHaveBeenCalledWith('ent1', 2027)
+      const destino = decodeURIComponent(String(res.headers['hx-redirect']))
+      expect(destino).toContain('/admin/entidades?msg=')
+      expect(destino).toContain('8760 conta(s)')
+    })
+
+    it('POST com ErroNegocio reabre o modal com a mensagem', async () => {
+      abrirMock.mockRejectedValue(new ErroNegocio('CONFLITO', 'O exercício 2026 já está aberto para esta entidade. Para atualizar as cópias, use "Ressincronizar".'))
+      const res = await app.inject({ method: 'POST', url: '/ent1/abrir-exercicio', ...form({ ano: '2026' }) })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('já está aberto')
+      expect(res.body).toContain('value="2026"') // ano digitado repreenchido
+    })
+
+    it('POST sem corpo: ano NaN vai ao service e o modal reabre com o ano corrente sugerido', async () => {
+      abrirMock.mockRejectedValue(new ErroNegocio('REQUISICAO_INVALIDA', 'Informe um exercício (ano) válido.'))
+      const res = await app.inject({ method: 'POST', url: '/ent1/abrir-exercicio' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Informe um exercício')
+      expect(res.body).toContain(`value="${new Date().getFullYear()}"`)
+      expect(abrirMock).toHaveBeenCalledWith('ent1', NaN)
+    })
+
+    it('POST 404 para entidade inexistente; erro inesperado propaga (500)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(null)
+      expect((await app.inject({ method: 'POST', url: '/x/abrir-exercicio', ...form({ ano: '2027' }) })).statusCode).toBe(404)
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      abrirMock.mockRejectedValue(new Error('boom'))
+      expect((await app.inject({ method: 'POST', url: '/ent1/abrir-exercicio', ...form({ ano: '2027' }) })).statusCode).toBe(500)
     })
   })
 })

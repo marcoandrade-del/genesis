@@ -51,7 +51,7 @@ export function descreverResumo(r: ResumoLote): string {
   return `${r.total} entidade(s): ${partes.join('; ')}.`
 }
 
-type ContaModelo = { id: string; codigo: string; descricao: string; nivel: number; admiteMovimento: boolean; parentId: string | null }
+export type ContaModelo = { id: string; codigo: string; descricao: string; nivel: number; admiteMovimento: boolean; parentId: string | null }
 
 // O modelo real (PCASP estendido) chega a ~8.7k contas. Um único INSERT estoura
 // o limite de ~65535 parâmetros do Postgres, então insere em lotes.
@@ -59,8 +59,8 @@ const LOTE = 1000
 
 /** Constrói o `createMany.data` de uma árvore de entidade a partir das contas do
  * modelo: ids novos e `parentId` remapeado (modelo → cópia). origem=MODELO.
- * Mesma semântica de `EntidadeService.criar`. */
-function copiarArvore(contas: ContaModelo[], entidadeId: string, ano: number) {
+ * Mesma semântica de `EntidadeService.criar`. Reusado pela abertura de exercício. */
+export function copiarArvore(contas: ContaModelo[], entidadeId: string, ano: number) {
   const idNovo = new Map<string, string>(contas.map((c) => [c.id, randomUUID()]))
   return contas.map((c) => ({
     id: idNovo.get(c.id)!,
@@ -77,7 +77,7 @@ function copiarArvore(contas: ContaModelo[], entidadeId: string, ano: number) {
 }
 
 type CreateManyDelegate = { createMany: (args: { data: unknown[] }) => Promise<unknown> }
-async function createManyEmLotes(delegate: CreateManyDelegate, linhas: unknown[]): Promise<void> {
+export async function createManyEmLotes(delegate: CreateManyDelegate, linhas: unknown[]): Promise<void> {
   for (let i = 0; i < linhas.length; i += LOTE) {
     await delegate.createMany({ data: linhas.slice(i, i + LOTE) })
   }

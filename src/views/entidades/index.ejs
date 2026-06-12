@@ -14,6 +14,13 @@
   </button>
 </div>
 
+<% if (msg) { %>
+  <div class="alert alert-success py-2 small alert-dismissible">
+    <i class="bi bi-check-circle me-1"></i><%= msg %>
+    <button type="button" class="btn-close btn-close-sm py-2" data-bs-dismiss="alert"></button>
+  </div>
+<% } %>
+
 <form class="mb-3 d-flex gap-2 align-items-end" method="get" action="/admin/entidades">
   <div class="flex-grow-1" style="max-width:420px">
     <label class="form-label small fw-semibold mb-1">Filtrar por Município</label>
@@ -64,12 +71,24 @@
                   <i class="bi bi-diagram-3 me-1"></i>Planos
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end">
-                  <li><h6 class="dropdown-header">Cópias da entidade · <%= e.ano %></h6></li>
-                  <li><a class="dropdown-item" href="/admin/contas-contabil-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-bank me-2"></i>Plano de Contas (PCASP)</a></li>
-                  <li><a class="dropdown-item" href="/admin/contas-receita-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-graph-down-arrow me-2"></i>Plano de Receita</a></li>
-                  <li><a class="dropdown-item" href="/admin/contas-despesa-entidade?entidadeId=<%= e.id %>&ano=<%= e.ano %>"><i class="bi bi-graph-up-arrow me-2"></i>Plano de Despesa</a></li>
+                  <% if (e.anos.length === 0) { %>
+                    <li><span class="dropdown-item-text small text-muted">Nenhum exercício com cópias.</span></li>
+                  <% } %>
+                  <% e.anos.forEach(function(ano) { %>
+                    <li><h6 class="dropdown-header">Cópias da entidade · <%= ano %></h6></li>
+                    <li><a class="dropdown-item" href="/admin/contas-contabil-entidade?entidadeId=<%= e.id %>&ano=<%= ano %>"><i class="bi bi-bank me-2"></i>Plano de Contas (PCASP)</a></li>
+                    <li><a class="dropdown-item" href="/admin/contas-receita-entidade?entidadeId=<%= e.id %>&ano=<%= ano %>"><i class="bi bi-graph-down-arrow me-2"></i>Plano de Receita</a></li>
+                    <li><a class="dropdown-item" href="/admin/contas-despesa-entidade?entidadeId=<%= e.id %>&ano=<%= ano %>"><i class="bi bi-graph-up-arrow me-2"></i>Plano de Despesa</a></li>
+                  <% }) %>
                 </ul>
               </div>
+              <button class="btn btn-sm btn-outline-primary me-1"
+                hx-get="/admin/entidades/<%= e.id %>/abrir-exercicio/form"
+                hx-target="#modal-body"
+                hx-swap="innerHTML"
+                title="Abrir exercício (copiar os planos do ano novo do modelo)">
+                <i class="bi bi-calendar-plus"></i>
+              </button>
               <button class="btn btn-sm btn-outline-secondary me-1"
                 hx-get="/admin/entidades/<%= e.id %>/form"
                 hx-target="#modal-body"

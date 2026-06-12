@@ -1,0 +1,43 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-calendar-plus me-2 text-primary"></i>Abrir exercício — <%= entidade.nome %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  hx-post="/admin/entidades/<%= entidade.id %>/abrir-exercicio"
+  hx-target="#modal-body"
+  hx-swap="innerHTML"
+  hx-trigger="submit-confirmed">
+
+  <div class="modal-body">
+    <% if (erro) { %>
+      <div class="alert alert-danger py-2 small"><%= erro %></div>
+    <% } %>
+
+    <p class="small text-muted mb-2">
+      Copia os planos do modelo do estado (contábil, receita e despesa) + fontes de recurso
+      para o exercício informado — o passo da virada de ano para entidades já onboardadas.
+    </p>
+    <% if (anos.length) { %>
+      <p class="small mb-3">Exercícios já abertos: <% anos.forEach(function(a) { %><span class="badge bg-primary bg-opacity-10 text-primary me-1 font-monospace"><%= a %></span><% }) %></p>
+    <% } else { %>
+      <p class="small text-muted mb-3">Esta entidade ainda não tem nenhum exercício com cópias.</p>
+    <% } %>
+
+    <div class="mb-2" style="max-width:180px">
+      <label class="form-label small fw-semibold">Exercício (ano) <span class="text-danger">*</span></label>
+      <input type="number" name="ano" class="form-control form-control-sm" min="1900" max="9999" required value="<%= anoSugerido %>">
+      <div class="form-text">O modelo do estado precisa ter os planos deste ano importados.</div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="button" class="btn btn-sm btn-primary"
+      onclick="confirmarGravacao(this.closest('form'), 'Exercício ' + (this.closest('form').querySelector('[name=ano]').value || ''))">
+      <i class="bi bi-calendar-plus me-1"></i>Abrir exercício
+    </button>
+  </div>
+</form>
