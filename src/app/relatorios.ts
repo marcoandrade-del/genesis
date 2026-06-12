@@ -24,7 +24,7 @@ import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
 type CorpoTemplate = { nome?: string; altura?: string; layout?: string }
-type CorpoRelatorio = { nome?: string; descricao?: string; query?: string; cabecalhoId?: string; rodapeId?: string }
+type CorpoRelatorio = { nome?: string; descricao?: string; query?: string; cabecalhoId?: string; rodapeId?: string; destino?: string }
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -353,8 +353,9 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
     const body = req.body ?? {}
     try {
-      await meus.criar(req.user.sub, entidadeId, body)
-      return reply.redirect('/app/relatorios')
+      const novo = await meus.criar(req.user.sub, entidadeId, body)
+      // destino=preview ("Salvar e visualizar"): salva e já abre a prévia.
+      return reply.redirect(body.destino === 'preview' ? `/app/relatorios/meus/${novo.id}/executar` : '/app/relatorios')
     } catch (e) {
       if (e instanceof ErroNegocio) {
         return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { ...body }, { erro: e.message, status: statusDeErro(e.code) })
@@ -372,7 +373,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     const body = req.body ?? {}
     try {
       await meus.atualizar(req.params.id, req.user.sub, entidadeId, body)
-      return reply.redirect('/app/relatorios')
+      return reply.redirect(body.destino === 'preview' ? `/app/relatorios/meus/${req.params.id}/executar` : '/app/relatorios')
     } catch (e) {
       if (e instanceof ErroNegocio) {
         return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { id: req.params.id, ...body }, { erro: e.message, status: statusDeErro(e.code) })

@@ -347,6 +347,20 @@ describe('appRelatoriosRoutes — Meus Relatórios', () => {
     expect(res.body).not.toContain('painel-totais')
   })
 
+  it('POST meus com destino=preview ("Salvar e visualizar") cria e abre a prévia', async () => {
+    m.criar.mockResolvedValue({ id: 'novo1' })
+    const res = await app.inject(POST('/relatorios/meus', { nome: 'R', query: 'select 1', destino: 'preview' }))
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/relatorios/meus/novo1/executar')
+  })
+
+  it('POST meus/:id com destino=preview atualiza e abre a prévia', async () => {
+    m.atualizar.mockResolvedValue({ id: 'rp1' })
+    const res = await app.inject(POST('/relatorios/meus/rp1', { nome: 'R', query: 'select 1', destino: 'preview' }))
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/relatorios/meus/rp1/executar')
+  })
+
   it('POST totais com voltar=editor redireciona para o design', async () => {
     m.salvarTotais.mockResolvedValue({ id: 'rp1' })
     const res = await app.inject(POST('/relatorios/meus/rp1/totais', { totais: '', voltar: 'editor' }))
