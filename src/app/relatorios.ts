@@ -16,6 +16,7 @@ import {
   lerTotaisConfig,
   configEfetiva,
   rotuloPadrao,
+  analisarColunas,
   AGG_TIPOS,
   type TotaisConfig,
 } from '../services/relatorio-totais.js'
@@ -23,7 +24,7 @@ import { ErroNegocio, statusDeErro } from '../errors.js'
 
 type Tipo = 'CABECALHO' | 'RODAPE'
 type CorpoTemplate = { nome?: string; altura?: string; layout?: string }
-type CorpoRelatorio = { nome?: string; descricao?: string; query?: string; cabecalhoId?: string; rodapeId?: string }
+type CorpoRelatorio = { nome?: string; descricao?: string; query?: string; cabecalhoId?: string; rodapeId?: string; destino?: string }
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -270,6 +271,22 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     }
   }
 
+  // Painel de totais no design: as colunas só existem executando a query salva.
+  // Query inválida/sandbox fora → sem painel (configura-se depois, pela prévia).
+  async function montarTotaisDoEditor(
+    reg: { query: string | null; configuracao?: unknown },
+    entidadeId: string,
+    ano: number,
+  ) {
+    if (!reg.query) return null
+    try {
+      const resultado = await executor.executar(reg.query, { entidadeId, ano })
+      return montarPainelTotais(resultado, lerTotaisConfig(reg.configuracao), analisarColunas(resultado).numericas)
+    } catch {
+      return null
+    }
+  }
+
   async function renderRelEditor(
     reply: FastifyReply,
     entidade: unknown,
@@ -277,7 +294,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     nivel: string,
     entidadeId: string,
     registro: CorpoRelatorio & { id?: string } | null,
-    opts: { erro?: string; status?: number } = {},
+    opts: { erro?: string; status?: number; totais?: ReturnType<typeof montarPainelTotais> | null } = {},
   ) {
     const [cabecalhos, rodapes, views] = await Promise.all([
       svc.listarCabecalhos(entidadeId),
@@ -293,6 +310,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       cabecalhos,
       rodapes,
       views,
+      totais: opts.totais ?? null,
       erro: opts.erro ?? null,
       layout: null,
     })
@@ -324,7 +342,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
       query: reg.query ?? '',
       cabecalhoId: reg.cabecalhoId ?? '',
       rodapeId: reg.rodapeId ?? '',
-    })
+    }, { totais: await montarTotaisDoEditor(reg, entidadeId, ano) })
   })
 
   // POST criar
@@ -335,8 +353,9 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     if (!podeEscrever(nivel)) return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: ERRO_LEITURA, status: 403 })
     const body = req.body ?? {}
     try {
-      await meus.criar(req.user.sub, entidadeId, body)
-      return reply.redirect('/app/relatorios')
+      const novo = await meus.criar(req.user.sub, entidadeId, body)
+      // destino=preview ("Salvar e visualizar"): salva e já abre a prévia.
+      return reply.redirect(body.destino === 'preview' ? `/app/relatorios/meus/${novo.id}/executar` : '/app/relatorios')
     } catch (e) {
       if (e instanceof ErroNegocio) {
         return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { ...body }, { erro: e.message, status: statusDeErro(e.code) })
@@ -354,7 +373,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     const body = req.body ?? {}
     try {
       await meus.atualizar(req.params.id, req.user.sub, entidadeId, body)
-      return reply.redirect('/app/relatorios')
+      return reply.redirect(body.destino === 'preview' ? `/app/relatorios/meus/${req.params.id}/executar` : '/app/relatorios')
     } catch (e) {
       if (e instanceof ErroNegocio) {
         return renderRelEditor(reply, entidade, ano, nivel, entidadeId, { id: req.params.id, ...body }, { erro: e.message, status: statusDeErro(e.code) })
@@ -422,9 +441,10 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
     })
   })
 
-  // POST salvar configuração de totais (do painel da prévia). Corpo: campo
-  // `totais` com o JSON da config; vazio = voltar ao automático.
-  app.post<{ Params: { id: string }; Body: { totais?: string } }>(`${baseRel}/:id/totais`, async (req, reply) => {
+  // POST salvar configuração de totais (painel da prévia OU do design). Corpo:
+  // campo `totais` com o JSON da config (vazio = voltar ao automático) e
+  // `voltar=editor` quando o painel está na tela de design.
+  app.post<{ Params: { id: string }; Body: { totais?: string; voltar?: string } }>(`${baseRel}/:id/totais`, async (req, reply) => {
     const { entidadeId, ano, nivel } = req.contexto
     const entidade = await carregarEntidade(entidadeId)
     if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
@@ -440,7 +460,8 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
         }
       }
       await meus.salvarTotais(req.params.id, req.user.sub, entidadeId, parsed)
-      return reply.redirect(`/app/relatorios/meus/${req.params.id}/executar`)
+      const sufixo = req.body?.voltar === 'editor' ? '' : '/executar'
+      return reply.redirect(`/app/relatorios/meus/${req.params.id}${sufixo}`)
     } catch (e) {
       if (e instanceof ErroNegocio) {
         return renderHub(reply, entidade, ano, nivel, entidadeId, req.user.sub, { erro: e.message, status: statusDeErro(e.code) })
@@ -555,7 +576,7 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
   })
 }
 
-/** Dados do painel "Totais" da prévia: config efetiva + metadados p/ o form. */
+/** Dados do painel "Totais" (prévia e design): config efetiva + metadados p/ o form. */
 function montarPainelTotais(
   resultado: { colunas: string[]; linhas: unknown[][] },
   cfgSalva: TotaisConfig | null,
@@ -564,6 +585,7 @@ function montarPainelTotais(
   return {
     cfg: configEfetiva(resultado, cfgSalva),
     automatico: cfgSalva === null,
+    colunas: resultado.colunas,
     numericas,
     aggTipos: AGG_TIPOS,
     rotulosPadrao: Object.fromEntries(
