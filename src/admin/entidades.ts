@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
 import type { TipoEntidade } from '@prisma/client'
 import { EntidadeService, type DadosAtualizarEntidade } from '../services/entidades.js'
+import { AberturaExercicioService } from '../services/abertura-exercicio.js'
+import { ErroNegocio } from '../errors.js'
 
 const TIPOS: TipoEntidade[] = ['PREFEITURA', 'CAMARA', 'ADM_INDIRETA']
 const ehTipo = (v: string): v is TipoEntidade => (TIPOS as string[]).includes(v)
@@ -35,8 +37,30 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
       include: { estado: { select: { sigla: true } } },
     })
 
+  // Exercícios com cópias por entidade (qualquer um dos 3 planos ou fontes) —
+  // alimenta o dropdown "Planos" por ano e o default do "Abrir exercício".
+  async function anosPorEntidade(ids: string[]): Promise<Map<string, number[]>> {
+    const sel = {
+      where: { entidadeId: { in: ids } },
+      distinct: ['entidadeId', 'ano'] as const,
+      select: { entidadeId: true, ano: true },
+    }
+    const [c, r, d, f] = await Promise.all([
+      app.prisma.contaContabilEntidade.findMany(sel),
+      app.prisma.contaReceitaEntidade.findMany(sel),
+      app.prisma.contaDespesaEntidade.findMany(sel),
+      app.prisma.fonteRecursoEntidade.findMany(sel),
+    ])
+    const mapa = new Map<string, Set<number>>()
+    for (const row of [...c, ...r, ...d, ...f]) {
+      if (!mapa.has(row.entidadeId)) mapa.set(row.entidadeId, new Set())
+      mapa.get(row.entidadeId)!.add(row.ano)
+    }
+    return new Map([...mapa.entries()].map(([id, anos]) => [id, [...anos].sort((a, b) => b - a)]))
+  }
+
   // ── LIST ────────────────────────────────────────────────────────────────────
-  app.get<{ Querystring: { municipioId?: string } }>('/', async (req, reply) => {
+  app.get<{ Querystring: { municipioId?: string; msg?: string } }>('/', async (req, reply) => {
     const municipioId = req.query.municipioId?.trim() || ''
     const [municipios, entidades] = await Promise.all([
       carregarMunicipios(),
@@ -46,6 +70,7 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
         include: { municipio: { include: { estado: { select: { sigla: true } } } } },
       }),
     ])
+    const anos = await anosPorEntidade(entidades.map((e) => e.id))
     // "Voltar" segue o drill-down: filtrado por município → lista de municípios do
     // estado dele; sem filtro → lista de estados.
     const municipioFiltro = municipioId ? municipios.find((m) => m.id === municipioId) : null
@@ -57,9 +82,10 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
         active: 'entidades',
         userEmail: req.user.email,
         municipios,
-        entidades,
+        entidades: entidades.map((e) => ({ ...e, anos: anos.get(e.id) ?? [] })),
         municipioSelecionado: municipioId,
         voltarUrl,
+        msg: req.query.msg?.trim() || null,
       },
       { layout: 'layouts/main' },
     )
@@ -163,6 +189,39 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Erro ao excluir.'
       return reply.status(400).send(msg)
+    }
+  })
+
+  // ── ABRIR EXERCÍCIO (virada de ano: copia os planos do ano novo) ────────────
+  app.get<{ Params: { id: string } }>('/:id/abrir-exercicio/form', async (req, reply) => {
+    const entidade = await app.prisma.entidade.findUnique({ where: { id: req.params.id } })
+    if (!entidade) return reply.status(404).send('Entidade não encontrada.')
+    const anos = (await anosPorEntidade([entidade.id])).get(entidade.id) ?? []
+    // Sugestão: ano seguinte ao último exercício aberto; sem cópias → ano corrente.
+    const anoSugerido = anos.length ? anos[0]! + 1 : new Date().getFullYear()
+    return reply.view('entidades/abrir-exercicio', { entidade, anos, anoSugerido, erro: null })
+  })
+
+  app.post<{ Params: { id: string }; Body: { ano?: string } }>('/:id/abrir-exercicio', async (req, reply) => {
+    const entidade = await app.prisma.entidade.findUnique({ where: { id: req.params.id } })
+    if (!entidade) return reply.status(404).send('Entidade não encontrada.')
+    const ano = parseInt(req.body?.ano ?? '', 10)
+    const reRenderErro = async (erro: string) => {
+      const anos = (await anosPorEntidade([entidade.id])).get(entidade.id) ?? []
+      return reply.view('entidades/abrir-exercicio', {
+        entidade,
+        anos,
+        anoSugerido: Number.isFinite(ano) ? ano : new Date().getFullYear(),
+        erro,
+      })
+    }
+    try {
+      const r = await new AberturaExercicioService(app.prisma).abrir(req.params.id, ano)
+      const msg = `Exercício ${r.ano} aberto para ${r.nome}: ${r.contabil} conta(s) contábil(eis), ${r.receita} de receita, ${r.despesa} de despesa e ${r.fontes} fonte(s).`
+      return reply.header('HX-Redirect', `/admin/entidades?msg=${encodeURIComponent(msg)}`).status(204).send()
+    } catch (e: unknown) {
+      if (e instanceof ErroNegocio) return reRenderErro(e.message)
+      throw e
     }
   })
 }
