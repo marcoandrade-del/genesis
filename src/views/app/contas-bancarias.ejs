@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contas bancárias · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<% var v = valores || {} %>
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Contas bancárias</li>
+    </ol>
+  </nav>
+
+  <h2 class="h4 fw-bold mb-1">Contas bancárias <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
+  <p class="text-muted small mb-3">
+    Cadastro padrão Febraban, vinculado às fontes de recurso do exercício.
+    Pagamentos de uma fonte só podem sair pelas contas bancárias daquela fonte.
+  </p>
+
+  <% if (erro) { %>
+    <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
+  <% } %>
+
+  <% if (podeEscrever) { %>
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body py-3">
+      <h6 class="fw-semibold mb-2"><i class="bi bi-bank me-1 text-primary"></i><%= editando ? 'Editar conta' : 'Nova conta' %></h6>
+      <form method="post" action="/app/contas-bancarias<%= editando ? '/' + editando : '' %>">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">Fonte de recurso <span class="text-danger">*</span></label>
+            <select name="fonteCodigo" class="form-select form-select-sm" required>
+              <option value="">— Selecione —</option>
+              <% fontes.forEach(function(f) { %>
+                <option value="<%= f.codigo %>" <%= v.fonteCodigo === f.codigo ? 'selected' : '' %>><%= f.codigo %> — <%= f.nomenclatura %></option>
+              <% }) %>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold">Banco <span class="text-danger">*</span></label>
+            <input type="text" name="bancoCodigo" class="form-control form-control-sm font-monospace" list="bancos-febraban"
+              value="<%= v.bancoCodigo || '' %>" placeholder="104" maxlength="3" pattern="\d{3}" required>
+            <datalist id="bancos-febraban">
+              <option value="001">Banco do Brasil</option>
+              <option value="104">Caixa Econômica Federal</option>
+              <option value="237">Bradesco</option>
+              <option value="341">Itaú Unibanco</option>
+              <option value="033">Santander</option>
+              <option value="041">Banrisul</option>
+              <option value="748">Sicredi</option>
+              <option value="756">Sicoob</option>
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small fw-semibold">Nome do banco <span class="text-muted fw-normal">(opcional)</span></label>
+            <input type="text" name="bancoNome" class="form-control form-control-sm" value="<%= v.bancoNome || '' %>" maxlength="80" placeholder="Caixa Econômica Federal">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label small fw-semibold">Agência <span class="text-danger">*</span></label>
+            <input type="text" name="agencia" class="form-control form-control-sm font-monospace" value="<%= v.agencia || '' %>" maxlength="4" pattern="\d{1,4}" required>
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small fw-semibold">DV</label>
+            <input type="text" name="agenciaDv" class="form-control form-control-sm font-monospace" value="<%= v.agenciaDv || '' %>" maxlength="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label small fw-semibold">Conta <span class="text-danger">*</span></label>
+            <input type="text" name="numero" class="form-control form-control-sm font-monospace" value="<%= v.numero || '' %>" maxlength="12" pattern="\d{1,12}" required>
+          </div>
+          <div class="col-md-1">
+            <label class="form-label small fw-semibold">DV</label>
+            <input type="text" name="numeroDv" class="form-control form-control-sm font-monospace" value="<%= v.numeroDv || '' %>" maxlength="1">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label small fw-semibold">Descrição <span class="text-muted fw-normal">(opcional)</span></label>
+            <input type="text" name="descricao" class="form-control form-control-sm" value="<%= v.descricao || '' %>" maxlength="120" placeholder="Conta movimento da fonte">
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
+          <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i><%= editando ? 'Salvar alterações' : 'Cadastrar conta' %></button>
+          <% if (editando) { %><a href="/app/contas-bancarias" class="btn btn-sm btn-outline-secondary">Cancelar edição</a><% } %>
+        </div>
+      </form>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="card border-0 shadow-sm"><div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead class="table-light"><tr>
+        <th class="ps-3">Fonte</th><th>Banco</th><th>Agência</th><th>Conta</th><th>Descrição</th><th>Status</th>
+        <% if (podeEscrever) { %><th class="text-end pe-3">Ações</th><% } %>
+      </tr></thead>
+      <tbody>
+        <% if (contas.length === 0) { %>
+          <tr><td colspan="<%= podeEscrever ? 7 : 6 %>" class="text-center text-muted py-4">Nenhuma conta bancária cadastrada.</td></tr>
+        <% } %>
+        <% contas.forEach(function(c) { %>
+          <tr class="<%= c.ativa ? '' : 'opacity-50' %>">
+            <td class="ps-3">
+              <span class="font-monospace fw-semibold"><%= c.fonteCodigo %></span>
+              <% if (c.fonteNomenclatura) { %><div class="small text-muted"><%= c.fonteNomenclatura %></div>
+              <% } else { %><div class="small text-warning">fonte fora do exercício <%= ano %></div><% } %>
+            </td>
+            <td><span class="font-monospace"><%= c.bancoCodigo %></span><% if (c.bancoNome) { %> <span class="small text-muted"><%= c.bancoNome %></span><% } %></td>
+            <td class="font-monospace"><%= c.agencia %><%= c.agenciaDv ? '-' + c.agenciaDv : '' %></td>
+            <td class="font-monospace"><%= c.numero %><%= c.numeroDv ? '-' + c.numeroDv : '' %></td>
+            <td class="small text-muted"><%= c.descricao || '—' %></td>
+            <td>
+              <% if (c.ativa) { %><span class="badge bg-success bg-opacity-10 text-success">Ativa</span>
+              <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Inativa</span><% } %>
+            </td>
+            <% if (podeEscrever) { %>
+            <td class="text-end pe-3">
+              <a href="/app/contas-bancarias?editar=<%= c.id %>" class="btn btn-sm btn-outline-secondary py-0 px-1" title="Editar"><i class="bi bi-pencil"></i></a>
+              <form method="post" action="/app/contas-bancarias/<%= c.id %>/alternar" class="d-inline">
+                <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-1" title="<%= c.ativa ? 'Inativar' : 'Reativar' %>"><i class="bi <%= c.ativa ? 'bi-pause' : 'bi-play' %>"></i></button>
+              </form>
+              <%# JSON em atributo de evento usa a tag de escape — ver memória ejs-json-em-atributo-de-evento %>
+              <form method="post" action="/app/contas-bancarias/<%= c.id %>/excluir" class="d-inline"
+                onsubmit="return confirm('Excluir a conta ' + <%= JSON.stringify(c.rotulo) %> + '?')">
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-1" title="Excluir"><i class="bi bi-trash"></i></button>
+              </form>
+            </td>
+            <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div></div>
+</div>
+</body>
+</html>

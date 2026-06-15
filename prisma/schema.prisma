@@ -657,9 +657,38 @@ model Entidade {
   rodapesRelatorio         RodapeRelatorio[]
   relatoriosPersonalizados RelatorioPersonalizado[]
   pastasFavorito           PastaFavorito[]
+  contasBancarias          ContaBancaria[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
+}
+
+// ─── Conta bancária (padrão Febraban) ────────────────────────────────────────
+// Vinculada à fonte de recurso POR CÓDIGO (não por FK à cópia do exercício):
+// o código TCE/STN é estável entre anos, então a conta sobrevive à virada de
+// exercício sem revinculação. Regra: pagamentos de uma fonte só podem sair
+// pelas contas bancárias daquela fonte (validado na emissão da OP).
+model ContaBancaria {
+  id          String   @id @default(uuid())
+  entidadeId  String
+  fonteCodigo String
+  bancoCodigo String // código Febraban/COMPE, 3 dígitos (ex.: 001, 104, 341)
+  bancoNome   String?
+  agencia     String
+  agenciaDv   String?
+  numero      String
+  numeroDv    String?
+  descricao   String?
+  ativa       Boolean  @default(true)
+  criadoEm    DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+  entidade    Entidade @relation(fields: [entidadeId], references: [id])
+
+  ordensPagamento OrdemPagamento[]
+
+  @@unique([entidadeId, bancoCodigo, agencia, numero])
+  @@index([entidadeId, fonteCodigo])
+  @@map("contas_bancarias")
 }
 
 // As contas de entidade são cópias por exercício (ano). `modeloContaId` é uma
@@ -1585,22 +1614,25 @@ enum StatusOrdemPagamento {
 }
 
 model OrdemPagamento {
-  id            String               @id @default(uuid())
-  entidadeId    String
-  liquidacaoId  String
-  numero        String
-  data          DateTime             @default(now())
-  valor         Decimal              @db.Decimal(18, 2)
-  contaBancaria String // conta bancária municipal (texto)
-  comprovante   String?
-  status        StatusOrdemPagamento @default(EMITIDA)
-  criadoEm      DateTime             @default(now())
-  atualizadoEm  DateTime             @updatedAt
-  entidade      Entidade             @relation(fields: [entidadeId], references: [id])
-  liquidacao    Liquidacao           @relation(fields: [liquidacaoId], references: [id])
+  id              String               @id @default(uuid())
+  entidadeId      String
+  liquidacaoId    String
+  numero          String
+  data            DateTime             @default(now())
+  valor           Decimal              @db.Decimal(18, 2)
+  contaBancaria   String // rótulo da conta p/ exibição (OPs antigas: texto livre)
+  contaBancariaId String? // FK ao cadastro Febraban (nulo só em OPs legadas)
+  comprovante     String?
+  status          StatusOrdemPagamento @default(EMITIDA)
+  criadoEm        DateTime             @default(now())
+  atualizadoEm    DateTime             @updatedAt
+  entidade        Entidade             @relation(fields: [entidadeId], references: [id])
+  liquidacao      Liquidacao           @relation(fields: [liquidacaoId], references: [id])
+  contaBancariaRef ContaBancaria?      @relation(fields: [contaBancariaId], references: [id])
 
   @@unique([entidadeId, numero])
   @@index([liquidacaoId])
   @@index([entidadeId])
+  @@index([contaBancariaId])
   @@map("ordens_pagamento")
 }

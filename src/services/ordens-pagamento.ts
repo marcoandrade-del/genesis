@@ -1,13 +1,14 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
+import { rotuloConta } from './contas-bancarias.js'
 
 export type DadosOrdemPagamento = {
   liquidacaoId: string
   numero: string
   data?: Date | string | null
   valor: string | number
-  contaBancaria: string
+  contaBancariaId: string
   comprovante?: string | null
 }
 
@@ -38,16 +39,40 @@ export class OrdensPagamentoService {
   async criar(entidadeId: string, dados: DadosOrdemPagamento) {
     const numero = dados.numero?.trim()
     if (!numero) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Número da OP é obrigatório.')
-    const contaBancaria = dados.contaBancaria?.trim()
-    if (!contaBancaria) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária é obrigatória.')
+    if (!dados.contaBancariaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária é obrigatória.')
     const valor = parseDecimalPositivo(dados.valor, 'Valor da OP')
 
-    const liquidacao = await this.prisma.liquidacao.findUnique({ where: { id: dados.liquidacaoId } })
+    // Inclui a fonte do empenho (via dotação) para a trava conta×fonte abaixo.
+    const liquidacao = await this.prisma.liquidacao.findUnique({
+      where: { id: dados.liquidacaoId },
+      include: {
+        empenho: {
+          select: { dotacaoDespesa: { select: { fonteRecurso: { select: { codigo: true, nomenclatura: true } } } } },
+        },
+      },
+    })
     if (!liquidacao || liquidacao.entidadeId !== entidadeId) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Liquidação inválida para esta entidade.')
     }
     if (liquidacao.status !== 'ATIVA') {
       throw new ErroNegocio('CONFLITO', 'Só é possível pagar liquidação ATIVA.')
+    }
+
+    // REGRA (Marco, 2026-05-28): pagamentos de uma fonte só podem sair pelas
+    // contas bancárias daquela fonte. A fonte da OP é a da dotação do empenho.
+    const fonte = liquidacao.empenho.dotacaoDespesa.fonteRecurso
+    const conta = await this.prisma.contaBancaria.findUnique({ where: { id: dados.contaBancariaId.trim() } })
+    if (!conta || conta.entidadeId !== entidadeId) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária inválida para esta entidade.')
+    }
+    if (!conta.ativa) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A conta bancária está inativa.')
+    }
+    if (conta.fonteCodigo !== fonte.codigo) {
+      throw new ErroNegocio(
+        'ENTIDADE_NAO_PROCESSAVEL',
+        `Pagamentos da fonte ${fonte.codigo} (${fonte.nomenclatura}) só podem sair de contas bancárias vinculadas a ela — a conta escolhida pertence à fonte ${conta.fonteCodigo}.`,
+      )
     }
 
     const disponivel = new Prisma.Decimal(liquidacao.valor).minus(liquidacao.valorPago)
@@ -66,7 +91,8 @@ export class OrdensPagamentoService {
             liquidacaoId: dados.liquidacaoId,
             numero,
             valor,
-            contaBancaria,
+            contaBancaria: rotuloConta(conta),
+            contaBancariaId: conta.id,
             comprovante: trimOuNull(dados.comprovante),
             ...(dados.data ? { data: new Date(dados.data) } : {}),
           },

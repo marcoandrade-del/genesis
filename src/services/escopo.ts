@@ -184,6 +184,16 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
         ref: '#61/#62',
       },
+      {
+        titulo: 'Contas bancárias (Febraban) × fontes de recurso',
+        descricao: 'Cadastro Febraban (banco/agência/conta com DV) vinculado à fonte por código; emissão de OP só paga por conta ativa da fonte do empenho.',
+        status: 'PRONTO',
+      },
+      {
+        titulo: 'Integração bancária CNAB (remessa/retorno 240/400)',
+        descricao: 'Arquivos de pagamento e conciliação por banco, sobre o cadastro Febraban.',
+        status: 'A_FAZER',
+      },
     ],
   },
   {

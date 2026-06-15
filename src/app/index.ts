@@ -10,6 +10,7 @@ import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
 import { appRelatoriosRoutes } from './relatorios.js'
 import { appComprasRoutes } from './compras.js'
+import { appContasBancariasRoutes } from './contas-bancarias.js'
 import { MenuAppService, type MenuAppNode } from '../services/menu-app.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
@@ -119,5 +120,6 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appContasRoutes)
     autenticado.register(appRelatoriosRoutes)
     autenticado.register(appComprasRoutes)
+    autenticado.register(appContasBancariasRoutes)
   })
 }
