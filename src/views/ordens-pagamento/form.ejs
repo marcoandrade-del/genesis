@@ -11,10 +11,9 @@
     <div class="row g-2">
       <div class="col-12 mb-1"><label class="form-label small fw-semibold">Liquidação <span class="text-danger">*</span></label>
         <% if (liquidacoes.length === 0) { %><div class="alert alert-warning py-2 small mb-1">Nenhuma liquidação ATIVA disponível.</div><% } %>
-        <select name="liquidacaoId" class="form-select form-select-sm" required
-          onchange="document.getElementById('op-saldo').textContent = this.options[this.selectedIndex].dataset.disp ? ('Saldo da liquidação: R$ ' + this.options[this.selectedIndex].dataset.disp) : ''">
-          <option value="" data-disp="">— Selecione —</option>
-          <% liquidacoes.forEach(function(l){ %><option value="<%= l.id %>" data-disp="<%= l.disponivel %>" <%= op && op.liquidacaoId === l.id ? 'selected' : '' %>><%= l.rotulo %> — disp. R$ <%= l.disponivel %></option><% }) %>
+        <select name="liquidacaoId" id="op-liquidacao" class="form-select form-select-sm" required>
+          <option value="" data-disp="" data-fonte="">— Selecione —</option>
+          <% liquidacoes.forEach(function(l){ %><option value="<%= l.id %>" data-disp="<%= l.disponivel %>" data-fonte="<%= l.fonteCodigo %>" data-fontenome="<%= l.fonteNomenclatura %>" <%= op && op.liquidacaoId === l.id ? 'selected' : '' %>><%= l.rotulo %> — disp. R$ <%= l.disponivel %></option><% }) %>
         </select>
         <div id="op-saldo" class="form-text text-success fw-semibold"></div></div>
 
@@ -26,11 +25,14 @@
         <input type="date" name="data" class="form-control form-control-sm" value="<%= op && op.data ? op.data : '' %>"></div>
 
       <div class="col-8 mb-1"><label class="form-label small fw-semibold">Conta bancária <span class="text-danger">*</span></label>
-        <input type="text" name="contaBancaria" class="form-control form-control-sm font-monospace" value="<%= op && op.contaBancaria ? op.contaBancaria : '' %>" placeholder="Banco / agência / conta" maxlength="60" required></div>
+        <select name="contaBancariaId" id="op-conta" class="form-select form-select-sm font-monospace" required disabled>
+          <option value="">— escolha a liquidação primeiro —</option>
+        </select>
+        <div id="op-conta-aviso" class="form-text text-danger d-none">Nenhuma conta bancária ativa cadastrada para esta fonte — cadastre em Contas bancárias (área da entidade).</div></div>
       <div class="col-4 mb-1"><label class="form-label small fw-semibold">Comprovante</label>
         <input type="text" name="comprovante" class="form-control form-control-sm" value="<%= op && op.comprovante ? op.comprovante : '' %>" maxlength="60"></div>
     </div>
-    <p class="small text-muted mb-0 mt-1"><i class="bi bi-info-circle me-1"></i>A OP exige uma liquidação ativa (REGRA 5) e não pode exceder seu saldo.</p>
+    <p class="small text-muted mb-0 mt-1"><i class="bi bi-info-circle me-1"></i>A OP exige uma liquidação ativa (REGRA 5), não pode exceder seu saldo e só paga por conta bancária da fonte do empenho.</p>
   </div>
 
   <div class="modal-footer">
@@ -38,3 +40,42 @@
     <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Emitir OP</button>
   </div>
 </form>
+
+<script>
+  (function () {
+    // Em <script> o JSON vai SEM escape HTML (<%- %>) — ver memória do projeto.
+    var CONTAS = <%- JSON.stringify(contas) %>
+    var CONTA_SALVA = <%- JSON.stringify(op && op.contaBancariaId ? op.contaBancariaId : null) %>
+    var selLiq = document.getElementById('op-liquidacao')
+    var selConta = document.getElementById('op-conta')
+    var saldo = document.getElementById('op-saldo')
+    var aviso = document.getElementById('op-conta-aviso')
+
+    function atualizar() {
+      var opt = selLiq.options[selLiq.selectedIndex]
+      var fonte = opt ? opt.dataset.fonte : ''
+      saldo.textContent = opt && opt.dataset.disp
+        ? 'Saldo da liquidação: R$ ' + opt.dataset.disp + ' — fonte ' + fonte + ' (' + opt.dataset.fontenome + ')'
+        : ''
+      selConta.replaceChildren()
+      if (!fonte) {
+        selConta.disabled = true
+        selConta.appendChild(new Option('— escolha a liquidação primeiro —', ''))
+        aviso.classList.add('d-none')
+        return
+      }
+      var daFonte = CONTAS.filter(function (c) { return c.fonteCodigo === fonte })
+      aviso.classList.toggle('d-none', daFonte.length > 0)
+      selConta.disabled = daFonte.length === 0
+      selConta.appendChild(new Option(daFonte.length ? '— Selecione —' : '— sem contas da fonte ' + fonte + ' —', ''))
+      daFonte.forEach(function (c) {
+        var o = new Option(c.rotulo, c.id)
+        if (c.id === CONTA_SALVA) o.selected = true
+        selConta.appendChild(o)
+      })
+    }
+
+    selLiq.addEventListener('change', atualizar)
+    atualizar() // restaura a seleção ao re-renderizar com erro
+  })()
+</script>

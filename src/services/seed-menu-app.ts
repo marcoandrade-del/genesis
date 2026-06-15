@@ -21,6 +21,7 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/arrecadacao', nome: 'Arrecadação', icone: 'bi-cash-stack', tipo: 'FUNCIONALIDADE' },
     ],
   },
+  { rota: '/app/contas-bancarias', nome: 'Contas bancárias', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Cadastro Febraban por fonte de recurso' },
   { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício' },
   { rota: '/app/contas', nome: 'Plano de Contas', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Contas contábeis do exercício' },
   { rota: '/app/relatorios', nome: 'Relatórios', icone: 'bi-file-earmark-bar-graph', tipo: 'FUNCIONALIDADE', descricao: 'Cabeçalhos e rodapés' },

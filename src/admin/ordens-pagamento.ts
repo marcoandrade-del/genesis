@@ -1,18 +1,42 @@
 import type { FastifyInstance } from 'fastify'
 import { Prisma } from '@prisma/client'
 import { OrdensPagamentoService } from '../services/ordens-pagamento.js'
+import { rotuloConta } from '../services/contas-bancarias.js'
 
 async function carregarLiquidacoes(app: FastifyInstance, entidadeId: string) {
   const liqs = await app.prisma.liquidacao.findMany({
     where: { entidadeId, status: 'ATIVA' },
     orderBy: { data: 'desc' },
-    select: { id: true, numero: true, valor: true, valorPago: true, empenho: { select: { numero: true } } },
+    select: {
+      id: true,
+      numero: true,
+      valor: true,
+      valorPago: true,
+      empenho: {
+        select: {
+          numero: true,
+          dotacaoDespesa: { select: { fonteRecurso: { select: { codigo: true, nomenclatura: true } } } },
+        },
+      },
+    },
   })
   return liqs.map((l) => ({
     id: l.id,
     rotulo: `${l.numero} (emp. ${l.empenho.numero})`,
     disponivel: new Prisma.Decimal(l.valor).minus(l.valorPago).toFixed(2),
+    fonteCodigo: l.empenho.dotacaoDespesa.fonteRecurso.codigo,
+    fonteNomenclatura: l.empenho.dotacaoDespesa.fonteRecurso.nomenclatura,
   }))
+}
+
+// Contas ativas da entidade p/ o select da OP (filtrado no cliente pela fonte
+// da liquidação escolhida — regra: pagamento só por conta da fonte).
+async function carregarContas(app: FastifyInstance, entidadeId: string) {
+  const contas = await app.prisma.contaBancaria.findMany({
+    where: { entidadeId, ativa: true },
+    orderBy: [{ fonteCodigo: 'asc' }, { bancoCodigo: 'asc' }, { agencia: 'asc' }, { numero: 'asc' }],
+  })
+  return contas.map((c) => ({ id: c.id, fonteCodigo: c.fonteCodigo, rotulo: rotuloConta(c) }))
 }
 
 /**
@@ -45,25 +69,25 @@ export async function adminOrdensPagamentoRoutes(app: FastifyInstance) {
   app.get<{ Querystring: { entidadeId?: string } }>('/form', async (req, reply) => {
     const entidadeId = req.query.entidadeId?.trim() || ''
     if (!entidadeId) return reply.status(400).send('Entidade não informada.')
-    const liquidacoes = await carregarLiquidacoes(app, entidadeId)
-    return reply.view('ordens-pagamento/form', { entidadeId, op: null, liquidacoes, erro: null })
+    const [liquidacoes, contas] = await Promise.all([carregarLiquidacoes(app, entidadeId), carregarContas(app, entidadeId)])
+    return reply.view('ordens-pagamento/form', { entidadeId, op: null, liquidacoes, contas, erro: null })
   })
 
   app.post<{
-    Body: { entidadeId: string; liquidacaoId: string; numero: string; data?: string; valor: string; contaBancaria: string; comprovante?: string }
+    Body: { entidadeId: string; liquidacaoId: string; numero: string; data?: string; valor: string; contaBancariaId: string; comprovante?: string }
   }>('/', async (req, reply) => {
     const b = req.body
     if (!b.entidadeId?.trim()) return reply.status(400).send('Entidade não informada.')
     try {
       await service.criar(b.entidadeId, {
-        liquidacaoId: b.liquidacaoId, numero: b.numero, valor: b.valor, contaBancaria: b.contaBancaria,
+        liquidacaoId: b.liquidacaoId, numero: b.numero, valor: b.valor, contaBancariaId: b.contaBancariaId,
         ...(b.data ? { data: b.data } : {}),
         ...(b.comprovante ? { comprovante: b.comprovante } : {}),
       })
       return reply.header('HX-Redirect', `/admin/ordens-pagamento?${new URLSearchParams({ entidadeId: b.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
-      const liquidacoes = await carregarLiquidacoes(app, b.entidadeId)
-      return reply.view('ordens-pagamento/form', { entidadeId: b.entidadeId, op: b, liquidacoes, erro: e instanceof Error ? e.message : 'Erro ao emitir OP.' })
+      const [liquidacoes, contas] = await Promise.all([carregarLiquidacoes(app, b.entidadeId), carregarContas(app, b.entidadeId)])
+      return reply.view('ordens-pagamento/form', { entidadeId: b.entidadeId, op: b, liquidacoes, contas, erro: e instanceof Error ? e.message : 'Erro ao emitir OP.' })
     }
   })
 
