@@ -52,16 +52,21 @@ async function centroVisivel(page: Page, selector: string) {
 
 async function arrastar(page: Page, deId: string, modifiers: string[] = []) {
   const handleSel = `.mb-0[data-id="${deId}"] > .tree-row .dd-grip`
+  const rowSel = `.mb-0[data-id="${deId}"] > .tree-row`
   const handle = await centroVisivel(page, handleSel)
+  const row = await centroVisivel(page, rowSel)
 
   for (const m of modifiers) await page.keyboard.down(m)
 
   await page.mouse.move(handle.x, handle.y)
   await page.mouse.down()
-  // SortableJS forceFallback precisa de vários mousemoves pra iniciar o drag
-  await page.mouse.move(handle.x + 8, handle.y + 8, { steps: 5 })
-  await page.mouse.move(handle.x + 20, handle.y + 20, { steps: 5 })
-  await page.mouse.move(handle.x + 40, handle.y + 40, { steps: 5 })
+  // SortableJS forceFallback precisa de vários mousemoves pra iniciar o drag.
+  // Levar o ghost ao CENTRO da própria linha (posição válida, mesmo menu): o
+  // grip fica na extrema direita da row; arrastar a partir dali pra fora da
+  // coluna joga o ghost sobre o painel/zona de outro módulo e dispara o guard
+  // "Bloqueado", mascarando o modo que o teste quer verificar.
+  await page.mouse.move(row.x, handle.y, { steps: 5 })
+  await page.mouse.move(row.x, row.y, { steps: 5 })
   await page.waitForTimeout(250)
 }
 
