@@ -36,10 +36,10 @@ describe('listarRaizes / listarFilhos / buscarPorId', () => {
 })
 
 describe('sugerirCodigo', () => {
-  it('sugere pai + sufixo sequencial de 2 dígitos', async () => {
-    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(PAI)
-    prisma.contaDespesaEntidade.count.mockResolvedValue(2)
-    expect(await service.sugerirCodigo('p1')).toBe('3.1.90.11.03')
+  it('preenche o primeiro segmento zerado, sequencial pelos filhos existentes', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue({ ...PAI, codigo: '3.1.90.11.00.00' })
+    prisma.contaDespesaEntidade.findMany.mockResolvedValue([{ codigo: '3.1.90.11.01.00' }, { codigo: '3.1.90.11.02.00' }])
+    expect(await service.sugerirCodigo('p1')).toBe('3.1.90.11.03.00')
   })
 
   it('lança RECURSO_NAO_ENCONTRADO quando pai não existe', async () => {

@@ -32,10 +32,10 @@ describe('listar / buscar', () => {
 })
 
 describe('sugerirCodigo', () => {
-  it('pai + sufixo sequencial', async () => {
-    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(PAI)
-    prisma.contaReceitaEntidade.count.mockResolvedValue(0)
-    expect(await service.sugerirCodigo('p1')).toBe('1.1.1.01')
+  it('preenche o primeiro segmento zerado da máscara (não anexa)', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue({ ...PAI, codigo: '1.7.1.1.51.2.1.00.00.00.00.00' })
+    prisma.contaReceitaEntidade.findMany.mockResolvedValue([])
+    expect(await service.sugerirCodigo('p1')).toBe('1.7.1.1.51.2.1.01.00.00.00.00')
   })
   it('RECURSO_NAO_ENCONTRADO quando pai não existe', async () => {
     prisma.contaReceitaEntidade.findUnique.mockResolvedValue(null)
