@@ -34,11 +34,22 @@ export class ContasContabilEntidadeService {
     return proximoCodigoDesdobramento(pai.codigo, filhos.map((f) => f.codigo))
   }
 
+  /**
+   * Adiciona um filho-desdobramento a uma conta. Permitido quando a conta é
+   * ANALÍTICA (1º filho — ela vira sintética) OU quando ela já é um
+   * DESDOBRAMENTO-PAI (adiciona mais um irmão). Não se desdobra direto uma
+   * sintética do modelo. Assim dá pra desdobrar uma conta em vários filhos.
+   */
   async desdobrar(contaId: string, dados: DadosDesdobrar) {
     const pai = await this.prisma.contaContabilEntidade.findUnique({ where: { id: contaId } })
     if (!pai) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
     if (!pai.admiteMovimento) {
-      throw new ErroNegocio('CONFLITO', 'Só contas analíticas (que admitem movimento) podem ser desdobradas.')
+      const desdobramentos = await this.prisma.contaContabilEntidade.count({
+        where: { parentId: pai.id, origem: 'DESDOBRAMENTO' },
+      })
+      if (desdobramentos === 0) {
+        throw new ErroNegocio('CONFLITO', 'Conta sintética do modelo não pode receber desdobramento direto — desdobre uma conta analítica.')
+      }
     }
     const codigo = dados.codigo.trim()
     if (!codigo) throw new ErroNegocio('REQUISICAO_INVALIDA', 'O código é obrigatório.')
@@ -58,7 +69,10 @@ export class ContasContabilEntidadeService {
             parentId: pai.id,
           },
         })
-        await tx.contaContabilEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
+        // Só vira sintética na 1ª vez (analítica). Desdobramento-pai já é sintética.
+        if (pai.admiteMovimento) {
+          await tx.contaContabilEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
+        }
         return filho
       })
     } catch (e) {
@@ -67,6 +81,18 @@ export class ContasContabilEntidadeService {
       }
       throw e
     }
+  }
+
+  /** Edita a descrição de um DESDOBRAMENTO (contas do modelo são imutáveis). */
+  async editarDescricao(id: string, descricao: string) {
+    const conta = await this.prisma.contaContabilEntidade.findUnique({ where: { id } })
+    if (!conta) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
+    if (conta.origem !== 'DESDOBRAMENTO') {
+      throw new ErroNegocio('CONFLITO', 'Só desdobramentos podem ser editados. Contas do modelo padrão são imutáveis.')
+    }
+    const nova = descricao.trim()
+    if (!nova) throw new ErroNegocio('REQUISICAO_INVALIDA', 'A descrição é obrigatória.')
+    return this.prisma.contaContabilEntidade.update({ where: { id }, data: { descricao: nova } })
   }
 
   /**

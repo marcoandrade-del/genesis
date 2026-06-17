@@ -4,7 +4,8 @@ import { rollupSaldos, type NoSaldo } from '../saldo-contabil.js'
 
 const D = (v: number) => new Prisma.Decimal(v)
 const no = (p: Partial<NoSaldo> & { id: string }): NoSaldo => ({
-  parentId: null, inicial: D(0), debito: D(0), credito: D(0), natureza: 'DEVEDORA', ...p,
+  parentId: null, inicial: D(0), debito: D(0), credito: D(0), natureza: 'DEVEDORA',
+  naturezaInformacao: null, superavitFinanceiro: null, funcao: null, ...p,
 })
 
 // Saldos vêm em "saldo devedor COM SINAL": + = devedor, − = credor.

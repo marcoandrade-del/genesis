@@ -156,4 +156,37 @@ describe('appContasRoutes', () => {
     expect(res.statusCode).toBe(302)
     expect(res.headers.location).toBe('/app/contas')
   })
+
+  it('POST editar com nível LEITURA → 403', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([])
+    const res = await app.inject({ method: 'POST', url: '/contas/d1/editar', payload: { descricao: 'X' } })
+    expect(res.statusCode).toBe(403)
+    expect(res.body).toContain('apenas leitura')
+  })
+
+  it('POST editar descrição de um desdobramento → 302', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'ESCRITA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([])
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'd1', entidadeId: 'ent1', admiteMovimento: true, origem: 'DESDOBRAMENTO', descricao: 'Antiga' })
+    prisma.contaContabilEntidade.update.mockResolvedValue({})
+    const res = await app.inject({ method: 'POST', url: '/contas/d1/editar', payload: { descricao: 'Nova' } })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/contas')
+  })
+
+  it('marca conta redutora "(-)" e mostra atributo PCASP (natureza da informação)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', codigo: '1.2.3.8', descricao: '(-) Depreciação Acumulada', nivel: 4, admiteMovimento: true, origem: 'MODELO', parentId: null, modeloContaId: 'm1' },
+    ])
+    prisma.conta.findMany.mockResolvedValue([
+      { id: 'm1', naturezaSaldo: 'CREDORA', naturezaInformacao: 'PATRIMONIAL', superavitFinanceiro: 'PATRIMONIAL', funcao: 'Registra a depreciação.' },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/contas' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('redutora')
+    expect(res.body).toContain('Patrim.') // naturezaInformacao abreviada
+  })
 })

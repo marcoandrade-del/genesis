@@ -11,7 +11,11 @@ export type SaldoConta = {
   totalDebito: Prisma.Decimal // soma bruta dos débitos (sempre ≥ 0)
   totalCredito: Prisma.Decimal // soma bruta dos créditos (sempre ≥ 0)
   saldoAtual: Prisma.Decimal
+  // Atributos PCASP da conta (do modelo padrão; NÃO agregam — valem por conta).
   natureza: Natureza | null
+  naturezaInformacao: string | null
+  superavitFinanceiro: string | null
+  funcao: string | null
 }
 
 /** Nó com os valores PRÓPRIOS de uma conta (sem agregação dos filhos). */
@@ -22,6 +26,9 @@ export type NoSaldo = {
   debito: Prisma.Decimal
   credito: Prisma.Decimal
   natureza: Natureza | null
+  naturezaInformacao: string | null
+  superavitFinanceiro: string | null
+  funcao: string | null
 }
 
 const D = (v: Prisma.Decimal.Value = 0) => new Prisma.Decimal(v)
@@ -65,7 +72,11 @@ export function rollupSaldos(nos: NoSaldo[]): Map<string, SaldoConta> {
       credito = credito.plus(cf.totalCredito)
       atual = atual.plus(cf.saldoAtual)
     }
-    const r: SaldoConta = { saldoInicial: inicial, totalDebito: debito, totalCredito: credito, saldoAtual: atual, natureza: no.natureza }
+    const r: SaldoConta = {
+      saldoInicial: inicial, totalDebito: debito, totalCredito: credito, saldoAtual: atual,
+      natureza: no.natureza, naturezaInformacao: no.naturezaInformacao,
+      superavitFinanceiro: no.superavitFinanceiro, funcao: no.funcao,
+    }
     memo.set(id, r)
     return r
   }
@@ -90,9 +101,12 @@ export class SaldoContabilService {
     // Natureza vem do modelo padrão (ContaContabilEntidade não tem o campo).
     const modeloIds = [...new Set(contas.map((c) => c.modeloContaId).filter((x): x is string => !!x))]
     const modelos = modeloIds.length
-      ? await this.prisma.conta.findMany({ where: { id: { in: modeloIds } }, select: { id: true, naturezaSaldo: true } })
+      ? await this.prisma.conta.findMany({
+          where: { id: { in: modeloIds } },
+          select: { id: true, naturezaSaldo: true, naturezaInformacao: true, superavitFinanceiro: true, funcao: true },
+        })
       : []
-    const natPorModelo = new Map(modelos.map((m) => [m.id, (m.naturezaSaldo as Natureza | null) ?? null]))
+    const atribPorModelo = new Map(modelos.map((m) => [m.id, m]))
 
     const iniciais = await this.prisma.saldoInicialAno.findMany({
       where: { entidadeId, ano },
@@ -113,14 +127,20 @@ export class SaldoContabilService {
       alvo.set(m.contaId, m._sum.valor ?? D())
     }
 
-    const nos: NoSaldo[] = contas.map((c) => ({
-      id: c.id,
-      parentId: c.parentId,
-      inicial: inicialPorConta.get(c.id) ?? D(),
-      debito: debPorConta.get(c.id) ?? D(),
-      credito: credPorConta.get(c.id) ?? D(),
-      natureza: c.modeloContaId ? natPorModelo.get(c.modeloContaId) ?? null : null,
-    }))
+    const nos: NoSaldo[] = contas.map((c) => {
+      const m = c.modeloContaId ? atribPorModelo.get(c.modeloContaId) : null
+      return {
+        id: c.id,
+        parentId: c.parentId,
+        inicial: inicialPorConta.get(c.id) ?? D(),
+        debito: debPorConta.get(c.id) ?? D(),
+        credito: credPorConta.get(c.id) ?? D(),
+        natureza: (m?.naturezaSaldo as Natureza | null) ?? null,
+        naturezaInformacao: m?.naturezaInformacao ?? null,
+        superavitFinanceiro: m?.superavitFinanceiro ?? null,
+        funcao: m?.funcao ?? null,
+      }
+    })
     return rollupSaldos(nos)
   }
 }
