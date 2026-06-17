@@ -1,53 +1,351 @@
-<%# Barra superior do /app: marca + navegação DINÂMICA (menu do core, em reply.locals.menuApp)
-    + contexto entidade/exercício + ações. Requer: entidade (com municipio.estado), ano.
-    Opcional: menuApp (árvore de navegação permitida); ausente em telas fora do escopo autenticado. %>
-<nav class="navbar navbar-dark bg-dark px-3 py-0" style="height:56px">
-  <div class="d-flex align-items-center">
-    <a class="navbar-brand fw-bold fs-6 me-2" href="/app">
-      <i class="bi bi-heptagon-fill text-primary me-2"></i>Gênesis
-    </a>
-    <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
-      <ul class="navbar-nav flex-row align-items-center mb-0">
-        <% menuApp.forEach(function (area) { %>
-          <% if (area.filhos && area.filhos.length) { %>
-            <li class="nav-item dropdown">
-              <a class="nav-link dropdown-toggle px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi <%= area.icone || 'bi-grid' %> me-1"></i><%= area.nome %>
-              </a>
-              <ul class="dropdown-menu dropdown-menu-dark">
+<%# ─────────────────────────────────────────────────────────────────────────────
+   GÊNESIS · COMMAND BAR  (barra superior do /app)
+   Proposta de UX mais arrojada. Mantém o vocabulário Wise (ink + lime + pílulas
+   24px) mas empurra a marca: barra ink com fio lime, navegação em pílulas com
+   estado ativo, mega-painéis de dropdown com tiles de ícone + descrição, um
+   "workspace switcher" (entidade · exercício) como pílula clicável, ações em
+   botões circulares e um command palette (⌘K) que navega por qualquer item.
+
+   Escapadas conscientes do DESIGN.md estão anotadas no fim do arquivo.
+
+   Requer: entidade (com municipio.estado), ano.
+   Opcional: menuApp (árvore permitida), nivel (LEITURA|ESCRITA|ADMIN). %>
+
+<%
+  // Achata as folhas navegáveis (com rota) para alimentar o command palette.
+  // Cada entrada carrega o grupo (área-pai) para dar contexto na busca.
+  const _gxFlat = [];
+  (typeof menuApp !== 'undefined' && menuApp ? menuApp : []).forEach(function (area) {
+    if (area.rota) _gxFlat.push({ nome: area.nome, grupo: 'Áreas', rota: area.rota, icone: area.icone || 'bi-grid' });
+    (area.filhos || []).forEach(function (f) {
+      if (f.rota) _gxFlat.push({ nome: f.nome, grupo: area.nome, rota: f.rota, icone: f.icone || 'bi-dot' });
+    });
+  });
+%>
+
+<style>
+  /* ── Command bar ──────────────────────────────────────────────────────── */
+  .gx-topbar {
+    position: sticky; top: 0; z-index: 1040;
+    display: flex; align-items: center; gap: 1rem;
+    height: 64px; padding: 0 1.25rem;
+    background:
+      radial-gradient(120% 180% at 0% 0%, rgba(159,232,112,.10), transparent 45%),
+      linear-gradient(180deg, #14160f 0%, var(--ink, #0e0f0c) 100%);
+    border-bottom: 1px solid rgba(159,232,112,.18);
+    box-shadow: 0 1px 0 rgba(159,232,112,.35), 0 8px 24px rgba(0,0,0,.28);
+  }
+
+  /* ── Marca ────────────────────────────────────────────────────────────── */
+  .gx-brand {
+    display: inline-flex; align-items: center; gap: .55rem;
+    padding: .35rem .7rem; border-radius: 14px;
+    color: var(--canvas-soft, #e8ebe6) !important; text-decoration: none;
+    font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -.01em;
+    border: 1px solid rgba(255,255,255,.08); flex-shrink: 0;
+    transition: border-color .15s, background .15s;
+  }
+  .gx-brand:hover { border-color: rgba(159,232,112,.4); background: rgba(255,255,255,.03); }
+  .gx-brand .bi { color: var(--primary, #9fe870); font-size: 1.15rem; }
+  .gx-brand small { display:block; font-size:.6rem; font-weight:600; letter-spacing:.16em;
+    text-transform:uppercase; color: rgba(232,235,230,.45); line-height:1; margin-top:2px; }
+
+  /* ── Navegação em pílulas ─────────────────────────────────────────────── */
+  .gx-nav { display: flex; align-items: center; gap: .25rem; min-width: 0;
+    overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; }
+  .gx-nav::-webkit-scrollbar { display: none; }
+  .gx-pill {
+    display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap;
+    padding: .5rem .85rem; border-radius: 9999px; border: 0; background: transparent;
+    color: rgba(232,235,230,.78) !important; text-decoration: none; cursor: pointer;
+    font-size: .875rem; font-weight: 600; font-family: 'Inter', sans-serif;
+    transition: background .15s, color .15s;
+  }
+  .gx-pill .bi { font-size: 1rem; opacity: .85; }
+  .gx-pill:hover { background: rgba(255,255,255,.07); color: #fff !important; }
+  .gx-pill.show, .gx-pill[aria-expanded="true"] { background: rgba(255,255,255,.09); color: #fff !important; }
+  .gx-pill.is-active {
+    color: var(--ink, #0e0f0c) !important; background: var(--primary, #9fe870);
+  }
+  .gx-pill.is-active .bi { opacity: 1; }
+  .gx-pill .gx-caret { font-size: .7rem; opacity: .55; margin-left: -.15rem; }
+
+  /* ── Mega-painel de dropdown ──────────────────────────────────────────── */
+  .gx-mega {
+    --bs-dropdown-min-width: 0;
+    border: 0; border-radius: 24px; padding: .85rem;
+    background: var(--canvas, #fff);
+    box-shadow: 0 18px 48px rgba(14,15,12,.28); margin-top: .6rem !important;
+    min-width: 340px; max-width: min(620px, 92vw);
+  }
+  .gx-mega-head { font-size: .68rem; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--mute, #868685); padding: .15rem .5rem .55rem; }
+  .gx-mega-grid { display: grid; grid-template-columns: 1fr; gap: .15rem; }
+  .gx-mega.is-wide .gx-mega-grid { grid-template-columns: 1fr 1fr; }
+  .gx-tile {
+    display: flex; align-items: flex-start; gap: .7rem; text-decoration: none;
+    padding: .55rem .6rem; border-radius: 14px; color: var(--ink, #0e0f0c);
+    transition: background .12s;
+  }
+  .gx-tile:hover { background: var(--canvas-soft, #e8ebe6); }
+  .gx-tile .gx-ico {
+    flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px;
+    display: grid; place-items: center; font-size: 1.05rem;
+    background: var(--primary-pale, #e2f6d5); color: var(--ink-deep, #163300);
+  }
+  .gx-tile:hover .gx-ico { background: var(--primary, #9fe870); }
+  .gx-tile-body { min-width: 0; }
+  .gx-tile-title { font-weight: 600; font-size: .9rem; line-height: 1.2; }
+  .gx-tile-desc { font-size: .76rem; color: var(--mute, #868685); line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gx-tile.gx-overview .gx-ico { background: var(--ink, #0e0f0c); color: var(--primary, #9fe870); }
+
+  /* ── Lado direito: busca + workspace + ações ──────────────────────────── */
+  .gx-right { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+  .gx-search {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .45rem .7rem; border-radius: 9999px; cursor: pointer;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: rgba(232,235,230,.7); font-size: .82rem; font-family: 'Inter', sans-serif;
+    transition: border-color .15s, background .15s;
+  }
+  .gx-search:hover { border-color: rgba(159,232,112,.45); background: rgba(255,255,255,.09); }
+  .gx-search kbd {
+    font-family: 'Inter', sans-serif; font-size: .7rem; font-weight: 600;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 6px; padding: .05rem .35rem; color: rgba(232,235,230,.8);
+  }
+
+  .gx-workspace {
+    display: inline-flex; align-items: center; gap: .6rem;
+    padding: .35rem .35rem .35rem .8rem; border-radius: 9999px; text-decoration: none;
+    background: rgba(159,232,112,.08); border: 1px solid rgba(159,232,112,.28);
+    transition: border-color .15s, background .15s;
+  }
+  .gx-workspace:hover { border-color: var(--primary, #9fe870); background: rgba(159,232,112,.14); }
+  .gx-ws-meta { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
+  .gx-ws-top { font-size: .65rem; letter-spacing: .08em; text-transform: uppercase;
+    color: rgba(232,235,230,.5); }
+  .gx-ws-name { font-size: .82rem; font-weight: 700; color: #fff;
+    max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gx-ws-year {
+    flex-shrink: 0; display: inline-grid; place-items: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700;
+    font-size: .78rem; color: var(--ink, #0e0f0c); background: var(--primary, #9fe870);
+    padding: .2rem .5rem; border-radius: 9999px;
+  }
+  .gx-ws-swap { color: rgba(232,235,230,.6); font-size: .9rem; padding-right: .25rem; }
+
+  .gx-icon-btn {
+    width: 40px; height: 40px; flex-shrink: 0; border-radius: 9999px; border: 0;
+    display: grid; place-items: center; cursor: pointer; text-decoration: none;
+    background: rgba(255,255,255,.06); color: rgba(232,235,230,.78);
+    transition: background .15s, color .15s;
+  }
+  .gx-icon-btn:hover { background: rgba(208,50,56,.18); color: #ffb4b7; }
+  .gx-icon-btn .bi { font-size: 1.05rem; }
+
+  /* ── Command palette ──────────────────────────────────────────────────── */
+  #gx-palette { position: fixed; inset: 0; z-index: 2000; display: none;
+    align-items: flex-start; justify-content: center; padding-top: 12vh;
+    background: rgba(14,15,12,.55); backdrop-filter: blur(4px); }
+  #gx-palette.open { display: flex; }
+  .gx-pal-card { width: min(560px, 92vw); background: var(--canvas, #fff);
+    border-radius: 24px; box-shadow: 0 24px 64px rgba(0,0,0,.35); overflow: hidden; }
+  .gx-pal-search { display: flex; align-items: center; gap: .6rem; padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--bs-border-color, rgba(14,15,12,.08)); }
+  .gx-pal-search .bi { color: var(--mute, #868685); font-size: 1.15rem; }
+  .gx-pal-search input { border: 0; outline: 0; width: 100%; font-size: 1rem;
+    color: var(--ink, #0e0f0c); background: transparent; font-family: 'Inter', sans-serif; }
+  .gx-pal-list { max-height: 52vh; overflow-y: auto; padding: .5rem; }
+  .gx-pal-item { display: flex; align-items: center; gap: .7rem; padding: .6rem .7rem;
+    border-radius: 14px; text-decoration: none; color: var(--ink, #0e0f0c); cursor: pointer; }
+  .gx-pal-item .gx-ico { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+    display: grid; place-items: center; background: var(--primary-pale, #e2f6d5);
+    color: var(--ink-deep, #163300); }
+  .gx-pal-item.active, .gx-pal-item:hover { background: var(--canvas-soft, #e8ebe6); }
+  .gx-pal-item.active .gx-ico { background: var(--primary, #9fe870); }
+  .gx-pal-grp { font-size: .72rem; color: var(--mute, #868685); margin-left: auto; }
+  .gx-pal-empty { padding: 1.5rem; text-align: center; color: var(--mute, #868685); font-size: .9rem; }
+
+  @media (max-width: 991.98px) {
+    .gx-brand small, .gx-search span, .gx-ws-meta { display: none; }
+    .gx-workspace { padding: .35rem; }
+  }
+</style>
+
+<nav class="gx-topbar">
+  <a class="gx-brand" href="/app">
+    <i class="bi bi-heptagon-fill"></i>
+    <span>Gênesis<small>Operador</small></span>
+  </a>
+
+  <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
+    <div class="gx-nav">
+      <% menuApp.forEach(function (area) { %>
+        <% if (area.filhos && area.filhos.length) { %>
+          <% const wide = (area.filhos.length + (area.rota ? 1 : 0)) > 5 %>
+          <div class="dropdown">
+            <button class="gx-pill" data-gx-route="<%= area.rota || '' %>" type="button"
+                    data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+              <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
+              <i class="bi bi-chevron-down gx-caret"></i>
+            </button>
+            <div class="dropdown-menu gx-mega <%= wide ? 'is-wide' : '' %>">
+              <div class="gx-mega-head"><%= area.nome %></div>
+              <div class="gx-mega-grid">
                 <% if (area.rota) { %>
-                  <li><a class="dropdown-item" href="<%= area.rota %>"><i class="bi <%= area.icone || 'bi-grid' %> me-2"></i><%= area.nome %> · visão geral</a></li>
-                  <li><hr class="dropdown-divider"></li>
+                  <a class="gx-tile gx-overview" href="<%= area.rota %>">
+                    <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
+                    <span class="gx-tile-body">
+                      <span class="gx-tile-title">Visão geral</span>
+                      <span class="gx-tile-desc"><%= area.nome %></span>
+                    </span>
+                  </a>
                 <% } %>
                 <% area.filhos.forEach(function (f) { %>
-                  <li><a class="dropdown-item" href="<%= f.rota || '#' %>"><i class="bi <%= f.icone || 'bi-dot' %> me-2"></i><%= f.nome %></a></li>
+                  <a class="gx-tile" href="<%= f.rota || '#' %>">
+                    <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
+                    <span class="gx-tile-body">
+                      <span class="gx-tile-title"><%= f.nome %></span>
+                      <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
+                    </span>
+                  </a>
                 <% }) %>
-              </ul>
-            </li>
-          <% } else { %>
-            <li class="nav-item">
-              <a class="nav-link px-2" href="<%= area.rota || '#' %>"><i class="bi <%= area.icone || 'bi-grid' %> me-1"></i><%= area.nome %></a>
-            </li>
-          <% } %>
-        <% }) %>
-      </ul>
+              </div>
+            </div>
+          </div>
+        <% } else { %>
+          <a class="gx-pill" data-gx-route="<%= area.rota || '' %>" href="<%= area.rota || '#' %>">
+            <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
+          </a>
+        <% } %>
+      <% }) %>
+    </div>
+  <% } else { %>
+    <div class="flex-grow-1"></div>
+  <% } %>
+
+  <div class="gx-right">
+    <% if (_gxFlat.length) { %>
+      <button class="gx-search" type="button" id="gx-search-trigger" aria-label="Buscar (Ctrl+K)">
+        <i class="bi bi-search"></i><span>Buscar…</span><kbd>⌘K</kbd>
+      </button>
     <% } %>
-  </div>
-  <div class="d-flex align-items-center gap-3">
-    <span class="text-white-50 small">
-      <%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> ·
-      <strong class="text-white"><%= entidade.nome %></strong> ·
-      <strong class="text-white font-monospace"><%= ano %></strong>
-    </span>
-    <a href="/app/contexto" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-arrow-left-right me-1"></i>Trocar contexto
+
+    <a href="/app/contexto" class="gx-workspace" title="Trocar contexto de trabalho">
+      <div class="gx-ws-meta">
+        <span class="gx-ws-top"><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %></span>
+        <span class="gx-ws-name"><%= entidade.nome %></span>
+      </div>
+      <span class="gx-ws-year"><%= ano %></span>
+      <i class="bi bi-arrow-left-right gx-ws-swap"></i>
     </a>
-    <a href="/app/logout" class="btn btn-sm btn-outline-secondary text-white border-secondary">
-      <i class="bi bi-box-arrow-right me-1"></i>Sair
+
+    <a href="/app/logout" class="gx-icon-btn" title="Sair" aria-label="Sair">
+      <i class="bi bi-box-arrow-right"></i>
     </a>
   </div>
 </nav>
+
+<% if (_gxFlat.length) { %>
+<%# ── Command palette: busca/navegação rápida por qualquer item permitido ── %>
+<div id="gx-palette" role="dialog" aria-modal="true" aria-label="Buscar navegação">
+  <div class="gx-pal-card" role="document">
+    <div class="gx-pal-search">
+      <i class="bi bi-search"></i>
+      <input type="text" id="gx-pal-input" placeholder="Ir para… (digite o nome de uma tela)" autocomplete="off">
+    </div>
+    <div class="gx-pal-list" id="gx-pal-list"></div>
+  </div>
+</div>
+<script>
+  (function () {
+    var ITEMS = <%- JSON.stringify(_gxFlat) %>;
+    var pal = document.getElementById('gx-palette');
+    var input = document.getElementById('gx-pal-input');
+    var list = document.getElementById('gx-pal-list');
+    var trigger = document.getElementById('gx-search-trigger');
+    var cursor = 0, filtered = ITEMS;
+
+    function esc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
+
+    function render() {
+      if (!filtered.length) { list.innerHTML = '<div class="gx-pal-empty">Nada encontrado.</div>'; return; }
+      list.innerHTML = filtered.map(function (it, i) {
+        return '<a class="gx-pal-item' + (i === cursor ? ' active' : '') + '" href="' + esc(it.rota) + '" data-i="' + i + '">' +
+          '<span class="gx-ico"><i class="bi ' + esc(it.icone) + '"></i></span>' +
+          '<span>' + esc(it.nome) + '</span>' +
+          '<span class="gx-pal-grp">' + esc(it.grupo) + '</span></a>';
+      }).join('');
+      var active = list.querySelector('.gx-pal-item.active');
+      if (active) active.scrollIntoView({ block: 'nearest' });
+    }
+
+    function filter() {
+      var q = input.value.trim().toLowerCase();
+      filtered = !q ? ITEMS : ITEMS.filter(function (it) {
+        return (it.nome + ' ' + it.grupo).toLowerCase().indexOf(q) !== -1;
+      });
+      cursor = 0; render();
+    }
+
+    function open() { pal.classList.add('open'); input.value = ''; filter(); setTimeout(function () { input.focus(); }, 30); }
+    function close() { pal.classList.remove('open'); }
+
+    if (trigger) trigger.addEventListener('click', open);
+    input.addEventListener('input', filter);
+
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); cursor = Math.min(cursor + 1, filtered.length - 1); render(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); cursor = Math.max(cursor - 1, 0); render(); }
+      else if (e.key === 'Enter') { e.preventDefault(); if (filtered[cursor]) window.location.href = filtered[cursor].rota; }
+      else if (e.key === 'Escape') { close(); }
+    });
+
+    list.addEventListener('mousemove', function (e) {
+      var el = e.target.closest('.gx-pal-item'); if (!el) return;
+      var i = parseInt(el.dataset.i, 10); if (i !== cursor) { cursor = i; render(); }
+    });
+
+    pal.addEventListener('click', function (e) { if (e.target === pal) close(); });
+
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); pal.classList.contains('open') ? close() : open(); }
+    });
+  })();
+</script>
+<% } %>
+
+<%# ── Marca item ativo comparando a rota com o pathname atual ─────────────── %>
+<script>
+  (function () {
+    var path = window.location.pathname.replace(/\/$/, '');
+    var best = null, bestLen = -1;
+    document.querySelectorAll('.gx-pill[data-gx-route]').forEach(function (el) {
+      var r = (el.getAttribute('data-gx-route') || '').replace(/\/$/, '');
+      if (!r || r === '/app') return;
+      if ((path === r || path.indexOf(r + '/') === 0) && r.length > bestLen) { best = el; bestLen = r.length; }
+    });
+    if (best) best.classList.add('is-active');
+  })();
+</script>
+
 <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
 <%# Bundle Bootstrap (Popper + dropdowns). As views do /app só carregam o CSS; o JS entra aqui. %>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <% } %>
+
+<%# ─────────────────────────────────────────────────────────────────────────────
+   ESCAPADAS CONSCIENTES DO DESIGN.md:
+   • `nav-bar` é especificado como fundo branco (canvas). Aqui invertemos para
+     ink com fio lime — um topo "command bar" de produto, mais arrojado que o
+     nav de marketing. O lime continua sendo o único acento (regra mantida).
+   • Introduzimos um command palette (⌘K) e tiles de ícone nos dropdowns —
+     padrões de app não cobertos pelo DESIGN.md de marketing, mas coerentes com
+     os tokens (rounded.xl 24px, primary-pale, ink-deep).
+   • O "workspace switcher" usa lime como borda/realce de uma pílula informativa,
+     não como CTA — escapa levemente do "lime só para CTA", de forma controlada.
+   ───────────────────────────────────────────────────────────────────────────── %>
+</content>
+</invoke>

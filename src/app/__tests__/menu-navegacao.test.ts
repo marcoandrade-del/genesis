@@ -39,8 +39,9 @@ describe('navegação dinâmica do /app', () => {
 
     const res = await pedir(app)
     expect(res.statusCode).toBe(200)
-    // navbar: Orçamento (tem filhos) vira dropdown; filho e folha aparecem
-    expect(res.body).toContain('dropdown-toggle')
+    // navbar: Orçamento (tem filhos) vira dropdown (mega-painel); filho e folha aparecem
+    expect(res.body).toContain('data-bs-toggle="dropdown"')
+    expect(res.body).toContain('gx-mega')
     expect(res.body).toContain('/app/orcamento/saldo')
     expect(res.body).toContain('/app/lancamentos')
     // bundle do Bootstrap injetado quando há menu
@@ -55,7 +56,7 @@ describe('navegação dinâmica do /app', () => {
 
     const res = await pedir(app)
     expect(res.statusCode).toBe(200)
-    expect(res.body).not.toContain('dropdown-toggle')
+    expect(res.body).not.toContain('data-bs-toggle="dropdown"')
     expect(res.body).not.toContain('bootstrap.bundle')
     // a barra base (contexto) continua renderizando
     expect(res.body).toContain('Prefeitura')
