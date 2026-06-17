@@ -8,6 +8,8 @@ import { appCreditosAdicionaisRoutes } from './creditos-adicionais.js'
 import { appArrecadacaoRoutes } from './arrecadacao.js'
 import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
+import { appContasReceitaRoutes } from './contas-receita.js'
+import { appContasDespesaRoutes } from './contas-despesa.js'
 import { appRelatoriosRoutes } from './relatorios.js'
 import { appComprasRoutes } from './compras.js'
 import { appContasBancariasRoutes } from './contas-bancarias.js'
@@ -118,6 +120,8 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appArrecadacaoRoutes)
     autenticado.register(appLancamentosRoutes)
     autenticado.register(appContasRoutes)
+    autenticado.register(appContasReceitaRoutes)
+    autenticado.register(appContasDespesaRoutes)
     autenticado.register(appRelatoriosRoutes)
     autenticado.register(appComprasRoutes)
     autenticado.register(appContasBancariasRoutes)

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { proximoCodigoDesdobramento } from './codigo-conta.js'
 
 export type DadosDesdobrar = { codigo: string; descricao: string }
 
@@ -29,8 +30,8 @@ export class ContasContabilEntidadeService {
   async sugerirCodigo(parentId: string): Promise<string> {
     const pai = await this.prisma.contaContabilEntidade.findUnique({ where: { id: parentId } })
     if (!pai) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
-    const filhos = await this.prisma.contaContabilEntidade.count({ where: { parentId } })
-    return `${pai.codigo}.${String(filhos + 1).padStart(2, '0')}`
+    const filhos = await this.prisma.contaContabilEntidade.findMany({ where: { parentId }, select: { codigo: true } })
+    return proximoCodigoDesdobramento(pai.codigo, filhos.map((f) => f.codigo))
   }
 
   async desdobrar(contaId: string, dados: DadosDesdobrar) {

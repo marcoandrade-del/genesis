@@ -24,6 +24,8 @@ const AREAS: readonly ItemSeed[] = [
   { rota: '/app/contas-bancarias', nome: 'Contas bancárias', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Cadastro Febraban por fonte de recurso' },
   { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício' },
   { rota: '/app/contas', nome: 'Plano de Contas', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Contas contábeis do exercício' },
+  { rota: '/app/contas-receita', nome: 'Plano de Receita', icone: 'bi-graph-up-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de receita do exercício' },
+  { rota: '/app/contas-despesa', nome: 'Plano de Despesa', icone: 'bi-graph-down-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de despesa do exercício' },
   { rota: '/app/relatorios', nome: 'Relatórios', icone: 'bi-file-earmark-bar-graph', tipo: 'FUNCIONALIDADE', descricao: 'Cabeçalhos e rodapés' },
   {
     rota: '/app/compras', nome: 'Compras', icone: 'bi-cart', tipo: 'SUBMENU',
