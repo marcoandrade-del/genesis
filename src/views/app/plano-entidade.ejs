@@ -7,12 +7,20 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <%- include('../layouts/_theme') %>
+  <style>
+    table.ocultar-detalhe .col-detalhe { display: none; }
+    .valor { font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+    .valor.neg { color: var(--bs-danger); }
+  </style>
 </head>
 <body class="bg-light">
 
 <%- include('_navbar') %>
 
-<div class="container py-4" style="max-width:1000px">
+<% const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %>
+<% const nat = { DEVEDORA: 'Devedora', CREDORA: 'Credora', MISTA: 'Mista' } %>
+
+<div class="container py-4" style="max-width:<%= comSaldos ? 1280 : 1000 %>px">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb small">
       <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
@@ -20,9 +28,20 @@
     </ol>
   </nav>
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h2 class="h4 fw-bold mb-0"><%= titulo %> — <span class="font-monospace"><%= ano %></span></h2>
-    <span class="badge bg-light text-dark"><%= contas.length %> conta(s)</span>
+    <div class="d-flex align-items-center gap-2">
+      <% if (comSaldos) { %>
+        <form method="get" action="<%= base %>" class="d-flex align-items-center gap-1">
+          <label class="form-label small mb-0 text-muted">Saldo em</label>
+          <input type="date" name="data" value="<%= dataRef %>" class="form-control form-control-sm" style="width:auto" onchange="this.form.submit()">
+        </form>
+        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('tbl').classList.toggle('ocultar-detalhe')" title="Mostrar/ocultar detalhes">
+          <i class="bi bi-arrows-collapse"></i>
+        </button>
+      <% } %>
+      <span class="badge bg-light text-dark"><%= contas.length %> conta(s)</span>
+    </div>
   </div>
 
   <% if (erro) { %>
@@ -33,14 +52,7 @@
     <div class="alert alert-secondary py-2 small"><i class="bi bi-eye me-1"></i>Acesso somente leitura nesta entidade — desdobramento desabilitado.</div>
   <% } %>
 
-  <p class="small text-muted mb-3">
-    <span class="badge bg-warning bg-opacity-10 text-warning-emphasis"><i class="bi bi-bank me-1"></i>Modelo Padrão</span>
-    = conta herdada do modelo padrão (imutável; só pode ser desdobrada).
-    <span class="badge bg-info bg-opacity-10 text-info-emphasis">Desdobramento</span>
-    = criada por você nesta entidade.
-  </p>
-
-  <% /* Form de desdobramento — aparece quando se clica "Desdobrar" numa conta analítica */ %>
+  <% /* Form de desdobramento — aparece ao clicar "Desdobrar" numa conta analítica */ %>
   <% if (desdobrar && podeEscrever) { %>
     <% const pai = contas.find(function(c){ return c.id === desdobrar.id }) %>
     <div class="card border-primary shadow-sm mb-3">
@@ -71,16 +83,22 @@
   <% } %>
 
   <div class="card border-0 shadow-sm"><div class="card-body p-0">
-    <table class="table table-hover align-middle mb-0">
+    <table id="tbl" class="table table-hover table-sm align-middle mb-0">
       <thead class="table-light"><tr>
         <th class="ps-3">Código / Descrição</th>
-        <th style="width:120px">Tipo</th>
-        <th style="width:130px">Origem</th>
-        <% if (podeEscrever) { %><th style="width:150px" class="text-end pe-3">Ações</th><% } %>
+        <% if (comSaldos) { %>
+          <th class="col-detalhe">Natureza</th>
+          <th class="valor">Saldo inicial</th>
+          <th class="valor">Total débito</th>
+          <th class="valor">Total crédito</th>
+          <th class="valor">Saldo atual</th>
+        <% } %>
+        <th class="col-detalhe" style="width:110px">Tipo</th>
+        <% if (podeEscrever) { %><th class="col-detalhe text-end pe-3" style="width:150px">Ações</th><% } %>
       </tr></thead>
       <tbody>
         <% if (contas.length === 0) { %>
-          <tr><td colspan="<%= podeEscrever ? 4 : 3 %>" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano não copiado para o exercício <%= ano %>.</td></tr>
+          <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano não copiado para o exercício <%= ano %>.</td></tr>
         <% } %>
         <% contas.forEach(function(c) { %>
           <tr>
@@ -90,18 +108,21 @@
                 <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
               </span>
             </td>
-            <td>
+            <% if (comSaldos) { %>
+              <td class="col-detalhe small text-muted"><%= c.saldo && c.saldo.natureza ? nat[c.saldo.natureza] : '—' %></td>
+              <td class="valor small"><%= brl(c.saldo && c.saldo.inicial) %></td>
+              <td class="valor small"><%= brl(c.saldo && c.saldo.debito) %></td>
+              <td class="valor small"><%= brl(c.saldo && c.saldo.credito) %></td>
+              <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'neg' : '' %>"><%= brl(c.saldo && c.saldo.atual) %></td>
+            <% } %>
+            <td class="col-detalhe">
               <% if (c.admiteMovimento) { %><span class="badge bg-primary bg-opacity-10 text-primary">Analítica</span>
               <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Sintética</span><% } %>
             </td>
-            <td>
-              <% if (c.origem === 'DESDOBRAMENTO') { %><span class="badge bg-info bg-opacity-10 text-info-emphasis"><i class="bi bi-diagram-2 me-1"></i>Desdobramento</span>
-              <% } else { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis" title="Conta do modelo padrão — imutável; só pode ser desdobrada."><i class="bi bi-bank me-1"></i>Modelo Padrão</span><% } %>
-            </td>
             <% if (podeEscrever) { %>
-              <td class="text-end pe-3">
+              <td class="col-detalhe text-end pe-3">
                 <% if (c.admiteMovimento) { %>
-                  <a href="<%= base %>?desdobrar=<%= c.id %>" class="btn btn-outline-primary btn-sm py-0 px-2" title="Desdobrar"><i class="bi bi-diagram-2"></i> Desdobrar</a>
+                  <a href="<%= base %>?desdobrar=<%= c.id %>" class="btn btn-outline-primary btn-sm py-0 px-2" title="Desdobrar"><i class="bi bi-diagram-2"></i></a>
                 <% } %>
                 <% if (c.origem === 'DESDOBRAMENTO' && !c.temFilhos) { %>
                   <form method="post" action="<%= base %>/<%= c.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir este desdobramento?')">
@@ -115,6 +136,10 @@
       </tbody>
     </table>
   </div></div>
+
+  <% if (!comSaldos) { %>
+    <p class="small text-muted mt-2">Contas do modelo padrão não podem ser excluídas — só desdobradas. Desdobramentos que você criou podem ser removidos enquanto não tiverem filhos nem movimento.</p>
+  <% } %>
 </div>
 </body>
 </html>

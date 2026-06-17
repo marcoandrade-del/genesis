@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { Prisma } from '@prisma/client'
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
 import { appContasRoutes } from '../contas.js'
 import type { FastifyInstance } from 'fastify'
@@ -34,7 +35,6 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('ATIVO')
     expect(res.body).toContain('Caixa')
     expect(res.body).toContain('Analítica')
-    expect(res.body).toContain('Desdobramento')
   })
 
   it('estado vazio quando o plano não foi copiado para o ano', async () => {
@@ -60,14 +60,23 @@ describe('appContasRoutes', () => {
     expect(res.headers.location).toBe('/app/contexto')
   })
 
-  it('pontifica contas do modelo padrão (badge + legenda)', async () => {
+  it('exibe saldos por conta (inicial/débito/crédito/saldo atual por natureza)', async () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     prisma.contaContabilEntidade.findMany.mockResolvedValue([
-      { id: 'c1', codigo: '1', descricao: 'ATIVO', nivel: 1, admiteMovimento: false, origem: 'MODELO', parentId: null },
+      { id: 'c1', codigo: '1.1.1', descricao: 'Caixa', nivel: 3, admiteMovimento: true, origem: 'MODELO', parentId: null, modeloContaId: 'm1' },
+    ])
+    prisma.conta.findMany.mockResolvedValue([{ id: 'm1', naturezaSaldo: 'DEVEDORA' }])
+    prisma.saldoInicialAno.findMany.mockResolvedValue([{ contaId: 'c1', valor: new Prisma.Decimal(100) }])
+    prisma.lancamentoItem.groupBy.mockResolvedValue([
+      { contaId: 'c1', tipo: 'DEBITO', _sum: { valor: new Prisma.Decimal(50) } },
+      { contaId: 'c1', tipo: 'CREDITO', _sum: { valor: new Prisma.Decimal(20) } },
     ])
     const res = await app.inject({ method: 'GET', url: '/contas' })
-    expect(res.body).toContain('Modelo Padrão')
-    expect(res.body).toContain('herdada do modelo padrão')
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Saldo atual')
+    expect(res.body).toContain('Devedora')
+    // DEVEDORA: 100 + (50 − 20) = 130
+    expect(res.body).toMatch(/130,00/)
   })
 
   it('GET ?desdobrar abre o form de uma conta analítica do escopo', async () => {
