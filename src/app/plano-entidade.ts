@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ErroNegocio, statusDeErro } from '../errors.js'
+import type { SaldoContabilService } from '../services/saldo-contabil.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -32,6 +33,9 @@ export type ConfigPlano = {
   descricao: string
   servico: ServicoPlano
   listarFlat: (entidadeId: string, ano: number) => Promise<ContaEntidade[]>
+  /** Só o plano contábil tem saldos (lançamentos). Quando presente, a tela
+   *  exibe saldo inicial/débito/crédito/saldo atual por conta. */
+  saldos?: SaldoContabilService
 }
 
 type RenderOpts = {
@@ -40,6 +44,18 @@ type RenderOpts = {
   desdobrar?: { id: string; codigo?: string; descricao?: string } | null
   sugestao?: string
 }
+
+/** Data de referência do saldo: `?data=YYYY-MM-DD` ou hoje (data de login). */
+function dataRefDe(req: FastifyRequest): Date {
+  const raw = (req.query as { data?: string } | undefined)?.data?.trim()
+  if (raw) {
+    const d = new Date(`${raw}T00:00:00`)
+    if (!Number.isNaN(d.getTime())) return d
+  }
+  return new Date()
+}
+
+const isoData = (d: Date) => d.toISOString().slice(0, 10)
 
 /**
  * Registra as rotas de um "plano de contas da entidade" no `/app`. Os 3 planos
@@ -70,7 +86,27 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     const { entidadeId, ano, nivel } = req.contexto
     const contas = await cfg.listarFlat(entidadeId, ano)
     const idsPais = new Set(contas.map((c) => c.parentId).filter(Boolean))
-    const linhas = contas.map((c) => ({ ...c, temFilhos: idsPais.has(c.id) }))
+
+    const dataRef = dataRefDe(req)
+    const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
+
+    const linhas = contas.map((c) => {
+      const s = saldos?.get(c.id)
+      return {
+        ...c,
+        temFilhos: idsPais.has(c.id),
+        saldo: s
+          ? {
+              inicial: s.saldoInicial.toNumber(),
+              debito: s.totalDebito.toNumber(),
+              credito: s.totalCredito.toNumber(),
+              atual: s.saldoAtual.toNumber(),
+              natureza: s.natureza,
+            }
+          : null,
+      }
+    })
+
     if (opts.status) reply.code(opts.status)
     return reply.view('app/plano-entidade', {
       base: url,
@@ -81,6 +117,8 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       nivel,
       contas: linhas,
       podeEscrever: podeEscrever(nivel),
+      comSaldos: !!cfg.saldos,
+      dataRef: isoData(dataRef),
       desdobrar: opts.desdobrar ?? null,
       sugestao: opts.sugestao ?? '',
       erro: opts.erro ?? null,
@@ -95,7 +133,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
   }
 
   // ── Lista (+ form de desdobrar quando ?desdobrar=<id>) ──────────────────────
-  app.get<{ Querystring: { desdobrar?: string } }>(cfg.rota, async (req, reply) => {
+  app.get<{ Querystring: { desdobrar?: string; data?: string } }>(cfg.rota, async (req, reply) => {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     const alvo = req.query.desdobrar?.trim()

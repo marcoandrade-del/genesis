@@ -7,7 +7,7 @@ const ENTIDADE = { id: 'ent1', nome: 'Prefeitura', municipio: { nome: 'Maringá'
 const CTX = { entidadeId: 'ent1', ano: 2026, nivel: 'ESCRITA' as const }
 
 describe('planos de receita e despesa no /app (factory compartilhada)', () => {
-  it('receita: lista do contexto e pontifica o modelo padrão', async () => {
+  it('receita: lista do contexto (sem coluna de saldo)', async () => {
     const { app, prisma } = await criarApp({ registrar: appContasReceitaRoutes, comView: true, simularUsuario: { sub: 'u1', email: 'u@x.com' }, simularContexto: CTX })
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     prisma.contaReceitaEntidade.findMany.mockResolvedValue([
@@ -17,7 +17,7 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Plano de Receita')
     expect(res.body).toContain('RECEITAS CORRENTES')
-    expect(res.body).toContain('Modelo Padrão')
+    expect(res.body).not.toContain('Saldo atual') // receita não tem saldos
     expect(prisma.contaReceitaEntidade.findMany).toHaveBeenCalledWith({
       where: { entidadeId: 'ent1', ano: 2026 },
       orderBy: { codigo: 'asc' },

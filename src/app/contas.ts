@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { ContasContabilEntidadeService } from '../services/contas-contabil-entidade.js'
+import { SaldoContabilService } from '../services/saldo-contabil.js'
 import { registrarRotasPlano } from './plano-entidade.js'
 
 /**
@@ -14,6 +15,7 @@ export async function appContasRoutes(app: FastifyInstance) {
     titulo: 'Plano de Contas (contábil)',
     descricao: 'Contas contábeis do exercício',
     servico,
+    saldos: new SaldoContabilService(app.prisma),
     listarFlat: (entidadeId, ano) =>
       app.prisma.contaContabilEntidade.findMany({
         where: { entidadeId, ano },
