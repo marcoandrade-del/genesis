@@ -129,4 +129,31 @@ describe('appContasRoutes', () => {
     expect(res.statusCode).toBe(403)
     expect(res.body).toContain('apenas leitura')
   })
+
+  it('razão: renderiza movimentos e saldo corrente da conta no mês', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1', codigo: '1.1.1', descricao: 'Caixa', entidadeId: 'ent1', modeloContaId: 'm1' })
+    prisma.conta.findUnique.mockResolvedValue({ naturezaSaldo: 'DEVEDORA' })
+    prisma.saldoInicialAno.findUnique.mockResolvedValue({ valor: new Prisma.Decimal(500) })
+    prisma.lancamentoItem.groupBy.mockResolvedValue([]) // nada antes do mês
+    prisma.resumoMensalConta.findMany.mockResolvedValue([{ mes: 3, totalDebito: new Prisma.Decimal(1000), totalCredito: new Prisma.Decimal(0) }])
+    prisma.lancamentoItem.findMany.mockResolvedValue([
+      { tipo: 'DEBITO', valor: new Prisma.Decimal(1000), lancamento: { data: new Date(Date.UTC(2026, 2, 15)), historico: 'Recebimento' } },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/contas/c1/razao?mes=3' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Razão')
+    expect(res.body).toContain('Caixa')
+    expect(res.body).toContain('Recebimento')
+    // saldo anterior 500 + débito 1000 = 1.500 (DEVEDORA)
+    expect(res.body).toMatch(/1\.500,00/)
+  })
+
+  it('razão: conta de outra entidade → redireciona para /app/contas', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'cX', codigo: '9', descricao: 'X', entidadeId: 'OUTRA', modeloContaId: null })
+    const res = await app.inject({ method: 'GET', url: '/contas/cX/razao' })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/contas')
+  })
 })

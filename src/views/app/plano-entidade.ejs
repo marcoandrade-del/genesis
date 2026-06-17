@@ -106,6 +106,9 @@
               <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
                 <span class="font-monospace small text-muted"><%= c.codigo %></span>
                 <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
+                <% if (comSaldos && c.admiteMovimento) { %>
+                  <a href="<%= base %>/<%= c.id %>/razao" class="ms-1 text-decoration-none small" title="Ver razão (movimentações)"><i class="bi bi-journal-text"></i></a>
+                <% } %>
               </span>
             </td>
             <% if (comSaldos) { %>
