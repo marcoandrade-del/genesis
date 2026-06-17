@@ -19,6 +19,8 @@
 
 <% const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %>
 <% const nat = { DEVEDORA: 'Devedora', CREDORA: 'Credora', MISTA: 'Mista' } %>
+<% /* saldo vem com sinal (+ devedor, − credor): exibe módulo + lado D/C */ %>
+<% const sal = (n) => { const v = Number(n) || 0; return v === 0 ? brl(0) : brl(Math.abs(v)) + (v < 0 ? ' C' : ' D') } %>
 
 <div class="container py-4" style="max-width:<%= comSaldos ? 1280 : 1000 %>px">
   <nav aria-label="breadcrumb">
@@ -113,10 +115,10 @@
             </td>
             <% if (comSaldos) { %>
               <td class="col-detalhe small text-muted"><%= c.saldo && c.saldo.natureza ? nat[c.saldo.natureza] : '—' %></td>
-              <td class="valor small"><%= brl(c.saldo && c.saldo.inicial) %></td>
+              <td class="valor small"><%= c.saldo ? sal(c.saldo.inicial) : '—' %></td>
               <td class="valor small"><%= brl(c.saldo && c.saldo.debito) %></td>
               <td class="valor small"><%= brl(c.saldo && c.saldo.credito) %></td>
-              <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'neg' : '' %>"><%= brl(c.saldo && c.saldo.atual) %></td>
+              <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'text-secondary' : '' %>"><%= c.saldo ? sal(c.saldo.atual) : '—' %></td>
             <% } %>
             <td class="col-detalhe">
               <% if (c.admiteMovimento) { %><span class="badge bg-primary bg-opacity-10 text-primary">Analítica</span>

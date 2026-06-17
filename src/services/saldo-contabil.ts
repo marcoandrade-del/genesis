@@ -3,9 +3,13 @@ import { PrismaClient, Prisma } from '@prisma/client'
 export type Natureza = 'DEVEDORA' | 'CREDORA' | 'MISTA'
 
 export type SaldoConta = {
+  // saldoInicial e saldoAtual vêm em "saldo devedor COM SINAL": positivo = saldo
+  // devedor, negativo = saldo credor. É o que permite o rollup do balancete —
+  // uma conta credora/retificadora (ex.: "(-) Depreciação Acumulada") entra
+  // negativa e SUBTRAI do grupo, em vez de somar. Exibir sempre |valor| + lado.
   saldoInicial: Prisma.Decimal
-  totalDebito: Prisma.Decimal
-  totalCredito: Prisma.Decimal
+  totalDebito: Prisma.Decimal // soma bruta dos débitos (sempre ≥ 0)
+  totalCredito: Prisma.Decimal // soma bruta dos créditos (sempre ≥ 0)
   saldoAtual: Prisma.Decimal
   natureza: Natureza | null
 }
@@ -14,7 +18,7 @@ export type SaldoConta = {
 export type NoSaldo = {
   id: string
   parentId: string | null
-  inicial: Prisma.Decimal
+  inicial: Prisma.Decimal // magnitude armazenada (≥ 0); o lado vem da natureza
   debito: Prisma.Decimal
   credito: Prisma.Decimal
   natureza: Natureza | null
@@ -22,17 +26,17 @@ export type NoSaldo = {
 
 const D = (v: Prisma.Decimal.Value = 0) => new Prisma.Decimal(v)
 
-/** Saldo próprio pela natureza: conta CREDORA inverte o sinal de (débito − crédito). */
-function saldoProprio(no: NoSaldo): Prisma.Decimal {
-  const dc = no.debito.minus(no.credito)
-  return no.natureza === 'CREDORA' ? no.inicial.minus(dc) : no.inicial.plus(dc)
+/** Saldo inicial em termos de DÉBITO (com sinal): conta credora entra negativa. */
+function inicialDevedor(no: NoSaldo): Prisma.Decimal {
+  return no.natureza === 'CREDORA' ? no.inicial.negated() : no.inicial
 }
 
 /**
- * Agrega os saldos pela árvore (balancete): o saldo de uma conta SINTÉTICA é a
- * soma dos saldos dos filhos. Lançamentos só existem em analíticas, então as
- * sintéticas entram com valor próprio zero e somam os descendentes. Cada folha
- * tem o sinal aplicado pela SUA natureza antes de subir.
+ * Agrega os saldos pela árvore (balancete), em SALDO DEVEDOR COM SINAL. Em
+ * termos de débito, todo débito soma e todo crédito subtrai (universal, sem
+ * ramo por natureza); a natureza entra só para dar o sinal do saldo inicial.
+ * Assim o saldo de uma sintética = soma (com sinal) dos filhos, e contas
+ * credoras/retificadoras subtraem do grupo — o jeito certo de fechar o balancete.
  */
 export function rollupSaldos(nos: NoSaldo[]): Map<string, SaldoConta> {
   const porId = new Map(nos.map((n) => [n.id, n]))
@@ -50,10 +54,10 @@ export function rollupSaldos(nos: NoSaldo[]): Map<string, SaldoConta> {
     const cache = memo.get(id)
     if (cache) return cache
     const no = porId.get(id)!
-    let inicial = no.inicial
+    let inicial = inicialDevedor(no)
     let debito = no.debito
     let credito = no.credito
-    let atual = saldoProprio(no)
+    let atual = inicial.plus(no.debito).minus(no.credito)
     for (const f of filhos.get(id) ?? []) {
       const cf = calc(f)
       inicial = inicial.plus(cf.saldoInicial)
