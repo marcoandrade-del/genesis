@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarMock } = vi.hoisted(() => ({ listarMock: vi.fn() }))
+const { listarMock, criarMock, buscarMock, excluirMock } = vi.hoisted(() => ({
+  listarMock: vi.fn(), criarMock: vi.fn(), buscarMock: vi.fn(), excluirMock: vi.fn(),
+}))
 
 vi.mock('../../services/lancamentos.js', () => ({
   LancamentosService: class {
     listar = listarMock
+    criar = criarMock
+    buscarPorId = buscarMock
+    excluir = excluirMock
   },
 }))
 
@@ -25,6 +30,9 @@ describe('appLancamentosRoutes', () => {
 
   beforeEach(async () => {
     listarMock.mockReset()
+    criarMock.mockReset()
+    buscarMock.mockReset()
+    excluirMock.mockReset()
     ;({ app, prisma } = await montar())
   })
 
@@ -62,5 +70,73 @@ describe('appLancamentosRoutes', () => {
     const res = await app.inject({ method: 'GET', url: '/lancamentos' })
     expect(res.statusCode).toBe(302)
     expect(res.headers.location).toBe('/app/contexto')
+  })
+
+  it('POST lançar com nível LEITURA → 403', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'LEITURA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    listarMock.mockResolvedValue([])
+    const res = await app.inject({ method: 'POST', url: '/lancamentos', payload: { data: '2026-03-15', historico: 'X', itens: '[]' } })
+    expect(res.statusCode).toBe(403)
+    expect(criarMock).not.toHaveBeenCalled()
+  })
+
+  it('POST lançar resolve códigos→conta e chama criar (302)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    listarMock.mockResolvedValue([])
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', codigo: '1.1.1.01' },
+      { id: 'c2', codigo: '2.1.1.01' },
+    ])
+    criarMock.mockResolvedValue({ id: 'L1' })
+    const itens = JSON.stringify([
+      { codigo: '1.1.1.01', tipo: 'DEBITO', valor: '100' },
+      { codigo: '2.1.1.01', tipo: 'CREDITO', valor: '100' },
+    ])
+    const res = await app.inject({ method: 'POST', url: '/lancamentos', payload: { data: '2026-03-15', historico: 'Teste', itens } })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/lancamentos')
+    expect(criarMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entidadeId: 'ent1', data: '2026-03-15', historico: 'Teste', criadoPorId: 'u1',
+        itens: [
+          { contaId: 'c1', tipo: 'DEBITO', valor: '100' },
+          { contaId: 'c2', tipo: 'CREDITO', valor: '100' },
+        ],
+      }),
+    )
+  })
+
+  it('POST lançar com código inexistente → erro amigável (400)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    listarMock.mockResolvedValue([])
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([])
+    const itens = JSON.stringify([
+      { codigo: '9.9.9', tipo: 'DEBITO', valor: '100' },
+      { codigo: '8.8.8', tipo: 'CREDITO', valor: '100' },
+    ])
+    const res = await app.inject({ method: 'POST', url: '/lancamentos', payload: { data: '2026-03-15', historico: 'Teste', itens } })
+    expect(res.statusCode).toBe(400)
+    expect(res.body).toContain('não encontrada neste exercício')
+    expect(criarMock).not.toHaveBeenCalled()
+  })
+
+  it('POST excluir → chama excluir e redireciona', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    listarMock.mockResolvedValue([])
+    buscarMock.mockResolvedValue({ id: 'L1', entidadeId: 'ent1' })
+    excluirMock.mockResolvedValue(undefined)
+    const res = await app.inject({ method: 'POST', url: '/lancamentos/L1/excluir' })
+    expect(res.statusCode).toBe(302)
+    expect(excluirMock).toHaveBeenCalledWith('L1')
+  })
+
+  it('POST excluir lançamento de outra entidade → 404', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    listarMock.mockResolvedValue([])
+    buscarMock.mockResolvedValue({ id: 'L1', entidadeId: 'OUTRA' })
+    const res = await app.inject({ method: 'POST', url: '/lancamentos/L1/excluir' })
+    expect(res.statusCode).toBe(404)
+    expect(excluirMock).not.toHaveBeenCalled()
   })
 })

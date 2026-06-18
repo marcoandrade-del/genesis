@@ -12,6 +12,8 @@
 
 <%- include('_navbar') %>
 
+<% const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %>
+
 <div class="container py-4" style="max-width:1000px">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb small">
@@ -24,22 +26,148 @@
     <h2 class="h4 fw-bold mb-0">Lançamentos — <span class="font-monospace"><%= ano %></span></h2>
     <div class="text-end">
       <div class="small text-muted">Total do exercício</div>
-      <div class="h5 fw-semibold mb-0 font-monospace">R$ <%= total.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></div>
+      <div class="h5 fw-semibold mb-0 font-monospace">R$ <%= brl(total) %></div>
     </div>
   </div>
 
+  <% if (erro) { %>
+    <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
+  <% } %>
+
+  <% if (!podeEscrever) { %>
+    <div class="alert alert-secondary py-2 small"><i class="bi bi-eye me-1"></i>Acesso somente leitura — você visualiza os lançamentos, mas não pode lançar.</div>
+  <% } %>
+
+  <% if (podeEscrever) { %>
+    <datalist id="contas-lista">
+      <% contas.forEach(function(c){ %><option value="<%= c.codigo %>"><%= c.descricao %></option><% }) %>
+    </datalist>
+
+    <div class="card border-primary shadow-sm mb-3">
+      <div class="card-header bg-primary bg-opacity-10 py-2 small fw-semibold">Novo lançamento contábil (partida dobrada)</div>
+      <div class="card-body">
+        <form id="form-lanc" method="post" action="/app/lancamentos">
+          <input type="hidden" name="itens" id="itens-json">
+          <div class="row g-2 mb-3">
+            <div class="col-sm-3">
+              <label class="form-label small mb-1">Data</label>
+              <input type="date" name="data" id="f-data" class="form-control form-control-sm" min="<%= anoMin %>" max="<%= anoMax %>" required
+                value="<%= valores && valores.data ? valores.data : '' %>">
+            </div>
+            <div class="col-sm-9">
+              <label class="form-label small mb-1">Histórico</label>
+              <input name="historico" id="f-hist" class="form-control form-control-sm" maxlength="300" required
+                value="<%= valores && valores.historico ? valores.historico : '' %>">
+            </div>
+          </div>
+
+          <table class="table table-sm align-middle mb-2">
+            <thead class="table-light"><tr>
+              <th style="width:120px">Tipo</th><th>Conta (código)</th><th style="width:160px" class="text-end">Valor R$</th><th style="width:40px"></th>
+            </tr></thead>
+            <tbody id="linhas"></tbody>
+          </table>
+
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-linha"><i class="bi bi-plus-lg"></i> Linha</button>
+            <div class="small font-monospace">
+              Débitos <strong id="tot-d">0,00</strong> · Créditos <strong id="tot-c">0,00</strong> ·
+              <span id="balanco" class="badge"></span>
+            </div>
+            <button type="submit" id="btn-salvar" class="btn btn-primary btn-sm" disabled>Lançar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script type="application/json" id="itens-init"><%- JSON.stringify(valores && valores.itens ? valores.itens : []) %></script>
+    <script>
+      var TBODY = document.getElementById('linhas')
+      function el(tag, props, attrs) {
+        var e = document.createElement(tag)
+        if (props) Object.keys(props).forEach(function (k) { e[k] = props[k] })
+        if (attrs) Object.keys(attrs).forEach(function (k) { e.setAttribute(k, attrs[k]) })
+        return e
+      }
+      function addLinha(codigo, tipo, valor) {
+        var tr = el('tr')
+        var sel = el('select', { className: 'form-select form-select-sm l-tipo' })
+        sel.appendChild(el('option', { value: 'DEBITO', textContent: 'Débito' }))
+        sel.appendChild(el('option', { value: 'CREDITO', textContent: 'Crédito' }))
+        var inpConta = el('input', { className: 'form-control form-control-sm font-monospace l-conta', placeholder: 'código da conta' }, { list: 'contas-lista' })
+        var inpValor = el('input', { type: 'number', className: 'form-control form-control-sm text-end l-valor', placeholder: '0,00' }, { step: '0.01', min: '0' })
+        var btn = el('button', { type: 'button', className: 'btn btn-outline-danger btn-sm py-0 px-1', title: 'Remover' })
+        btn.appendChild(el('i', { className: 'bi bi-x' }))
+
+        var tdTipo = el('td'); tdTipo.appendChild(sel)
+        var tdConta = el('td'); tdConta.appendChild(inpConta)
+        var tdValor = el('td'); tdValor.appendChild(inpValor)
+        var tdDel = el('td'); tdDel.appendChild(btn)
+        tr.appendChild(tdTipo); tr.appendChild(tdConta); tr.appendChild(tdValor); tr.appendChild(tdDel)
+        TBODY.appendChild(tr)
+
+        if (tipo) sel.value = tipo
+        if (codigo) inpConta.value = codigo
+        if (valor) inpValor.value = valor
+        btn.addEventListener('click', function () { tr.remove(); recalc() })
+        tr.addEventListener('input', recalc)
+      }
+      function recalc() {
+        var d = 0, c = 0
+        document.querySelectorAll('#linhas tr').forEach(function (tr) {
+          var v = parseFloat(tr.querySelector('.l-valor').value) || 0
+          if (tr.querySelector('.l-tipo').value === 'DEBITO') d += v; else c += v
+        })
+        var fmt = function (n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+        document.getElementById('tot-d').textContent = fmt(d)
+        document.getElementById('tot-c').textContent = fmt(c)
+        var bal = document.getElementById('balanco')
+        var ok = d > 0 && Math.abs(d - c) < 0.005
+        bal.textContent = ok ? 'Balanceado ✓' : ('Diferença ' + fmt(Math.abs(d - c)))
+        bal.className = 'badge ' + (ok ? 'bg-success' : 'bg-warning text-dark')
+        document.getElementById('btn-salvar').disabled = !ok
+      }
+      document.getElementById('btn-linha').addEventListener('click', function () { addLinha() })
+      document.getElementById('form-lanc').addEventListener('submit', function (e) {
+        var itens = []
+        document.querySelectorAll('#linhas tr').forEach(function (tr) {
+          var codigo = tr.querySelector('.l-conta').value.trim()
+          var valor = tr.querySelector('.l-valor').value
+          if (codigo && valor) itens.push({ codigo: codigo, tipo: tr.querySelector('.l-tipo').value, valor: valor })
+        })
+        if (itens.length < 2) { e.preventDefault(); alert('Informe ao menos um débito e um crédito.'); return }
+        document.getElementById('itens-json').value = JSON.stringify(itens)
+      })
+      var init = JSON.parse(document.getElementById('itens-init').textContent || '[]')
+      if (init.length) { init.forEach(function (i) { addLinha(i.codigo, i.tipo, i.valor) }) }
+      else { addLinha(undefined, 'DEBITO'); addLinha(undefined, 'CREDITO') }
+      recalc()
+    </script>
+  <% } %>
+
   <div class="card border-0 shadow-sm"><div class="card-body p-0">
     <table class="table table-hover align-middle mb-0">
-      <thead class="table-light"><tr><th class="ps-3" style="width:120px">Data</th><th>Histórico</th><th class="text-end pe-3" style="width:160px">Valor R$</th></tr></thead>
+      <thead class="table-light"><tr>
+        <th class="ps-3" style="width:120px">Data</th><th>Histórico</th>
+        <th class="text-end" style="width:160px">Valor R$</th>
+        <% if (podeEscrever) { %><th style="width:50px" class="text-end pe-3"></th><% } %>
+      </tr></thead>
       <tbody>
         <% if (lancamentos.length === 0) { %>
-          <tr><td colspan="3" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum lançamento no exercício <%= ano %>.</td></tr>
+          <tr><td colspan="<%= podeEscrever ? 4 : 3 %>" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhum lançamento no exercício <%= ano %>.</td></tr>
         <% } %>
         <% lancamentos.forEach(function(l) { %>
           <tr>
             <td class="ps-3 font-monospace small"><%= new Date(l.data).toLocaleDateString('pt-BR') %></td>
             <td><%= l.historico %></td>
-            <td class="text-end pe-3 font-monospace"><%= Number(l.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) %></td>
+            <td class="text-end font-monospace"><%= brl(l.valor) %></td>
+            <% if (podeEscrever) { %>
+              <td class="text-end pe-3">
+                <form method="post" action="/app/lancamentos/<%= l.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir este lançamento? O resumo mensal será revertido.')">
+                  <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-1" title="Excluir lançamento"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            <% } %>
           </tr>
         <% }) %>
       </tbody>
