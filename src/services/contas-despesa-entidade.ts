@@ -44,7 +44,12 @@ export class ContasDespesaEntidadeService {
     const pai = await this.prisma.contaDespesaEntidade.findUnique({ where: { id: contaId } })
     if (!pai) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
     if (!pai.admiteMovimento) {
-      throw new ErroNegocio('CONFLITO', 'Só contas analíticas (que admitem movimento) podem ser desdobradas.')
+      const desdobramentos = await this.prisma.contaDespesaEntidade.count({
+        where: { parentId: pai.id, origem: 'DESDOBRAMENTO' },
+      })
+      if (desdobramentos === 0) {
+        throw new ErroNegocio('CONFLITO', 'Conta sintética do modelo não pode receber desdobramento direto — desdobre uma conta analítica.')
+      }
     }
     const codigo = dados.codigo.trim()
     if (!codigo) throw new ErroNegocio('REQUISICAO_INVALIDA', 'O código é obrigatório.')
@@ -64,7 +69,9 @@ export class ContasDespesaEntidadeService {
             parentId: pai.id,
           },
         })
-        await tx.contaDespesaEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
+        if (pai.admiteMovimento) {
+          await tx.contaDespesaEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
+        }
         return filho
       })
     } catch (e) {
@@ -73,6 +80,18 @@ export class ContasDespesaEntidadeService {
       }
       throw e
     }
+  }
+
+  /** Edita a descrição de um DESDOBRAMENTO (contas do modelo são imutáveis). */
+  async editarDescricao(id: string, descricao: string) {
+    const conta = await this.prisma.contaDespesaEntidade.findUnique({ where: { id } })
+    if (!conta) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Conta não encontrada.')
+    if (conta.origem !== 'DESDOBRAMENTO') {
+      throw new ErroNegocio('CONFLITO', 'Só desdobramentos podem ser editados. Contas do modelo padrão são imutáveis.')
+    }
+    const nova = descricao.trim()
+    if (!nova) throw new ErroNegocio('REQUISICAO_INVALIDA', 'A descrição é obrigatória.')
+    return this.prisma.contaDespesaEntidade.update({ where: { id }, data: { descricao: nova } })
   }
 
   /** Exclui um DESDOBRAMENTO (cópias do modelo não se excluem aqui). Ao remover o

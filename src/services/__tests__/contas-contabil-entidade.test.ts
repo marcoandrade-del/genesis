@@ -57,9 +57,18 @@ describe('desdobrar', () => {
     prisma.contaContabilEntidade.findUnique.mockResolvedValue(null)
     await expect(service.desdobrar('xx', { codigo: '1', descricao: 'X' })).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
-  it('CONFLITO quando sintética', async () => {
+  it('CONFLITO quando sintética do modelo (sem desdobramentos)', async () => {
     prisma.contaContabilEntidade.findUnique.mockResolvedValue({ ...PAI, admiteMovimento: false })
+    prisma.contaContabilEntidade.count.mockResolvedValue(0) // não é desdobramento-pai
     await expect(service.desdobrar('p1', { codigo: '1', descricao: 'X' })).rejects.toMatchObject({ code: 'CONFLITO' })
+  })
+  it('desdobramento-pai (sintética COM filho desdobramento) recebe mais um filho, sem reverter', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ ...PAI, admiteMovimento: false })
+    prisma.contaContabilEntidade.count.mockResolvedValue(1) // já tem 1 desdobramento
+    prisma.contaContabilEntidade.create.mockResolvedValue({ id: 'f2' })
+    await service.desdobrar('p1', { codigo: '1.1.1.02', descricao: 'Caixa B' })
+    expect(prisma.contaContabilEntidade.create).toHaveBeenCalled()
+    expect(prisma.contaContabilEntidade.update).not.toHaveBeenCalled() // não vira sintética de novo
   })
   it('REQUISICAO_INVALIDA quando código vazio', async () => {
     prisma.contaContabilEntidade.findUnique.mockResolvedValue(PAI)
@@ -130,5 +139,32 @@ describe('excluir', () => {
     prisma.contaContabilEntidade.count.mockResolvedValueOnce(0)
     prisma.contaContabilEntidade.delete.mockRejectedValue(new Error('boom'))
     await expect(service.excluir('d1')).rejects.toThrow('boom')
+  })
+})
+
+describe('editarDescricao', () => {
+  const DESD = { id: 'd1', origem: 'DESDOBRAMENTO', descricao: 'Antiga' }
+
+  it('edita a descrição de um desdobramento (com trim)', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    prisma.contaContabilEntidade.update.mockResolvedValue({ ...DESD, descricao: 'Nova' })
+    await service.editarDescricao('d1', '  Nova  ')
+    expect(prisma.contaContabilEntidade.update).toHaveBeenCalledWith({ where: { id: 'd1' }, data: { descricao: 'Nova' } })
+  })
+
+  it('bloqueia editar conta do MODELO', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'm1', origem: 'MODELO', descricao: 'X' })
+    await expect(service.editarDescricao('m1', 'Y')).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaContabilEntidade.update).not.toHaveBeenCalled()
+  })
+
+  it('REQUISICAO_INVALIDA quando descrição vazia', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(DESD)
+    await expect(service.editarDescricao('d1', '   ')).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
+  it('RECURSO_NAO_ENCONTRADO quando não existe', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(null)
+    await expect(service.editarDescricao('x', 'Y')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
 })

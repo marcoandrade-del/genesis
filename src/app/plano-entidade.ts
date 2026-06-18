@@ -20,9 +20,10 @@ export type ContaEntidade = {
 
 /** Interface comum dos 3 services (ContasContabil/Receita/DespesaEntidadeService). */
 export type ServicoPlano = {
-  buscarPorId(id: string): Promise<{ id: string; entidadeId: string; admiteMovimento: boolean } | null>
+  buscarPorId(id: string): Promise<{ id: string; entidadeId: string; admiteMovimento: boolean; origem: string; descricao: string } | null>
   sugerirCodigo(parentId: string): Promise<string>
   desdobrar(contaId: string, dados: { codigo: string; descricao: string }): Promise<unknown>
+  editarDescricao(id: string, descricao: string): Promise<unknown>
   excluir(id: string): Promise<unknown>
 }
 
@@ -43,6 +44,7 @@ type RenderOpts = {
   status?: number
   desdobrar?: { id: string; codigo?: string; descricao?: string } | null
   sugestao?: string
+  editar?: { id: string; descricao: string } | null
 }
 
 /** Data de referência do saldo: `?data=YYYY-MM-DD` ou hoje (data de login). */
@@ -86,6 +88,10 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     const { entidadeId, ano, nivel } = req.contexto
     const contas = await cfg.listarFlat(entidadeId, ano)
     const idsPais = new Set(contas.map((c) => c.parentId).filter(Boolean))
+    // Contas que já são "desdobramento-pai" podem receber mais filhos (várias).
+    const idsPaisDesdobramento = new Set(
+      contas.filter((c) => c.origem === 'DESDOBRAMENTO').map((c) => c.parentId).filter(Boolean),
+    )
 
     const dataRef = dataRefDe(req)
     const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
@@ -95,6 +101,11 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       return {
         ...c,
         temFilhos: idsPais.has(c.id),
+        // Redutora/retificadora do PCASP: marcada com "(-)" no título (subtrai do grupo).
+        redutora: c.descricao.trim().startsWith('(-)'),
+        // Desdobra analítica (1º filho) OU conta que já é desdobramento-pai (+ filhos).
+        podeDesdobrar: c.admiteMovimento || idsPaisDesdobramento.has(c.id),
+        podeEditar: c.origem === 'DESDOBRAMENTO',
         saldo: s
           ? {
               inicial: s.saldoInicial.toNumber(),
@@ -102,6 +113,9 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
               credito: s.totalCredito.toNumber(),
               atual: s.saldoAtual.toNumber(),
               natureza: s.natureza,
+              naturezaInformacao: s.naturezaInformacao,
+              superavit: s.superavitFinanceiro,
+              funcao: s.funcao,
             }
           : null,
       }
@@ -121,6 +135,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       dataRef: isoData(dataRef),
       desdobrar: opts.desdobrar ?? null,
       sugestao: opts.sugestao ?? '',
+      editar: opts.editar ?? null,
       erro: opts.erro ?? null,
       layout: null,
     })
@@ -132,18 +147,28 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     return conta && conta.entidadeId === entidadeId ? conta : null
   }
 
-  // ── Lista (+ form de desdobrar quando ?desdobrar=<id>) ──────────────────────
-  app.get<{ Querystring: { desdobrar?: string; data?: string } }>(cfg.rota, async (req, reply) => {
+  // ── Lista (+ form de desdobrar/editar via ?desdobrar / ?editar) ─────────────
+  app.get<{ Querystring: { desdobrar?: string; editar?: string; data?: string } }>(cfg.rota, async (req, reply) => {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
-    const alvo = req.query.desdobrar?.trim()
-    if (alvo) {
-      const conta = await buscarNoEscopo(alvo, req.contexto.entidadeId)
-      if (conta && conta.admiteMovimento) {
+
+    const alvoD = req.query.desdobrar?.trim()
+    if (alvoD) {
+      const conta = await buscarNoEscopo(alvoD, req.contexto.entidadeId)
+      if (conta) {
         const sugestao = await cfg.servico.sugerirCodigo(conta.id)
         return renderLista(req, reply, entidade, { desdobrar: { id: conta.id }, sugestao })
       }
     }
+
+    const alvoE = req.query.editar?.trim()
+    if (alvoE) {
+      const conta = await buscarNoEscopo(alvoE, req.contexto.entidadeId)
+      if (conta && conta.origem === 'DESDOBRAMENTO') {
+        return renderLista(req, reply, entidade, { editar: { id: conta.id, descricao: conta.descricao } })
+      }
+    }
+
     return renderLista(req, reply, entidade)
   })
 
@@ -178,6 +203,28 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       }
     },
   )
+
+  // ── Editar descrição (só desdobramento) ──────────────────────────────────────
+  app.post<{ Params: { id: string }; Body: Record<string, unknown> }>(`${cfg.rota}/:id/editar`, async (req, reply) => {
+    const { entidadeId, nivel } = req.contexto
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    if (!podeEscrever(nivel)) return renderLista(req, reply, entidade, { erro: ERRO_LEITURA, status: 403 })
+
+    const conta = await buscarNoEscopo(req.params.id, entidadeId)
+    if (!conta) return renderLista(req, reply, entidade, { erro: 'Conta não encontrada nesta entidade.', status: 404 })
+
+    const descricao = String((req.body ?? {})['descricao'] ?? '')
+    try {
+      await cfg.servico.editarDescricao(conta.id, descricao)
+      return reply.redirect(url)
+    } catch (e) {
+      if (e instanceof ErroNegocio) {
+        return renderLista(req, reply, entidade, { erro: e.message, status: statusDeErro(e.code), editar: { id: conta.id, descricao } })
+      }
+      throw e
+    }
+  })
 
   // ── Excluir desdobramento ────────────────────────────────────────────────────
   app.post<{ Params: { id: string } }>(`${cfg.rota}/:id/excluir`, async (req, reply) => {

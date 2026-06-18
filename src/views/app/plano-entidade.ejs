@@ -19,6 +19,8 @@
 
 <% const brl = (n) => (Number(n) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %>
 <% const nat = { DEVEDORA: 'Devedora', CREDORA: 'Credora', MISTA: 'Mista' } %>
+<% /* saldo vem com sinal (+ devedor, − credor): exibe módulo + lado D/C */ %>
+<% const sal = (n) => { const v = Number(n) || 0; return v === 0 ? brl(0) : brl(Math.abs(v)) + (v < 0 ? ' C' : ' D') } %>
 
 <div class="container py-4" style="max-width:<%= comSaldos ? 1280 : 1000 %>px">
   <nav aria-label="breadcrumb">
@@ -61,7 +63,7 @@
         <% if (pai) { %><span class="font-monospace text-muted">· <%= pai.codigo %></span> <%= pai.descricao %><% } %>
       </div>
       <div class="card-body">
-        <p class="small text-muted mb-3">Esta conta vira <strong>sintética</strong> e a nova filha nasce <strong>analítica</strong> (origem: desdobramento).</p>
+        <p class="small text-muted mb-3">A nova conta filha nasce <strong>analítica</strong> (origem: desdobramento). Você pode desdobrar a mesma conta em <strong>vários filhos</strong> — repita a ação.</p>
         <form method="post" action="<%= base %>/<%= desdobrar.id %>/desdobrar" class="row g-2 align-items-end">
           <div class="col-sm-4">
             <label class="form-label small mb-1">Código</label>
@@ -82,6 +84,28 @@
     </div>
   <% } %>
 
+  <% /* Form de edição de descrição — só para desdobramentos (contas não-padrão) */ %>
+  <% if (editar && podeEscrever) { %>
+    <% const alvoEd = contas.find(function(c){ return c.id === editar.id }) %>
+    <div class="card border-warning shadow-sm mb-3">
+      <div class="card-header bg-warning bg-opacity-10 py-2 small fw-semibold">
+        Editar descrição <% if (alvoEd) { %><span class="font-monospace text-muted">· <%= alvoEd.codigo %></span><% } %>
+      </div>
+      <div class="card-body">
+        <form method="post" action="<%= base %>/<%= editar.id %>/editar" class="row g-2 align-items-end">
+          <div class="col-sm-10">
+            <label class="form-label small mb-1">Descrição</label>
+            <input name="descricao" class="form-control form-control-sm" maxlength="200" required value="<%= editar.descricao %>">
+          </div>
+          <div class="col-sm-2 d-flex gap-1">
+            <button type="submit" class="btn btn-warning btn-sm flex-grow-1">Salvar</button>
+            <a href="<%= base %>" class="btn btn-outline-secondary btn-sm">Cancelar</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  <% } %>
+
   <div class="card border-0 shadow-sm"><div class="card-body p-0">
     <table id="tbl" class="table table-hover table-sm align-middle mb-0">
       <thead class="table-light"><tr>
@@ -94,7 +118,7 @@
           <th class="valor">Saldo atual</th>
         <% } %>
         <th class="col-detalhe" style="width:110px">Tipo</th>
-        <% if (podeEscrever) { %><th class="col-detalhe text-end pe-3" style="width:150px">Ações</th><% } %>
+        <% if (podeEscrever) { %><th class="col-detalhe text-end pe-3" style="width:180px">Ações</th><% } %>
       </tr></thead>
       <tbody>
         <% if (contas.length === 0) { %>
@@ -106,17 +130,21 @@
               <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
                 <span class="font-monospace small text-muted"><%= c.codigo %></span>
                 <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
+                <% if (c.redutora) { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-1" title="Conta redutora/retificadora (PCASP) — subtrai do saldo do grupo">redutora</span><% } %>
                 <% if (comSaldos && c.admiteMovimento) { %>
                   <a href="<%= base %>/<%= c.id %>/razao" class="ms-1 text-decoration-none small" title="Ver razão (movimentações)"><i class="bi bi-journal-text"></i></a>
                 <% } %>
               </span>
             </td>
             <% if (comSaldos) { %>
-              <td class="col-detalhe small text-muted"><%= c.saldo && c.saldo.natureza ? nat[c.saldo.natureza] : '—' %></td>
-              <td class="valor small"><%= brl(c.saldo && c.saldo.inicial) %></td>
+              <td class="col-detalhe small text-muted" title="<%= c.saldo ? [c.saldo.superavit ? 'Superávit: ' + c.saldo.superavit : '', c.saldo.funcao || ''].filter(Boolean).join(' — ') : '' %>">
+                <%= c.saldo && c.saldo.natureza ? nat[c.saldo.natureza] : '—' %>
+                <% if (c.saldo && c.saldo.naturezaInformacao) { %><span class="badge bg-light text-muted" style="font-size:.65rem"><%= ({PATRIMONIAL:'Patrim.',ORCAMENTARIA:'Orçam.',CONTROLE:'Controle'})[c.saldo.naturezaInformacao] || c.saldo.naturezaInformacao %></span><% } %>
+              </td>
+              <td class="valor small"><%= c.saldo ? sal(c.saldo.inicial) : '—' %></td>
               <td class="valor small"><%= brl(c.saldo && c.saldo.debito) %></td>
               <td class="valor small"><%= brl(c.saldo && c.saldo.credito) %></td>
-              <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'neg' : '' %>"><%= brl(c.saldo && c.saldo.atual) %></td>
+              <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'text-secondary' : '' %>"><%= c.saldo ? sal(c.saldo.atual) : '—' %></td>
             <% } %>
             <td class="col-detalhe">
               <% if (c.admiteMovimento) { %><span class="badge bg-primary bg-opacity-10 text-primary">Analítica</span>
@@ -124,8 +152,11 @@
             </td>
             <% if (podeEscrever) { %>
               <td class="col-detalhe text-end pe-3">
-                <% if (c.admiteMovimento) { %>
-                  <a href="<%= base %>?desdobrar=<%= c.id %>" class="btn btn-outline-primary btn-sm py-0 px-2" title="Desdobrar"><i class="bi bi-diagram-2"></i></a>
+                <% if (c.podeDesdobrar) { %>
+                  <a href="<%= base %>?desdobrar=<%= c.id %>" class="btn btn-outline-primary btn-sm py-0 px-2" title="Desdobrar (adicionar conta filha)"><i class="bi bi-diagram-2"></i></a>
+                <% } %>
+                <% if (c.podeEditar) { %>
+                  <a href="<%= base %>?editar=<%= c.id %>" class="btn btn-outline-warning btn-sm py-0 px-2" title="Editar descrição"><i class="bi bi-pencil"></i></a>
                 <% } %>
                 <% if (c.origem === 'DESDOBRAMENTO' && !c.temFilhos) { %>
                   <form method="post" action="<%= base %>/<%= c.id %>/excluir" class="d-inline" onsubmit="return confirm('Excluir este desdobramento?')">
