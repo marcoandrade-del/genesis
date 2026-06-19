@@ -1,6 +1,22 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma, type TipoMutacao } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import type { ItemDado } from './lancamentos.js'
+
+/**
+ * Escolhe o evento patrimonial da arrecadação a partir do indicador de mutação e
+ * da natureza da receita (todos têm a mesma estrutura: D Caixa / C contrapartida):
+ *  - EFETIVA                          → E300 (VPA classe 4)
+ *  - NÃO-EFETIVA, capital op. crédito → E400 (passivo classe 2)   [natureza 2.1.x]
+ *  - NÃO-EFETIVA, capital alienação   → E500 (baixa de ativo cl.1) [natureza 2.2.x]
+ *  - demais não-efetivas (ex.: amortização 2.3) → sem evento patrimonial (só E100/E200)
+ */
+function eventoPatrimonial(tipo: TipoMutacao, naturezaCodigo: string): { codigo: string; descricao: string } | null {
+  if (tipo === 'EFETIVA') return { codigo: '300', descricao: 'Variação patrimonial aumentativa (receita efetiva)' }
+  const [categoria, origem] = naturezaCodigo.split('.')
+  if (categoria === '2' && origem === '1') return { codigo: '400', descricao: 'Mutação por operação de crédito (passivo)' }
+  if (categoria === '2' && origem === '2') return { codigo: '500', descricao: 'Mutação por alienação de bens (baixa de ativo)' }
+  return null
+}
 
 /**
  * Motor de Eventos da Receita — a "Tabela de Integração" que transforma a
@@ -75,7 +91,7 @@ export class MotorEventosReceita {
     const db = tx ?? this.prisma
     const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
     const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
-    const efetiva = parametro?.tipoMutacao === 'EFETIVA'
+    const patrimonial = parametro ? eventoPatrimonial(parametro.tipoMutacao, ctx.naturezaCodigo) : null
 
     const ddrControle = ctx.fonteVinculada
       ? CONTAS_EVENTO.ddrControleVinculado
@@ -88,7 +104,7 @@ export class MotorEventosReceita {
       ddrControle,
       CONTAS_EVENTO.ddrDisponibilidade,
     ]
-    if (efetiva) codigos.push(caixa, parametro!.contaVpaCodigo)
+    if (patrimonial) codigos.push(caixa, parametro!.contaContrapartidaCodigo)
 
     const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, codigos, db)
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
@@ -141,14 +157,15 @@ export class MotorEventosReceita {
       ),
     ]
 
-    // E300 — Patrimonial (só receita EFETIVA): D Caixa / C VPA
-    if (efetiva) {
+    // Evento patrimonial (E300/E400/E500): D Caixa / C contrapartida (VPA, passivo
+    // ou baixa de ativo, conforme a natureza). Mesma estrutura, conta e código variam.
+    if (patrimonial) {
       eventos.push(
         par(
-          '300',
-          'Variação patrimonial aumentativa (receita efetiva)',
+          patrimonial.codigo,
+          patrimonial.descricao,
           { codigo: caixa, cc: { fonte: ctx.fonteCodigo } },
-          { codigo: parametro!.contaVpaCodigo, cc: { natureza: ctx.naturezaCodigo } },
+          { codigo: parametro!.contaContrapartidaCodigo, cc: { natureza: ctx.naturezaCodigo } },
         ),
       )
     }

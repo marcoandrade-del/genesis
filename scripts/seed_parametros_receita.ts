@@ -20,19 +20,25 @@ import { PrismaClient, type TipoMutacao } from '@prisma/client'
 const APLICAR = process.argv.includes('--apply')
 const MODELOS = ['PARANÁ', 'PCASP STN']
 
-// De/para NR → VPA (classe 4). Naturezas não tributárias EFETIVAS presentes na
-// LOA de Maringá (exceto aluguel, canônico). Configurado em nível de espécie/
-// desdobramento; as folhas abaixo herdam por prefixo.
-const PARAMETROS: Array<{ natureza: string; tipoMutacao: TipoMutacao; vpa: string; nome: string }> = [
-  { natureza: '1.3.1.1.01', tipoMutacao: 'EFETIVA', vpa: '4.3.3.1.1.02.00.00.00.00.00.00', nome: 'Aluguéis e arrendamentos (patrimônio imobiliário)' },
-  { natureza: '1.3.2.1', tipoMutacao: 'EFETIVA', vpa: '4.4.5.2.1.00.00.00.00.00.00.00', nome: 'Rendimentos de aplicação financeira' },
-  { natureza: '1.7.1.1.51', tipoMutacao: 'EFETIVA', vpa: '4.5.2.1.3.02.00.00.00.00.00.00', nome: 'Cota-Parte do FPM (transferência intergovernamental)' },
+// De/para NR → conta de contrapartida patrimonial. Configurado em nível de
+// espécie/desdobramento; as folhas abaixo herdam por prefixo. EFETIVA credita VPA
+// (classe 4); NÃO-EFETIVA credita passivo (op. crédito) ou baixa de ativo (alienação).
+const PARAMETROS: Array<{ natureza: string; tipoMutacao: TipoMutacao; contrapartida: string; nome: string }> = [
+  // Efetivas (E300 — VPA)
+  { natureza: '1.3.1.1.01', tipoMutacao: 'EFETIVA', contrapartida: '4.3.3.1.1.02.00.00.00.00.00.00', nome: 'Aluguéis e arrendamentos → VPA exploração imobiliária' },
+  { natureza: '1.3.2.1', tipoMutacao: 'EFETIVA', contrapartida: '4.4.5.2.1.00.00.00.00.00.00.00', nome: 'Rendimentos de aplicação → VPA financeira' },
+  { natureza: '1.7.1.1.51', tipoMutacao: 'EFETIVA', contrapartida: '4.5.2.1.3.02.00.00.00.00.00.00', nome: 'Cota-Parte do FPM → VPA transferência' },
+  // Não-efetivas (E400/E500 — passivo / baixa de ativo)
+  { natureza: '2.1', tipoMutacao: 'NAO_EFETIVA', contrapartida: '2.2.2.1.1.02.98.00.00.00.00.00', nome: 'Operação de crédito (capital) → passivo empréstimo interno LP' },
+  { natureza: '2.2', tipoMutacao: 'NAO_EFETIVA', contrapartida: '1.2.3.1.1.01.01.00.00.00.00.00', nome: 'Alienação de bens (capital) → baixa de imobilizado' },
 ]
 
 const EVENTOS: Array<{ codigo: string; descricao: string }> = [
   { codigo: '100', descricao: 'Arrecadação orçamentária — D 6.2.1.2 Receita Realizada / C 6.2.1.1 Receita a Realizar (cc: natureza)' },
   { codigo: '200', descricao: 'Disponibilidade por Destinação (DDR) — D 7.2.1.1.x Controle / C 8.2.1.1.1.01 (cc: fonte)' },
   { codigo: '300', descricao: 'Variação Patrimonial Aumentativa (receita efetiva) — D 1.1.1.1.1.x Caixa / C VPA classe 4 (de/para NR→VPA)' },
+  { codigo: '400', descricao: 'Mutação por operação de crédito (receita não-efetiva, capital 2.1) — D 1.1.1.1.1.x Caixa / C passivo classe 2' },
+  { codigo: '500', descricao: 'Mutação por alienação de bens (receita não-efetiva, capital 2.2) — D 1.1.1.1.1.x Caixa / C baixa de ativo classe 1' },
 ]
 
 async function main() {
@@ -52,11 +58,11 @@ async function main() {
       if (APLICAR) {
         await prisma.parametroReceita.upsert({
           where: { modeloContabilId_naturezaCodigo: { modeloContabilId: modelo.id, naturezaCodigo: p.natureza } },
-          create: { modeloContabilId: modelo.id, naturezaCodigo: p.natureza, tipoMutacao: p.tipoMutacao, contaVpaCodigo: p.vpa },
-          update: { tipoMutacao: p.tipoMutacao, contaVpaCodigo: p.vpa },
+          create: { modeloContabilId: modelo.id, naturezaCodigo: p.natureza, tipoMutacao: p.tipoMutacao, contaContrapartidaCodigo: p.contrapartida },
+          update: { tipoMutacao: p.tipoMutacao, contaContrapartidaCodigo: p.contrapartida },
         })
       }
-      console.log(`  param  ${p.natureza.padEnd(12)} ${p.tipoMutacao}  → VPA ${p.vpa}  (${p.nome})`)
+      console.log(`  param  ${p.natureza.padEnd(12)} ${p.tipoMutacao.padEnd(11)} → ${p.contrapartida}  (${p.nome})`)
     }
 
     for (const e of EVENTOS) {
