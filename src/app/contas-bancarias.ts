@@ -34,7 +34,11 @@ export async function appContasBancariasRoutes(app: FastifyInstance) {
     opts: { erro?: string; status?: number; valores?: Record<string, unknown>; editando?: string } = {},
   ) {
     const { entidadeId, ano, nivel } = req.contexto
-    const [contas, fontes] = await Promise.all([svc.listar(entidadeId, ano), svc.listarFontes(entidadeId, ano)])
+    const [contas, fontes, disponibilidades] = await Promise.all([
+      svc.listar(entidadeId, ano),
+      svc.listarFontes(entidadeId, ano),
+      svc.disponibilidadesContabeis(entidadeId, ano),
+    ])
     if (opts.status) reply.code(opts.status)
     return reply.view('app/contas-bancarias', {
       entidade,
@@ -42,6 +46,7 @@ export async function appContasBancariasRoutes(app: FastifyInstance) {
       nivel,
       contas,
       fontes,
+      disponibilidades,
       valores: opts.valores ?? {},
       editando: opts.editando ?? null,
       podeEscrever: podeEscrever(nivel),
@@ -60,6 +65,7 @@ export async function appContasBancariasRoutes(app: FastifyInstance) {
       numero: String(body['numero'] ?? ''),
       numeroDv: String(body['numeroDv'] ?? ''),
       descricao: String(body['descricao'] ?? ''),
+      contaContabilCodigo: String(body['contaContabilCodigo'] ?? ''),
     }
   }
 

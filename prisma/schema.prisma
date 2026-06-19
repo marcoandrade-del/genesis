@@ -711,22 +711,26 @@ model Entidade {
 // exercício sem revinculação. Regra: pagamentos de uma fonte só podem sair
 // pelas contas bancárias daquela fonte (validado na emissão da OP).
 model ContaBancaria {
-  id          String   @id @default(uuid())
-  entidadeId  String
-  fonteCodigo String
-  bancoCodigo String // código Febraban/COMPE, 3 dígitos (ex.: 001, 104, 341)
-  bancoNome   String?
-  agencia     String
-  agenciaDv   String?
-  numero      String
-  numeroDv    String?
-  descricao   String?
-  ativa       Boolean  @default(true)
-  criadoEm    DateTime @default(now())
-  atualizadoEm DateTime @updatedAt
-  entidade    Entidade @relation(fields: [entidadeId], references: [id])
+  id                  String   @id @default(uuid())
+  entidadeId          String
+  fonteCodigo         String
+  bancoCodigo         String // código Febraban/COMPE, 3 dígitos (ex.: 001, 104, 341)
+  bancoNome           String?
+  agencia             String
+  agenciaDv           String?
+  numero              String
+  numeroDv            String?
+  descricao           String?
+  // Folha contábil de disponibilidade (classe 1.1.1.x) desta conta — debitada no
+  // E300 da arrecadação. Opcional: sem ela, a arrecadação cai no caixa default.
+  contaContabilCodigo String?
+  ativa               Boolean  @default(true)
+  criadoEm            DateTime @default(now())
+  atualizadoEm        DateTime @updatedAt
+  entidade            Entidade @relation(fields: [entidadeId], references: [id])
 
   ordensPagamento OrdemPagamento[]
+  arrecadacoes    Arrecadacao[]
 
   @@unique([entidadeId, bancoCodigo, agencia, numero])
   @@index([entidadeId, fonteCodigo])
@@ -1063,14 +1067,16 @@ model PrevisaoReceita {
 /// previsão (conta analítica × fonte) do orçamento APROVADO. ESTORNO reverte
 /// arrecadação já registrada. Imutável após criado — correção é por estorno.
 model Arrecadacao {
-  id         String          @id @default(uuid())
-  previsaoId String
-  tipo       ArrecadacaoTipo
-  data       DateTime        @db.Date
-  valor      Decimal         @db.Decimal(18, 2)
-  historico  String?
-  criadoEm   DateTime        @default(now())
-  previsao   PrevisaoReceita @relation(fields: [previsaoId], references: [id])
+  id              String          @id @default(uuid())
+  previsaoId      String
+  tipo            ArrecadacaoTipo
+  data            DateTime        @db.Date
+  valor           Decimal         @db.Decimal(18, 2)
+  historico       String?
+  contaBancariaId String? // conta bancária por onde a receita entrou (deriva a folha de caixa do E300)
+  criadoEm        DateTime        @default(now())
+  previsao        PrevisaoReceita @relation(fields: [previsaoId], references: [id])
+  contaBancaria   ContaBancaria?  @relation(fields: [contaBancariaId], references: [id])
 
   @@index([previsaoId])
   @@map("arrecadacoes")

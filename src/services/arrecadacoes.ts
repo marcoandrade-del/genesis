@@ -10,6 +10,7 @@ export interface DadosArrecadacao {
   valor: string
   historico?: string
   criadoPorId: string // autor (para os lançamentos contábeis gerados)
+  contaBancariaId?: string // conta por onde a receita entra (deriva a folha de caixa do E300)
 }
 
 export interface LinhaArrecadacao {
@@ -95,6 +96,26 @@ export class ArrecadacoesService {
     const ano = Number(dados.data.slice(0, 4))
     const histBase = dados.historico?.trim() || (dados.tipo === 'ESTORNO' ? 'Estorno de arrecadação' : 'Arrecadação da receita')
 
+    // Conta bancária (opcional): a receita entra por ela e dela vem a folha de
+    // caixa do E300. A conta tem de ser da MESMA fonte da previsão.
+    let contaBancariaId: string | null = null
+    let caixaCodigo: string | null = null
+    if (dados.contaBancariaId?.trim()) {
+      const cb = await this.prisma.contaBancaria.findUnique({ where: { id: dados.contaBancariaId.trim() } })
+      if (!cb || cb.entidadeId !== orcamento.entidadeId) {
+        throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária não encontrada nesta entidade.')
+      }
+      if (!cb.ativa) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A conta bancária selecionada está inativa.')
+      if (cb.fonteCodigo !== previsao.fonteRecurso.codigo) {
+        throw new ErroNegocio(
+          'ENTIDADE_NAO_PROCESSAVEL',
+          `A conta bancária é da fonte ${cb.fonteCodigo}, mas a previsão é da fonte ${previsao.fonteRecurso.codigo}.`,
+        )
+      }
+      contaBancariaId = cb.id
+      caixaCodigo = cb.contaContabilCodigo // pode ser null → motor usa o caixa default
+    }
+
     return this.prisma.$transaction(async (tx) => {
       const mov = await tx.arrecadacao.create({
         data: {
@@ -103,6 +124,7 @@ export class ArrecadacoesService {
           data: new Date(dados.data),
           valor,
           historico: dados.historico?.trim() || null,
+          contaBancariaId,
         },
       })
       await tx.previsaoReceita.update({
@@ -121,6 +143,7 @@ export class ArrecadacoesService {
           fonteCodigo: previsao.fonteRecurso.codigo,
           fonteVinculada: previsao.fonteRecurso.vinculada,
           valor,
+          caixaCodigo,
         },
         { estorno: dados.tipo === 'ESTORNO' },
         tx,

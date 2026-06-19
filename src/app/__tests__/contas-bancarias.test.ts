@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 const m = vi.hoisted(() => ({
   listar: vi.fn(),
   listarFontes: vi.fn(),
+  disponibilidades: vi.fn(),
   criar: vi.fn(),
   atualizar: vi.fn(),
   alternarAtiva: vi.fn(),
@@ -13,6 +14,7 @@ vi.mock('../../services/contas-bancarias.js', () => ({
   ContasBancariasService: class {
     listar = m.listar
     listarFontes = m.listarFontes
+    disponibilidadesContabeis = m.disponibilidades
     criar = m.criar
     atualizar = m.atualizar
     alternarAtiva = m.alternarAtiva
@@ -33,7 +35,7 @@ const CONTA = {
   descricao: 'Movimento', ativa: true, rotulo: '104 ag. 0394 c/c 123456-7 — Movimento',
 }
 const FONTES = [{ codigo: '500', nomenclatura: 'Recursos Livres' }]
-const DADOS = { fonteCodigo: '500', bancoCodigo: '104', bancoNome: 'Caixa', agencia: '0394', agenciaDv: '', numero: '123456', numeroDv: '7', descricao: 'Movimento' }
+const DADOS = { fonteCodigo: '500', bancoCodigo: '104', bancoNome: 'Caixa', agencia: '0394', agenciaDv: '', numero: '123456', numeroDv: '7', descricao: 'Movimento', contaContabilCodigo: '' }
 
 const form = (o: Record<string, string>) =>
   Object.entries(o).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&')
@@ -56,6 +58,7 @@ describe('appContasBancariasRoutes', () => {
     Object.values(m).forEach((fn) => fn.mockReset())
     m.listar.mockResolvedValue([CONTA])
     m.listarFontes.mockResolvedValue(FONTES)
+    m.disponibilidades.mockResolvedValue([])
     ;({ app, prisma } = await montar())
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
   })
@@ -162,7 +165,7 @@ describe('appContasBancariasRoutes', () => {
     const res = await app.inject({ method: 'POST', url: '/contas-bancarias', payload: '', headers: { 'content-type': 'application/x-www-form-urlencoded' } })
     expect(res.statusCode).toBe(302)
     expect(m.criar).toHaveBeenCalledWith('ent1', 2026, {
-      fonteCodigo: '', bancoCodigo: '', bancoNome: '', agencia: '', agenciaDv: '', numero: '', numeroDv: '', descricao: '',
+      fonteCodigo: '', bancoCodigo: '', bancoNome: '', agencia: '', agenciaDv: '', numero: '', numeroDv: '', descricao: '', contaContabilCodigo: '',
     })
   })
 

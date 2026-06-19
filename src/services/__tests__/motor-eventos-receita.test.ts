@@ -156,6 +156,20 @@ describe('MotorEventosReceita', () => {
     expect(eventos.some((e) => e.eventoCodigo === '300')).toBe(true)
   })
 
+  it('caixaCodigo (conta bancária) sobrepõe o caixa default no E300', async () => {
+    const OVERRIDE = '1.1.1.1.1.99.00.00.00.00.00.00'
+    comFolhas(mock, [...TODAS_FOLHAS, OVERRIDE])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+    ])
+    const eventos = await motor(mock).resolver({ ...baseCtx, caixaCodigo: OVERRIDE })
+    const e300 = eventos.find((e) => e.eventoCodigo === '300')!
+    const deb = e300.itens.find((i) => i.tipo === 'DEBITO')!
+    expect(deb.contaId).toBe(`id:${OVERRIDE}`)
+    // caixa default NÃO foi usado
+    expect(deb.contaId).not.toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+  })
+
   it('falha clara quando uma folha fixa não existe no plano da entidade', async () => {
     // remove a Receita a Realizar das folhas disponíveis
     comFolhas(
