@@ -189,4 +189,44 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('redutora')
     expect(res.body).toContain('Patrim.') // naturezaInformacao abreviada
   })
+
+  it('distribuir: GET de uma conta analítica do escopo renderiza o fluxo', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'ESCRITA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1', codigo: '1.1.1', descricao: 'Caixa', entidadeId: 'ent1', admiteMovimento: true })
+    prisma.saldoInicialAno.findUnique.mockResolvedValue({ valor: new Prisma.Decimal(500) })
+    prisma.lancamentoItem.findMany.mockResolvedValue([
+      { id: 'it1', tipo: 'DEBITO', valor: new Prisma.Decimal(1000), lancamento: { data: new Date(Date.UTC(2026, 2, 10)), historico: 'Receb.' } },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/contas/c1/distribuir' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Desdobrar com distribuição')
+    expect(res.body).toContain('Caixa')
+    expect(res.body).toContain('Receb.')
+  })
+
+  it('distribuir: conta de outra entidade → redireciona', async () => {
+    ;({ app, prisma } = await montar({ entidadeId: 'ent1', ano: 2026, nivel: 'ESCRITA' }))
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'cX', codigo: '9', descricao: 'X', entidadeId: 'OUTRA', admiteMovimento: true })
+    const res = await app.inject({ method: 'GET', url: '/contas/cX/distribuir' })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/contas')
+  })
+
+  it('distribuir: LEITURA não acessa o GET (redireciona)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE) // contexto padrão é LEITURA
+    const res = await app.inject({ method: 'GET', url: '/contas/c1/distribuir' })
+    expect(res.statusCode).toBe(302)
+    expect(res.headers.location).toBe('/app/contas')
+  })
+
+  it('distribuir: POST com LEITURA → 403', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1', codigo: '1.1.1', descricao: 'Caixa', entidadeId: 'ent1', admiteMovimento: true })
+    prisma.saldoInicialAno.findUnique.mockResolvedValue(null)
+    prisma.lancamentoItem.findMany.mockResolvedValue([])
+    const res = await app.inject({ method: 'POST', url: '/contas/c1/distribuir', payload: { filhos: '[]', distribuicao: '{}' } })
+    expect(res.statusCode).toBe(403)
+  })
 })
