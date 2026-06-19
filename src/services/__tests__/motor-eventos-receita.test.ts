@@ -203,6 +203,52 @@ describe('MotorEventosReceita', () => {
     expect(deb.contaId).not.toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
   })
 
+  it('arrecadação tributária (COMPETENCIA) gera E560 baixando o ativo, sem VPA nova', async () => {
+    const ATIVO = '1.1.2.1.1.01.05.00.00.00.00.00'
+    comFolhas(mock, [...TODAS_FOLHAS, ATIVO])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: '4.1.1.x', contaAtivoCodigo: ATIVO },
+    ])
+    const eventos = await motor(mock).resolver({ ...baseCtx, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00' })
+    expect(eventos.map((e) => e.eventoCodigo)).toEqual(['100', '200', '560'])
+    const e560 = eventos.find((e) => e.eventoCodigo === '560')!
+    expect(e560.itens.find((i) => i.tipo === 'DEBITO')!.contaId).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+    expect(e560.itens.find((i) => i.tipo === 'CREDITO')!.contaId).toBe(`id:${ATIVO}`) // baixa do crédito a receber
+  })
+
+  it('resolverLancamentoTributario gera E550: D ativo / C VPA', async () => {
+    const ATIVO = '1.1.2.1.1.01.05.00.00.00.00.00'
+    const VPA = '4.1.1.2.50.00.00.00.00.00.00.00'
+    comFolhas(mock, [ATIVO, VPA])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: VPA, contaAtivoCodigo: ATIVO },
+    ])
+    const eventos = await motor(mock).resolverLancamentoTributario({ entidadeId: ENT, ano: ANO, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00', valor: '500' })
+    expect(eventos).toHaveLength(1)
+    expect(eventos[0].eventoCodigo).toBe('550')
+    expect(eventos[0].itens.find((i) => i.tipo === 'DEBITO')!.contaId).toBe(`id:${ATIVO}`)
+    expect(eventos[0].itens.find((i) => i.tipo === 'CREDITO')!.contaId).toBe(`id:${VPA}`)
+  })
+
+  it('lançamento tributário no estorno inverte (C ativo / D VPA)', async () => {
+    const ATIVO = '1.1.2.1.1.01.05.00.00.00.00.00'
+    const VPA = '4.1.1.2.50.00.00.00.00.00.00.00'
+    comFolhas(mock, [ATIVO, VPA])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: VPA, contaAtivoCodigo: ATIVO },
+    ])
+    const [e550] = await motor(mock).resolverLancamentoTributario({ entidadeId: ENT, ano: ANO, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00', valor: '500' }, { estorno: true })
+    expect(e550.itens.find((i) => i.contaId === `id:${ATIVO}`)!.tipo).toBe('CREDITO')
+  })
+
+  it('lançamento tributário falha se a natureza não for competência configurada', async () => {
+    comFolhas(mock)
+    mock.parametroReceita.findMany.mockResolvedValue([])
+    await expect(
+      motor(mock).resolverLancamentoTributario({ entidadeId: ENT, ano: ANO, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00', valor: '1' }),
+    ).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+  })
+
   it('falha clara quando uma folha fixa não existe no plano da entidade', async () => {
     // remove a Receita a Realizar das folhas disponíveis
     comFolhas(
