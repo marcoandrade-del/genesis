@@ -3,793 +3,460 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gênesis — Mockup</title>
+<title>Gênesis — Mockup (Wise)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+  /* ── Tokens Wise (1:1 com DESIGN.md / _theme.ejs) ──────────────────────── */
   :root {
-    --bg-deep:      #08090a;
-    --bg-panel:     #0f1011;
-    --bg-surface:   #191a1b;
-    --bg-elevated:  #28282c;
-    --text-primary: #f7f8f8;
-    --text-secondary: #d0d6e0;
-    --text-muted:   #8a8f98;
-    --text-subtle:  #62666d;
-    --accent:       #7170ff;
-    --accent-bg:    #5e6ad2;
-    --accent-hover: #828fff;
-    --border:       rgba(255,255,255,0.08);
-    --border-subtle: rgba(255,255,255,0.05);
-    --green:        #27a644;
+    --primary: #9fe870; --primary-active: #cdffad;
+    --primary-neutral: #c5edab; --primary-pale: #e2f6d5;
+    --canvas: #ffffff; --canvas-soft: #e8ebe6;
+    --ink: #0e0f0c; --ink-deep: #163300; --body: #454745; --mute: #868685;
+    --positive: #2ead4b; --positive-deep: #054d28;
+    --warning: #ffd11a; --warning-content: #4a3b1c;
+    --negative: #d03238; --negative-darkest: #a7000d; --negative-bg: #320707;
+    --border: rgba(14,15,12,.08);
     --font: 'Inter', -apple-system, system-ui, sans-serif;
+    --display: 'Manrope', 'Inter', sans-serif;
   }
 
   body {
-    font-family: var(--font);
-    font-feature-settings: "cv01","ss03";
-    background: var(--bg-deep);
-    color: var(--text-primary);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    font-family: var(--font); font-feature-settings: "calt";
+    background: var(--canvas-soft); color: var(--ink);
+    -webkit-font-smoothing: antialiased; min-height: 100vh;
+    display: flex; flex-direction: column;
   }
 
-  /* ── TOPBAR ── */
-  .topbar {
-    height: 48px;
-    background: var(--bg-panel);
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    gap: 12px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
+  /* ── COMMAND BAR (espelha src/views/app/_navbar.ejs) ───────────────────── */
+  .gx-topbar {
+    position: sticky; top: 0; z-index: 100;
+    display: flex; align-items: center; gap: 1rem;
+    height: 64px; padding: 0 1.25rem;
+    background:
+      radial-gradient(120% 180% at 0% 0%, rgba(159,232,112,.10), transparent 45%),
+      linear-gradient(180deg, #14160f 0%, var(--ink) 100%);
+    border-bottom: 1px solid rgba(159,232,112,.18);
+    box-shadow: 0 1px 0 rgba(159,232,112,.35), 0 8px 24px rgba(0,0,0,.28);
   }
-  .topbar-logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 590;
-    letter-spacing: -0.182px;
-    color: var(--text-primary);
-    text-decoration: none;
+  .gx-brand {
+    display: inline-flex; align-items: center; gap: .55rem;
+    padding: .35rem .7rem; border-radius: 14px;
+    color: var(--canvas-soft); text-decoration: none;
+    font-family: var(--display); font-weight: 800; letter-spacing: -.01em;
+    border: 1px solid rgba(255,255,255,.08); flex-shrink: 0;
+    transition: border-color .15s, background .15s;
   }
-  .logo-mark {
-    width: 22px;
-    height: 22px;
-    background: linear-gradient(135deg, var(--accent-bg), var(--accent));
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 590;
-    color: #fff;
-  }
-  .topbar-divider { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
-  .topbar-breadcrumb {
-    font-size: 13px;
-    font-weight: 510;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .topbar-breadcrumb span { color: var(--text-secondary); }
-  .topbar-spacer { flex: 1; }
-  .topbar-cmd {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 4px 10px;
-    font-size: 12px;
-    color: var(--text-muted);
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .topbar-cmd:hover { background: rgba(255,255,255,0.07); }
-  .kbd {
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 1px 5px;
-    font-size: 11px;
-    font-weight: 510;
-    color: var(--text-subtle);
-  }
-  .avatar {
-    width: 28px; height: 28px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #5e6ad2, #7170ff);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 11px; font-weight: 590; color: #fff;
-    cursor: pointer;
-  }
+  .gx-brand:hover { border-color: rgba(159,232,112,.4); background: rgba(255,255,255,.03); }
+  .gx-brand .bi { color: var(--primary); font-size: 1.15rem; }
+  .gx-brand small { display:block; font-size:.6rem; font-weight:600; letter-spacing:.16em;
+    text-transform:uppercase; color: rgba(232,235,230,.45); line-height:1; margin-top:2px; }
 
-  /* ── LAYOUT ── */
-  .layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 48px); }
+  .gx-nav { display: flex; align-items: center; gap: .25rem; min-width: 0;
+    overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; }
+  .gx-nav::-webkit-scrollbar { display: none; }
+  .gx-pill {
+    position: relative; display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap;
+    padding: .5rem .85rem; border-radius: 9999px; border: 0; background: transparent;
+    color: rgba(232,235,230,.78); text-decoration: none; cursor: pointer;
+    font-size: .875rem; font-weight: 600; font-family: var(--font);
+    transition: background .15s, color .15s;
+  }
+  .gx-pill .bi { font-size: 1rem; opacity: .85; }
+  .gx-pill:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .gx-pill.is-active { color: var(--ink); background: var(--primary); }
+  .gx-pill .gx-caret { font-size: .7rem; opacity: .55; margin-left: -.15rem; }
 
-  /* ── SIDEBAR ── */
-  .sidebar {
-    width: 220px;
-    background: var(--bg-panel);
-    border-right: 1px solid var(--border-subtle);
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
-    flex-shrink: 0;
+  /* Mega-painel demonstrativo (aberto) */
+  .gx-mega {
+    position: absolute; top: 100%; left: 0; margin-top: .6rem;
+    border-radius: 24px; padding: .85rem; background: var(--canvas);
+    box-shadow: 0 18px 48px rgba(14,15,12,.28); min-width: 340px; z-index: 50;
+    display: none;
   }
-  .sidebar-section { padding: 16px 8px 8px; }
-  .sidebar-label {
-    font-size: 11px;
-    font-weight: 510;
-    color: var(--text-subtle);
-    letter-spacing: 0.4px;
-    text-transform: uppercase;
-    padding: 0 8px;
-    margin-bottom: 4px;
-  }
-  .sidebar-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 400;
-    color: var(--text-secondary);
-    cursor: pointer;
-    transition: background 0.12s, color 0.12s;
-    text-decoration: none;
-    position: relative;
-  }
-  .sidebar-item:hover { background: rgba(255,255,255,0.04); color: var(--text-primary); }
-  .sidebar-item.active {
-    background: rgba(113,112,255,0.12);
-    color: var(--text-primary);
-  }
-  .sidebar-item.active .sidebar-icon { color: var(--accent); }
-  .sidebar-icon { font-size: 14px; width: 16px; text-align: center; color: var(--text-muted); }
-  .sidebar-count {
-    margin-left: auto;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--border-subtle);
-    border-radius: 10px;
-    padding: 1px 7px;
-    font-size: 11px;
-    font-weight: 510;
-    color: var(--text-subtle);
-  }
-  .sidebar-sub { padding-left: 24px; }
-  .sidebar-sub .sidebar-item { font-size: 12px; padding: 5px 8px; }
-  .sidebar-divider { height: 1px; background: var(--border-subtle); margin: 8px 8px; }
+  .gx-dd { position: relative; }
+  .gx-dd.open .gx-mega { display: block; }
+  .gx-dd.open > .gx-pill { background: rgba(255,255,255,.09); color: #fff; }
+  .gx-mega-head { font-size: .68rem; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--mute); padding: .15rem .5rem .55rem; }
+  .gx-tile { display: flex; align-items: flex-start; gap: .7rem; text-decoration: none;
+    padding: .55rem .6rem; border-radius: 14px; color: var(--ink); transition: background .12s; }
+  .gx-tile:hover { background: var(--canvas-soft); }
+  .gx-tile .gx-ico { flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px;
+    display: grid; place-items: center; font-size: 1.05rem;
+    background: var(--primary-pale); color: var(--ink-deep); }
+  .gx-tile:hover .gx-ico { background: var(--primary); }
+  .gx-tile.gx-overview .gx-ico { background: var(--ink); color: var(--primary); }
+  .gx-tile-title { font-weight: 600; font-size: .9rem; line-height: 1.2; }
+  .gx-tile-desc { font-size: .76rem; color: var(--mute); line-height: 1.25; }
 
-  /* ── MAIN ── */
-  .main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+  .gx-right { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
+  .gx-search { display: inline-flex; align-items: center; gap: .5rem;
+    padding: .45rem .7rem; border-radius: 9999px; cursor: pointer;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: rgba(232,235,230,.7); font-size: .82rem; font-family: var(--font);
+    transition: border-color .15s, background .15s; }
+  .gx-search:hover { border-color: rgba(159,232,112,.45); background: rgba(255,255,255,.09); }
+  .gx-search kbd { font-family: var(--font); font-size: .7rem; font-weight: 600;
+    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 6px; padding: .05rem .35rem; color: rgba(232,235,230,.8); }
 
-  /* ── PAGE HEADER ── */
-  .page-header {
-    padding: 28px 32px 20px;
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex;
-    align-items: flex-end;
-    gap: 16px;
-  }
-  .page-title {
-    font-size: 20px;
-    font-weight: 590;
-    letter-spacing: -0.24px;
-    color: var(--text-primary);
-    line-height: 1.2;
-  }
-  .page-subtitle {
-    font-size: 13px;
-    color: var(--text-muted);
-    margin-top: 3px;
-    font-weight: 400;
-  }
-  .page-actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .gx-workspace { display: inline-flex; align-items: center; gap: .6rem;
+    padding: .35rem .35rem .35rem .8rem; border-radius: 9999px; text-decoration: none;
+    background: rgba(159,232,112,.08); border: 1px solid rgba(159,232,112,.28);
+    transition: border-color .15s, background .15s; }
+  .gx-workspace:hover { border-color: var(--primary); background: rgba(159,232,112,.14); }
+  .gx-ws-meta { display: flex; flex-direction: column; line-height: 1.05; }
+  .gx-ws-top { font-size: .65rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(232,235,230,.5); }
+  .gx-ws-name { font-size: .82rem; font-weight: 700; color: #fff; }
+  .gx-ws-year { display: inline-grid; place-items: center; font-family: ui-monospace, Menlo, monospace;
+    font-weight: 700; font-size: .78rem; color: var(--ink); background: var(--primary);
+    padding: .2rem .5rem; border-radius: 9999px; }
+  .gx-ws-swap { color: rgba(232,235,230,.6); font-size: .9rem; padding-right: .25rem; }
+  .gx-icon-btn { width: 40px; height: 40px; border-radius: 9999px; border: 0;
+    display: grid; place-items: center; cursor: pointer; text-decoration: none;
+    background: rgba(255,255,255,.06); color: rgba(232,235,230,.78); transition: background .15s, color .15s; }
+  .gx-icon-btn:hover { background: rgba(208,50,56,.18); color: #ffb4b7; }
 
-  /* ── BUTTONS ── */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 510;
-    font-family: var(--font);
-    font-feature-settings: "cv01","ss03";
-    cursor: pointer;
-    border: none;
-    transition: background 0.15s, color 0.15s;
-    letter-spacing: -0.13px;
-  }
-  .btn-ghost {
-    background: rgba(255,255,255,0.02);
-    color: #e2e4e7;
-    border: 1px solid rgb(36,40,44);
-  }
-  .btn-ghost:hover { background: rgba(255,255,255,0.06); }
-  .btn-primary {
-    background: var(--accent-bg);
-    color: #fff;
-    border: 1px solid transparent;
-  }
-  .btn-primary:hover { background: var(--accent-hover); }
-  .btn-danger {
-    background: rgba(239,68,68,0.1);
-    color: #f87171;
-    border: 1px solid rgba(239,68,68,0.2);
-  }
-  .btn-danger:hover { background: rgba(239,68,68,0.18); }
-  .btn-sm { padding: 4px 8px; font-size: 12px; }
-  .btn-icon { padding: 6px; }
+  /* ── CONTAINER ─────────────────────────────────────────────────────────── */
+  .wrap { width: 100%; max-width: 1200px; margin: 0 auto; padding: 28px 24px 48px; flex: 1; }
 
-  /* ── TOOLBAR ── */
-  .toolbar {
-    padding: 12px 32px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .search-box {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 6px 12px;
-    width: 240px;
-    transition: border 0.15s;
-  }
-  .search-box:focus-within { border-color: rgba(255,255,255,0.15); }
-  .search-box input {
-    background: transparent;
-    border: none;
-    outline: none;
-    font-family: var(--font);
-    font-feature-settings: "cv01","ss03";
-    font-size: 13px;
-    color: var(--text-primary);
-    width: 100%;
-  }
-  .search-box input::placeholder { color: var(--text-muted); }
-  .search-icon { color: var(--text-subtle); font-size: 13px; }
-  .filter-pill {
-    display: flex; align-items: center; gap: 5px;
-    background: transparent;
-    border: 1px solid rgb(35,37,42);
-    border-radius: 9999px;
-    padding: 4px 10px 4px 8px;
-    font-size: 12px; font-weight: 510;
-    color: var(--text-secondary);
-    cursor: pointer;
-    font-family: var(--font);
-    transition: background 0.12s;
-  }
-  .filter-pill:hover { background: rgba(255,255,255,0.04); }
-  .filter-pill.active { border-color: var(--accent-bg); color: var(--accent); background: rgba(94,106,210,0.08); }
+  /* ── PAGE HEADER ───────────────────────────────────────────────────────── */
+  .breadcrumb { font-size: .8rem; color: var(--mute); margin-bottom: 14px; display: flex; gap: 6px; align-items: center; }
+  .breadcrumb a { color: var(--ink-deep); text-decoration: none; }
+  .page-header { display: flex; align-items: flex-end; gap: 16px; margin-bottom: 22px; }
+  .page-title { font-family: var(--display); font-weight: 800; font-size: 2rem; letter-spacing: -.02em; line-height: 1.1; }
+  .page-subtitle { font-size: .9rem; color: var(--body); margin-top: 6px; }
+  .page-actions { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+  /* ── BUTTONS (pill 24px) ───────────────────────────────────────────────── */
+  .btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px;
+    border-radius: 24px; font-size: .9rem; font-weight: 600; font-family: var(--font);
+    cursor: pointer; border: 1px solid transparent; transition: background .15s, border-color .15s, color .15s; }
+  .btn-sm { padding: 5px 12px; font-size: .82rem; border-radius: 16px; }
+  .btn-icon { padding: 7px; width: 34px; height: 34px; justify-content: center; }
+  .btn-primary { background: var(--primary); color: var(--ink); }
+  .btn-primary:hover { background: var(--primary-active); }
+  .btn-secondary { background: var(--canvas); color: var(--ink); border-color: rgba(14,15,12,.2); }
+  .btn-secondary:hover { background: var(--canvas-soft); border-color: var(--ink); }
+  .btn-danger { background: var(--canvas); color: var(--negative); border-color: rgba(208,50,56,.4); }
+  .btn-danger:hover { background: var(--negative); color: #fff; border-color: var(--negative); }
+
+  /* ── TABS ──────────────────────────────────────────────────────────────── */
+  .tabs { display: flex; gap: 4px; margin-bottom: 18px; }
+  .tab { padding: 8px 16px; border-radius: 9999px; font-size: .88rem; font-weight: 600;
+    color: var(--body); cursor: pointer; display: flex; align-items: center; gap: 7px;
+    background: transparent; border: 1px solid transparent; transition: background .15s; }
+  .tab:hover { background: rgba(14,15,12,.04); }
+  .tab.active { background: var(--ink); color: var(--canvas-soft); }
+  .tab-count { background: rgba(255,255,255,.18); border-radius: 9999px; padding: 0 8px; font-size: .72rem; }
+  .tab:not(.active) .tab-count { background: rgba(14,15,12,.07); color: var(--body); }
+
+  /* ── LAYOUT GRID ───────────────────────────────────────────────────────── */
+  .grid { display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start; }
+
+  /* ── CARD ──────────────────────────────────────────────────────────────── */
+  .card { background: var(--canvas); border-radius: 24px; box-shadow: 0 1px 2px rgba(14,15,12,.04), 0 4px 12px rgba(14,15,12,.05); overflow: hidden; }
+
+  /* ── TOOLBAR ───────────────────────────────────────────────────────────── */
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .search-box { display: flex; align-items: center; gap: 8px; background: var(--canvas-soft);
+    border: 1px solid var(--border); border-radius: 12px; padding: 8px 14px; min-width: 220px; flex: 1; max-width: 320px; }
+  .search-box input { background: transparent; border: none; outline: none; font-family: var(--font);
+    font-size: .88rem; color: var(--ink); width: 100%; }
+  .search-box input::placeholder { color: var(--mute); }
+  .search-box .bi { color: var(--mute); }
+  .filter-pill { display: flex; align-items: center; gap: 6px; background: transparent;
+    border: 1px solid rgba(14,15,12,.15); border-radius: 9999px; padding: 6px 14px;
+    font-size: .82rem; font-weight: 600; color: var(--body); cursor: pointer; font-family: var(--font); }
+  .filter-pill:hover { background: var(--canvas-soft); }
+  .filter-pill.active { background: var(--primary-pale); border-color: var(--primary); color: var(--ink-deep); }
   .toolbar-spacer { flex: 1; }
 
-  /* ── TABLE ── */
-  .table-wrap { padding: 0 32px 32px; }
-  table { width: 100%; border-collapse: collapse; margin-top: 4px; }
-  thead th {
-    text-align: left;
-    padding: 8px 12px;
-    font-size: 11px;
-    font-weight: 510;
-    color: var(--text-subtle);
-    letter-spacing: 0.3px;
-    text-transform: uppercase;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  tbody tr {
-    border-bottom: 1px solid var(--border-subtle);
-    transition: background 0.1s;
-    cursor: pointer;
-  }
-  tbody tr:hover { background: rgba(255,255,255,0.02); }
+  /* ── TABLE ─────────────────────────────────────────────────────────────── */
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; padding: 12px 18px; font-size: .72rem; font-weight: 600;
+    color: var(--mute); letter-spacing: .04em; text-transform: uppercase;
+    background: var(--canvas-soft); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; cursor: pointer; }
   tbody tr:last-child { border-bottom: none; }
-  td {
-    padding: 12px 12px;
-    font-size: 13px;
-    color: var(--text-secondary);
-    vertical-align: middle;
-  }
-  td:first-child { color: var(--text-primary); font-weight: 510; }
-  .td-actions {
-    display: flex; gap: 4px; justify-content: flex-end;
-    opacity: 0;
-    transition: opacity 0.15s;
-  }
+  tbody tr:hover { background: rgba(159,232,112,.08); }
+  tbody tr.selected { background: var(--primary-pale); }
+  td { padding: 14px 18px; font-size: .9rem; color: var(--body); vertical-align: middle; }
+  td.name { color: var(--ink); font-weight: 600; }
+  .td-actions { display: flex; gap: 6px; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
   tbody tr:hover .td-actions { opacity: 1; }
-  .status-dot {
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .dot {
-    width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green);
-    box-shadow: 0 0 6px rgba(39,166,68,0.5);
-  }
-  .dot.inactive { background: var(--text-subtle); box-shadow: none; }
-  .badge {
-    display: inline-flex; align-items: center;
-    background: rgba(255,255,255,0.05);
-    border: 1px solid var(--border-subtle);
-    border-radius: 2px;
-    padding: 1px 6px 1px 4px;
-    font-size: 10px; font-weight: 510;
-    color: var(--text-muted);
-    gap: 4px;
-  }
-  .badge-accent {
-    background: rgba(113,112,255,0.1);
-    border-color: rgba(113,112,255,0.2);
-    color: var(--accent);
-  }
 
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.85);
-    z-index: 200;
-    display: flex; align-items: center; justify-content: center;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.2s;
-  }
-  .modal-overlay.open { opacity: 1; pointer-events: all; }
-  .modal {
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    width: 480px;
-    box-shadow:
-      rgba(0,0,0,0) 0px 8px 2px,
-      rgba(0,0,0,0.01) 0px 5px 2px,
-      rgba(0,0,0,0.04) 0px 3px 2px,
-      rgba(0,0,0,0.07) 0px 1px 1px,
-      rgba(0,0,0,0.08) 0px 0px 1px;
-    transform: translateY(8px);
-    transition: transform 0.2s;
-  }
-  .modal-overlay.open .modal { transform: translateY(0); }
-  .modal-header {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .modal-title {
-    font-size: 15px; font-weight: 590;
-    letter-spacing: -0.165px;
-    color: var(--text-primary);
-    flex: 1;
-  }
-  .modal-close {
-    background: rgba(255,255,255,0.03);
-    border: 1px solid var(--border);
-    border-radius: 50%;
-    width: 28px; height: 28px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: var(--text-muted); font-size: 14px;
-    transition: background 0.12s;
-  }
-  .modal-close:hover { background: rgba(255,255,255,0.07); color: var(--text-primary); }
-  .modal-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
-  .field-label {
-    font-size: 12px; font-weight: 510;
-    color: var(--text-secondary);
-    letter-spacing: -0.13px;
-  }
-  .field-input {
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 9px 12px;
-    font-family: var(--font);
-    font-feature-settings: "cv01","ss03";
-    font-size: 14px;
-    color: var(--text-primary);
-    outline: none;
-    transition: border 0.15s, box-shadow 0.15s;
-  }
-  .field-input:focus {
-    border-color: var(--accent-bg);
-    box-shadow: 0 0 0 3px rgba(94,106,210,0.12);
-  }
-  .field-input::placeholder { color: var(--text-muted); }
-  textarea.field-input { resize: vertical; min-height: 72px; }
-  .field-hint { font-size: 12px; color: var(--text-subtle); }
-  .modal-footer {
-    padding: 16px 24px;
-    border-top: 1px solid var(--border-subtle);
-    display: flex; justify-content: flex-end; gap: 8px;
-  }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--canvas-soft);
+    border-radius: 9999px; padding: 3px 10px; font-size: .76rem; font-weight: 600; color: var(--body); }
+  .badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 9999px;
+    padding: 3px 11px; font-size: .76rem; font-weight: 600; }
+  .badge-positive { background: var(--primary-pale); color: var(--positive-deep); }
+  .badge-muted { background: var(--canvas-soft); color: var(--mute); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--positive); }
+  .dot.inactive { background: var(--mute); }
 
-  /* ── DETAIL PANEL ── */
-  .detail-panel {
-    width: 300px;
-    border-left: 1px solid var(--border-subtle);
-    background: var(--bg-panel);
-    display: flex; flex-direction: column;
-    overflow-y: auto;
-    flex-shrink: 0;
-  }
-  .detail-header {
-    padding: 20px 20px 16px;
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .detail-name {
-    font-size: 15px; font-weight: 590;
-    letter-spacing: -0.165px; color: var(--text-primary);
-    margin-bottom: 4px;
-  }
-  .detail-id { font-size: 11px; color: var(--text-subtle); font-family: 'Berkeley Mono', monospace; }
-  .detail-section { padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); }
-  .detail-section-label {
-    font-size: 11px; font-weight: 510;
-    color: var(--text-subtle); text-transform: uppercase;
-    letter-spacing: 0.4px; margin-bottom: 10px;
-  }
-  .detail-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  /* ── DETAIL PANEL ──────────────────────────────────────────────────────── */
+  .detail .detail-header { padding: 20px; border-bottom: 1px solid var(--border); }
+  .detail-name { font-family: var(--display); font-weight: 800; font-size: 1.1rem; }
+  .detail-id { font-size: .72rem; color: var(--mute); font-family: ui-monospace, Menlo, monospace; margin-top: 4px; }
+  .detail-section { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+  .detail-section:last-child { border-bottom: none; }
+  .detail-section-label { font-size: .72rem; font-weight: 700; color: var(--mute);
+    text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .detail-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
   .detail-row:last-child { margin-bottom: 0; }
-  .detail-key { font-size: 12px; color: var(--text-muted); }
-  .detail-val { font-size: 12px; color: var(--text-secondary); font-weight: 510; text-align: right; }
-  .detail-tree { display: flex; flex-direction: column; gap: 4px; }
-  .tree-item {
-    display: flex; align-items: center; gap: 8px;
-    padding: 5px 8px; border-radius: 5px;
-    font-size: 12px; color: var(--text-secondary);
-    background: rgba(255,255,255,0.02);
-    border: 1px solid var(--border-subtle);
-  }
-  .tree-icon { color: var(--text-muted); font-size: 11px; }
+  .detail-key { font-size: .82rem; color: var(--mute); }
+  .detail-val { font-size: .82rem; color: var(--ink); font-weight: 600; }
+  .tree-item { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 12px;
+    font-size: .82rem; color: var(--body); background: var(--canvas-soft); margin-bottom: 5px; }
+  .tree-item .bi { color: var(--ink-deep); }
+  .stack { display: flex; flex-direction: column; gap: 8px; }
+  .stack .btn { justify-content: flex-start; }
 
-  /* ── EMPTY STATE ── */
-  .empty {
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    padding: 64px 32px; gap: 12px; color: var(--text-muted);
-    text-align: center;
-  }
-  .empty-icon { font-size: 28px; opacity: 0.4; }
-  .empty-title { font-size: 14px; font-weight: 510; color: var(--text-secondary); }
-  .empty-desc { font-size: 13px; max-width: 280px; line-height: 1.5; }
+  /* ── MODAL ─────────────────────────────────────────────────────────────── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(14,15,12,.55); backdrop-filter: blur(4px);
+    z-index: 200; display: flex; align-items: center; justify-content: center; padding: 24px;
+    opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--canvas); border-radius: 24px; width: 480px; max-width: 100%;
+    box-shadow: 0 24px 64px rgba(0,0,0,.35); transform: translateY(8px); transition: transform .2s; }
+  .modal-overlay.open .modal { transform: translateY(0); }
+  .modal-header { padding: 22px 24px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  .modal-title { font-family: var(--display); font-weight: 800; font-size: 1.15rem; flex: 1; }
+  .modal-close { background: var(--canvas-soft); border: 0; border-radius: 9999px; width: 34px; height: 34px;
+    display: grid; place-items: center; cursor: pointer; color: var(--body); font-size: 1rem; }
+  .modal-close:hover { background: var(--negative-bg); color: #fff; }
+  .modal-body { padding: 22px 24px; display: flex; flex-direction: column; gap: 18px; }
+  .field { display: flex; flex-direction: column; gap: 7px; }
+  .field-label { font-size: .82rem; font-weight: 600; color: var(--ink); }
+  .field-label .req { color: var(--negative); }
+  .field-input { background: var(--canvas); border: 1px solid rgba(14,15,12,.15); border-radius: 12px;
+    padding: 10px 14px; font-family: var(--font); font-size: .92rem; color: var(--ink); outline: none;
+    transition: border-color .15s, box-shadow .15s; }
+  .field-input:focus { border-color: var(--ink); box-shadow: 0 0 0 .2rem rgba(159,232,112,.25); }
+  .field-input::placeholder { color: var(--mute); }
+  .field-hint { font-size: .78rem; color: var(--mute); }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
 
-  /* ── TABS ── */
-  .tabs {
-    display: flex; gap: 0;
-    border-bottom: 1px solid var(--border-subtle);
-    padding: 0 32px;
-  }
-  .tab {
-    padding: 10px 14px;
-    font-size: 13px; font-weight: 510;
-    color: var(--text-muted);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    margin-bottom: -1px;
-    transition: color 0.15s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .tab:hover { color: var(--text-secondary); }
-  .tab.active { color: var(--text-primary); border-bottom-color: var(--accent); }
-  .tab-count {
-    background: rgba(255,255,255,0.06);
-    border-radius: 10px;
-    padding: 1px 6px;
-    font-size: 10px;
-    color: var(--text-subtle);
-  }
+  /* ── COMMAND PALETTE ───────────────────────────────────────────────────── */
+  .pal-overlay { position: fixed; inset: 0; background: rgba(14,15,12,.55); backdrop-filter: blur(4px);
+    z-index: 300; display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; }
+  .pal-overlay.open { display: flex; }
+  .pal-card { width: min(560px, 92vw); background: var(--canvas); border-radius: 24px;
+    box-shadow: 0 24px 64px rgba(0,0,0,.35); overflow: hidden; }
+  .pal-search { display: flex; align-items: center; gap: 10px; padding: 16px 18px; border-bottom: 1px solid var(--border); }
+  .pal-search input { border: 0; outline: 0; width: 100%; font-size: 1rem; font-family: var(--font); color: var(--ink); }
+  .pal-list { max-height: 52vh; overflow-y: auto; padding: 8px; }
+  .pal-item { display: flex; align-items: center; gap: 11px; padding: 10px 11px; border-radius: 14px;
+    cursor: pointer; color: var(--ink); }
+  .pal-item:hover, .pal-item.active { background: var(--canvas-soft); }
+  .pal-item .gx-ico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
+    background: var(--primary-pale); color: var(--ink-deep); flex-shrink: 0; }
+  .pal-item .grp { margin-left: auto; font-size: .74rem; color: var(--mute); }
 
-  /* ── SCROLLBAR ── */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.14); }
-
-  /* ── TOOLTIP ── */
-  .chip {
-    display: inline-flex; align-items: center; gap: 4px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid var(--border-subtle);
-    border-radius: 4px;
-    padding: 2px 7px;
-    font-size: 11px; font-weight: 510;
-    color: var(--text-muted);
-  }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: rgba(14,15,12,.15); border-radius: 9999px; }
 </style>
 </head>
 <body>
 
-<!-- TOPBAR -->
-<header class="topbar">
-  <a class="topbar-logo" href="#">
-    <div class="logo-mark">G</div>
-    Gênesis
-  </a>
-  <div class="topbar-divider"></div>
-  <div class="topbar-breadcrumb">
-    Sistemas <span style="color:var(--text-subtle)">›</span> <span>ERP Municipal</span>
+<!-- ── COMMAND BAR ───────────────────────────────────────────────────────── -->
+<nav class="gx-topbar">
+  <a class="gx-brand" href="#"><i class="bi bi-heptagon-fill"></i><span>Gênesis<small>Operador</small></span></a>
+
+  <div class="gx-nav">
+    <div class="gx-dd open">
+      <button class="gx-pill"><i class="bi bi-cash-coin"></i>Orçamento<i class="bi bi-chevron-down gx-caret"></i></button>
+      <div class="gx-mega">
+        <div class="gx-mega-head">Orçamento</div>
+        <a class="gx-tile gx-overview" href="#"><span class="gx-ico"><i class="bi bi-cash-coin"></i></span>
+          <span><span class="gx-tile-title">Visão geral</span><span class="gx-tile-desc">Orçamento</span></span></a>
+        <a class="gx-tile" href="#"><span class="gx-ico"><i class="bi bi-wallet2"></i></span>
+          <span><span class="gx-tile-title">Dotações</span><span class="gx-tile-desc">Saldos por dotação</span></span></a>
+        <a class="gx-tile" href="#"><span class="gx-ico"><i class="bi bi-graph-up"></i></span>
+          <span><span class="gx-tile-title">Previsões</span><span class="gx-tile-desc">Receita prevista</span></span></a>
+      </div>
+    </div>
+    <a class="gx-pill is-active" href="#"><i class="bi bi-receipt"></i>Execução</a>
+    <a class="gx-pill" href="#"><i class="bi bi-cart3"></i>Compras</a>
+    <a class="gx-pill" href="#"><i class="bi bi-file-earmark-bar-graph"></i>Relatórios</a>
   </div>
-  <div class="topbar-spacer"></div>
-  <div class="topbar-cmd" onclick="openModal()">
-    <span style="color:var(--text-subtle)">⌕</span>
-    Buscar ou criar...
-    <span class="kbd">⌘K</span>
+
+  <div class="gx-right">
+    <button class="gx-search" onclick="openPalette()"><i class="bi bi-search"></i><span>Buscar…</span><kbd>⌘K</kbd></button>
+    <a href="#" class="gx-workspace">
+      <div class="gx-ws-meta"><span class="gx-ws-top">PR · Curitiba</span><span class="gx-ws-name">Prefeitura Municipal</span></div>
+      <span class="gx-ws-year">2026</span><i class="bi bi-arrow-left-right gx-ws-swap"></i>
+    </a>
+    <a href="#" class="gx-icon-btn" title="Sair"><i class="bi bi-box-arrow-right"></i></a>
   </div>
-  <div class="avatar">MA</div>
-</header>
+</nav>
 
-<div class="layout">
+<!-- ── CONTEÚDO ──────────────────────────────────────────────────────────── -->
+<div class="wrap">
 
-  <!-- SIDEBAR -->
-  <nav class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-label">Visão Geral</div>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">⬡</span> Dashboard
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">◫</span> Sistemas
-        <span class="sidebar-count">4</span>
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">◻</span> Usuários
-        <span class="sidebar-count">128</span>
-      </a>
+  <div class="breadcrumb"><a href="#">Execução</a> <i class="bi bi-chevron-right" style="font-size:.7rem"></i> <span>Menus do módulo</span></div>
+
+  <div class="page-header">
+    <div>
+      <div class="page-title">Módulo Financeiro</div>
+      <div class="page-subtitle">6 menus · 24 itens de funcionalidade · 43 usuários com acesso</div>
     </div>
+    <div class="page-actions">
+      <button class="btn btn-secondary"><i class="bi bi-download"></i> Exportar</button>
+      <button class="btn btn-primary" onclick="openModal()"><i class="bi bi-plus-lg"></i> Novo menu</button>
+    </div>
+  </div>
 
-    <div class="sidebar-divider"></div>
+  <div class="tabs">
+    <div class="tab active">Menus <span class="tab-count">6</span></div>
+    <div class="tab">Itens <span class="tab-count">24</span></div>
+    <div class="tab">Permissões <span class="tab-count">43</span></div>
+    <div class="tab">Admins <span class="tab-count">2</span></div>
+  </div>
 
-    <div class="sidebar-section">
-      <div class="sidebar-label">ERP Municipal</div>
-      <a class="sidebar-item active" href="#">
-        <span class="sidebar-icon">▤</span> Módulos
-        <span class="sidebar-count">6</span>
-      </a>
-      <div class="sidebar-sub">
-        <a class="sidebar-item active" href="#">
-          <span class="sidebar-icon" style="color:var(--accent)">●</span> Financeiro
-        </a>
-        <a class="sidebar-item" href="#">
-          <span class="sidebar-icon">○</span> RH
-        </a>
-        <a class="sidebar-item" href="#">
-          <span class="sidebar-icon">○</span> Tributação
-        </a>
-        <a class="sidebar-item" href="#">
-          <span class="sidebar-icon">○</span> Licitação
-        </a>
+  <div class="grid">
+    <!-- LISTA -->
+    <div class="card">
+      <div class="toolbar">
+        <div class="search-box"><i class="bi bi-search"></i><input type="text" placeholder="Filtrar menus..."></div>
+        <button class="filter-pill active"><span class="dot"></span> Ativos</button>
+        <button class="filter-pill">Inativos</button>
+        <button class="filter-pill">Todos</button>
+        <div class="toolbar-spacer"></div>
+        <span class="chip"><i class="bi bi-arrow-down-up"></i> Ordem</span>
       </div>
-    </div>
-
-    <div class="sidebar-divider"></div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-label">Configuração</div>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">⚙</span> Permissões
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">♟</span> Admins
-      </a>
-      <a class="sidebar-item" href="#">
-        <span class="sidebar-icon">⛶</span> Relatórios
-      </a>
-    </div>
-  </nav>
-
-  <!-- MAIN CONTENT -->
-  <main class="main">
-
-    <!-- PAGE HEADER -->
-    <div class="page-header">
-      <div>
-        <div class="page-title">Módulo Financeiro</div>
-        <div class="page-subtitle">6 menus · 24 itens de funcionalidade · 43 usuários com acesso</div>
-      </div>
-      <div class="page-actions">
-        <button class="btn btn-ghost">
-          <span>↓</span> Exportar
-        </button>
-        <button class="btn btn-primary" onclick="openModal()">
-          + Novo Menu
-        </button>
-      </div>
-    </div>
-
-    <!-- TABS -->
-    <div class="tabs">
-      <div class="tab active">Menus <span class="tab-count">6</span></div>
-      <div class="tab">Itens <span class="tab-count">24</span></div>
-      <div class="tab">Permissões <span class="tab-count">43</span></div>
-      <div class="tab">Admins <span class="tab-count">2</span></div>
-    </div>
-
-    <!-- TOOLBAR -->
-    <div class="toolbar">
-      <div class="search-box">
-        <span class="search-icon">⌕</span>
-        <input type="text" placeholder="Filtrar menus...">
-      </div>
-      <button class="filter-pill active">
-        <span>●</span> Ativos
-      </button>
-      <button class="filter-pill">Inativos</button>
-      <button class="filter-pill">Todos</button>
-      <div class="toolbar-spacer"></div>
-      <span class="chip">Ordem ↕</span>
-    </div>
-
-    <!-- TABLE -->
-    <div class="table-wrap">
       <table>
         <thead>
-          <tr>
-            <th>Nome</th>
-            <th>Ícone</th>
-            <th>Itens</th>
-            <th>Status</th>
-            <th>Criado em</th>
-            <th></th>
-          </tr>
+          <tr><th>Nome</th><th>Ícone</th><th>Itens</th><th>Status</th><th>Criado em</th><th></th></tr>
         </thead>
         <tbody>
+          <tr class="selected" onclick="selectRow(this)">
+            <td class="name">Contas a Pagar</td>
+            <td><span class="chip"><i class="bi bi-wallet2"></i> wallet</span></td>
+            <td>8 itens</td>
+            <td><span class="badge badge-positive"><span class="dot"></span> Ativo</span></td>
+            <td>14 abr 2026</td>
+            <td><div class="td-actions">
+              <button class="btn btn-secondary btn-sm btn-icon" title="Editar" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" title="Excluir" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
+            </div></td>
+          </tr>
           <tr onclick="selectRow(this)">
-            <td>Contas a Pagar</td>
-            <td><span class="chip">💳 wallet</span></td>
-            <td><span style="color:var(--text-muted)">8 itens</span></td>
-            <td><span class="status-dot"><span class="dot"></span> Ativo</span></td>
-            <td style="color:var(--text-subtle)">14 abr 2026</td>
+            <td class="name">Contas a Receber</td>
+            <td><span class="chip"><i class="bi bi-inbox"></i> inbox</span></td>
+            <td>6 itens</td>
+            <td><span class="badge badge-positive"><span class="dot"></span> Ativo</span></td>
+            <td>14 abr 2026</td>
             <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" title="Editar" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" title="Excluir" onclick="event.stopPropagation()">✕</button>
+              <button class="btn btn-secondary btn-sm btn-icon" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
             </div></td>
           </tr>
-          <tr>
-            <td>Contas a Receber</td>
-            <td><span class="chip">📥 inbox</span></td>
-            <td><span style="color:var(--text-muted)">6 itens</span></td>
-            <td><span class="status-dot"><span class="dot"></span> Ativo</span></td>
-            <td style="color:var(--text-subtle)">14 abr 2026</td>
+          <tr onclick="selectRow(this)">
+            <td class="name">Fluxo de Caixa</td>
+            <td><span class="chip"><i class="bi bi-bar-chart"></i> bar-chart</span></td>
+            <td>4 itens</td>
+            <td><span class="badge badge-positive"><span class="dot"></span> Ativo</span></td>
+            <td>15 abr 2026</td>
             <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()">✕</button>
+              <button class="btn btn-secondary btn-sm btn-icon" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
             </div></td>
           </tr>
-          <tr>
-            <td>Fluxo de Caixa</td>
-            <td><span class="chip">📊 bar-chart</span></td>
-            <td><span style="color:var(--text-muted)">4 itens</span></td>
-            <td><span class="status-dot"><span class="dot"></span> Ativo</span></td>
-            <td style="color:var(--text-subtle)">15 abr 2026</td>
+          <tr onclick="selectRow(this)">
+            <td class="name">Empenhos</td>
+            <td><span class="chip"><i class="bi bi-clipboard"></i> clipboard</span></td>
+            <td>3 itens</td>
+            <td><span class="badge badge-positive"><span class="dot"></span> Ativo</span></td>
+            <td>15 abr 2026</td>
             <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()">✕</button>
+              <button class="btn btn-secondary btn-sm btn-icon" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
             </div></td>
           </tr>
-          <tr>
-            <td>Empenhos</td>
-            <td><span class="chip">📋 clipboard</span></td>
-            <td><span style="color:var(--text-muted)">3 itens</span></td>
-            <td><span class="status-dot"><span class="dot"></span> Ativo</span></td>
-            <td style="color:var(--text-subtle)">15 abr 2026</td>
+          <tr onclick="selectRow(this)">
+            <td class="name">Liquidações</td>
+            <td><span class="chip"><i class="bi bi-check2-square"></i> check</span></td>
+            <td>2 itens</td>
+            <td><span class="badge badge-muted"><span class="dot inactive"></span> Inativo</span></td>
+            <td>16 abr 2026</td>
             <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()">✕</button>
+              <button class="btn btn-secondary btn-sm btn-icon" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
             </div></td>
           </tr>
-          <tr>
-            <td>Liquidações</td>
-            <td><span class="chip">✓ check</span></td>
-            <td><span style="color:var(--text-muted)">2 itens</span></td>
-            <td><span class="status-dot"><span class="dot inactive"></span> <span style="color:var(--text-subtle)">Inativo</span></span></td>
-            <td style="color:var(--text-subtle)">16 abr 2026</td>
+          <tr onclick="selectRow(this)">
+            <td class="name">Relatórios Financeiros</td>
+            <td><span class="chip"><i class="bi bi-file-text"></i> file-text</span></td>
+            <td>1 item</td>
+            <td><span class="badge badge-positive"><span class="dot"></span> Ativo</span></td>
+            <td>17 abr 2026</td>
             <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()">✕</button>
-            </div></td>
-          </tr>
-          <tr>
-            <td>Relatórios Financeiros</td>
-            <td><span class="chip">📑 file-text</span></td>
-            <td><span style="color:var(--text-muted)">1 item</span></td>
-            <td><span class="status-dot"><span class="dot"></span> Ativo</span></td>
-            <td style="color:var(--text-subtle)">17 abr 2026</td>
-            <td><div class="td-actions">
-              <button class="btn btn-ghost btn-sm btn-icon" onclick="openModal(event)">✎</button>
-              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()">✕</button>
+              <button class="btn btn-secondary btn-sm btn-icon" onclick="openModal(event)"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-danger btn-sm btn-icon" onclick="event.stopPropagation()"><i class="bi bi-trash"></i></button>
             </div></td>
           </tr>
         </tbody>
       </table>
     </div>
 
-  </main>
-
-  <!-- DETAIL PANEL -->
-  <aside class="detail-panel" id="detailPanel">
-    <div class="detail-header">
-      <div class="detail-name">Contas a Pagar</div>
-      <div class="detail-id">id: 394905b2-6e68</div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-label">Detalhes</div>
-      <div class="detail-row">
-        <span class="detail-key">Status</span>
-        <span class="detail-val"><span class="status-dot"><span class="dot"></span> Ativo</span></span>
+    <!-- DETALHE -->
+    <aside class="card detail">
+      <div class="detail-header">
+        <div class="detail-name">Contas a Pagar</div>
+        <div class="detail-id">id: 394905b2-6e68</div>
       </div>
-      <div class="detail-row">
-        <span class="detail-key">Ícone</span>
-        <span class="detail-val">💳 wallet</span>
+      <div class="detail-section">
+        <div class="detail-section-label">Detalhes</div>
+        <div class="detail-row"><span class="detail-key">Status</span><span class="detail-val"><span class="badge badge-positive"><span class="dot"></span> Ativo</span></span></div>
+        <div class="detail-row"><span class="detail-key">Ícone</span><span class="detail-val">wallet</span></div>
+        <div class="detail-row"><span class="detail-key">Ordem</span><span class="detail-val">1</span></div>
+        <div class="detail-row"><span class="detail-key">Módulo</span><span class="detail-val">Financeiro</span></div>
+        <div class="detail-row"><span class="detail-key">Criado</span><span class="detail-val">14 abr 2026</span></div>
       </div>
-      <div class="detail-row">
-        <span class="detail-key">Ordem</span>
-        <span class="detail-val">1</span>
+      <div class="detail-section">
+        <div class="detail-section-label">Itens <span class="badge badge-positive">8</span></div>
+        <div class="tree-item"><i class="bi bi-card-text"></i> Cadastro de Fornecedores</div>
+        <div class="tree-item"><i class="bi bi-pencil-square"></i> Lançar Conta</div>
+        <div class="tree-item"><i class="bi bi-check2-circle"></i> Aprovar Pagamento</div>
+        <div class="tree-item"><i class="bi bi-list-nested"></i> Relatórios <span class="badge badge-muted" style="margin-left:auto">submenu</span></div>
+        <div class="tree-item" style="margin-left:18px"><i class="bi bi-calendar-event"></i> Por Vencimento</div>
+        <div class="tree-item" style="margin-left:18px"><i class="bi bi-person"></i> Por Fornecedor</div>
       </div>
-      <div class="detail-row">
-        <span class="detail-key">Módulo</span>
-        <span class="detail-val">Financeiro</span>
+      <div class="detail-section">
+        <div class="detail-section-label">Ações</div>
+        <div class="stack">
+          <button class="btn btn-secondary" onclick="openModal()"><i class="bi bi-pencil"></i> Editar menu</button>
+          <button class="btn btn-secondary"><i class="bi bi-plus-lg"></i> Adicionar item</button>
+          <button class="btn btn-danger"><i class="bi bi-trash"></i> Excluir menu</button>
+        </div>
       </div>
-      <div class="detail-row">
-        <span class="detail-key">Criado</span>
-        <span class="detail-val">14 abr 2026</span>
-      </div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-label">Itens <span class="badge badge-accent">8</span></div>
-      <div class="detail-tree">
-        <div class="tree-item"><span class="tree-icon">◻</span> Cadastro de Fornecedores</div>
-        <div class="tree-item"><span class="tree-icon">◻</span> Lançar Conta</div>
-        <div class="tree-item"><span class="tree-icon">◻</span> Aprovar Pagamento</div>
-        <div class="tree-item"><span class="tree-icon">▤</span> Relatórios <span class="badge" style="margin-left:auto">submenu</span></div>
-        <div class="tree-item" style="padding-left:24px"><span class="tree-icon">◻</span> Por Vencimento</div>
-        <div class="tree-item" style="padding-left:24px"><span class="tree-icon">◻</span> Por Fornecedor</div>
-      </div>
-    </div>
-    <div class="detail-section">
-      <div class="detail-section-label">Ações</div>
-      <div style="display:flex;flex-direction:column;gap:6px">
-        <button class="btn btn-ghost" style="justify-content:flex-start" onclick="openModal()">✎ Editar menu</button>
-        <button class="btn btn-ghost" style="justify-content:flex-start">+ Adicionar item</button>
-        <button class="btn btn-danger" style="justify-content:flex-start">✕ Excluir menu</button>
-      </div>
-    </div>
-  </aside>
-
+    </aside>
+  </div>
 </div>
 
-<!-- MODAL: NOVO MENU -->
+<!-- ── MODAL: NOVO MENU ──────────────────────────────────────────────────── -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Novo Menu</div>
-      <div class="modal-close" onclick="closeModal()">✕</div>
+      <div class="modal-title">Novo menu</div>
+      <button class="modal-close" onclick="closeModal()"><i class="bi bi-x-lg"></i></button>
     </div>
     <div class="modal-body">
       <div class="field">
-        <label class="field-label">Nome <span style="color:var(--accent)">*</span></label>
+        <label class="field-label">Nome <span class="req">*</span></label>
         <input class="field-input" type="text" placeholder="Ex: Contas a Pagar" autofocus>
       </div>
       <div class="field">
         <label class="field-label">Ícone</label>
         <input class="field-input" type="text" placeholder="Ex: wallet, bar-chart, file-text">
-        <span class="field-hint">Nome do ícone da biblioteca utilizada no frontend.</span>
+        <span class="field-hint">Nome do ícone (Bootstrap Icons) usado no frontend.</span>
       </div>
       <div class="field">
         <label class="field-label">Ordem</label>
@@ -798,29 +465,45 @@
       </div>
     </div>
     <div class="modal-footer">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary">Criar Menu</button>
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary">Criar menu</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── COMMAND PALETTE ───────────────────────────────────────────────────── -->
+<div class="pal-overlay" id="palOverlay" onclick="closePalette(event)">
+  <div class="pal-card">
+    <div class="pal-search"><i class="bi bi-search" style="color:var(--mute)"></i><input type="text" placeholder="Ir para… (digite o nome de uma tela)"></div>
+    <div class="pal-list">
+      <div class="pal-item active"><span class="gx-ico"><i class="bi bi-wallet2"></i></span> Dotações <span class="grp">Orçamento</span></div>
+      <div class="pal-item"><span class="gx-ico"><i class="bi bi-cash-stack"></i></span> Empenhos <span class="grp">Execução</span></div>
+      <div class="pal-item"><span class="gx-ico"><i class="bi bi-clipboard2-check"></i></span> Liquidações <span class="grp">Execução</span></div>
+      <div class="pal-item"><span class="gx-ico"><i class="bi bi-bank"></i></span> Ordens de pagamento <span class="grp">Execução</span></div>
+      <div class="pal-item"><span class="gx-ico"><i class="bi bi-file-earmark-bar-graph"></i></span> Relatórios financeiros <span class="grp">Relatórios</span></div>
     </div>
   </div>
 </div>
 
 <script>
-  function openModal(e) {
-    if (e) e.stopPropagation();
-    document.getElementById('modalOverlay').classList.add('open');
-    setTimeout(() => document.querySelector('.field-input').focus(), 50);
-  }
-  function closeModal(e) {
-    if (e && e.target !== e.currentTarget) return;
-    document.getElementById('modalOverlay').classList.remove('open');
-  }
+  function openModal(e) { if (e) e.stopPropagation(); document.getElementById('modalOverlay').classList.add('open');
+    setTimeout(() => document.querySelector('.field-input').focus(), 50); }
+  function closeModal(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('modalOverlay').classList.remove('open'); }
+  function openPalette() { document.getElementById('palOverlay').classList.add('open');
+    setTimeout(() => document.querySelector('.pal-search input').focus(), 50); }
+  function closePalette(e) { if (e && e.target !== e.currentTarget) return; document.getElementById('palOverlay').classList.remove('open'); }
+  function selectRow(row) { document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('selected')); row.classList.add('selected'); }
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') { closeModal(); closePalette(); }
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openPalette(); }
   });
-  function selectRow(row) {
-    document.querySelectorAll('tbody tr').forEach(r => r.style.background = '');
-    row.style.background = 'rgba(113,112,255,0.06)';
-  }
+  // Fecha o mega-painel demonstrativo ao clicar fora
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.gx-dd')) document.querySelectorAll('.gx-dd.open').forEach(d => d.classList.remove('open'));
+  });
+  document.querySelectorAll('.gx-dd > .gx-pill').forEach(p => p.addEventListener('click', e => {
+    e.stopPropagation(); p.parentElement.classList.toggle('open');
+  }));
 </script>
 </body>
 </html>
