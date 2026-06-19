@@ -530,6 +530,14 @@ enum TipoLancamento {
 enum OrigemLancamento {
   ARRECADACAO
   LANCAMENTO_TRIBUTARIO
+  INSCRICAO_DIVIDA_ATIVA
+}
+
+// Tipo de movimento na tela de lançamento tributário: constituição do crédito ou
+// inscrição em dívida ativa (reclassifica o crédito a receber → dívida ativa).
+enum TipoLancamentoTributario {
+  LANCAMENTO
+  INSCRICAO_DIVIDA_ATIVA
 }
 
 // Impacto patrimonial da natureza da receita (MCASP): EFETIVA gera VPA (classe 4);
@@ -565,6 +573,9 @@ model ParametroReceita {
   // baixada na arrecadação (E560). CAIXA = não tributária (E300/E400/E500).
   indicadorReconhecimento  IndicadorReconhecimento @default(CAIXA)
   contaAtivoCodigo         String?
+  // Dívida ativa (classe 1.2.1.x): destino da inscrição (E570) — D dívida ativa /
+  // C baixa do crédito a receber circulante (contaAtivoCodigo).
+  contaDividaAtivaCodigo   String?
   criadoEm                 DateTime       @default(now())
   atualizadoEm             DateTime       @updatedAt
   modeloContabil           ModeloContabil @relation(fields: [modeloContabilId], references: [id])
@@ -1090,6 +1101,7 @@ model PrevisaoReceita {
 model LancamentoTributario {
   id               String          @id @default(uuid())
   previsaoId       String
+  tipo             TipoLancamentoTributario @default(LANCAMENTO)
   data             DateTime        @db.Date // data do lançamento / fato gerador
   valor            Decimal         @db.Decimal(18, 2)
   vencimento       DateTime?       @db.Date

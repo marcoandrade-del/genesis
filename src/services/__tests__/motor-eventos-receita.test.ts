@@ -241,6 +241,29 @@ describe('MotorEventosReceita', () => {
     expect(e550.itens.find((i) => i.contaId === `id:${ATIVO}`)!.tipo).toBe('CREDITO')
   })
 
+  it('resolverInscricaoDividaAtiva gera E570: D dívida ativa / C baixa do circulante', async () => {
+    const CIRC = '1.1.2.1.1.01.05.00.00.00.00.00'
+    const DA = '1.2.1.1.1.04.01.01.05.00.00.00'
+    comFolhas(mock, [CIRC, DA])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: 'x', contaAtivoCodigo: CIRC, contaDividaAtivaCodigo: DA },
+    ])
+    const eventos = await motor(mock).resolverInscricaoDividaAtiva({ entidadeId: ENT, ano: ANO, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00', valor: '300' })
+    expect(eventos[0].eventoCodigo).toBe('570')
+    expect(eventos[0].itens.find((i) => i.tipo === 'DEBITO')!.contaId).toBe(`id:${DA}`)
+    expect(eventos[0].itens.find((i) => i.tipo === 'CREDITO')!.contaId).toBe(`id:${CIRC}`)
+  })
+
+  it('inscrição em dívida ativa falha sem conta de DA configurada', async () => {
+    comFolhas(mock)
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: 'x', contaAtivoCodigo: 'a', contaDividaAtivaCodigo: null },
+    ])
+    await expect(
+      motor(mock).resolverInscricaoDividaAtiva({ entidadeId: ENT, ano: ANO, naturezaCodigo: '1.1.1.2.50.0.1.00.00.00.00.00', valor: '1' }),
+    ).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+  })
+
   it('lançamento tributário falha se a natureza não for competência configurada', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([])

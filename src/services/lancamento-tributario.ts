@@ -5,6 +5,7 @@ import { LancamentosService } from './lancamentos.js'
 
 export interface DadosLancamentoTributario {
   previsaoId: string
+  tipo?: string // LANCAMENTO (default) | INSCRICAO_DIVIDA_ATIVA
   data: string // YYYY-MM-DD (fato gerador / lançamento)
   valor: string
   vencimento?: string
@@ -61,12 +62,15 @@ export class LancamentoTributarioService {
 
     const ano = Number(dados.data.slice(0, 4))
     const valor = new Prisma.Decimal(dados.valor)
-    const histBase = dados.historico?.trim() || 'Lançamento de crédito tributário'
+    const ehInscricao = dados.tipo === 'INSCRICAO_DIVIDA_ATIVA'
+    const histBase = dados.historico?.trim() || (ehInscricao ? 'Inscrição em dívida ativa' : 'Lançamento de crédito tributário')
+    const ctx = { entidadeId: orcamento.entidadeId, ano, naturezaCodigo: previsao.contaReceita.codigo, valor }
 
     return this.prisma.$transaction(async (tx) => {
       const lt = await tx.lancamentoTributario.create({
         data: {
           previsaoId: previsao.id,
+          tipo: ehInscricao ? 'INSCRICAO_DIVIDA_ATIVA' : 'LANCAMENTO',
           data: new Date(dados.data),
           valor,
           vencimento: dados.vencimento ? new Date(dados.vencimento) : null,
@@ -78,11 +82,10 @@ export class LancamentoTributarioService {
         },
       })
 
-      const eventos = await this.motor.resolverLancamentoTributario(
-        { entidadeId: orcamento.entidadeId, ano, naturezaCodigo: previsao.contaReceita.codigo, valor },
-        {},
-        tx,
-      )
+      const eventos = ehInscricao
+        ? await this.motor.resolverInscricaoDividaAtiva(ctx, {}, tx)
+        : await this.motor.resolverLancamentoTributario(ctx, {}, tx)
+      const origemTipo = ehInscricao ? 'INSCRICAO_DIVIDA_ATIVA' : 'LANCAMENTO_TRIBUTARIO'
       for (const ev of eventos) {
         await this.lancamentos.criar(
           {
@@ -91,7 +94,7 @@ export class LancamentoTributarioService {
             historico: `${ev.descricaoEvento} — ${histBase}`,
             itens: ev.itens,
             criadoPorId: dados.criadoPorId,
-            origemTipo: 'LANCAMENTO_TRIBUTARIO',
+            origemTipo,
             origemId: lt.id,
             eventoCodigo: ev.eventoCodigo,
           },
@@ -112,7 +115,7 @@ export class LancamentoTributarioService {
       throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Lançamento tributário não encontrado.')
     }
     const lancs = await this.prisma.lancamento.findMany({
-      where: { origemTipo: 'LANCAMENTO_TRIBUTARIO', origemId: id },
+      where: { origemTipo: { in: ['LANCAMENTO_TRIBUTARIO', 'INSCRICAO_DIVIDA_ATIVA'] }, origemId: id },
       select: { id: true },
     })
     for (const l of lancs) await this.lancamentos.excluir(l.id) // reverte ResumoMensalConta + apaga itens
@@ -138,7 +141,7 @@ export class LancamentoTributarioService {
       throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Lançamento tributário não encontrado.')
     }
     const lancs = await this.prisma.lancamento.findMany({
-      where: { origemTipo: 'LANCAMENTO_TRIBUTARIO', origemId: id },
+      where: { origemTipo: { in: ['LANCAMENTO_TRIBUTARIO', 'INSCRICAO_DIVIDA_ATIVA'] }, origemId: id },
       include: { itens: true },
       orderBy: { eventoCodigo: 'asc' },
     })
