@@ -70,6 +70,21 @@ describe('desdobrar', () => {
     expect(prisma.contaContabilEntidade.create).toHaveBeenCalled()
     expect(prisma.contaContabilEntidade.update).not.toHaveBeenCalled() // não vira sintética de novo
   })
+
+  it('GUARD: bloqueia desdobrar simples se a analítica já tem movimento', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(PAI) // analítica
+    prisma.lancamentoItem.count.mockResolvedValue(2)
+    prisma.saldoInicialAno.findUnique.mockResolvedValue(null)
+    await expect(service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'X' })).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaContabilEntidade.create).not.toHaveBeenCalled()
+  })
+
+  it('GUARD: bloqueia desdobrar simples se a analítica tem saldo inicial', async () => {
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue(PAI)
+    prisma.lancamentoItem.count.mockResolvedValue(0)
+    prisma.saldoInicialAno.findUnique.mockResolvedValue({ valor: new Prisma.Decimal(500) })
+    await expect(service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'X' })).rejects.toMatchObject({ code: 'CONFLITO' })
+  })
   it('REQUISICAO_INVALIDA quando código vazio', async () => {
     prisma.contaContabilEntidade.findUnique.mockResolvedValue(PAI)
     await expect(service.desdobrar('p1', { codigo: '  ', descricao: 'X' })).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })

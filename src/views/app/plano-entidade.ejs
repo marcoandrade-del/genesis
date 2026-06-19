@@ -152,10 +152,11 @@
             </td>
             <% if (podeEscrever) { %>
               <td class="col-detalhe text-end pe-3">
-                <% if (c.podeDesdobrar) { %>
+                <% const temValor = comSaldos && c.admiteMovimento && c.saldo && (c.saldo.debito || c.saldo.credito || c.saldo.inicial) %>
+                <% if (c.podeDesdobrar && !temValor) { %>
                   <a href="<%= base %>?desdobrar=<%= c.id %>" class="btn btn-outline-primary btn-sm py-0 px-2" title="Desdobrar (adicionar conta filha)"><i class="bi bi-diagram-2"></i></a>
                 <% } %>
-                <% if (comSaldos && c.admiteMovimento && c.saldo && (c.saldo.debito || c.saldo.credito || c.saldo.inicial)) { %>
+                <% if (temValor) { %>
                   <a href="<%= base %>/<%= c.id %>/distribuir" class="btn btn-outline-info btn-sm py-0 px-2" title="Desdobrar redistribuindo os valores (desde 1º/jan)"><i class="bi bi-diagram-3"></i></a>
                 <% } %>
                 <% if (c.podeEditar) { %>
