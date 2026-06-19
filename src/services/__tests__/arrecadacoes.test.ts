@@ -173,6 +173,48 @@ describe('ArrecadacoesService.criar', () => {
   })
 })
 
+describe('ArrecadacoesService.trilhaDoMovimento', () => {
+  const MOV = {
+    id: 'a1', tipo: 'ARRECADACAO', data: new Date('2026-06-19'), valor: '100', historico: 'FPM',
+    previsao: {
+      contaReceita: { codigo: '1.7', descricao: 'FPM' },
+      fonteRecurso: { codigo: '1000', nomenclatura: 'Livres' },
+      orcamento: { entidadeId: 'ent1' },
+    },
+    contaBancaria: null,
+  }
+
+  it('retorna o movimento + eventos com débito antes do crédito e contas resolvidas', async () => {
+    prisma.arrecadacao.findUnique.mockResolvedValue(MOV)
+    prisma.lancamento.findMany.mockResolvedValue([
+      {
+        eventoCodigo: '100', historico: 'E100',
+        itens: [
+          { tipo: 'CREDITO', valor: '100', contaId: 'c2', naturezaReceitaCodigo: '1.7', fonteCodigo: null },
+          { tipo: 'DEBITO', valor: '100', contaId: 'c1', naturezaReceitaCodigo: '1.7', fonteCodigo: null },
+        ],
+      },
+    ])
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', codigo: '6.2.1.2', descricao: 'Realizada' },
+      { id: 'c2', codigo: '6.2.1.1', descricao: 'A Realizar' },
+    ])
+    const t = await service.trilhaDoMovimento('a1', 'ent1')
+    expect(t.movimento.id).toBe('a1')
+    expect(t.eventos).toHaveLength(1)
+    expect(t.eventos[0].itens[0].tipo).toBe('DEBITO') // ordenado: D antes de C
+    expect(t.eventos[0].itens[0].conta.codigo).toBe('6.2.1.2')
+    expect(t.eventos[0].itens[1].conta.codigo).toBe('6.2.1.1')
+  })
+
+  it('rejeita movimento de outra entidade ou inexistente', async () => {
+    prisma.arrecadacao.findUnique.mockResolvedValue({ ...MOV, previsao: { ...MOV.previsao, orcamento: { entidadeId: 'OUTRA' } } })
+    await expect(service.trilhaDoMovimento('a1', 'ent1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+    prisma.arrecadacao.findUnique.mockResolvedValue(null)
+    await expect(service.trilhaDoMovimento('a1', 'ent1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+})
+
 describe('ArrecadacoesService.listar', () => {
   it('lista movimentos do orçamento, mais recentes primeiro', async () => {
     prisma.arrecadacao.findMany.mockResolvedValue([{ id: 'a1' }])

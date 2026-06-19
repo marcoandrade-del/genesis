@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lançamentos do movimento · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  var fmt = function(n) { return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  var estorno = movimento.tipo === 'ESTORNO'
+%>
+<div class="container py-4" style="max-width:980px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/orcamento/arrecadacao" class="text-decoration-none">Arrecadação</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Lançamentos do movimento</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h2 class="h4 fw-bold mb-0">Trilha contábil do movimento</h2>
+    <a href="/app/orcamento/arrecadacao" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+  </div>
+
+  <%# Cabeçalho do movimento orçamentário %>
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <% if (estorno) { %><span class="badge bg-danger bg-opacity-10 text-danger">Estorno de arrecadação</span>
+      <% } else { %><span class="badge bg-primary bg-opacity-10 text-primary">Arrecadação</span><% } %>
+      <span class="text-muted small"><%= new Date(movimento.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></span>
+      <span class="ms-auto font-monospace fw-bold fs-5 <%= estorno ? 'text-danger' : '' %>">R$ <%= estorno ? '−' : '' %><%= fmt(movimento.valor) %></span>
+    </div>
+    <div class="row small g-2">
+      <div class="col-md-7">
+        <div class="text-muted">Natureza da receita</div>
+        <div class="font-monospace"><%= movimento.previsao.contaReceita.codigo %> · <%= movimento.previsao.contaReceita.descricao %></div>
+      </div>
+      <div class="col-md-5">
+        <div class="text-muted">Fonte de recurso</div>
+        <div class="font-monospace"><%= movimento.previsao.fonteRecurso.codigo %> · <%= movimento.previsao.fonteRecurso.nomenclatura %></div>
+      </div>
+      <% if (movimento.contaBancaria) { %>
+        <div class="col-md-7">
+          <div class="text-muted">Conta bancária</div>
+          <div class="font-monospace"><%= movimento.contaBancaria.bancoCodigo %> ag. <%= movimento.contaBancaria.agencia %> c/c <%= movimento.contaBancaria.numero %><% if (movimento.contaBancaria.descricao) { %> — <%= movimento.contaBancaria.descricao %><% } %></div>
+        </div>
+      <% } %>
+      <% if (movimento.historico) { %>
+        <div class="col-md-5"><div class="text-muted">Histórico</div><div><%= movimento.historico %></div></div>
+      <% } %>
+    </div>
+  </div></div>
+
+  <h6 class="fw-semibold text-muted mb-2"><i class="bi bi-diagram-3 me-1"></i><%= eventos.length %> lançamento(s) contábil(is) gerado(s)</h6>
+
+  <% if (eventos.length === 0) { %>
+    <div class="alert alert-secondary py-2 small"><i class="bi bi-info-circle me-1"></i>Este movimento não gerou lançamentos contábeis (anterior à integração, ou sem evento aplicável).</div>
+  <% } %>
+
+  <% eventos.forEach(function(ev) { %>
+    <div class="card border-0 shadow-sm mb-2"><div class="card-body py-2">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-dark bg-opacity-10 text-dark font-monospace">E<%= ev.eventoCodigo %></span>
+        <span class="small text-muted"><%= ev.historico %></span>
+      </div>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+          <% ev.itens.forEach(function(it) { %>
+            <tr>
+              <td style="width:34px" class="text-center">
+                <% if (it.tipo === 'DEBITO') { %><span class="badge bg-primary bg-opacity-10 text-primary" title="Débito">D</span>
+                <% } else { %><span class="badge bg-success bg-opacity-10 text-success" title="Crédito">C</span><% } %>
+              </td>
+              <td class="small">
+                <span class="font-monospace"><%= it.conta ? it.conta.codigo : '—' %></span>
+                <span class="text-muted"><%= it.conta ? it.conta.descricao : '' %></span>
+                <% if (it.naturezaReceitaCodigo) { %><span class="badge bg-light text-muted ms-1" title="Conta-corrente: natureza da receita">nat <%= it.naturezaReceitaCodigo %></span><% } %>
+                <% if (it.fonteCodigo) { %><span class="badge bg-light text-muted ms-1" title="Conta-corrente: fonte">fonte <%= it.fonteCodigo %></span><% } %>
+              </td>
+              <td class="text-end font-monospace small" style="white-space:nowrap"><%= fmt(it.valor) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div></div>
+  <% }) %>
+</div>
+</body>
+</html>

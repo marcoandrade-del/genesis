@@ -79,7 +79,16 @@ export async function appContasRoutes(app: FastifyInstance) {
       saldoFinal: n(r.saldoFinal),
       totalDebito: n(r.totalDebito),
       totalCredito: n(r.totalCredito),
-      movimentos: r.movimentos.map((m) => ({ dia: dia2(m.data), historico: m.historico, debito: n(m.debito), credito: n(m.credito), saldo: n(m.saldo) })),
+      movimentos: r.movimentos.map((m) => ({
+        dia: dia2(m.data),
+        historico: m.historico,
+        debito: n(m.debito),
+        credito: n(m.credito),
+        saldo: n(m.saldo),
+        origemTipo: m.origemTipo ?? null,
+        origemId: m.origemId ?? null,
+        eventoCodigo: m.eventoCodigo ?? null,
+      })),
       totaisPorDia: r.totaisPorDia.map((t) => ({ dia: String(t.dia).padStart(2, '0'), debito: n(t.debito), credito: n(t.credito) })),
       layout: null,
     })

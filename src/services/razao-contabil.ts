@@ -3,7 +3,16 @@ import type { Natureza } from './saldo-contabil.js'
 
 const D0 = () => new Prisma.Decimal(0)
 
-export type ItemRazao = { data: Date; historico: string; debito: Prisma.Decimal; credito: Prisma.Decimal }
+export type ItemRazao = {
+  data: Date
+  historico: string
+  debito: Prisma.Decimal
+  credito: Prisma.Decimal
+  // Origem (rastreabilidade ←): de qual fato orçamentário o lançamento nasceu.
+  origemTipo?: string | null
+  origemId?: string | null
+  eventoCodigo?: string | null
+}
 export type MovimentoRazao = ItemRazao & { saldo: Prisma.Decimal }
 
 export type Razao = {
@@ -92,7 +101,11 @@ export class RazaoContabilService {
 
     const itensDb = await this.prisma.lancamentoItem.findMany({
       where: { contaId, lancamento: { entidadeId, data: { gte: mesInicio, lt: mesFim } } },
-      select: { tipo: true, valor: true, lancamento: { select: { data: true, historico: true } } },
+      select: {
+        tipo: true,
+        valor: true,
+        lancamento: { select: { data: true, historico: true, origemTipo: true, origemId: true, eventoCodigo: true } },
+      },
       orderBy: [{ lancamento: { data: 'asc' } }, { id: 'asc' }],
     })
 
@@ -101,6 +114,9 @@ export class RazaoContabilService {
       historico: it.lancamento.historico,
       debito: it.tipo === 'DEBITO' ? it.valor : D0(),
       credito: it.tipo === 'CREDITO' ? it.valor : D0(),
+      origemTipo: it.lancamento.origemTipo,
+      origemId: it.lancamento.origemId,
+      eventoCodigo: it.lancamento.eventoCodigo,
     }))
 
     return montarRazao(saldoAnterior, natureza, itens)

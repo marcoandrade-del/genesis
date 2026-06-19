@@ -177,6 +177,54 @@ export class ArrecadacoesService {
   }
 
   /**
+   * Trilha contábil de um movimento (para a tela "lançamentos do movimento"):
+   * o movimento + os lançamentos gerados, com código/descrição de cada conta
+   * resolvidos. Escopado à entidade (não vaza movimento de outra).
+   */
+  async trilhaDoMovimento(arrecadacaoId: string, entidadeId: string) {
+    const movimento = await this.prisma.arrecadacao.findUnique({
+      where: { id: arrecadacaoId },
+      include: {
+        previsao: {
+          include: {
+            contaReceita: { select: { codigo: true, descricao: true } },
+            fonteRecurso: { select: { codigo: true, nomenclatura: true } },
+            orcamento: { select: { entidadeId: true } },
+          },
+        },
+        contaBancaria: { select: { bancoCodigo: true, agencia: true, numero: true, descricao: true } },
+      },
+    })
+    if (!movimento || movimento.previsao.orcamento.entidadeId !== entidadeId) {
+      throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Movimento de arrecadação não encontrado.')
+    }
+
+    const lancamentos = await this.lancamentosDoMovimento(arrecadacaoId)
+    const contaIds = [...new Set(lancamentos.flatMap((l) => l.itens.map((i) => i.contaId)))]
+    const contas = await this.prisma.contaContabilEntidade.findMany({
+      where: { id: { in: contaIds } },
+      select: { id: true, codigo: true, descricao: true },
+    })
+    const porId = new Map(contas.map((c) => [c.id, c]))
+
+    const eventos = lancamentos.map((l) => ({
+      eventoCodigo: l.eventoCodigo,
+      historico: l.historico,
+      itens: l.itens
+        .slice()
+        .sort((a, b) => (a.tipo === b.tipo ? 0 : a.tipo === 'DEBITO' ? -1 : 1))
+        .map((i) => ({
+          tipo: i.tipo,
+          valor: i.valor,
+          naturezaReceitaCodigo: i.naturezaReceitaCodigo,
+          fonteCodigo: i.fonteCodigo,
+          conta: porId.get(i.contaId) ?? null,
+        })),
+    }))
+    return { movimento, eventos }
+  }
+
+  /**
    * Previsto × arrecadado do exercício: totais, por fonte (plano) e por conta
    * de receita COM roll-up (folha + ancestrais da árvore ContaReceitaEntidade)
    * — espelha o SaldoOrcamentarioService da despesa.

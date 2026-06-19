@@ -73,6 +73,25 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
     return renderTela(req, reply, entidade)
   })
 
+  // ── Trilha contábil de um movimento (lançamentos gerados) ─────
+  app.get<{ Params: { id: string } }>('/orcamento/arrecadacao/:id/lancamentos', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    try {
+      const trilha = await svc.trilhaDoMovimento(req.params.id, req.contexto.entidadeId)
+      return reply.view('app/arrecadacao-lancamentos', {
+        entidade,
+        ano: req.contexto.ano,
+        movimento: trilha.movimento,
+        eventos: trilha.eventos,
+        layout: null,
+      })
+    } catch (e) {
+      if (e instanceof ErroNegocio) return reply.code(statusDeErro(e.code)).view('404', { caminho: req.url })
+      throw e
+    }
+  })
+
   // ── Registrar movimento (arrecadação ou estorno) ─────────────
   app.post('/orcamento/arrecadacao', async (req, reply) => {
     const { entidadeId, ano, nivel } = req.contexto
