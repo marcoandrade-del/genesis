@@ -35,6 +35,13 @@
       <div class="text-muted small">Não há previsões de receita tributária (1.1.x) neste orçamento.</div>
     <% } else { %>
     <form method="post" action="/app/orcamento/lancamento-tributario" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label small fw-semibold mb-0">Tipo</label>
+        <select name="tipo" class="form-select form-select-sm">
+          <option value="LANCAMENTO" <%= v.tipo === 'INSCRICAO_DIVIDA_ATIVA' ? '' : 'selected' %>>Lançamento (constitui)</option>
+          <option value="INSCRICAO_DIVIDA_ATIVA" <%= v.tipo === 'INSCRICAO_DIVIDA_ATIVA' ? 'selected' : '' %>>Inscrição em dívida ativa</option>
+        </select>
+      </div>
       <div class="col-md-5">
         <label class="form-label small fw-semibold mb-0">Natureza tributária (× fonte)</label>
         <select name="previsaoId" class="form-select form-select-sm" required>
@@ -64,7 +71,9 @@
       <% if (lancamentos.length === 0) { %><tr><td colspan="7" class="text-center text-muted py-3">Nenhum crédito lançado.</td></tr><% } %>
       <% lancamentos.forEach(function(l){ %>
         <tr>
-          <td class="ps-3 small text-muted"><%= dbr(l.data) %></td>
+          <td class="ps-3 small text-muted"><%= dbr(l.data) %>
+            <% if (l.tipo === 'INSCRICAO_DIVIDA_ATIVA') { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis">Dívida ativa</span><% } %>
+          </td>
           <td class="small font-monospace"><%= l.previsao.contaReceita.codigo %> <span class="text-muted"><%= l.previsao.contaReceita.descricao %></span></td>
           <td class="small"><%= l.devedorNome || '—' %><% if (l.devedorDocumento) { %> <span class="text-muted">(<%= l.devedorDocumento %>)</span><% } %></td>
           <td class="small text-muted"><%= dbr(l.vencimento) %></td>

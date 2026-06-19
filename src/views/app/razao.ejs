@@ -100,6 +100,8 @@
                     <a href="/app/orcamento/arrecadacao/<%= m.origemId %>/lancamentos" class="badge bg-primary bg-opacity-10 text-primary text-decoration-none ms-1" title="Origem: arrecadação (ver movimento)"><i class="bi bi-link-45deg"></i>Arrecadação<% if (m.eventoCodigo) { %> · E<%= m.eventoCodigo %><% } %></a>
                   <% } else if (m.origemTipo === 'LANCAMENTO_TRIBUTARIO' && m.origemId) { %>
                     <a href="/app/orcamento/lancamento-tributario/<%= m.origemId %>/lancamentos" class="badge bg-info bg-opacity-10 text-info-emphasis text-decoration-none ms-1" title="Origem: lançamento tributário"><i class="bi bi-link-45deg"></i>Lançamento trib.<% if (m.eventoCodigo) { %> · E<%= m.eventoCodigo %><% } %></a>
+                  <% } else if (m.origemTipo === 'INSCRICAO_DIVIDA_ATIVA' && m.origemId) { %>
+                    <a href="/app/orcamento/lancamento-tributario/<%= m.origemId %>/lancamentos" class="badge bg-warning bg-opacity-10 text-warning-emphasis text-decoration-none ms-1" title="Origem: inscrição em dívida ativa"><i class="bi bi-link-45deg"></i>Inscrição DA<% if (m.eventoCodigo) { %> · E<%= m.eventoCodigo %><% } %></a>
                   <% } %>
                 </td>
                 <td class="valor small"><%= m.debito ? brl(m.debito) : '' %></td>

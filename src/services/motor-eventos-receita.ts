@@ -7,6 +7,7 @@ type ParametroRow = {
   indicadorReconhecimento: IndicadorReconhecimento
   contaContrapartidaCodigo: string
   contaAtivoCodigo: string | null
+  contaDividaAtivaCodigo?: string | null
 }
 
 /**
@@ -229,6 +230,43 @@ export class MotorEventosReceita {
         eventoCodigo: '550',
         descricaoEvento: 'Lançamento de crédito tributário (direito a receber)',
         itens: [leg(parametro.contaAtivoCodigo, dAtivo), leg(parametro.contaContrapartidaCodigo, dVpa)],
+      },
+    ]
+  }
+
+  /**
+   * Resolve a INSCRIÇÃO em dívida ativa — reclassificação permutativa do crédito a
+   * receber (E570 D Dívida Ativa 1.2.1.x / C baixa do crédito a receber circulante
+   * 1.1.2.x), conta-corrente = natureza. Sem VPA (a VPA já foi no lançamento).
+   */
+  async resolverInscricaoDividaAtiva(
+    ctx: { entidadeId: string; ano: number; naturezaCodigo: string; valor: Prisma.Decimal | string | number },
+    opts: { estorno?: boolean } = {},
+    tx?: Prisma.TransactionClient,
+  ): Promise<LancamentoEvento[]> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
+    const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
+    if (!parametro || !parametro.contaAtivoCodigo || !parametro.contaDividaAtivaCodigo) {
+      throw new ErroNegocio(
+        'ENTIDADE_NAO_PROCESSAVEL',
+        `A natureza ${ctx.naturezaCodigo} não tem conta de dívida ativa configurada — não há o que inscrever.`,
+      )
+    }
+    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, [parametro.contaDividaAtivaCodigo, parametro.contaAtivoCodigo], db)
+    const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
+    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
+      const id = idPorCodigo.get(codigo)
+      if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
+      return { contaId: id, tipo, valor, naturezaReceitaCodigo: ctx.naturezaCodigo, fonteCodigo: null }
+    }
+    const dDA: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
+    const dCirc: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
+    return [
+      {
+        eventoCodigo: '570',
+        descricaoEvento: 'Inscrição em dívida ativa (reclassificação do crédito)',
+        itens: [leg(parametro.contaDividaAtivaCodigo, dDA), leg(parametro.contaAtivoCodigo, dCirc)],
       },
     ]
   }

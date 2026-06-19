@@ -73,6 +73,7 @@ export async function appLancamentoTributarioRoutes(app: FastifyInstance) {
     const body = (req.body ?? {}) as Record<string, unknown>
     const dados = {
       previsaoId: String(body['previsaoId'] ?? ''),
+      tipo: String(body['tipo'] ?? 'LANCAMENTO'),
       data: String(body['data'] ?? ''),
       valor: String(body['valor'] ?? ''),
       vencimento: String(body['vencimento'] ?? ''),

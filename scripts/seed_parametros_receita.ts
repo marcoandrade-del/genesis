@@ -32,6 +32,7 @@ const PARAMETROS: Array<{
   nome: string
   indicador?: IndicadorReconhecimento
   ativo?: string
+  dividaAtiva?: string
 }> = [
   // Efetivas — não tributárias (E300 — VPA, regime de caixa)
   { natureza: '1.3.1.1.01', tipoMutacao: 'EFETIVA', contrapartida: '4.3.3.1.1.02.00.00.00.00.00.00', nome: 'Aluguéis e arrendamentos → VPA exploração imobiliária' },
@@ -40,10 +41,16 @@ const PARAMETROS: Array<{
   // Não-efetivas (E400/E500 — passivo / baixa de ativo)
   { natureza: '2.1', tipoMutacao: 'NAO_EFETIVA', contrapartida: '2.2.2.1.1.02.98.00.00.00.00.00', nome: 'Operação de crédito (capital) → passivo empréstimo interno LP' },
   { natureza: '2.2', tipoMutacao: 'NAO_EFETIVA', contrapartida: '1.2.3.1.1.01.01.00.00.00.00.00', nome: 'Alienação de bens (capital) → baixa de imobilizado' },
-  // Tributárias — competência (E550 lançamento D ativo / C VPA; E560 arrecadação baixa o ativo).
-  // Só o PRINCIPAL (multas/juros e dívida ativa = fase 2).
-  { natureza: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.2.1.02.00.00.00.00.00.00', ativo: '1.1.2.1.1.01.05.00.00.00.00.00', nome: 'IPTU Principal → VPA imposto / ativo créditos a receber IPTU' },
-  { natureza: '1.1.1.4.51.1.1', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.3.1.02.00.00.00.00.00.00', ativo: '1.1.2.1.1.01.07.00.00.00.00.00', nome: 'ISSQN Principal → VPA imposto / ativo créditos a receber ISS' },
+  // Tributárias PRINCIPAL — competência (E550 lançamento D ativo / C VPA; E560 arrecadação
+  // baixa o ativo; E570 inscrição em dívida ativa D dívida ativa / C baixa do circulante).
+  { natureza: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.2.1.02.00.00.00.00.00.00', ativo: '1.1.2.1.1.01.05.00.00.00.00.00', dividaAtiva: '1.2.1.1.1.04.01.01.05.00.00.00', nome: 'IPTU Principal → VPA / ativo IPTU / dívida ativa IPTU' },
+  { natureza: '1.1.1.4.51.1.1', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.3.1.02.00.00.00.00.00.00', ativo: '1.1.2.1.1.01.07.00.00.00.00.00', dividaAtiva: '1.2.1.1.1.04.01.01.07.00.00.00', nome: 'ISSQN Principal → VPA / ativo ISS / dívida ativa ISS' },
+  // Tributárias DÍVIDA ATIVA (…0.3 / …1.3) — arrecadação baixa o ativo de DÍVIDA ATIVA (E560).
+  { natureza: '1.1.1.2.50.0.3', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.2.1.02.00.00.00.00.00.00', ativo: '1.2.1.1.1.04.01.01.05.00.00.00', nome: 'IPTU Dívida Ativa → baixa do ativo de dívida ativa' },
+  { natureza: '1.1.1.4.51.1.3', tipoMutacao: 'EFETIVA', indicador: 'COMPETENCIA', contrapartida: '4.1.1.3.1.02.00.00.00.00.00.00', ativo: '1.2.1.1.1.04.01.01.07.00.00.00', nome: 'ISSQN Dívida Ativa → baixa do ativo de dívida ativa' },
+  // Multas e juros (…0.2 / …1.2) — receita efetiva (E300): D Caixa / C VPA de multas e juros.
+  { natureza: '1.1.1.2.50.0.2', tipoMutacao: 'EFETIVA', contrapartida: '4.4.2.4.1.05.00.00.00.00.00.00', nome: 'IPTU Multas e Juros → VPA multas e juros sobre IPTU' },
+  { natureza: '1.1.1.4.51.1.2', tipoMutacao: 'EFETIVA', contrapartida: '4.4.2.4.1.07.00.00.00.00.00.00', nome: 'ISSQN Multas e Juros → VPA multas e juros sobre ISS' },
 ]
 
 const EVENTOS: Array<{ codigo: string; descricao: string }> = [
@@ -54,6 +61,7 @@ const EVENTOS: Array<{ codigo: string; descricao: string }> = [
   { codigo: '500', descricao: 'Mutação por alienação de bens (receita não-efetiva, capital 2.2) — D 1.1.1.1.1.x Caixa / C baixa de ativo classe 1' },
   { codigo: '550', descricao: 'Lançamento de crédito tributário (competência) — D 1.1.2.x Créditos a Receber / C VPA classe 4' },
   { codigo: '560', descricao: 'Arrecadação da receita lançada — D 1.1.1.1.1.x Caixa / C 1.1.2.x baixa do crédito a receber (sem VPA nova)' },
+  { codigo: '570', descricao: 'Inscrição em dívida ativa — D 1.2.1.x Dívida Ativa / C 1.1.2.x baixa do crédito a receber circulante (reclassificação)' },
 ]
 
 async function main() {
@@ -76,6 +84,7 @@ async function main() {
           contaContrapartidaCodigo: p.contrapartida,
           indicadorReconhecimento: p.indicador ?? ('CAIXA' as IndicadorReconhecimento),
           contaAtivoCodigo: p.ativo ?? null,
+          contaDividaAtivaCodigo: p.dividaAtiva ?? null,
         }
         await prisma.parametroReceita.upsert({
           where: { modeloContabilId_naturezaCodigo: { modeloContabilId: modelo.id, naturezaCodigo: p.natureza } },

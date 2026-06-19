@@ -48,6 +48,21 @@ describe('LancamentoTributarioService.criar', () => {
     expect(itens.find((i: any) => i.tipo === 'CREDITO').contaId).toBe(`id:${VPA}`)
   })
 
+  it('tipo INSCRICAO_DIVIDA_ATIVA dispara E570 (D dívida ativa / C baixa do circulante)', async () => {
+    armar()
+    const DA = '1.2.1.1.1.04.01.01.05.00.00.00'
+    prisma.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: VPA, contaAtivoCodigo: ATIVO, contaDividaAtivaCodigo: DA },
+    ])
+    await svc.criar('o1', dados({ tipo: 'INSCRICAO_DIVIDA_ATIVA' }))
+    const lc = prisma.lancamento.create.mock.calls[0][0].data
+    expect(lc.origemTipo).toBe('INSCRICAO_DIVIDA_ATIVA')
+    expect(lc.eventoCodigo).toBe('570')
+    const itens = prisma.lancamentoItem.createMany.mock.calls[0][0].data
+    expect(itens.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${DA}`)
+    expect(itens.find((i: any) => i.tipo === 'CREDITO').contaId).toBe(`id:${ATIVO}`)
+  })
+
   it('rejeita natureza não-tributária (sem parâmetro de competência)', async () => {
     armar()
     prisma.parametroReceita.findMany.mockResolvedValue([]) // nenhuma config
