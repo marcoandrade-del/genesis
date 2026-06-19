@@ -1,10 +1,17 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma, type OrigemLancamento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
 const TIPOS = ['DEBITO', 'CREDITO'] as const
 export type TipoLancamento = (typeof TIPOS)[number]
 
-export type ItemDado = { contaId: string; tipo: TipoLancamento; valor: string }
+export type ItemDado = {
+  contaId: string
+  tipo: TipoLancamento
+  valor: string
+  // Conta-corrente (sub-razão): natureza da receita e/ou fonte. Manual = undefined.
+  naturezaReceitaCodigo?: string | null
+  fonteCodigo?: string | null
+}
 
 export type DadosCriarLancamento = {
   entidadeId: string
@@ -12,6 +19,11 @@ export type DadosCriarLancamento = {
   historico: string
   itens: ItemDado[]
   criadoPorId: string
+  // Rastreabilidade: preenchido quando o lançamento nasce de um fato orçamentário
+  // (disparo da Tabela de Eventos). Manual = undefined.
+  origemTipo?: OrigemLancamento | null
+  origemId?: string | null
+  eventoCodigo?: string | null
 }
 
 export type FiltrosListagem = {
@@ -58,7 +70,14 @@ export class LancamentosService {
     })
   }
 
-  async criar(dados: DadosCriarLancamento) {
+  /**
+   * Cria um lançamento com partida dobrada. Quando `tx` é fornecido, persiste
+   * dentro dessa transação (usado pelo disparo da Tabela de Eventos, que precisa
+   * gerar o lançamento atômico com o movimento orçamentário); sem `tx`, abre a
+   * sua própria transação.
+   */
+  async criar(dados: DadosCriarLancamento, tx?: Prisma.TransactionClient) {
+    const db = tx ?? this.prisma
     const { ano, mes } = extrairAnoMes(dados.data)
 
     if (!dados.itens || dados.itens.length < 2) {
@@ -80,12 +99,12 @@ export class LancamentosService {
       throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'Valor total do lançamento não pode ser zero.')
     }
 
-    const entidade = await this.prisma.entidade.findUnique({ where: { id: dados.entidadeId } })
+    const entidade = await db.entidade.findUnique({ where: { id: dados.entidadeId } })
     if (!entidade) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Entidade não encontrada.')
 
     // Valida cada conta: existe na cópia desta entidade no ano e admite movimento.
     const contaIds = [...new Set(dados.itens.map((i) => i.contaId))]
-    const contas = await this.prisma.contaContabilEntidade.findMany({
+    const contas = await db.contaContabilEntidade.findMany({
       where: { id: { in: contaIds } },
     })
     const porId = new Map(contas.map((c) => [c.id, c]))
@@ -116,28 +135,33 @@ export class LancamentosService {
       totaisPorConta.set(i.contaId, t)
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const lanc = await tx.lancamento.create({
+    const persistir = async (t: Prisma.TransactionClient) => {
+      const lanc = await t.lancamento.create({
         data: {
           entidadeId: dados.entidadeId,
           data: new Date(dados.data),
           historico: dados.historico,
           valor: somaD,
           criadoPorId: dados.criadoPorId,
+          origemTipo: dados.origemTipo ?? null,
+          origemId: dados.origemId ?? null,
+          eventoCodigo: dados.eventoCodigo ?? null,
         },
       })
 
-      await tx.lancamentoItem.createMany({
+      await t.lancamentoItem.createMany({
         data: dados.itens.map((i) => ({
           lancamentoId: lanc.id,
           contaId: i.contaId,
           tipo: i.tipo,
           valor: dec(i.valor),
+          naturezaReceitaCodigo: i.naturezaReceitaCodigo ?? null,
+          fonteCodigo: i.fonteCodigo ?? null,
         })),
       })
 
       for (const [contaId, { debito, credito }] of totaisPorConta) {
-        await tx.resumoMensalConta.upsert({
+        await t.resumoMensalConta.upsert({
           where: { entidadeId_contaId_ano_mes: { entidadeId: dados.entidadeId, contaId, ano, mes } },
           create: { entidadeId: dados.entidadeId, contaId, ano, mes, totalDebito: debito, totalCredito: credito },
           update: { totalDebito: { increment: debito }, totalCredito: { increment: credito } },
@@ -145,7 +169,9 @@ export class LancamentosService {
       }
 
       return lanc
-    })
+    }
+
+    return tx ? persistir(tx) : this.prisma.$transaction(persistir)
   }
 
   async excluir(id: string) {

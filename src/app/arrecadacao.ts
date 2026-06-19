@@ -89,6 +89,7 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
       data: String(body['data'] ?? ''),
       valor: String(body['valor'] ?? ''),
       historico: String(body['historico'] ?? ''),
+      criadoPorId: req.user.sub,
     }
 
     try {

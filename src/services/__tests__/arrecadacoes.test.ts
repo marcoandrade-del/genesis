@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ArrecadacoesService } from '../arrecadacoes.js'
+import { CONTAS_EVENTO } from '../motor-eventos-receita.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 
 let prisma: PrismaMock
@@ -11,7 +12,16 @@ beforeEach(() => {
 })
 
 const ORC = { id: 'o1', entidadeId: 'ent1', ano: 2026, status: 'EM_EXECUCAO' }
-const PREV = { id: 'p1', orcamentoId: 'o1', contaReceitaEntidadeId: 'cr1', fonteRecursoEntidadeId: 'fr1', valorPrevisto: '1000', valorArrecadado: '200' }
+const PREV = {
+  id: 'p1',
+  orcamentoId: 'o1',
+  contaReceitaEntidadeId: 'cr1',
+  fonteRecursoEntidadeId: 'fr1',
+  valorPrevisto: '1000',
+  valorArrecadado: '200',
+  contaReceita: { codigo: '1.3.2.1.01.1.1.05.00.00.00.00' },
+  fonteRecurso: { codigo: '1000', vinculada: false },
+}
 
 const baseDados = (over = {}) => ({
   previsaoId: 'p1',
@@ -19,14 +29,41 @@ const baseDados = (over = {}) => ({
   data: '2026-06-11',
   valor: '150.50',
   historico: 'IPTU cota única',
+  criadoPorId: 'u1',
   ...over,
 })
+
+/**
+ * Arma os mocks para o disparo contábil rodar até o fim (sem parametro → só
+ * E100+E200). contaContabilEntidade.findMany serve aos dois consumidores:
+ * o motor consulta por código; o LancamentosService consulta por id.
+ */
+function armarDisparo() {
+  prisma.entidade.findUnique.mockResolvedValue({
+    id: 'ent1',
+    municipio: { modeloContabilId: 'mod', estado: { modeloContabilId: 'mod' } },
+  })
+  prisma.parametroReceita.findMany.mockResolvedValue([])
+  prisma.contaContabilEntidade.findMany.mockImplementation(({ where }: any) => {
+    if (where?.codigo?.in) {
+      return Promise.resolve(where.codigo.in.map((codigo: string) => ({ id: `id:${codigo}`, codigo, admiteMovimento: true })))
+    }
+    if (where?.id?.in) {
+      return Promise.resolve(
+        where.id.in.map((id: string) => ({ id, codigo: id, admiteMovimento: true, entidadeId: 'ent1', ano: 2026 })),
+      )
+    }
+    return Promise.resolve([])
+  })
+  prisma.lancamento.create.mockResolvedValue({ id: 'lx' })
+}
 
 describe('ArrecadacoesService.criar', () => {
   beforeEach(() => {
     prisma.orcamento.findUnique.mockResolvedValue(ORC)
     prisma.previsaoReceita.findUnique.mockResolvedValue(PREV)
     prisma.arrecadacao.create.mockResolvedValue({ id: 'a1' })
+    armarDisparo()
   })
 
   it('cria o movimento e incrementa o valorArrecadado da previsão na transação', async () => {
@@ -40,6 +77,34 @@ describe('ArrecadacoesService.criar', () => {
     const upd = prisma.previsaoReceita.update.mock.calls[0][0]
     expect(upd.where).toEqual({ id: 'p1' })
     expect(upd.data.valorArrecadado.increment.toString()).toBe('150.5')
+  })
+
+  it('dispara os lançamentos contábeis E100/E200 com origem ARRECADACAO (rastreabilidade)', async () => {
+    await service.criar('o1', baseDados())
+    // sem parametro EFETIVO → 2 lançamentos (orçamentário + DDR)
+    expect(prisma.lancamento.create).toHaveBeenCalledTimes(2)
+    const e100 = prisma.lancamento.create.mock.calls[0][0].data
+    expect(e100.origemTipo).toBe('ARRECADACAO')
+    expect(e100.origemId).toBe('a1')
+    expect(e100.eventoCodigo).toBe('100')
+    expect(e100.valor.toString()).toBe('150.5')
+    // os itens carregam a conta-corrente (natureza no E100)
+    const itensE100 = prisma.lancamentoItem.createMany.mock.calls[0][0].data
+    expect(itensE100).toHaveLength(2)
+    expect(itensE100.every((i: any) => i.naturezaReceitaCodigo === '1.3.2.1.01.1.1.05.00.00.00.00')).toBe(true)
+    // E100 debita Receita Realizada
+    expect(itensE100.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
+  })
+
+  it('lançamentos gerados são consultáveis pelo movimento (mão dupla →)', async () => {
+    prisma.lancamento.findMany.mockResolvedValue([{ id: 'lx', eventoCodigo: '100' }])
+    const r = await service.lancamentosDoMovimento('a1')
+    expect(r).toEqual([{ id: 'lx', eventoCodigo: '100' }])
+    expect(prisma.lancamento.findMany).toHaveBeenCalledWith({
+      where: { origemTipo: 'ARRECADACAO', origemId: 'a1' },
+      include: { itens: true },
+      orderBy: { eventoCodigo: 'asc' },
+    })
   })
 
   it('ESTORNO decrementa e não pode exceder o arrecadado da previsão', async () => {
