@@ -532,24 +532,27 @@ enum OrigemLancamento {
 }
 
 // Impacto patrimonial da natureza da receita (MCASP): EFETIVA gera VPA (classe 4);
-// NAO_EFETIVA é permutativa (passivo classe 2 / baixa de ativo) — fase 2.
+// NAO_EFETIVA é permutativa (passivo classe 2 na op. de crédito / baixa de ativo na alienação).
 enum TipoMutacao {
   EFETIVA
   NAO_EFETIVA
 }
 
 // Parametrização por Natureza da Receita (a "matriz de amarração"): de/para
-// NR → conta de VPA (classe 4) + indicador de mutação. Esparsa: só as naturezas
-// configuradas. Vive no modelo (por estado), como o plano de contas.
+// NR → conta de contrapartida patrimonial + indicador de mutação. Esparsa: só as
+// naturezas configuradas. Vive no modelo (por estado), como o plano de contas.
 model ParametroReceita {
-  id               String         @id @default(uuid())
-  modeloContabilId String
-  naturezaCodigo   String // ex.: "1.3.1.1.01.1.1"
-  tipoMutacao      TipoMutacao
-  contaVpaCodigo   String // VPA a creditar quando EFETIVA, ex.: "4.3.3.1.1.02"
-  criadoEm         DateTime       @default(now())
-  atualizadoEm     DateTime       @updatedAt
-  modeloContabil   ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+  id                       String      @id @default(uuid())
+  modeloContabilId         String
+  naturezaCodigo           String // ex.: "1.3.1.1.01.1.1"
+  tipoMutacao              TipoMutacao
+  // Conta de contrapartida patrimonial a creditar no lançamento da arrecadação:
+  // VPA classe 4 (efetiva, E300), passivo classe 2 (op. crédito, E400) ou baixa de
+  // ativo classe 1 (alienação, E500). Mapeada à coluna legada "contaVpaCodigo".
+  contaContrapartidaCodigo String         @map("contaVpaCodigo")
+  criadoEm                 DateTime       @default(now())
+  atualizadoEm             DateTime       @updatedAt
+  modeloContabil           ModeloContabil @relation(fields: [modeloContabilId], references: [id])
 
   @@unique([modeloContabilId, naturezaCodigo])
   @@index([modeloContabilId])

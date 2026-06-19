@@ -99,7 +99,7 @@ describe('ArrecadacoesService.criar', () => {
   it('com conta bancária: grava a conta e o E300 debita a folha de caixa dela', async () => {
     const CAIXA = '1.1.1.1.1.99.00.00.00.00.00.00'
     prisma.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: '4.4.5.2.1.00.00.00.00.00.00.00' },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: '4.4.5.2.1.00.00.00.00.00.00.00' },
     ])
     prisma.contaBancaria.findUnique.mockResolvedValue({ id: 'cb1', entidadeId: 'ent1', fonteCodigo: '1000', ativa: true, contaContabilCodigo: CAIXA })
     await service.criar('o1', baseDados({ contaBancariaId: 'cb1' }))

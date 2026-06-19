@@ -54,7 +54,7 @@ describe('MotorEventosReceita', () => {
   it('natureza EFETIVA gera E100 + E200 + E300, todos balanceados', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
 
     const eventos = await motor(mock).resolver(baseCtx)
@@ -112,7 +112,7 @@ describe('MotorEventosReceita', () => {
   it('natureza NAO_EFETIVA não gera E300', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'NAO_EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'NAO_EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
     const eventos = await motor(mock).resolver(baseCtx)
     expect(eventos.map((e) => e.eventoCodigo)).toEqual(['100', '200'])
@@ -121,7 +121,7 @@ describe('MotorEventosReceita', () => {
   it('E300: D Caixa (cc fonte) / C VPA do de/para (cc natureza)', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
     const eventos = await motor(mock).resolver(baseCtx)
     const e300 = eventos.find((e) => e.eventoCodigo === '300')!
@@ -136,7 +136,7 @@ describe('MotorEventosReceita', () => {
   it('estorno inverte o lado de cada perna (mesmas contas)', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
     const eventos = await motor(mock).resolver(baseCtx, { estorno: true })
     const e100 = eventos.find((e) => e.eventoCodigo === '100')!
@@ -148,19 +148,52 @@ describe('MotorEventosReceita', () => {
   it('prefixo mais longo vence no de/para', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3', tipoMutacao: 'NAO_EFETIVA', contaVpaCodigo: 'x' },
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3', tipoMutacao: 'NAO_EFETIVA', contaContrapartidaCodigo: 'x' },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
     const eventos = await motor(mock).resolver(baseCtx)
     // o prefixo mais específico (1.3.2.1, EFETIVA) é o que vale → tem E300
     expect(eventos.some((e) => e.eventoCodigo === '300')).toBe(true)
   })
 
+  it('não-efetiva op. de crédito (natureza 2.1) gera E400 creditando o passivo', async () => {
+    const PASSIVO = '2.2.2.1.1.02.98.00.00.00.00.00'
+    comFolhas(mock, [...TODAS_FOLHAS, PASSIVO])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '2.1', tipoMutacao: 'NAO_EFETIVA', contaContrapartidaCodigo: PASSIVO },
+    ])
+    const eventos = await motor(mock).resolver({ ...baseCtx, naturezaCodigo: '2.1.1.9.99.0.1.17.00.00.00.00' })
+    expect(eventos.map((e) => e.eventoCodigo)).toEqual(['100', '200', '400'])
+    const e400 = eventos.find((e) => e.eventoCodigo === '400')!
+    expect(e400.itens.find((i) => i.tipo === 'DEBITO')!.contaId).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+    expect(e400.itens.find((i) => i.tipo === 'CREDITO')!.contaId).toBe(`id:${PASSIVO}`)
+  })
+
+  it('não-efetiva alienação (natureza 2.2) gera E500 creditando a baixa de ativo', async () => {
+    const ATIVO = '1.2.3.1.1.01.01.00.00.00.00.00'
+    comFolhas(mock, [...TODAS_FOLHAS, ATIVO])
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '2.2', tipoMutacao: 'NAO_EFETIVA', contaContrapartidaCodigo: ATIVO },
+    ])
+    const eventos = await motor(mock).resolver({ ...baseCtx, naturezaCodigo: '2.2.1.0.00.0.1.00.00.00.00.00' })
+    expect(eventos.map((e) => e.eventoCodigo)).toEqual(['100', '200', '500'])
+    expect(eventos.find((e) => e.eventoCodigo === '500')!.itens.find((i) => i.tipo === 'CREDITO')!.contaId).toBe(`id:${ATIVO}`)
+  })
+
+  it('não-efetiva sem caso definido (ex.: amortização 2.3) gera só E100/E200', async () => {
+    comFolhas(mock)
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '2.3', tipoMutacao: 'NAO_EFETIVA', contaContrapartidaCodigo: 'x' },
+    ])
+    const eventos = await motor(mock).resolver({ ...baseCtx, naturezaCodigo: '2.3.1.0.00.0.1.00.00.00.00.00' })
+    expect(eventos.map((e) => e.eventoCodigo)).toEqual(['100', '200'])
+  })
+
   it('caixaCodigo (conta bancária) sobrepõe o caixa default no E300', async () => {
     const OVERRIDE = '1.1.1.1.1.99.00.00.00.00.00.00'
     comFolhas(mock, [...TODAS_FOLHAS, OVERRIDE])
     mock.parametroReceita.findMany.mockResolvedValue([
-      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: VPA_APLIC },
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaContrapartidaCodigo: VPA_APLIC },
     ])
     const eventos = await motor(mock).resolver({ ...baseCtx, caixaCodigo: OVERRIDE })
     const e300 = eventos.find((e) => e.eventoCodigo === '300')!
