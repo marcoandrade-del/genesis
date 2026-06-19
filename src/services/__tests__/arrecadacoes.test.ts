@@ -96,6 +96,29 @@ describe('ArrecadacoesService.criar', () => {
     expect(itensE100.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
   })
 
+  it('com conta bancária: grava a conta e o E300 debita a folha de caixa dela', async () => {
+    const CAIXA = '1.1.1.1.1.99.00.00.00.00.00.00'
+    prisma.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', contaVpaCodigo: '4.4.5.2.1.00.00.00.00.00.00.00' },
+    ])
+    prisma.contaBancaria.findUnique.mockResolvedValue({ id: 'cb1', entidadeId: 'ent1', fonteCodigo: '1000', ativa: true, contaContabilCodigo: CAIXA })
+    await service.criar('o1', baseDados({ contaBancariaId: 'cb1' }))
+    expect(prisma.arrecadacao.create.mock.calls[0][0].data.contaBancariaId).toBe('cb1')
+    const e300call = prisma.lancamento.create.mock.calls.find((c: any) => c[0].data.eventoCodigo === '300')!
+    const lancId = e300call[0].data // header; itens vão em createMany — confere pelo último createMany do E300
+    const itensCalls = prisma.lancamentoItem.createMany.mock.calls.map((c: any) => c[0].data)
+    const itensE300 = itensCalls.find((itens: any[]) => itens.some((i) => i.contaId === `id:${CAIXA}`))
+    expect(itensE300).toBeTruthy()
+    expect(itensE300.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${CAIXA}`)
+    expect(lancId.eventoCodigo).toBe('300')
+  })
+
+  it('rejeita conta bancária de fonte diferente da previsão', async () => {
+    prisma.contaBancaria.findUnique.mockResolvedValue({ id: 'cb1', entidadeId: 'ent1', fonteCodigo: '9999', ativa: true, contaContabilCodigo: null })
+    await expect(service.criar('o1', baseDados({ contaBancariaId: 'cb1' }))).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+    expect(prisma.arrecadacao.create).not.toHaveBeenCalled()
+  })
+
   it('lançamentos gerados são consultáveis pelo movimento (mão dupla →)', async () => {
     prisma.lancamento.findMany.mockResolvedValue([{ id: 'lx', eventoCodigo: '100' }])
     const r = await service.lancamentosDoMovimento('a1')

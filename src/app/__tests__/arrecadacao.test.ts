@@ -116,7 +116,7 @@ describe('appArrecadacaoRoutes', () => {
     const res = await app.inject(POST(DADOS))
     expect(res.statusCode).toBe(302)
     expect(res.headers.location).toBe('/app/orcamento/arrecadacao')
-    expect(criarMock).toHaveBeenCalledWith('o1', { ...DADOS, criadoPorId: 'u1' })
+    expect(criarMock).toHaveBeenCalledWith('o1', { ...DADOS, criadoPorId: 'u1', contaBancariaId: '' })
   })
 
   it('POST com ErroNegocio reabre a tela com a mensagem e os valores digitados', async () => {
@@ -149,7 +149,7 @@ describe('appArrecadacaoRoutes', () => {
     criarMock.mockResolvedValue({ id: 'a1' })
     const res = await app.inject({ method: 'POST', url: '/orcamento/arrecadacao' })
     expect(res.statusCode).toBe(302)
-    expect(criarMock).toHaveBeenCalledWith('o1', { previsaoId: '', tipo: '', data: '', valor: '', historico: '', criadoPorId: 'u1' })
+    expect(criarMock).toHaveBeenCalledWith('o1', { previsaoId: '', tipo: '', data: '', valor: '', historico: '', criadoPorId: 'u1', contaBancariaId: '' })
   })
 
   it('POST redireciona se a entidade sumiu; propaga erro inesperado', async () => {

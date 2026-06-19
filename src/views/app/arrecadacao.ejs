@@ -66,10 +66,10 @@
           <div class="row g-2 align-items-end">
             <div class="col-md-5">
               <label class="form-label small fw-semibold mb-0">Previsão (conta × fonte)</label>
-              <select name="previsaoId" class="form-select form-select-sm" required>
-                <option value="">— selecione —</option>
+              <select name="previsaoId" id="previsaoSel" class="form-select form-select-sm" required>
+                <option value="" data-fonte="">— selecione —</option>
                 <% previsoes.forEach(function(p) { %>
-                  <option value="<%= p.id %>" <%= v.previsaoId === p.id ? 'selected' : '' %>>
+                  <option value="<%= p.id %>" data-fonte="<%= p.fonteRecurso.codigo %>" <%= v.previsaoId === p.id ? 'selected' : '' %>>
                     <%= p.contaReceita.codigo %> · <%= p.contaReceita.descricao %> — FR <%= p.fonteRecurso.codigo %>
                   </option>
                 <% }) %>
@@ -95,11 +95,41 @@
             </div>
           </div>
           <div class="row g-2 mt-1">
-            <div class="col-md-11">
+            <div class="col-md-6">
               <input type="text" name="historico" class="form-control form-control-sm" maxlength="200" placeholder="Histórico (opcional)" value="<%= v.historico || '' %>">
+            </div>
+            <div class="col-md-6">
+              <select name="contaBancariaId" id="contaBancariaSel" class="form-select form-select-sm">
+                <option value="" data-fonte="">— conta bancária (opcional; deriva o caixa do E300) —</option>
+                <% contasBancarias.forEach(function(cb) { %>
+                  <option value="<%= cb.id %>" data-fonte="<%= cb.fonteCodigo %>" <%= v.contaBancariaId === cb.id ? 'selected' : '' %>><%= cb.rotulo %> · FR <%= cb.fonteCodigo %></option>
+                <% }) %>
+              </select>
             </div>
           </div>
         </form>
+        <script>
+          // Filtra as contas bancárias pela fonte da previsão selecionada (DOM puro).
+          (function () {
+            var prev = document.getElementById('previsaoSel')
+            var cb = document.getElementById('contaBancariaSel')
+            if (!prev || !cb) return
+            function filtrar() {
+              var opt = prev.options[prev.selectedIndex]
+              var fonte = opt ? opt.getAttribute('data-fonte') : ''
+              for (var i = 0; i < cb.options.length; i++) {
+                var o = cb.options[i]
+                var of = o.getAttribute('data-fonte')
+                var ok = of === '' || of === fonte
+                o.hidden = !ok
+                o.disabled = !ok
+              }
+              if (cb.selectedIndex >= 0 && cb.options[cb.selectedIndex].hidden) cb.value = ''
+            }
+            prev.addEventListener('change', filtrar)
+            filtrar()
+          })()
+        </script>
         <% } %>
       </div>
     </div>

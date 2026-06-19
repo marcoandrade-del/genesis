@@ -43,6 +43,11 @@ export type ContextoArrecadacao = {
   fonteCodigo: string
   fonteVinculada: boolean
   valor: Prisma.Decimal | string | number
+  /**
+   * Folha contábil de caixa a debitar no E300 — vinda da conta bancária por onde
+   * a receita entrou. Se ausente, usa o caixa de arrecadação default da entidade.
+   */
+  caixaCodigo?: string | null
 }
 
 export type LancamentoEvento = {
@@ -75,6 +80,7 @@ export class MotorEventosReceita {
     const ddrControle = ctx.fonteVinculada
       ? CONTAS_EVENTO.ddrControleVinculado
       : CONTAS_EVENTO.ddrControleOrdinario
+    const caixa = ctx.caixaCodigo || CONTAS_EVENTO.caixaArrecadacao
 
     const codigos = [
       CONTAS_EVENTO.receitaARealizar,
@@ -82,7 +88,7 @@ export class MotorEventosReceita {
       ddrControle,
       CONTAS_EVENTO.ddrDisponibilidade,
     ]
-    if (efetiva) codigos.push(CONTAS_EVENTO.caixaArrecadacao, parametro!.contaVpaCodigo)
+    if (efetiva) codigos.push(caixa, parametro!.contaVpaCodigo)
 
     const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, codigos, db)
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
@@ -141,7 +147,7 @@ export class MotorEventosReceita {
         par(
           '300',
           'Variação patrimonial aumentativa (receita efetiva)',
-          { codigo: CONTAS_EVENTO.caixaArrecadacao, cc: { fonte: ctx.fonteCodigo } },
+          { codigo: caixa, cc: { fonte: ctx.fonteCodigo } },
           { codigo: parametro!.contaVpaCodigo, cc: { natureza: ctx.naturezaCodigo } },
         ),
       )

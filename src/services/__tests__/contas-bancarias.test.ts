@@ -65,6 +65,7 @@ describe('ContasBancariasService.criar', () => {
     expect(prisma.contaBancaria.create.mock.calls[0][0].data).toEqual({
       entidadeId: 'ent1', fonteCodigo: '500', bancoCodigo: '104', bancoNome: null,
       agencia: '0394', agenciaDv: null, numero: '123456', numeroDv: 'X', descricao: null,
+      contaContabilCodigo: null,
     })
   })
 

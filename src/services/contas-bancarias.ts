@@ -10,6 +10,7 @@ export interface DadosContaBancaria {
   numero?: string
   numeroDv?: string
   descricao?: string
+  contaContabilCodigo?: string
 }
 
 const RE_BANCO = /^\d{3}$/
@@ -68,6 +69,18 @@ export class ContasBancariasService {
       where: { entidadeId, ano },
       orderBy: { codigo: 'asc' },
       select: { codigo: true, nomenclatura: true },
+    })
+  }
+
+  /**
+   * Folhas (analíticas) de disponibilidade — Caixa e Equivalentes (classe 1.1.1) —
+   * para o select de "conta contábil" da conta bancária.
+   */
+  disponibilidadesContabeis(entidadeId: string, ano: number) {
+    return this.prisma.contaContabilEntidade.findMany({
+      where: { entidadeId, ano, admiteMovimento: true, codigo: { startsWith: '1.1.1' } },
+      orderBy: { codigo: 'asc' },
+      select: { codigo: true, descricao: true },
     })
   }
 
@@ -146,6 +159,25 @@ export class ContasBancariasService {
       throw new ErroNegocio('REQUISICAO_INVALIDA', `Fonte ${fonteCodigo} não existe para esta entidade no exercício ${ano}.`)
     }
 
+    // Conta contábil de disponibilidade (opcional): se informada, precisa ser uma
+    // folha de Caixa e Equivalentes (1.1.1.x) do plano da entidade.
+    const contaContabilCodigo = trimOuNull(dados.contaContabilCodigo)
+    if (contaContabilCodigo) {
+      const cc = await this.prisma.contaContabilEntidade.findUnique({
+        where: { entidadeId_ano_codigo: { entidadeId, ano, codigo: contaContabilCodigo } },
+        select: { admiteMovimento: true },
+      })
+      if (!cc) {
+        throw new ErroNegocio('REQUISICAO_INVALIDA', `Conta contábil ${contaContabilCodigo} não existe no plano da entidade (exercício ${ano}).`)
+      }
+      if (!cc.admiteMovimento) {
+        throw new ErroNegocio('REQUISICAO_INVALIDA', `Conta contábil ${contaContabilCodigo} é sintética — escolha uma folha (analítica).`)
+      }
+      if (!contaContabilCodigo.startsWith('1.1.1')) {
+        throw new ErroNegocio('REQUISICAO_INVALIDA', 'A conta de disponibilidade deve ser de Caixa e Equivalentes (classe 1.1.1).')
+      }
+    }
+
     return {
       fonteCodigo,
       bancoCodigo,
@@ -155,6 +187,7 @@ export class ContasBancariasService {
       numero,
       numeroDv: numeroDv ? numeroDv.toUpperCase() : null,
       descricao: trimOuNull(dados.descricao),
+      contaContabilCodigo,
     }
   }
 
