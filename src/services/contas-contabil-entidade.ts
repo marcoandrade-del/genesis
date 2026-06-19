@@ -50,6 +50,23 @@ export class ContasContabilEntidadeService {
       if (desdobramentos === 0) {
         throw new ErroNegocio('CONFLITO', 'Conta sintética do modelo não pode receber desdobramento direto — desdobre uma conta analítica.')
       }
+    } else {
+      // Analítica (1º desdobramento): se já tem saldo/movimento, o desdobramento
+      // simples deixaria os valores presos na sintética. Exige o fluxo que
+      // redistribui (épico #85) para não perder a trilha desde o início do ano.
+      const [movs, si] = await Promise.all([
+        this.prisma.lancamentoItem.count({ where: { contaId: pai.id } }),
+        this.prisma.saldoInicialAno.findUnique({
+          where: { entidadeId_contaId_ano: { entidadeId: pai.entidadeId, contaId: pai.id, ano: pai.ano } },
+          select: { valor: true },
+        }),
+      ])
+      if (movs > 0 || (si && !si.valor.isZero())) {
+        throw new ErroNegocio(
+          'CONFLITO',
+          'Esta conta já tem saldo inicial ou movimento — use "Desdobrar com distribuição" para redistribuir os valores aos filhos.',
+        )
+      }
     }
     const codigo = dados.codigo.trim()
     if (!codigo) throw new ErroNegocio('REQUISICAO_INVALIDA', 'O código é obrigatório.')
