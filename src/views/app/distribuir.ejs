@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Desdobrar com distribuição · <%= conta.codigo %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+  <style>.valor{font-variant-numeric:tabular-nums;text-align:right}.cell-v{width:120px}</style>
+</head>
+<body class="bg-light">
+
+<%- include('_navbar') %>
+
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/contas" class="text-decoration-none">Plano de Contas</a></li>
+      <li class="breadcrumb-item active">Desdobrar com distribuição</li>
+    </ol>
+  </nav>
+
+  <h2 class="h5 fw-bold mb-1"><span class="font-monospace text-muted"><%= conta.codigo %></span> <%= conta.descricao %></h2>
+  <p class="small text-muted">Exercício <%= ano %> · as movimentações e o saldo inicial serão redistribuídos para os filhos <strong>desde 1º de janeiro</strong>. A conta-mãe vira sintética.</p>
+
+  <% if (erro) { %><div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div><% } %>
+
+  <form id="form-dist" method="post" action="/app/contas/<%= conta.id %>/distribuir">
+    <input type="hidden" name="filhos" id="h-filhos">
+    <input type="hidden" name="distribuicao" id="h-dist">
+
+    <!-- FASE 1: contas filhas -->
+    <div id="fase1" class="card border-primary shadow-sm mb-3">
+      <div class="card-header bg-primary bg-opacity-10 py-2 small fw-semibold">1. Contas filhas (código · descrição · saldo inicial)</div>
+      <div class="card-body">
+        <table class="table table-sm align-middle mb-2">
+          <thead class="table-light"><tr><th style="width:200px">Código</th><th>Descrição</th><th class="cell-v">Saldo inicial</th><th style="width:40px"></th></tr></thead>
+          <tbody id="filhos"></tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-filho"><i class="bi bi-plus-lg"></i> Filho</button>
+          <div class="small font-monospace">Saldo inicial da mãe: <strong id="si-mae">0,00</strong> · digitado: <strong id="si-soma">0,00</strong> <span id="si-bal" class="badge"></span></div>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-fase2">Próximo: distribuir →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE 2: matriz de rateio dos movimentos -->
+    <div id="fase2" class="card border-primary shadow-sm mb-3" style="display:none">
+      <div class="card-header bg-primary bg-opacity-10 py-2 small fw-semibold">2. Quanto de cada movimentação vai para cada filho</div>
+      <div class="card-body">
+        <div class="table-responsive"><table class="table table-sm align-middle mb-2" id="matriz"></table></div>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-voltar1">← Voltar</button>
+          <span id="mz-bal" class="badge"></span>
+          <button type="button" class="btn btn-primary btn-sm" id="btn-fase3">Revisar →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- FASE 3: resumo -->
+    <div id="fase3" class="card border-success shadow-sm mb-3" style="display:none">
+      <div class="card-header bg-success bg-opacity-10 py-2 small fw-semibold">3. Resumo — confira e confirme</div>
+      <div class="card-body">
+        <table class="table table-sm align-middle mb-3" id="resumo">
+          <thead class="table-light"><tr><th>Conta filha</th><th class="valor">Saldo inicial</th><th class="valor">Débito</th><th class="valor">Crédito</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-voltar2">← Voltar</button>
+          <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2"></i> Confirmar e executar</button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script type="application/json" id="dados-mov"><%- JSON.stringify(movimentos) %></script>
+<script>
+  var SI_MAE = <%= saldoInicial %>
+  var MOVS = JSON.parse(document.getElementById('dados-mov').textContent || '[]')
+  var children = []
+  function el(t, p, a){ var e=document.createElement(t); if(p)Object.keys(p).forEach(function(k){e[k]=p[k]}); if(a)Object.keys(a).forEach(function(k){e.setAttribute(k,a[k])}); return e }
+  function fmt(n){ return (Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) }
+  document.getElementById('si-mae').textContent = fmt(SI_MAE)
+
+  // ── Fase 1 ──
+  var FB = document.getElementById('filhos')
+  function addFilho(codigo, desc, si){
+    var tr = el('tr')
+    var iCod = el('input',{className:'form-control form-control-sm font-monospace f-cod',placeholder:'código',value:codigo||''})
+    var iDes = el('input',{className:'form-control form-control-sm f-des',placeholder:'descrição',value:desc||''})
+    var iSi  = el('input',{type:'number',className:'form-control form-control-sm text-end f-si',value:si||'0'},{step:'0.01'})
+    var bDel = el('button',{type:'button',className:'btn btn-outline-danger btn-sm py-0 px-1',title:'Remover'}); bDel.appendChild(el('i',{className:'bi bi-x'}))
+    ;[iCod,iDes,iSi,bDel].forEach(function(c){ var td=el('td'); td.appendChild(c); tr.appendChild(td) })
+    FB.appendChild(tr)
+    bDel.addEventListener('click', function(){ tr.remove(); somaSi() })
+    iSi.addEventListener('input', somaSi)
+  }
+  function somaSi(){
+    var s=0; FB.querySelectorAll('.f-si').forEach(function(i){ s+=parseFloat(i.value)||0 })
+    document.getElementById('si-soma').textContent=fmt(s)
+    var ok=Math.abs(s-SI_MAE)<0.005
+    var b=document.getElementById('si-bal'); b.textContent= ok?'ok ✓':'difere'; b.className='badge '+(ok?'bg-success':'bg-warning text-dark')
+  }
+  document.getElementById('btn-filho').addEventListener('click', function(){ addFilho() })
+
+  // ── Fase 2: matriz ──
+  function lerFilhos(){
+    var out=[]
+    var ok=true
+    FB.querySelectorAll('tr').forEach(function(tr){
+      var cod=tr.querySelector('.f-cod').value.trim(), des=tr.querySelector('.f-des').value.trim(), si=parseFloat(tr.querySelector('.f-si').value)||0
+      if(cod) out.push({codigo:cod, descricao:des, saldoInicial:si})
+    })
+    return out
+  }
+  function montarMatriz(){
+    var mz=document.getElementById('matriz'); mz.textContent=''
+    var thead=el('thead',{className:'table-light'}), htr=el('tr')
+    htr.appendChild(el('th',{textContent:'Movimentação'}))
+    children.forEach(function(c){ htr.appendChild(el('th',{className:'valor', textContent:c.codigo})) })
+    htr.appendChild(el('th',{className:'valor', textContent:'A distribuir'}))
+    thead.appendChild(htr); mz.appendChild(thead)
+    var tb=el('tbody')
+    MOVS.forEach(function(m){
+      var tr=el('tr'); tr.dataset.mid=m.id; tr.dataset.valor=m.valor
+      var td0=el('td')
+      td0.appendChild(el('div',{className:'small', textContent:m.data+' · '+(m.tipo==='DEBITO'?'D':'C')+' '+fmt(m.valor)}))
+      td0.appendChild(el('div',{className:'small text-muted text-truncate', textContent:m.historico})); td0.style.maxWidth='340px'
+      tr.appendChild(td0)
+      children.forEach(function(c){
+        var td=el('td'); var inp=el('input',{type:'number',className:'form-control form-control-sm text-end mz-in',value:'0'},{step:'0.01','data-cod':c.codigo})
+        inp.addEventListener('input', recalcMz); td.appendChild(inp); tr.appendChild(td)
+      })
+      tr.appendChild(el('td',{className:'valor small mz-rest'}))
+      tb.appendChild(tr)
+    })
+    mz.appendChild(tb); recalcMz()
+  }
+  function recalcMz(){
+    var tudoOk = MOVS.length===0 ? false : true
+    document.querySelectorAll('#matriz tbody tr').forEach(function(tr){
+      var alvo=parseFloat(tr.dataset.valor)||0, s=0
+      tr.querySelectorAll('.mz-in').forEach(function(i){ s+=parseFloat(i.value)||0 })
+      var rest=alvo-s
+      var cell=tr.querySelector('.mz-rest'); cell.textContent=fmt(rest); cell.className='valor small mz-rest '+(Math.abs(rest)<0.005?'text-success':'text-danger fw-semibold')
+      if(Math.abs(rest)>=0.005) tudoOk=false
+    })
+    var b=document.getElementById('mz-bal'); b.textContent=tudoOk?'Tudo distribuído ✓':'Faltam linhas a fechar'; b.className='badge '+(tudoOk?'bg-success':'bg-warning text-dark')
+    document.getElementById('btn-fase3').disabled=!tudoOk
+  }
+
+  // ── Resumo ──
+  function montarResumo(){
+    var tb=document.querySelector('#resumo tbody'); tb.textContent=''
+    children.forEach(function(c){
+      var deb=0, cred=0
+      document.querySelectorAll('#matriz tbody tr').forEach(function(tr){
+        var inp=tr.querySelector('.mz-in[data-cod="'+c.codigo+'"]'); var v=inp?parseFloat(inp.value)||0:0
+        if(tr.dataset.valor && v){ var d=MOVS.find(function(m){return m.id===tr.dataset.mid}); if(d&&d.tipo==='DEBITO')deb+=v; else cred+=v }
+      })
+      var tr=el('tr')
+      tr.appendChild(el('td',{className:'font-monospace small', textContent:c.codigo+' · '+c.descricao}))
+      tr.appendChild(el('td',{className:'valor small', textContent:fmt(c.saldoInicial)}))
+      tr.appendChild(el('td',{className:'valor small', textContent:fmt(deb)}))
+      tr.appendChild(el('td',{className:'valor small', textContent:fmt(cred)}))
+      tb.appendChild(tr)
+    })
+  }
+
+  function show(id){ ['fase1','fase2','fase3'].forEach(function(f){ document.getElementById(f).style.display = f===id?'':'none' }) }
+  document.getElementById('btn-fase2').addEventListener('click', function(){
+    children=lerFilhos()
+    if(children.length<2){ alert('Cadastre ao menos 2 contas filhas.'); return }
+    var s=children.reduce(function(a,c){return a+c.saldoInicial},0)
+    if(Math.abs(s-SI_MAE)>=0.005){ alert('A soma dos saldos iniciais ('+fmt(s)+') tem que bater com o da conta ('+fmt(SI_MAE)+').'); return }
+    montarMatriz(); show('fase2')
+  })
+  document.getElementById('btn-voltar1').addEventListener('click', function(){ show('fase1') })
+  document.getElementById('btn-fase3').addEventListener('click', function(){ montarResumo(); show('fase3') })
+  document.getElementById('btn-voltar2').addEventListener('click', function(){ show('fase2') })
+
+  document.getElementById('form-dist').addEventListener('submit', function(e){
+    var dist={}
+    document.querySelectorAll('#matriz tbody tr').forEach(function(tr){
+      var partes={}
+      tr.querySelectorAll('.mz-in').forEach(function(i){ var v=parseFloat(i.value)||0; partes[i.getAttribute('data-cod')]=String(v) })
+      dist[tr.dataset.mid]=partes
+    })
+    document.getElementById('h-filhos').value=JSON.stringify(children)
+    document.getElementById('h-dist').value=JSON.stringify(dist)
+  })
+
+  // init
+  addFilho(); addFilho(); somaSi()
+</script>
+</body>
+</html>
