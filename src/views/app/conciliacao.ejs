@@ -57,14 +57,36 @@
         <form method="post" action="/app/orcamento/conciliacao/importar">
           <input type="hidden" name="contaBancariaId" value="<%= contaId %>">
           <div class="d-flex gap-2 mb-2">
-            <select name="formato" class="form-select form-select-sm" style="max-width:120px">
+            <select name="formato" id="conciliaFormato" class="form-select form-select-sm" style="max-width:120px">
               <option value="OFX">OFX</option>
               <option value="CSV">CSV</option>
+              <option value="CNAB">CNAB 240</option>
             </select>
+            <input type="file" id="conciliaFile" accept=".ofx,.csv,.ret,.cnab,.txt" class="form-control form-control-sm">
             <button type="submit" class="btn btn-sm btn-primary">Importar</button>
           </div>
-          <textarea name="conteudo" class="form-control form-control-sm font-monospace" rows="3" placeholder="Cole aqui o conteúdo do extrato (OFX ou CSV: data;valor;histórico)"></textarea>
+          <textarea name="conteudo" id="conciliaConteudo" class="form-control form-control-sm font-monospace" rows="3" placeholder="Selecione um arquivo (OFX/CSV/CNAB) ou cole o conteúdo aqui"></textarea>
         </form>
+        <script>
+          // Lê o arquivo no navegador (FileReader) para a textarea — sem upload no servidor.
+          (function () {
+            var file = document.getElementById('conciliaFile')
+            var area = document.getElementById('conciliaConteudo')
+            var fmt = document.getElementById('conciliaFormato')
+            if (!file || !area || !fmt) return
+            file.addEventListener('change', function () {
+              var f = file.files && file.files[0]
+              if (!f) return
+              var ext = (f.name.split('.').pop() || '').toLowerCase()
+              if (ext === 'ofx') fmt.value = 'OFX'
+              else if (ext === 'csv') fmt.value = 'CSV'
+              else if (ext === 'ret' || ext === 'cnab') fmt.value = 'CNAB'
+              var r = new FileReader()
+              r.onload = function () { area.value = String(r.result || '') }
+              r.readAsText(f)
+            })
+          })()
+        </script>
       </div></div></div>
       <%# Manual + auto %>
       <div class="col-lg-6"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">

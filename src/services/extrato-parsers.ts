@@ -102,9 +102,51 @@ export function parseOFX(conteudo: string): LinhaExtrato[] {
   return out
 }
 
-/** Despacha o parser pelo formato. CNAB ainda não implementado (fase 2). */
+/** Campo posicional (1-based, inclusivo) de uma linha de tamanho fixo. */
+function campo(linha: string, inicio: number, fim: number): string {
+  return linha.slice(inicio - 1, fim).trim()
+}
+
+/** Valor CNAB (centavos, sem ponto) → "1234.56". */
+function valorCnab(raw: string): string {
+  const n = Number(raw.replace(/\D/g, '')) / 100
+  return Number.isFinite(n) ? n.toFixed(2) : '0.00'
+}
+
+/**
+ * CNAB 240 — arquivo de RETORNO de cobrança (Febraban). Lê os títulos LIQUIDADOS:
+ * para cada par de detalhe Segmento T (dados do título) + Segmento U (valores pagos),
+ * emite um crédito com o valor pago e a data de crédito. Só registros com valor pago > 0.
+ * (CNAB 400 e arrecadação de convênio não são cobertos aqui.)
+ */
+export function parseCNAB240(conteudo: string): LinhaExtrato[] {
+  const linhas = conteudo.split(/\r?\n/).filter((l) => l.length >= 240)
+  if (linhas.length === 0) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Arquivo CNAB 240 inválido (linhas de 240 posições não encontradas).')
+  const out: LinhaExtrato[] = []
+  let docPendente: string | undefined
+  for (const l of linhas) {
+    if (campo(l, 8, 8) !== '3') continue // só registros de detalhe
+    const seg = campo(l, 14, 14).toUpperCase()
+    if (seg === 'T') {
+      // nº do documento (seu número) — guarda para casar com o Segmento U seguinte
+      docPendente = campo(l, 59, 73) || campo(l, 41, 58) || undefined
+    } else if (seg === 'U') {
+      const valor = valorCnab(campo(l, 78, 92)) // valor pago pelo sacado
+      const dataRaw = campo(l, 146, 153) || campo(l, 138, 145) // data crédito / ocorrência (DDMMAAAA)
+      const data = normalizarData(`${dataRaw.slice(4, 8)}${dataRaw.slice(2, 4)}${dataRaw.slice(0, 2)}`)
+      if (data && Number(valor) > 0) {
+        out.push({ data, valor, sentido: 'CREDITO', historico: 'Liquidação CNAB', documento: docPendente })
+      }
+      docPendente = undefined
+    }
+  }
+  if (out.length === 0) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Nenhum título liquidado encontrado no CNAB 240 (Segmento U com valor pago).')
+  return out
+}
+
+/** Despacha o parser pelo formato. */
 export function parseExtrato(formato: 'CSV' | 'OFX' | 'CNAB', conteudo: string): LinhaExtrato[] {
   if (formato === 'CSV') return parseCSV(conteudo)
   if (formato === 'OFX') return parseOFX(conteudo)
-  throw new ErroNegocio('REQUISICAO_INVALIDA', 'Importação CNAB ainda não disponível — use OFX, CSV ou lançamento manual.')
+  return parseCNAB240(conteudo)
 }
