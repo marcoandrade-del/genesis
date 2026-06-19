@@ -177,11 +177,11 @@
       <div class="card-body p-0">
         <table class="table table-hover table-sm align-middle mb-0">
           <thead class="table-light">
-            <tr><th class="ps-3">Data</th><th>Tipo</th><th>Conta</th><th>Fonte</th><th>Histórico</th><th class="text-end pe-3">Valor R$</th></tr>
+            <tr><th class="ps-3">Data</th><th>Tipo</th><th>Conta</th><th>Fonte</th><th>Histórico</th><th class="text-end">Valor R$</th><th class="text-end pe-3" style="width:48px">Trilha</th></tr>
           </thead>
           <tbody>
             <% if (movimentos.length === 0) { %>
-              <tr><td colspan="6" class="text-center text-muted py-3">Nenhum movimento registrado.</td></tr>
+              <tr><td colspan="7" class="text-center text-muted py-3">Nenhum movimento registrado.</td></tr>
             <% } %>
             <% movimentos.forEach(function(m) { %>
               <tr>
@@ -196,7 +196,10 @@
                 <td class="small font-monospace"><%= m.previsao.contaReceita.codigo %> <span class="text-muted"><%= m.previsao.contaReceita.descricao %></span></td>
                 <td class="small font-monospace"><%= m.previsao.fonteRecurso.codigo %></td>
                 <td class="small text-muted"><%= m.historico || '—' %></td>
-                <td class="text-end pe-3 font-monospace fw-semibold <%= m.tipo === 'ESTORNO' ? 'text-danger' : '' %>"><%= m.tipo === 'ESTORNO' ? '−' : '' %><%= fmt(m.valor) %></td>
+                <td class="text-end font-monospace fw-semibold <%= m.tipo === 'ESTORNO' ? 'text-danger' : '' %>"><%= m.tipo === 'ESTORNO' ? '−' : '' %><%= fmt(m.valor) %></td>
+                <td class="text-end pe-3">
+                  <a href="/app/orcamento/arrecadacao/<%= m.id %>/lancamentos" class="text-decoration-none" title="Ver lançamentos contábeis gerados"><i class="bi bi-diagram-3"></i></a>
+                </td>
               </tr>
             <% }) %>
           </tbody>
