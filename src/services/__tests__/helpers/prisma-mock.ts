@@ -582,6 +582,18 @@ export function criarPrismaMock() {
       delete: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
+    movimentoBancario: {
+      findUnique: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      createMany: vi.fn(),
+      update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      delete: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
     cabecalhoRelatorio: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),

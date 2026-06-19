@@ -732,8 +732,9 @@ model ContaBancaria {
   atualizadoEm        DateTime @updatedAt
   entidade            Entidade @relation(fields: [entidadeId], references: [id])
 
-  ordensPagamento OrdemPagamento[]
-  arrecadacoes    Arrecadacao[]
+  ordensPagamento     OrdemPagamento[]
+  arrecadacoes        Arrecadacao[]
+  movimentosBancarios MovimentoBancario[]
 
   @@unique([entidadeId, bancoCodigo, agencia, numero])
   @@index([entidadeId, fonteCodigo])
@@ -1080,6 +1081,8 @@ model Arrecadacao {
   criadoEm        DateTime        @default(now())
   previsao        PrevisaoReceita @relation(fields: [previsaoId], references: [id])
   contaBancaria   ContaBancaria?  @relation(fields: [contaBancariaId], references: [id])
+  // Conciliação bancária: o crédito do extrato que casa com esta arrecadação (1:1).
+  movimentoBancario MovimentoBancario?
 
   @@index([previsaoId])
   @@map("arrecadacoes")
@@ -1088,6 +1091,36 @@ model Arrecadacao {
 enum ArrecadacaoTipo {
   ARRECADACAO
   ESTORNO
+}
+
+// De onde veio um movimento do extrato bancário (conciliação).
+enum OrigemImportExtrato {
+  MANUAL
+  CSV
+  OFX
+  CNAB
+}
+
+/// Linha do extrato bancário de uma conta (conciliação). Crédito = entrada de
+/// receita; casa 1:1 com uma Arrecadacao quando conciliado.
+model MovimentoBancario {
+  id              String              @id @default(uuid())
+  contaBancariaId String
+  data            DateTime            @db.Date
+  valor           Decimal             @db.Decimal(18, 2)
+  sentido         TipoLancamento //    CREDITO = entrada (receita); DEBITO = saída
+  historico       String?
+  documento       String? //           nº do documento/identificador no extrato
+  origemImport    OrigemImportExtrato @default(MANUAL)
+  loteImport      String? //           agrupa as linhas de um mesmo import
+  arrecadacaoId   String? //           arrecadação conciliada (nulo = pendente)
+  criadoEm        DateTime            @default(now())
+  contaBancaria   ContaBancaria       @relation(fields: [contaBancariaId], references: [id])
+  arrecadacao     Arrecadacao?        @relation(fields: [arrecadacaoId], references: [id])
+
+  @@unique([arrecadacaoId]) // uma arrecadação casa com no máximo um movimento
+  @@index([contaBancariaId, data])
+  @@map("movimentos_bancarios")
 }
 
 /// Crédito adicional (Lei 4.320/1964): altera o orçamento já aprovado/em
