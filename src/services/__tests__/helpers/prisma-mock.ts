@@ -424,6 +424,13 @@ export function criarPrismaMock() {
       create: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
+    lancamentoTributario: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+    },
     acessoEntidade: {
       findUnique: vi.fn(),
       findFirst: vi.fn(),

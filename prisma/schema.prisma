@@ -529,6 +529,7 @@ enum TipoLancamento {
 // (Manual = origemTipo null.) Vai crescer conforme integramos despesa etc.
 enum OrigemLancamento {
   ARRECADACAO
+  LANCAMENTO_TRIBUTARIO
 }
 
 // Impacto patrimonial da natureza da receita (MCASP): EFETIVA gera VPA (classe 4);
@@ -536,6 +537,15 @@ enum OrigemLancamento {
 enum TipoMutacao {
   EFETIVA
   NAO_EFETIVA
+}
+
+// Momento do reconhecimento patrimonial da receita (MCASP):
+// CAIXA = reconhece na arrecadação (não tributária); COMPETENCIA = reconhece no
+// LANÇAMENTO (tributária: constitui o direito a receber e a VPA antes; a arrecadação
+// só baixa o ativo).
+enum IndicadorReconhecimento {
+  CAIXA
+  COMPETENCIA
 }
 
 // Parametrização por Natureza da Receita (a "matriz de amarração"): de/para
@@ -550,6 +560,11 @@ model ParametroReceita {
   // VPA classe 4 (efetiva, E300), passivo classe 2 (op. crédito, E400) ou baixa de
   // ativo classe 1 (alienação, E500). Mapeada à coluna legada "contaVpaCodigo".
   contaContrapartidaCodigo String         @map("contaVpaCodigo")
+  // Tributária (COMPETENCIA): reconhece o crédito no lançamento. `contaAtivoCodigo`
+  // é a conta de "créditos a receber" (classe 1.1.2.x) debitada no lançamento e
+  // baixada na arrecadação (E560). CAIXA = não tributária (E300/E400/E500).
+  indicadorReconhecimento  IndicadorReconhecimento @default(CAIXA)
+  contaAtivoCodigo         String?
   criadoEm                 DateTime       @default(now())
   atualizadoEm             DateTime       @updatedAt
   modeloContabil           ModeloContabil @relation(fields: [modeloContabilId], references: [id])
@@ -1061,10 +1076,33 @@ model PrevisaoReceita {
   contaReceita           ContaReceitaEntidade @relation(fields: [contaReceitaEntidadeId], references: [id])
   fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
   arrecadacoes           Arrecadacao[]
+  lancamentosTributarios LancamentoTributario[]
 
   @@unique([orcamentoId, contaReceitaEntidadeId, fonteRecursoEntidadeId], name: "previsao_unica")
   @@index([orcamentoId])
   @@map("previsoes_receita")
+}
+
+/// Lançamento (constituição) do crédito tributário — estágio de COMPETÊNCIA da
+/// receita tributária: reconhece o direito a receber e a VPA no fato gerador
+/// (evento E550). A arrecadação posterior só baixa o ativo (E560). Imutável —
+/// correção por estorno.
+model LancamentoTributario {
+  id               String          @id @default(uuid())
+  previsaoId       String
+  data             DateTime        @db.Date // data do lançamento / fato gerador
+  valor            Decimal         @db.Decimal(18, 2)
+  vencimento       DateTime?       @db.Date
+  devedorNome      String?
+  devedorDocumento String?
+  documento        String? //                 nº do auto/notificação/carnê
+  historico        String?
+  criadoEm         DateTime        @default(now())
+  criadoPorId      String
+  previsao         PrevisaoReceita @relation(fields: [previsaoId], references: [id])
+
+  @@index([previsaoId])
+  @@map("lancamentos_tributarios")
 }
 
 /// Movimento de arrecadação da receita (gap #5 PR-3): incide sobre uma

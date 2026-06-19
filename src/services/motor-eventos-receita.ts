@@ -1,10 +1,17 @@
-import { PrismaClient, Prisma, type TipoMutacao } from '@prisma/client'
+import { PrismaClient, Prisma, type TipoMutacao, type IndicadorReconhecimento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import type { ItemDado } from './lancamentos.js'
 
+type ParametroRow = {
+  tipoMutacao: TipoMutacao
+  indicadorReconhecimento: IndicadorReconhecimento
+  contaContrapartidaCodigo: string
+  contaAtivoCodigo: string | null
+}
+
 /**
- * Escolhe o evento patrimonial da arrecadação a partir do indicador de mutação e
- * da natureza da receita (todos têm a mesma estrutura: D Caixa / C contrapartida):
+ * Escolhe o evento patrimonial NÃO-tributário da arrecadação (regime de caixa) a
+ * partir do indicador de mutação e da natureza (mesma estrutura: D Caixa / C contrapartida):
  *  - EFETIVA                          → E300 (VPA classe 4)
  *  - NÃO-EFETIVA, capital op. crédito → E400 (passivo classe 2)   [natureza 2.1.x]
  *  - NÃO-EFETIVA, capital alienação   → E500 (baixa de ativo cl.1) [natureza 2.2.x]
@@ -16,6 +23,21 @@ function eventoPatrimonial(tipo: TipoMutacao, naturezaCodigo: string): { codigo:
   if (categoria === '2' && origem === '1') return { codigo: '400', descricao: 'Mutação por operação de crédito (passivo)' }
   if (categoria === '2' && origem === '2') return { codigo: '500', descricao: 'Mutação por alienação de bens (baixa de ativo)' }
   return null
+}
+
+/**
+ * Evento patrimonial da ARRECADAÇÃO (D Caixa / C contrapartida). Para a tributária
+ * (COMPETENCIA) a contrapartida é a BAIXA do crédito a receber (E560 — a VPA já foi
+ * reconhecida no lançamento); para a não-tributária (CAIXA) é VPA/passivo/ativo (E300/400/500).
+ */
+function patrimonialArrecadacao(parametro: ParametroRow | null, naturezaCodigo: string): { codigo: string; descricao: string; contrapartida: string } | null {
+  if (!parametro) return null
+  if (parametro.indicadorReconhecimento === 'COMPETENCIA') {
+    if (!parametro.contaAtivoCodigo) return null
+    return { codigo: '560', descricao: 'Arrecadação de receita lançada (baixa do crédito a receber)', contrapartida: parametro.contaAtivoCodigo }
+  }
+  const ev = eventoPatrimonial(parametro.tipoMutacao, naturezaCodigo)
+  return ev ? { ...ev, contrapartida: parametro.contaContrapartidaCodigo } : null
 }
 
 /**
@@ -91,7 +113,7 @@ export class MotorEventosReceita {
     const db = tx ?? this.prisma
     const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
     const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
-    const patrimonial = parametro ? eventoPatrimonial(parametro.tipoMutacao, ctx.naturezaCodigo) : null
+    const patrimonial = patrimonialArrecadacao(parametro, ctx.naturezaCodigo)
 
     const ddrControle = ctx.fonteVinculada
       ? CONTAS_EVENTO.ddrControleVinculado
@@ -104,7 +126,7 @@ export class MotorEventosReceita {
       ddrControle,
       CONTAS_EVENTO.ddrDisponibilidade,
     ]
-    if (patrimonial) codigos.push(caixa, parametro!.contaContrapartidaCodigo)
+    if (patrimonial) codigos.push(caixa, patrimonial.contrapartida)
 
     const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, codigos, db)
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
@@ -157,20 +179,58 @@ export class MotorEventosReceita {
       ),
     ]
 
-    // Evento patrimonial (E300/E400/E500): D Caixa / C contrapartida (VPA, passivo
-    // ou baixa de ativo, conforme a natureza). Mesma estrutura, conta e código variam.
+    // Evento patrimonial da arrecadação: D Caixa / C contrapartida — VPA/passivo/ativo
+    // (E300/E400/E500, regime de caixa) ou baixa do crédito a receber (E560, tributária).
     if (patrimonial) {
       eventos.push(
         par(
           patrimonial.codigo,
           patrimonial.descricao,
           { codigo: caixa, cc: { fonte: ctx.fonteCodigo } },
-          { codigo: parametro!.contaContrapartidaCodigo, cc: { natureza: ctx.naturezaCodigo } },
+          { codigo: patrimonial.contrapartida, cc: { natureza: ctx.naturezaCodigo } },
         ),
       )
     }
 
     return eventos
+  }
+
+  /**
+   * Resolve o LANÇAMENTO (constituição) do crédito tributário — estágio de
+   * COMPETÊNCIA: E550 D Créditos a Receber (ativo 1.1.2.x) / C VPA (classe 4),
+   * conta-corrente = natureza. O estorno inverte. (O orçamentário/DDR só ocorre
+   * na arrecadação posterior.)
+   */
+  async resolverLancamentoTributario(
+    ctx: { entidadeId: string; ano: number; naturezaCodigo: string; valor: Prisma.Decimal | string | number },
+    opts: { estorno?: boolean } = {},
+    tx?: Prisma.TransactionClient,
+  ): Promise<LancamentoEvento[]> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
+    const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
+    if (!parametro || parametro.indicadorReconhecimento !== 'COMPETENCIA' || !parametro.contaAtivoCodigo) {
+      throw new ErroNegocio(
+        'ENTIDADE_NAO_PROCESSAVEL',
+        `A natureza ${ctx.naturezaCodigo} não está configurada como tributária (competência) com conta de ativo — não há crédito a constituir.`,
+      )
+    }
+    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, [parametro.contaAtivoCodigo, parametro.contaContrapartidaCodigo], db)
+    const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
+    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
+      const id = idPorCodigo.get(codigo)
+      if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
+      return { contaId: id, tipo, valor, naturezaReceitaCodigo: ctx.naturezaCodigo, fonteCodigo: null }
+    }
+    const dAtivo: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
+    const dVpa: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
+    return [
+      {
+        eventoCodigo: '550',
+        descricaoEvento: 'Lançamento de crédito tributário (direito a receber)',
+        itens: [leg(parametro.contaAtivoCodigo, dAtivo), leg(parametro.contaContrapartidaCodigo, dVpa)],
+      },
+    ]
   }
 
   /** Resolve o modelo contábil que a entidade usa (município ⟶ estado). */
