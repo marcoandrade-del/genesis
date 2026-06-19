@@ -271,6 +271,58 @@ export class MotorEventosReceita {
     ]
   }
 
+  /** Saldo (devedor: D − C) de uma conta-folha da entidade no exercício, pelo código. */
+  async saldoDaConta(entidadeId: string, ano: number, contaCodigo: string, tx?: Prisma.TransactionClient): Promise<Prisma.Decimal> {
+    const db = tx ?? this.prisma
+    const conta = await db.contaContabilEntidade.findUnique({
+      where: { entidadeId_ano_codigo: { entidadeId, ano, codigo: contaCodigo } },
+      select: { id: true },
+    })
+    if (!conta) return new Prisma.Decimal(0)
+    const grp = await db.lancamentoItem.groupBy({ by: ['tipo'], where: { contaId: conta.id }, _sum: { valor: true } })
+    let d = new Prisma.Decimal(0)
+    let c = new Prisma.Decimal(0)
+    for (const g of grp) {
+      if (g.tipo === 'DEBITO') d = g._sum.valor ?? d
+      else c = g._sum.valor ?? c
+    }
+    return d.minus(c)
+  }
+
+  /**
+   * Controle da baixa parcial: a arrecadação de uma receita por COMPETÊNCIA (que
+   * baixa o ativo) não pode exceder o crédito a receber já lançado (saldo do ativo).
+   * Para naturezas de caixa (não tributárias) não há controle.
+   */
+  async validarBaixaArrecadacao(entidadeId: string, ano: number, naturezaCodigo: string, valor: Prisma.Decimal | string | number, tx?: Prisma.TransactionClient): Promise<void> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(entidadeId, db)
+    const parametro = await this.parametroPara(modeloId, naturezaCodigo, db)
+    if (!parametro || parametro.indicadorReconhecimento !== 'COMPETENCIA' || !parametro.contaAtivoCodigo) return
+    const saldo = await this.saldoDaConta(entidadeId, ano, parametro.contaAtivoCodigo, db)
+    if (new Prisma.Decimal(valor).greaterThan(saldo)) {
+      throw new ErroNegocio(
+        'ENTIDADE_NAO_PROCESSAVEL',
+        `Arrecadação excede o crédito a receber lançado para esta natureza (saldo a receber: ${saldo.toFixed(2)}). Lance o crédito antes de arrecadar.`,
+      )
+    }
+  }
+
+  /** Controle: a inscrição em dívida ativa não pode exceder o crédito a receber (circulante). */
+  async validarInscricaoDividaAtiva(entidadeId: string, ano: number, naturezaCodigo: string, valor: Prisma.Decimal | string | number, tx?: Prisma.TransactionClient): Promise<void> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(entidadeId, db)
+    const parametro = await this.parametroPara(modeloId, naturezaCodigo, db)
+    if (!parametro || !parametro.contaAtivoCodigo) return
+    const saldo = await this.saldoDaConta(entidadeId, ano, parametro.contaAtivoCodigo, db)
+    if (new Prisma.Decimal(valor).greaterThan(saldo)) {
+      throw new ErroNegocio(
+        'ENTIDADE_NAO_PROCESSAVEL',
+        `Inscrição em dívida ativa excede o crédito a receber (saldo: ${saldo.toFixed(2)}).`,
+      )
+    }
+  }
+
   /** Resolve o modelo contábil que a entidade usa (município ⟶ estado). */
   private async modeloDaEntidade(entidadeId: string, db: Db): Promise<string> {
     const entidade = await db.entidade.findUnique({

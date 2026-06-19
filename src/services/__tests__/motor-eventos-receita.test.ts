@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 import { MotorEventosReceita, CONTAS_EVENTO } from '../motor-eventos-receita.js'
 
@@ -280,5 +280,39 @@ describe('MotorEventosReceita', () => {
     )
     mock.parametroReceita.findMany.mockResolvedValue([])
     await expect(motor(mock).resolver(baseCtx)).rejects.toThrow(/Integração contábil indisponível/)
+  })
+})
+
+describe('MotorEventosReceita — controle de baixa (saldo a receber)', () => {
+  let mock: PrismaMock
+  beforeEach(() => {
+    mock = criarPrismaMock()
+    mock.entidade.findUnique.mockResolvedValue({ id: ENT, municipio: { modeloContabilId: null, estado: { modeloContabilId: MODELO } } })
+  })
+
+  it('saldoDaConta devolve débito − crédito da conta', async () => {
+    mock.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1' })
+    mock.lancamentoItem.groupBy.mockResolvedValue([
+      { tipo: 'DEBITO', _sum: { valor: new Prisma.Decimal('1000') } },
+      { tipo: 'CREDITO', _sum: { valor: new Prisma.Decimal('300') } },
+    ])
+    expect((await motor(mock).saldoDaConta(ENT, ANO, '1.1.2.x')).toString()).toBe('700')
+  })
+
+  it('validarBaixaArrecadacao barra arrecadação acima do crédito lançado (e passa dentro do saldo)', async () => {
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: 'x', contaAtivoCodigo: '1.1.2.x' },
+    ])
+    mock.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1' })
+    mock.lancamentoItem.groupBy.mockResolvedValue([{ tipo: 'DEBITO', _sum: { valor: new Prisma.Decimal('100') } }])
+    await expect(motor(mock).validarBaixaArrecadacao(ENT, ANO, '1.1.1.2.50.0.1.00', '150')).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+    await expect(motor(mock).validarBaixaArrecadacao(ENT, ANO, '1.1.1.2.50.0.1.00', '80')).resolves.toBeUndefined()
+  })
+
+  it('não controla natureza de caixa (não tributária)', async () => {
+    mock.parametroReceita.findMany.mockResolvedValue([
+      { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'CAIXA', contaContrapartidaCodigo: 'x', contaAtivoCodigo: null },
+    ])
+    await expect(motor(mock).validarBaixaArrecadacao(ENT, ANO, '1.3.2.1.01', '9999')).resolves.toBeUndefined()
   })
 })

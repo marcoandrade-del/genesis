@@ -82,6 +82,10 @@ export class LancamentoTributarioService {
         },
       })
 
+      // A inscrição em dívida ativa não pode exceder o crédito a receber (saldo do circulante).
+      if (ehInscricao) {
+        await this.motor.validarInscricaoDividaAtiva(orcamento.entidadeId, ano, previsao.contaReceita.codigo, valor, tx)
+      }
       const eventos = ehInscricao
         ? await this.motor.resolverInscricaoDividaAtiva(ctx, {}, tx)
         : await this.motor.resolverLancamentoTributario(ctx, {}, tx)

@@ -132,6 +132,12 @@ export class ArrecadacoesService {
         data: { valorArrecadado: dados.tipo === 'ARRECADACAO' ? { increment: valor } : { decrement: valor } },
       })
 
+      // Baixa parcial controlada: arrecadação de tributária (competência) não pode
+      // exceder o crédito a receber lançado (saldo do ativo).
+      if (dados.tipo === 'ARRECADACAO') {
+        await this.motor.validarBaixaArrecadacao(orcamento.entidadeId, ano, previsao.contaReceita.codigo, valor, tx)
+      }
+
       // Integração contábil (Tabela de Eventos): a arrecadação dispara os
       // lançamentos automáticos no plano de contas, na mesma transação. O estorno
       // gera os lançamentos invertidos. Rastreabilidade mão-dupla via origem*.

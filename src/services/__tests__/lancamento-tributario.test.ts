@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { Prisma } from '@prisma/client'
 import { LancamentoTributarioService } from '../lancamento-tributario.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 
@@ -54,6 +55,9 @@ describe('LancamentoTributarioService.criar', () => {
     prisma.parametroReceita.findMany.mockResolvedValue([
       { naturezaCodigo: '1.1.1.2.50.0.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'COMPETENCIA', contaContrapartidaCodigo: VPA, contaAtivoCodigo: ATIVO, contaDividaAtivaCodigo: DA },
     ])
+    // saldo a receber suficiente (crédito já lançado) para a inscrição de 500
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'ativo-id' })
+    prisma.lancamentoItem.groupBy.mockResolvedValue([{ tipo: 'DEBITO', _sum: { valor: new Prisma.Decimal('1000') } }])
     await svc.criar('o1', dados({ tipo: 'INSCRICAO_DIVIDA_ATIVA' }))
     const lc = prisma.lancamento.create.mock.calls[0][0].data
     expect(lc.origemTipo).toBe('INSCRICAO_DIVIDA_ATIVA')
