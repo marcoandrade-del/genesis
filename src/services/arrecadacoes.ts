@@ -1,5 +1,7 @@
 import { PrismaClient, Prisma, type ArrecadacaoTipo } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { MotorEventosReceita } from './motor-eventos-receita.js'
+import { LancamentosService } from './lancamentos.js'
 
 export interface DadosArrecadacao {
   previsaoId: string
@@ -7,6 +9,7 @@ export interface DadosArrecadacao {
   data: string // yyyy-mm-dd
   valor: string
   historico?: string
+  criadoPorId: string // autor (para os lançamentos contábeis gerados)
 }
 
 export interface LinhaArrecadacao {
@@ -41,7 +44,13 @@ function r2(n: number): number {
  * imutável após criado — correção é por estorno, preservando a trilha.
  */
 export class ArrecadacoesService {
-  constructor(private prisma: PrismaClient) {}
+  private motor: MotorEventosReceita
+  private lancamentos: LancamentosService
+
+  constructor(private prisma: PrismaClient) {
+    this.motor = new MotorEventosReceita(prisma)
+    this.lancamentos = new LancamentosService(prisma)
+  }
 
   /** Movimentos do orçamento, mais recentes primeiro. */
   listar(orcamentoId: string) {
@@ -68,14 +77,23 @@ export class ArrecadacoesService {
     if (!Number.isFinite(n) || n <= 0) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Valor deve ser positivo.')
     const valor = new Prisma.Decimal(dados.valor)
 
-    const previsao = await this.prisma.previsaoReceita.findUnique({ where: { id: dados.previsaoId.trim() } })
+    const previsao = await this.prisma.previsaoReceita.findUnique({
+      where: { id: dados.previsaoId.trim() },
+      include: {
+        contaReceita: { select: { codigo: true } },
+        fonteRecurso: { select: { codigo: true, vinculada: true } },
+      },
+    })
     if (!previsao || previsao.orcamentoId !== orcamentoId) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'A previsão não pertence a este orçamento.')
     }
-    // Estorno não pode deixar o arrecadado da previsão negativo.
+    // Estorno não pode deixar o arrecadado da previsão negativo (saldo a estornar).
     if (dados.tipo === 'ESTORNO' && valor.greaterThan(previsao.valorArrecadado)) {
       throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O estorno excede o valor arrecadado desta previsão.')
     }
+
+    const ano = Number(dados.data.slice(0, 4))
+    const histBase = dados.historico?.trim() || (dados.tipo === 'ESTORNO' ? 'Estorno de arrecadação' : 'Arrecadação da receita')
 
     return this.prisma.$transaction(async (tx) => {
       const mov = await tx.arrecadacao.create({
@@ -91,7 +109,47 @@ export class ArrecadacoesService {
         where: { id: previsao.id },
         data: { valorArrecadado: dados.tipo === 'ARRECADACAO' ? { increment: valor } : { decrement: valor } },
       })
+
+      // Integração contábil (Tabela de Eventos): a arrecadação dispara os
+      // lançamentos automáticos no plano de contas, na mesma transação. O estorno
+      // gera os lançamentos invertidos. Rastreabilidade mão-dupla via origem*.
+      const eventos = await this.motor.resolver(
+        {
+          entidadeId: orcamento.entidadeId,
+          ano,
+          naturezaCodigo: previsao.contaReceita.codigo,
+          fonteCodigo: previsao.fonteRecurso.codigo,
+          fonteVinculada: previsao.fonteRecurso.vinculada,
+          valor,
+        },
+        { estorno: dados.tipo === 'ESTORNO' },
+        tx,
+      )
+      for (const ev of eventos) {
+        await this.lancamentos.criar(
+          {
+            entidadeId: orcamento.entidadeId,
+            data: dados.data,
+            historico: `${ev.descricaoEvento} — ${histBase}`,
+            itens: ev.itens,
+            criadoPorId: dados.criadoPorId,
+            origemTipo: 'ARRECADACAO',
+            origemId: mov.id,
+            eventoCodigo: ev.eventoCodigo,
+          },
+          tx,
+        )
+      }
       return mov
+    })
+  }
+
+  /** Lançamentos contábeis gerados por um movimento de arrecadação (rastreabilidade →). */
+  lancamentosDoMovimento(arrecadacaoId: string) {
+    return this.prisma.lancamento.findMany({
+      where: { origemTipo: 'ARRECADACAO', origemId: arrecadacaoId },
+      include: { itens: true },
+      orderBy: { eventoCodigo: 'asc' },
     })
   }
 
