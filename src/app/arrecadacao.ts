@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { ContasBancariasService } from '../services/contas-bancarias.js'
+import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
@@ -19,6 +20,7 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
   const svc = new ArrecadacoesService(app.prisma)
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const contasBancSvc = new ContasBancariasService(app.prisma)
+  const cfgDash = new ConfiguracaoDashboardService(app.prisma)
 
   async function carregarEntidade(req: FastifyRequest, reply: FastifyReply) {
     const entidade = await app.prisma.entidade.findUnique({
@@ -49,6 +51,8 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
       orcamento ? previsoesSvc.listar(orcamento.id) : Promise.resolve([]),
       contasBancSvc.listar(entidadeId, ano),
     ])
+    const granularidade = await cfgDash.granularidade(entidadeId)
+    resumo.porConta = aplicarGranularidade(resumo.porConta, granularidade)
     if (opts.status) reply.code(opts.status)
     return reply.view('app/arrecadacao', {
       entidade,
@@ -56,6 +60,7 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
       nivel,
       orcamento,
       resumo,
+      granularidade,
       movimentos,
       previsoes,
       contasBancarias: contasBanc.filter((c) => c.ativa),

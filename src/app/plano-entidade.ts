@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 import type { SaldoContabilService } from '../services/saldo-contabil.js'
+import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -71,6 +72,7 @@ const isoData = (d: Date) => d.toISOString().slice(0, 10)
  */
 export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
   const url = `/app${cfg.rota}` // usado em links/redirects das views
+  const cfgDash = new ConfiguracaoDashboardService(app.prisma)
 
   async function carregarEntidade(req: FastifyRequest, reply: FastifyReply) {
     const entidade = await app.prisma.entidade.findUnique({
@@ -87,16 +89,21 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
   async function renderLista(req: FastifyRequest, reply: FastifyReply, entidade: unknown, opts: RenderOpts = {}) {
     const { entidadeId, ano, nivel } = req.contexto
     const contas = await cfg.listarFlat(entidadeId, ano)
+    // Estrutura (temFilhos/pode-desdobrar) usa a árvore completa; o que se EXIBE
+    // depende da granularidade do dashboard (PADRAO esconde os desdobramentos locais).
     const idsPais = new Set(contas.map((c) => c.parentId).filter(Boolean))
     // Contas que já são "desdobramento-pai" podem receber mais filhos (várias).
     const idsPaisDesdobramento = new Set(
       contas.filter((c) => c.origem === 'DESDOBRAMENTO').map((c) => c.parentId).filter(Boolean),
     )
 
+    const granularidade = await cfgDash.granularidade(entidadeId)
+    const contasVisiveis = aplicarGranularidade(contas, granularidade)
+
     const dataRef = dataRefDe(req)
     const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
 
-    const linhas = contas.map((c) => {
+    const linhas = contasVisiveis.map((c) => {
       const s = saldos?.get(c.id)
       return {
         ...c,
@@ -130,6 +137,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       ano,
       nivel,
       contas: linhas,
+      granularidade,
       podeEscrever: podeEscrever(nivel),
       comSaldos: !!cfg.saldos,
       dataRef: isoData(dataRef),

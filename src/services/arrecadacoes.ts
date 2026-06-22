@@ -21,6 +21,7 @@ export interface LinhaArrecadacao {
   previsto: number
   arrecadado: number
   saldo: number
+  origem?: string // só nas linhas por conta (MODELO|DESDOBRAMENTO) — p/ a granularidade do painel
 }
 
 export interface ResumoArrecadacao {
@@ -252,7 +253,7 @@ export class ArrecadacoesService {
 
     const contas = await this.prisma.contaReceitaEntidade.findMany({
       where: { entidadeId, ano },
-      select: { id: true, codigo: true, descricao: true, nivel: true, parentId: true },
+      select: { id: true, codigo: true, descricao: true, nivel: true, parentId: true, origem: true },
     })
     const noPorId = new Map(contas.map((c) => [c.id, c]))
 
@@ -317,7 +318,7 @@ export class ArrecadacoesService {
       porConta: contas
         .filter((c) => acumConta.has(c.id))
         .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }))
-        .map((c) => linha(c.id, c.codigo, c.descricao, c.nivel, acumConta.get(c.id)!)),
+        .map((c) => ({ ...linha(c.id, c.codigo, c.descricao, c.nivel, acumConta.get(c.id)!), origem: c.origem })),
     }
   }
 }

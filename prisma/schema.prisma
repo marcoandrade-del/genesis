@@ -729,9 +729,31 @@ model Entidade {
   relatoriosPersonalizados RelatorioPersonalizado[]
   pastasFavorito           PastaFavorito[]
   contasBancarias          ContaBancaria[]
+  configuracaoDashboard    ConfiguracaoDashboard?
 
   @@unique([municipioId, nome])
   @@map("entidades")
+}
+
+// Granularidade de exibição dos planos (contas/receita/despesa) nos painéis:
+// PADRAO mostra só as contas do plano padrão (modelo), colapsando os desdobramentos
+// locais na conta-modelo (os valores já sobem por roll-up); DESDOBRADO mostra a árvore
+// local completa (modelo + desdobramentos).
+enum GranularidadePlano {
+  PADRAO
+  DESDOBRADO
+}
+
+/// Configuração do dashboard por entidade (vale para todos os painéis que exibem os planos).
+model ConfiguracaoDashboard {
+  id                 String             @id @default(uuid())
+  entidadeId         String             @unique
+  granularidadePlano GranularidadePlano @default(DESDOBRADO)
+  criadoEm           DateTime           @default(now())
+  atualizadoEm       DateTime           @updatedAt
+  entidade           Entidade           @relation(fields: [entidadeId], references: [id])
+
+  @@map("configuracoes_dashboard")
 }
 
 // ─── Conta bancária (padrão Febraban) ────────────────────────────────────────

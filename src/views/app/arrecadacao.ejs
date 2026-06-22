@@ -24,7 +24,11 @@
     </ol>
   </nav>
 
-  <h2 class="h4 fw-bold mb-3">Arrecadação da Receita <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
+  <h2 class="h4 fw-bold mb-3">Arrecadação da Receita <span class="font-monospace fs-6 text-muted"><%= ano %></span>
+    <% if (typeof granularidade !== 'undefined' && granularidade === 'PADRAO') { %>
+      <a href="/app/configuracao" class="badge bg-info bg-opacity-10 text-info-emphasis text-decoration-none align-middle ms-1" style="font-size:.6em" title="Por conta: só o plano padrão (desdobramentos colapsados)"><i class="bi bi-diagram-2 me-1"></i>Plano padrão</a>
+    <% } %>
+  </h2>
 
   <% if (erro) { %>
     <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
