@@ -31,7 +31,29 @@ export const ROTULOS_ELEMENTO: Record<string, string> = {
   ENDERECO_ENTIDADE: 'Endereço da entidade',
 }
 
-export type ElementoLayout = { tipo: string; x: number; y: number }
+// Fontes oferecidas no editor (web-safe; também resolvem no Chromium do PDF).
+export const FONTES_PERMITIDAS = [
+  'sans-serif', 'serif', 'monospace', 'Arial', 'Times New Roman', 'Courier New', 'Georgia', 'Verdana',
+] as const
+export const ALINHAMENTOS = ['left', 'center', 'right'] as const
+export type Alinhamento = (typeof ALINHAMENTOS)[number]
+
+// Posição (x/y em %) + formatação opcional por elemento. As props de formatação
+// só são gravadas quando válidas e ≠ default, para não inchar o JSON nem mexer
+// em layouts antigos. `alinhamento` é a ÂNCORA horizontal do campo na posição x.
+export type ElementoLayout = {
+  tipo: string
+  x: number
+  y: number
+  fonte?: string
+  tamanho?: number
+  negrito?: boolean
+  italico?: boolean
+  sublinhado?: boolean
+  alinhamento?: Alinhamento
+  brasaoLargura?: number
+  brasaoAltura?: number
+}
 
 type DadosTemplate = { nome?: unknown; altura?: unknown; layout?: unknown }
 
@@ -40,6 +62,10 @@ const ALTURA_MAX = 400
 const ALTURA_PADRAO_CABECALHO = 120
 const ALTURA_PADRAO_RODAPE = 80
 const NOME_MAX = 120
+const TAMANHO_MIN = 6
+const TAMANHO_MAX = 48
+const BRASAO_DIM_MIN = 16
+const BRASAO_DIM_MAX = 400
 
 function normalizarNome(nome: unknown): string {
   const v = typeof nome === 'string' ? nome.trim() : ''
@@ -62,6 +88,28 @@ function clampPct(n: number): number {
   return Math.min(100, Math.max(0, Math.round(n * 100) / 100))
 }
 
+// Normaliza as props de formatação; inclui só as válidas e ≠ default (boolean
+// false e alinhamento 'left' são omitidos). BRASAO ganha largura/altura.
+function normalizarFormatacao(tipo: string, el: Record<string, unknown>): Partial<ElementoLayout> {
+  const out: Partial<ElementoLayout> = {}
+  if (typeof el.fonte === 'string' && (FONTES_PERMITIDAS as readonly string[]).includes(el.fonte)) {
+    out.fonte = el.fonte
+  }
+  const tam = Number(el.tamanho)
+  if (Number.isFinite(tam) && tam >= TAMANHO_MIN && tam <= TAMANHO_MAX) out.tamanho = Math.round(tam)
+  if (el.negrito === true || el.negrito === 'true') out.negrito = true
+  if (el.italico === true || el.italico === 'true') out.italico = true
+  if (el.sublinhado === true || el.sublinhado === 'true') out.sublinhado = true
+  if (el.alinhamento === 'center' || el.alinhamento === 'right') out.alinhamento = el.alinhamento
+  if (tipo === 'BRASAO') {
+    const lg = Number(el.brasaoLargura)
+    const al = Number(el.brasaoAltura)
+    if (Number.isFinite(lg) && lg >= BRASAO_DIM_MIN && lg <= BRASAO_DIM_MAX) out.brasaoLargura = Math.round(lg)
+    if (Number.isFinite(al) && al >= BRASAO_DIM_MIN && al <= BRASAO_DIM_MAX) out.brasaoAltura = Math.round(al)
+  }
+  return out
+}
+
 /**
  * Valida e normaliza a lista de elementos do layout. Cada `tipo` deve estar na
  * allowlist da faixa e aparecer no máximo uma vez; x/y são porcentagens.
@@ -73,7 +121,8 @@ function validarLayout(permitidos: readonly string[], layout: unknown): Elemento
     if (typeof el !== 'object' || el === null) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Elemento de layout inválido.')
     }
-    const { tipo, x, y } = el as Record<string, unknown>
+    const obj = el as Record<string, unknown>
+    const { tipo, x, y } = obj
     if (typeof tipo !== 'string' || !permitidos.includes(tipo)) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', `Elemento não permitido nesta faixa: ${String(tipo)}.`)
     }
@@ -84,7 +133,7 @@ function validarLayout(permitidos: readonly string[], layout: unknown): Elemento
     if (!Number.isFinite(nx) || !Number.isFinite(ny)) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Posição de elemento inválida.')
     }
-    return { tipo, x: clampPct(nx), y: clampPct(ny) }
+    return { tipo, x: clampPct(nx), y: clampPct(ny), ...normalizarFormatacao(tipo, obj) }
   })
   if (itens.length === 0) {
     throw new ErroNegocio('REQUISICAO_INVALIDA', 'Adicione ao menos um elemento à faixa.')

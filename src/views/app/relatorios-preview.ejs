@@ -6,20 +6,37 @@
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]
     })
   }
+  // CSS inline de formatação do elemento (espelha relatorio-pdf.ts). Retorna já
+  // com ';' inicial p/ concatenar após left/top, ou '' quando não há formatação.
+  function estiloElemento(el) {
+    var s = []
+    if (el.fonte) s.push('font-family:' + el.fonte)
+    if (el.tamanho) s.push('font-size:' + el.tamanho + 'px')
+    if (el.negrito) s.push('font-weight:bold')
+    if (el.italico) s.push('font-style:italic')
+    if (el.sublinhado) s.push('text-decoration:underline')
+    if (el.alinhamento === 'center') s.push('transform:translateX(-50%)')
+    else if (el.alinhamento === 'right') s.push('transform:translateX(-100%)')
+    return s.length ? ';' + s.join(';') : ''
+  }
   // Conteúdo (HTML escapado) de cada elemento de faixa, preenchido com os dados reais.
-  function conteudoEl(tipo) {
-    switch (tipo) {
-      case 'BRASAO':
-        return entidade.brasao
-          ? '<img src="' + esc(entidade.brasao) + '" style="max-height:48px;max-width:120px" alt="Brasão">'
-          : '<span class="text-muted fst-italic">Brasão</span>'
+  function conteudoEl(el) {
+    switch (el.tipo) {
+      case 'BRASAO': {
+        if (!entidade.brasao) return '<span class="text-muted fst-italic">Brasão</span>'
+        var dim = []
+        if (el.brasaoLargura) dim.push('width:' + el.brasaoLargura + 'px')
+        if (el.brasaoAltura) dim.push('height:' + el.brasaoAltura + 'px')
+        var estilo = dim.length ? dim.join(';') : 'max-height:48px;max-width:120px'
+        return '<img src="' + esc(entidade.brasao) + '" style="' + estilo + '" alt="Brasão">'
+      }
       case 'NOME_ENTIDADE': return esc(entidade.nome)
       case 'NOME_RELATORIO': return esc(relatorio.nome)
       case 'DATA_GERACAO': return esc(geradoEm.toLocaleDateString('pt-BR'))
       case 'HORA_GERACAO': return esc(geradoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
       case 'NUMERO_PAGINA': return 'Página 1 de 1'
       case 'ENDERECO_ENTIDADE': return esc(entidade.endereco || '')
-      default: return esc(tipo)
+      default: return esc(el.tipo)
     }
   }
 %>
@@ -89,7 +106,7 @@
         <% if (cabecalho) { var lc = Array.isArray(cabecalho.layout) ? cabecalho.layout : [] %>
           <div class="faixa border-bottom mb-3" style="height:<%= cabecalho.altura %>px">
             <% lc.forEach(function(el) { %>
-              <div class="el" style="left:<%= Number(el.x) || 0 %>%;top:<%= Number(el.y) || 0 %>%"><%- conteudoEl(el.tipo) %></div>
+              <div class="el" style="left:<%= Number(el.x) || 0 %>%;top:<%= Number(el.y) || 0 %>%<%= estiloElemento(el) %>"><%- conteudoEl(el) %></div>
             <% }) %>
           </div>
         <% } %>
@@ -111,7 +128,7 @@
         <% if (rodape) { var lr = Array.isArray(rodape.layout) ? rodape.layout : [] %>
           <div class="faixa border-top mt-3" style="height:<%= rodape.altura %>px">
             <% lr.forEach(function(el) { %>
-              <div class="el" style="left:<%= Number(el.x) || 0 %>%;top:<%= Number(el.y) || 0 %>%"><%- conteudoEl(el.tipo) %></div>
+              <div class="el" style="left:<%= Number(el.x) || 0 %>%;top:<%= Number(el.y) || 0 %>%<%= estiloElemento(el) %>"><%- conteudoEl(el) %></div>
             <% }) %>
           </div>
         <% } %>

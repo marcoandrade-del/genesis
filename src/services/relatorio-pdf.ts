@@ -1,5 +1,6 @@
 import { chromium, type Browser } from 'playwright'
 import { montarRender } from './relatorio-totais.js'
+import type { ElementoLayout } from './cabecalhos-rodapes.js'
 
 export type DadosFaixa = {
   nomeEntidade: string
@@ -10,19 +11,39 @@ export type DadosFaixa = {
   horaGeracao: string
 }
 export type Faixa = { altura: number; layout: unknown } | null
-type ElLayout = { tipo: string; x: number; y: number }
+type ElLayout = ElementoLayout
 export type ResultadoPdf = { colunas: string[]; linhas: unknown[][]; truncado?: boolean }
 
 function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }
 
+// CSS inline de formatação do elemento (fonte/estilo + âncora horizontal via transform).
+function estiloElemento(el: ElLayout): string {
+  const s: string[] = []
+  if (el.fonte) s.push(`font-family:${el.fonte}`)
+  if (el.tamanho) s.push(`font-size:${el.tamanho}px`)
+  if (el.negrito) s.push('font-weight:bold')
+  if (el.italico) s.push('font-style:italic')
+  if (el.sublinhado) s.push('text-decoration:underline')
+  if (el.alinhamento === 'center') s.push('transform:translateX(-50%)')
+  else if (el.alinhamento === 'right') s.push('transform:translateX(-100%)')
+  return s.join(';')
+}
+
 // Conteúdo de um elemento de faixa no PDF. NUMERO_PAGINA usa os spans nativos do
 // Playwright (pageNumber/totalPages), que ele preenche por página.
-function conteudoEl(tipo: string, d: DadosFaixa): string {
-  switch (tipo) {
-    case 'BRASAO':
-      return d.brasao ? `<img src="${esc(d.brasao)}" style="max-height:40px;max-width:120px">` : ''
+function conteudoEl(el: ElLayout, d: DadosFaixa): string {
+  switch (el.tipo) {
+    case 'BRASAO': {
+      if (!d.brasao) return ''
+      const dim = [
+        el.brasaoLargura ? `width:${el.brasaoLargura}px` : '',
+        el.brasaoAltura ? `height:${el.brasaoAltura}px` : '',
+      ].filter(Boolean).join(';')
+      const estilo = dim || 'max-height:40px;max-width:120px'
+      return `<img src="${esc(d.brasao)}" style="${estilo}">`
+    }
     case 'NOME_ENTIDADE': return esc(d.nomeEntidade)
     case 'NOME_RELATORIO': return esc(d.nomeRelatorio)
     case 'DATA_GERACAO': return esc(d.dataGeracao)
@@ -38,7 +59,10 @@ export function montarTemplateFaixa(faixa: Faixa, dados: DadosFaixa): string {
   if (!faixa) return '<span></span>'
   const lista: ElLayout[] = Array.isArray(faixa.layout) ? (faixa.layout as ElLayout[]) : []
   const els = lista
-    .map((el) => `<div style="position:absolute;left:${Number(el.x) || 0}%;top:${Number(el.y) || 0}%">${conteudoEl(el.tipo, dados)}</div>`)
+    .map((el) => {
+      const estilo = estiloElemento(el)
+      return `<div style="position:absolute;left:${Number(el.x) || 0}%;top:${Number(el.y) || 0}%${estilo ? ';' + estilo : ''}">${conteudoEl(el, dados)}</div>`
+    })
     .join('')
   return `<div style="position:relative;width:100%;height:${faixa.altura}px;font-size:10px;font-family:sans-serif;padding:0 12mm;box-sizing:border-box">${els}</div>`
 }

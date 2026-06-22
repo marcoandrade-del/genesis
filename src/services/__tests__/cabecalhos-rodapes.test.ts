@@ -234,6 +234,55 @@ describe('CabecalhosRodapesService', () => {
     })
   })
 
+  describe('formatação do layout', () => {
+    beforeEach(() => prisma.entidade.findUnique.mockResolvedValue(ENTIDADE))
+
+    async function criarComLayout(layout: unknown[]): Promise<{ layout: unknown[] }> {
+      let data: { layout: unknown[] } = { layout: [] }
+      prisma.cabecalhoRelatorio.create.mockImplementation((args: { data: { layout: unknown[] } }) => {
+        data = args.data
+        return Promise.resolve({ id: 'c1' })
+      })
+      await svc.criarCabecalho('ent1', 'u1', { nome: 'X', layout })
+      return data
+    }
+
+    it('mantém props de formatação válidas', async () => {
+      const d = await criarComLayout([
+        { tipo: 'NOME_ENTIDADE', x: 10, y: 10, fonte: 'Arial', tamanho: 16, negrito: true, italico: true, sublinhado: true, alinhamento: 'center' },
+      ])
+      expect(d.layout[0]).toEqual({
+        tipo: 'NOME_ENTIDADE', x: 10, y: 10, fonte: 'Arial', tamanho: 16,
+        negrito: true, italico: true, sublinhado: true, alinhamento: 'center',
+      })
+    })
+
+    it('descarta props inválidas/default (fonte fora da lista, tamanho fora do range, alinhamento left, boolean false)', async () => {
+      const d = await criarComLayout([
+        { tipo: 'NOME_ENTIDADE', x: 0, y: 0, fonte: 'Comic Sans', tamanho: 999, negrito: false, alinhamento: 'left' },
+      ])
+      expect(d.layout[0]).toEqual({ tipo: 'NOME_ENTIDADE', x: 0, y: 0 })
+    })
+
+    it('dimensões do brasão só valem para BRASAO e dentro do range (16–400)', async () => {
+      const d = await criarComLayout([
+        { tipo: 'BRASAO', x: 0, y: 0, brasaoLargura: 80, brasaoAltura: 5 }, // altura 5 < 16 → descarta
+        { tipo: 'NOME_ENTIDADE', x: 0, y: 0, brasaoLargura: 80 }, // ignorado em não-BRASAO
+      ])
+      expect(d.layout[0]).toEqual({ tipo: 'BRASAO', x: 0, y: 0, brasaoLargura: 80 })
+      expect(d.layout[1]).toEqual({ tipo: 'NOME_ENTIDADE', x: 0, y: 0 })
+    })
+
+    it('tamanho/dimensões em string são coagidos', async () => {
+      const d = await criarComLayout([
+        { tipo: 'NOME_ENTIDADE', x: 0, y: 0, tamanho: '20' },
+        { tipo: 'BRASAO', x: 0, y: 0, brasaoLargura: '120' },
+      ])
+      expect(d.layout[0]).toEqual({ tipo: 'NOME_ENTIDADE', x: 0, y: 0, tamanho: 20 })
+      expect(d.layout[1]).toEqual({ tipo: 'BRASAO', x: 0, y: 0, brasaoLargura: 120 })
+    })
+  })
+
   it('erros são instâncias de ErroNegocio', async () => {
     prisma.entidade.findUnique.mockResolvedValue(null)
     await expect(svc.criarCabecalho('x', 'u', { nome: 'a', layout: [] })).rejects.toBeInstanceOf(ErroNegocio)

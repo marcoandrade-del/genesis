@@ -42,6 +42,32 @@ describe('montarTemplateFaixa', () => {
     expect(html).toContain('height:100px')
   })
 
+  it('aplica formatação por elemento (fonte/estilo/âncora) e dimensões do brasão', () => {
+    const faixa = {
+      altura: 120,
+      layout: [
+        { tipo: 'NOME_ENTIDADE', x: 50, y: 10, fonte: 'Arial', tamanho: 16, negrito: true, italico: true, sublinhado: true, alinhamento: 'center' },
+        { tipo: 'NUMERO_PAGINA', x: 98, y: 90, alinhamento: 'right' },
+        { tipo: 'BRASAO', x: 2, y: 10, brasaoLargura: 80, brasaoAltura: 60 },
+      ],
+    }
+    const html = montarTemplateFaixa(faixa, DADOS)
+    expect(html).toContain('font-family:Arial')
+    expect(html).toContain('font-size:16px')
+    expect(html).toContain('font-weight:bold')
+    expect(html).toContain('font-style:italic')
+    expect(html).toContain('text-decoration:underline')
+    expect(html).toContain('transform:translateX(-50%)') // alinhamento center
+    expect(html).toContain('transform:translateX(-100%)') // alinhamento right
+    expect(html).toContain('width:80px;height:60px') // brasão dimensionado
+  })
+
+  it('elemento sem formatação não injeta estilos extras', () => {
+    const html = montarTemplateFaixa({ altura: 80, layout: [{ tipo: 'DATA_GERACAO', x: 10, y: 10 }] }, DADOS)
+    expect(html).toContain('left:10%;top:10%"')
+    expect(html).not.toContain('font-weight')
+  })
+
   it('BRASAO sem brasão fica vazio', () => {
     const html = montarTemplateFaixa({ altura: 80, layout: [{ tipo: 'BRASAO', x: 0, y: 0 }] }, { ...DADOS, brasao: null })
     expect(html).not.toContain('<img')

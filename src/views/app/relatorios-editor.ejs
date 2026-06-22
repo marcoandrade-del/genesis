@@ -15,12 +15,21 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <%- include('../layouts/_theme') %>
   <style>
+    .editor-wrap { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: 20px 1fr; }
+    .ruler-corner { background: #f1f1f1; border: 1px solid #e3e3e3; }
+    .ruler-top, .ruler-left { position: relative; background: #f7f7f7; border: 1px solid #e3e3e3; font-size: 9px; color: #999; overflow: hidden; }
+    .ruler-top .tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid #ddd; padding-left: 2px; line-height: 18px; }
+    .ruler-left .tick { position: absolute; left: 0; right: 0; border-top: 1px solid #ddd; padding-left: 2px; }
     #canvas { position: relative; border: 1px dashed var(--bs-border-color, #ccc); background: #fff; overflow: hidden; }
     #canvas .el { position: absolute; cursor: move; padding: 2px 6px; white-space: nowrap; font-size: 13px; background: rgba(159,232,112,.12); border: 1px solid rgba(0,0,0,.12); border-radius: 4px; user-select: none; touch-action: none; }
+    #canvas .el.sel { outline: 2px solid var(--bs-primary, #0d6efd); outline-offset: 1px; background: rgba(13,110,253,.10); }
     #canvas .el .rm { margin-left: 6px; color: #c00; cursor: pointer; font-weight: bold; }
     #canvas .el .ph { color: #999; font-style: italic; }
+    #canvas .guia-v { position: absolute; top: 0; bottom: 0; border-left: 1px dashed #4a90d9; display: none; pointer-events: none; }
+    #canvas .guia-h { position: absolute; left: 0; right: 0; border-top: 1px dashed #4a90d9; display: none; pointer-events: none; }
     .paleta .chip { cursor: pointer; }
     .paleta .chip.ativo { opacity: .4; pointer-events: none; }
+    #toolbar .btn.on { background: var(--bs-primary, #0d6efd); color: #fff; }
   </style>
 </head>
 <body class="bg-light">
@@ -79,9 +88,54 @@
       <% }) %>
     </div>
 
-    <label class="form-label small fw-semibold">Pré-visualização da faixa</label>
-    <div id="canvas" style="height: <%= alturaAtual %>px"></div>
-    <div class="form-text mb-3">As posições são relativas à faixa, então o modelo se adapta à largura da página na geração.</div>
+    <label class="form-label small fw-semibold">Formatação <span class="text-muted fw-normal">— selecione um elemento na faixa</span></label>
+    <div id="toolbar" class="card card-body py-2 mb-2 d-none">
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <span id="tb-alvo" class="badge bg-secondary"></span>
+        <div id="tb-texto" class="d-flex flex-wrap align-items-center gap-2">
+          <%# Manter em sincronia com FONTES_PERMITIDAS em src/services/cabecalhos-rodapes.ts %>
+          <select id="tb-fonte" class="form-select form-select-sm" style="width:auto" title="Fonte">
+            <option value="">Fonte padrão</option>
+            <option value="sans-serif">Sans-serif</option>
+            <option value="serif">Serif</option>
+            <option value="monospace">Monospace</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Verdana">Verdana</option>
+          </select>
+          <input id="tb-tamanho" type="number" min="6" max="48" class="form-control form-control-sm" style="width:84px" placeholder="px" title="Tamanho (px)">
+          <div class="btn-group btn-group-sm">
+            <button type="button" id="tb-negrito" class="btn btn-outline-secondary fw-bold" title="Negrito">N</button>
+            <button type="button" id="tb-italico" class="btn btn-outline-secondary fst-italic" title="Itálico">I</button>
+            <button type="button" id="tb-sublinhado" class="btn btn-outline-secondary text-decoration-underline" title="Sublinhado">S</button>
+          </div>
+          <div class="btn-group btn-group-sm" role="group" title="Alinhamento (âncora do campo na posição x)">
+            <button type="button" id="tb-left" class="btn btn-outline-secondary"><i class="bi bi-text-left"></i></button>
+            <button type="button" id="tb-center" class="btn btn-outline-secondary"><i class="bi bi-text-center"></i></button>
+            <button type="button" id="tb-right" class="btn btn-outline-secondary"><i class="bi bi-text-right"></i></button>
+          </div>
+        </div>
+        <div id="tb-brasao" class="d-flex align-items-center gap-2 d-none">
+          <span class="small text-muted">Brasão (px):</span>
+          <input id="tb-larg" type="number" min="16" max="400" class="form-control form-control-sm" style="width:96px" placeholder="largura" title="Largura do brasão">
+          <input id="tb-alt" type="number" min="16" max="400" class="form-control form-control-sm" style="width:96px" placeholder="altura" title="Altura do brasão">
+        </div>
+      </div>
+    </div>
+
+    <label class="form-label small fw-semibold">Pré-visualização da faixa <span class="text-muted fw-normal">— clique p/ selecionar; arraste p/ posicionar (segure Alt p/ desativar o encaixe)</span></label>
+    <div class="editor-wrap mb-1">
+      <div class="ruler-corner"></div>
+      <div class="ruler-top" id="ruler-top"></div>
+      <div class="ruler-left" id="ruler-left"></div>
+      <div id="canvas" style="height: <%= alturaAtual %>px">
+        <div class="guia-v" id="guia-v"></div>
+        <div class="guia-h" id="guia-h"></div>
+      </div>
+    </div>
+    <div class="form-text mb-3">Posições em % da faixa (réguas 0–100). O encaixe arredonda a cada 5%. O modelo se adapta à largura da página na geração.</div>
 
     <div class="d-flex gap-2">
       <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
@@ -100,38 +154,68 @@
   const inputLayout = document.getElementById('layout')
   const paleta = document.getElementById('paleta')
   const inputAltura = document.getElementById('altura')
+  const guiaV = document.getElementById('guia-v')
+  const guiaH = document.getElementById('guia-h')
+  const toolbar = document.getElementById('toolbar')
+  const ROTULOS = <%- JSON.stringify(elementos.reduce(function(acc, e){ acc[e.tipo] = e.label; return acc }, {})) %>;
 
-  // Estado: lista de { tipo, x, y } (x/y em % da faixa). Fonte da verdade.
+  // Estado: lista de { tipo, x, y, fonte?, tamanho?, negrito?, italico?, sublinhado?, alinhamento?, brasaoLargura?, brasaoAltura? }.
   let layout = Array.isArray(DADOS.layout) ? DADOS.layout.map(function(e) {
-    return { tipo: e.tipo, x: Number(e.x) || 0, y: Number(e.y) || 0 }
+    var n = { tipo: e.tipo, x: Number(e.x) || 0, y: Number(e.y) || 0 }
+    if (e.fonte) n.fonte = e.fonte
+    if (e.tamanho) n.tamanho = Number(e.tamanho)
+    if (e.negrito) n.negrito = true
+    if (e.italico) n.italico = true
+    if (e.sublinhado) n.sublinhado = true
+    if (e.alinhamento) n.alinhamento = e.alinhamento
+    if (e.brasaoLargura) n.brasaoLargura = Number(e.brasaoLargura)
+    if (e.brasaoAltura) n.brasaoAltura = Number(e.brasaoAltura)
+    return n
   }) : []
+
+  let selecionado = null
+
+  function clamp(n) { return Math.min(100, Math.max(0, Math.round(n * 100) / 100)) }
 
   function placeholder(texto) {
     const s = document.createElement('span'); s.className = 'ph'; s.textContent = texto; return s
   }
 
   // Conteúdo de amostra de cada elemento (data/hora/página são exemplos).
-  function conteudo(tipo) {
+  function conteudo(item) {
     const agora = new Date()
-    if (tipo === 'BRASAO') {
+    if (item.tipo === 'BRASAO') {
       if (DADOS.entidade.brasao) {
-        const img = document.createElement('img'); img.src = DADOS.entidade.brasao
-        img.style.maxHeight = '56px'; img.style.maxWidth = '120px'; img.alt = 'Brasão'
+        const img = document.createElement('img'); img.src = DADOS.entidade.brasao; img.alt = 'Brasão'
+        if (item.brasaoLargura) img.style.width = item.brasaoLargura + 'px'
+        if (item.brasaoAltura) img.style.height = item.brasaoAltura + 'px'
+        if (!item.brasaoLargura && !item.brasaoAltura) { img.style.maxHeight = '56px'; img.style.maxWidth = '120px' }
         return img
       }
       return placeholder('Brasão')
     }
     const s = document.createElement('span')
-    switch (tipo) {
+    switch (item.tipo) {
       case 'NOME_ENTIDADE': DADOS.entidade.nome ? s.textContent = DADOS.entidade.nome : s.appendChild(placeholder('Nome da entidade')); break
       case 'NOME_RELATORIO': s.appendChild(placeholder('Nome do relatório')); break
       case 'DATA_GERACAO': s.textContent = agora.toLocaleDateString('pt-BR'); break
       case 'HORA_GERACAO': s.textContent = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); break
       case 'NUMERO_PAGINA': s.textContent = 'Página 1 de 1'; break
       case 'ENDERECO_ENTIDADE': DADOS.entidade.endereco ? s.textContent = DADOS.entidade.endereco : s.appendChild(placeholder('Endereço da entidade')); break
-      default: s.textContent = tipo
+      default: s.textContent = item.tipo
     }
     return s
+  }
+
+  // Aplica a formatação do item ao elemento do canvas (espelha relatorio-pdf.ts / preview).
+  function aplicarEstilo(el, item) {
+    el.style.fontFamily = item.fonte || ''
+    el.style.fontSize = item.tamanho ? item.tamanho + 'px' : ''
+    el.style.fontWeight = item.negrito ? 'bold' : ''
+    el.style.fontStyle = item.italico ? 'italic' : ''
+    el.style.textDecoration = item.sublinhado ? 'underline' : ''
+    el.style.transform = item.alinhamento === 'center' ? 'translateX(-50%)'
+      : item.alinhamento === 'right' ? 'translateX(-100%)' : ''
   }
 
   function rotuloChip(tipo, ativo) {
@@ -140,13 +224,15 @@
   }
 
   function render() {
-    canvas.textContent = ''
+    // Remove só os elementos (mantém as guias, que são filhos fixos do canvas).
+    canvas.querySelectorAll('.el').forEach(function(n) { n.remove() })
     layout.forEach(function(item) {
       const el = document.createElement('div')
-      el.className = 'el'
+      el.className = 'el' + (item === selecionado ? ' sel' : '')
       el.style.left = item.x + '%'
       el.style.top = item.y + '%'
-      el.appendChild(conteudo(item.tipo))
+      aplicarEstilo(el, item)
+      el.appendChild(conteudo(item))
       const rm = document.createElement('span')
       rm.className = 'rm'; rm.textContent = '×'; rm.title = 'Remover'
       rm.addEventListener('pointerdown', function(ev) { ev.stopPropagation() })
@@ -155,7 +241,6 @@
       arrastavel(el, item)
       canvas.appendChild(el)
     })
-    // Atualiza estado visual da paleta.
     paleta.querySelectorAll('.chip').forEach(function(c) {
       rotuloChip(c.dataset.tipo, layout.some(function(i) { return i.tipo === c.dataset.tipo }))
     })
@@ -164,17 +249,65 @@
 
   function adicionar(tipo) {
     if (layout.some(function(i) { return i.tipo === tipo })) return
-    layout.push({ tipo: tipo, x: 4, y: 40 })
-    render()
+    const item = { tipo: tipo, x: 5, y: 40 }
+    layout.push(item)
+    selecionar(item)
   }
 
   function remover(tipo) {
+    if (selecionado && selecionado.tipo === tipo) selecionar(null)
     layout = layout.filter(function(i) { return i.tipo !== tipo })
     render()
   }
 
+  // ── Seleção + toolbar ───────────────────────────────────────────
+  function selecionar(item) {
+    selecionado = item
+    render()
+    atualizarToolbar()
+  }
+
+  function atualizarToolbar() {
+    if (!selecionado) { toolbar.classList.add('d-none'); return }
+    toolbar.classList.remove('d-none')
+    document.getElementById('tb-alvo').textContent = ROTULOS[selecionado.tipo] || selecionado.tipo
+    const ehBrasao = selecionado.tipo === 'BRASAO'
+    document.getElementById('tb-texto').classList.toggle('d-none', ehBrasao)
+    document.getElementById('tb-brasao').classList.toggle('d-none', !ehBrasao)
+    if (ehBrasao) {
+      document.getElementById('tb-larg').value = selecionado.brasaoLargura || ''
+      document.getElementById('tb-alt').value = selecionado.brasaoAltura || ''
+    } else {
+      document.getElementById('tb-fonte').value = selecionado.fonte || ''
+      document.getElementById('tb-tamanho').value = selecionado.tamanho || ''
+      document.getElementById('tb-negrito').classList.toggle('on', !!selecionado.negrito)
+      document.getElementById('tb-italico').classList.toggle('on', !!selecionado.italico)
+      document.getElementById('tb-sublinhado').classList.toggle('on', !!selecionado.sublinhado)
+      const al = selecionado.alinhamento || 'left'
+      document.getElementById('tb-left').classList.toggle('on', al === 'left')
+      document.getElementById('tb-center').classList.toggle('on', al === 'center')
+      document.getElementById('tb-right').classList.toggle('on', al === 'right')
+    }
+  }
+
+  function setProp(prop, val) {
+    if (!selecionado) return
+    if (val === '' || val === null || val === undefined || val === false) delete selecionado[prop]
+    else selecionado[prop] = val
+    render()
+    atualizarToolbar()
+  }
+
+  // ── Drag + snap (5%, Alt desativa) + guias ──────────────────────
+  function mostrarGuias(x, y) {
+    guiaV.style.left = x + '%'; guiaV.style.display = 'block'
+    guiaH.style.top = y + '%'; guiaH.style.display = 'block'
+  }
+  function esconderGuias() { guiaV.style.display = 'none'; guiaH.style.display = 'none' }
+
   function arrastavel(el, item) {
     el.addEventListener('pointerdown', function(ev) {
+      if (ev.target.classList.contains('rm')) return
       ev.preventDefault()
       const rect = canvas.getBoundingClientRect()
       const elRect = el.getBoundingClientRect()
@@ -184,21 +317,29 @@
       function mover(e) {
         let x = (e.clientX - offX - rect.left) / rect.width * 100
         let y = (e.clientY - offY - rect.top) / rect.height * 100
-        item.x = Math.min(100, Math.max(0, Math.round(x * 100) / 100))
-        item.y = Math.min(100, Math.max(0, Math.round(y * 100) / 100))
+        if (!e.altKey) { x = Math.round(x / 5) * 5; y = Math.round(y / 5) * 5 }
+        item.x = clamp(x); item.y = clamp(y)
         el.style.left = item.x + '%'
         el.style.top = item.y + '%'
+        mostrarGuias(item.x, item.y)
         inputLayout.value = JSON.stringify(layout)
       }
-      function soltar(e) {
+      function soltar() {
         el.releasePointerCapture(ev.pointerId)
         el.removeEventListener('pointermove', mover)
         el.removeEventListener('pointerup', soltar)
+        esconderGuias()
+        selecionar(item)
       }
       el.addEventListener('pointermove', mover)
       el.addEventListener('pointerup', soltar)
     })
   }
+
+  // Clique no canvas vazio desmarca.
+  canvas.addEventListener('pointerdown', function(ev) {
+    if (ev.target === canvas) selecionar(null)
+  })
 
   paleta.addEventListener('click', function(ev) {
     const chip = ev.target.closest('.chip')
@@ -209,6 +350,34 @@
     const h = parseInt(inputAltura.value, 10)
     if (Number.isFinite(h) && h >= 40 && h <= 400) canvas.style.height = h + 'px'
   })
+
+  // ── Wiring da toolbar ───────────────────────────────────────────
+  document.getElementById('tb-fonte').addEventListener('change', function() { setProp('fonte', this.value) })
+  document.getElementById('tb-tamanho').addEventListener('input', function() {
+    const n = parseInt(this.value, 10); setProp('tamanho', Number.isFinite(n) ? n : '')
+  })
+  document.getElementById('tb-negrito').addEventListener('click', function() { if (selecionado) setProp('negrito', !selecionado.negrito) })
+  document.getElementById('tb-italico').addEventListener('click', function() { if (selecionado) setProp('italico', !selecionado.italico) })
+  document.getElementById('tb-sublinhado').addEventListener('click', function() { if (selecionado) setProp('sublinhado', !selecionado.sublinhado) })
+  document.getElementById('tb-left').addEventListener('click', function() { setProp('alinhamento', '') })
+  document.getElementById('tb-center').addEventListener('click', function() { setProp('alinhamento', 'center') })
+  document.getElementById('tb-right').addEventListener('click', function() { setProp('alinhamento', 'right') })
+  document.getElementById('tb-larg').addEventListener('input', function() {
+    const n = parseInt(this.value, 10); setProp('brasaoLargura', Number.isFinite(n) ? n : '')
+  })
+  document.getElementById('tb-alt').addEventListener('input', function() {
+    const n = parseInt(this.value, 10); setProp('brasaoAltura', Number.isFinite(n) ? n : '')
+  })
+
+  // Réguas 0–100% (10 em 10).
+  ;(function montarReguas() {
+    const top = document.getElementById('ruler-top')
+    const left = document.getElementById('ruler-left')
+    for (let p = 0; p <= 100; p += 10) {
+      const t = document.createElement('span'); t.className = 'tick'; t.style.left = p + '%'; t.textContent = p; top.appendChild(t)
+      const l = document.createElement('span'); l.className = 'tick'; l.style.top = p + '%'; l.textContent = p; left.appendChild(l)
+    }
+  })()
 
   // Garante o hidden preenchido mesmo se o usuário salvar sem mexer no canvas.
   document.getElementById('form').addEventListener('submit', function() {
