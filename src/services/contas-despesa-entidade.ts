@@ -57,6 +57,19 @@ export class ContasDespesaEntidadeService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Dotação já executada não pode ser realocada por aqui: a movimentação da
+        // despesa (reserva/empenho→liquidação→pagamento) é imutável e só se corrige
+        // por estorno. Estorne a execução antes de desdobrar (Specs 22-06-2026, item 8).
+        const executadas = await tx.dotacaoDespesa.count({
+          where: {
+            contaDespesaEntidadeId: pai.id,
+            OR: [{ reservas: { some: {} } }, { empenhos: { some: {} } }],
+          },
+        })
+        if (executadas > 0) {
+          throw new ErroNegocio('CONFLITO', 'Esta conta de despesa já possui dotação com reserva ou empenho — estorne a execução antes de desdobrar.')
+        }
+
         const filho = await tx.contaDespesaEntidade.create({
           data: {
             entidadeId: pai.entidadeId,
@@ -68,6 +81,12 @@ export class ContasDespesaEntidadeService {
             origem: 'DESDOBRAMENTO',
             parentId: pai.id,
           },
+        })
+        // Reaponta as dotações orçamentárias da mãe para a filha analítica. Sem execução
+        // (garantido acima), é só reclassificação — nenhuma reserva/empenho a mover.
+        await tx.dotacaoDespesa.updateMany({
+          where: { contaDespesaEntidadeId: pai.id },
+          data: { contaDespesaEntidadeId: filho.id },
         })
         if (pai.admiteMovimento) {
           await tx.contaDespesaEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
