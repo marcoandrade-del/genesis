@@ -2,7 +2,7 @@ import { PrismaClient, Prisma, type TipoEmpenho } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
-import { resumirEmpenho } from './saldos-empenho.js'
+import { resumirEmpenho, validarLancamento } from './saldos-empenho.js'
 
 export type DadosEmpenho = {
   dotacaoDespesaId: string
@@ -149,25 +149,26 @@ export class EmpenhosService {
     }
   }
 
-  /** Anula um empenho ATIVO sem liquidações e estorna o empenhado na dotação. */
-  async anular(id: string, usuarioId: string, data: Date = new Date()) {
+  /**
+   * Estorna o empenho (do saldo a liquidar). O valor define se é parcial ou total —
+   * o núcleo valida `Σ estornos ≤ saldo do empenho` e a anterioridade. Ao zerar o net
+   * empenhado, vira ANULADO. Estorna o empenhado na dotação.
+   */
+  async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
     const empenho = await this.prisma.empenho.findUnique({ where: { id } })
     if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
-    if (empenho.status !== 'ATIVO') throw new ErroNegocio('CONFLITO', 'Apenas empenho ATIVO pode ser anulado.')
-    if (!new Prisma.Decimal(empenho.valorLiquidado).isZero()) {
-      throw new ErroNegocio('CONFLITO', 'Empenho com liquidações não pode ser anulado.')
-    }
+    const v = parseDecimalPositivo(valor, 'Valor do estorno')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: id } })
+    validarLancamento(movimentos, { tipo: 'ESTORNO_EMPENHO', valor: v, data }, { empenho: empenho.data })
     return this.prisma.$transaction(async (tx) => {
-      const atualizado = await tx.empenho.update({ where: { id }, data: { status: 'ANULADO' } })
-      await tx.dotacaoDespesa.update({
-        where: { id: empenho.dotacaoDespesaId },
-        data: { valorEmpenhado: { decrement: empenho.valor } },
-      })
-      // Razão: ESTORNO_EMPENHO total (anulação é all-or-nothing; sem liquidações).
       await tx.movimentoEmpenho.create({
-        data: { entidadeId: empenho.entidadeId, empenhoId: id, tipo: 'ESTORNO_EMPENHO', valor: empenho.valor, data, criadoPorId: usuarioId, historico: `Anulação do empenho ${empenho.numero}` },
+        data: { entidadeId: empenho.entidadeId, empenhoId: id, tipo: 'ESTORNO_EMPENHO', valor: v, data, criadoPorId: usuarioId, historico: `Estorno do empenho ${empenho.numero}` },
       })
-      return atualizado
+      await tx.dotacaoDespesa.update({ where: { id: empenho.dotacaoDespesaId }, data: { valorEmpenhado: { decrement: v } } })
+      if (resumirEmpenho([...movimentos, { tipo: 'ESTORNO_EMPENHO', valor: v }]).netEmpenhado.isZero()) {
+        await tx.empenho.update({ where: { id }, data: { status: 'ANULADO' } })
+      }
+      return { id, estornado: v.toFixed(2) }
     })
   }
 

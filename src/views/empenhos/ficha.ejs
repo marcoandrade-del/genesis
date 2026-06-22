@@ -59,6 +59,17 @@
     <span>Saldo a liquidar: <strong class="font-monospace"><%= brl(resumo.saldoEmpenho) %></strong></span>
     <span>Saldo a pagar: <strong class="font-monospace"><%= brl(resumo.saldoAPagar) %></strong></span>
   </div>
+  <% const saldoEmp = Number(resumo.saldoEmpenho) %>
+  <% if (saldoEmp > 0) { %>
+    <form class="row g-2 align-items-end justify-content-end mt-2 pt-3 border-top" hx-post="/admin/empenhos/<%= empenho.id %>/estornar"
+      hx-confirm="Confirmar o estorno do empenho?" data-confirm-titulo="Estornar empenho" data-confirm-tipo="danger" data-confirm-ok="Estornar">
+      <div class="col-auto"><label class="form-label small mb-1">Estornar empenho — valor</label>
+        <input type="number" name="valor" step="0.01" min="0.01" max="<%= saldoEmp.toFixed(2) %>" value="<%= saldoEmp.toFixed(2) %>" class="form-control form-control-sm font-monospace text-end" style="width:140px" required></div>
+      <div class="col-auto"><label class="form-label small mb-1">Data</label>
+        <input type="date" name="data" value="<%= new Date().toISOString().slice(0, 10) %>" class="form-control form-control-sm" required></div>
+      <div class="col-auto"><button class="btn btn-outline-danger btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Estornar</button></div>
+    </form>
+  <% } %>
 </div></div>
 
 <div class="card border-0 shadow-sm"><div class="card-body p-0">

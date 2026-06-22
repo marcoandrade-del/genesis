@@ -14,7 +14,8 @@ beforeEach(() => {
 function dadosOk(over: Partial<Record<string, unknown>> = {}) {
   return { liquidacaoId: 'l1', numero: 'OP-001', valor: '200', contaBancariaId: 'cb1', ...over } as never
 }
-// liquidação: valor 300, já pago 100 → disponível 200; empenho na fonte 500
+const D = (v: string | number) => new Prisma.Decimal(v)
+// liquidação 300, já pago 100 (na razão) → saldo da liquidação = 200; empenho na fonte 500
 function mockLiq(over: Partial<Record<string, unknown>> = {}) {
   prisma.liquidacao.findUnique.mockResolvedValue({
     id: 'l1',
@@ -24,9 +25,14 @@ function mockLiq(over: Partial<Record<string, unknown>> = {}) {
     status: 'ATIVA',
     valor: '300',
     valorPago: '100',
-    empenho: { dotacaoDespesa: { fonteRecurso: { codigo: '500', nomenclatura: 'Recursos Livres' } } },
+    empenho: { data: new Date('2026-01-05'), dotacaoDespesa: { fonteRecurso: { codigo: '500', nomenclatura: 'Recursos Livres' } } },
     ...over,
   })
+  prisma.movimentoEmpenho.findMany.mockResolvedValue([
+    { tipo: 'EMPENHO', valor: D(500) },
+    { tipo: 'LIQUIDACAO', valor: D(300), liquidacaoId: 'l1' },
+    { tipo: 'PAGAMENTO', valor: D(100), liquidacaoId: 'l1', ordemPagamentoId: 'p0' },
+  ])
 }
 // conta bancária ativa da fonte 500 (a mesma do empenho)
 function mockConta(over: Partial<Record<string, unknown>> = {}) {
@@ -146,22 +152,40 @@ describe('OrdensPagamentoService.confirmar / cancelar', () => {
     prisma.ordemPagamento.findUnique.mockResolvedValue({ id: 'op1', status: 'PAGA', comprovante: null })
     await expect(service.confirmarPagamento('op1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
-  it('OP inexistente → RECURSO_NAO_ENCONTRADO; cancelar OP já cancelada → CONFLITO', async () => {
+  it('OP inexistente → RECURSO_NAO_ENCONTRADO', async () => {
     prisma.ordemPagamento.findUnique.mockResolvedValue(null)
     await expect(service.confirmarPagamento('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
-    await expect(service.cancelar('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
-    prisma.ordemPagamento.findUnique.mockResolvedValue({ id: 'op1', status: 'CANCELADA' })
-    await expect(service.cancelar('op1')).rejects.toMatchObject({ code: 'CONFLITO' })
+    await expect(service.estornar('x', '10', 'u1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
 
-  it('cancela e estorna o valor pago', async () => {
-    prisma.ordemPagamento.findUnique.mockResolvedValue({ id: 'op1', entidadeId: 'ent1', numero: 'OP-1', status: 'EMITIDA', liquidacaoId: 'l1', valor: new Prisma.Decimal('200'), liquidacao: { empenhoId: 'e1' } })
+  // OP op1: paga 200 (na razão) → pode estornar até 200
+  function mockOp() {
+    prisma.ordemPagamento.findUnique.mockResolvedValue({ id: 'op1', entidadeId: 'ent1', numero: 'OP-1', status: 'PAGA', liquidacaoId: 'l1', valor: D(200), data: new Date('2026-02-01'), liquidacao: { empenhoId: 'e1' } })
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: D(500) },
+      { tipo: 'LIQUIDACAO', valor: D(300), liquidacaoId: 'l1' },
+      { tipo: 'PAGAMENTO', valor: D(200), liquidacaoId: 'l1', ordemPagamentoId: 'op1' },
+    ])
+  }
+  it('estorno total do pagamento zera o pago e marca CANCELADA', async () => {
+    mockOp()
     prisma.ordemPagamento.update.mockResolvedValue({ id: 'op1', status: 'CANCELADA' })
-    await service.cancelar('op1', 'u1')
+    await service.estornar('op1', '200', 'u1', new Date('2026-03-01'))
     expect(prisma.liquidacao.update.mock.calls[0][0].data.valorPago.decrement.toString()).toBe('200')
-    // razão: ESTORNO_PAGAMENTO total da OP
     const m = prisma.movimentoEmpenho.create.mock.calls[0][0].data
     expect(m).toMatchObject({ tipo: 'ESTORNO_PAGAMENTO', empenhoId: 'e1', liquidacaoId: 'l1', ordemPagamentoId: 'op1', criadoPorId: 'u1' })
     expect(m.valor.toString()).toBe('200')
+    expect(prisma.ordemPagamento.update).toHaveBeenCalledWith({ where: { id: 'op1' }, data: { status: 'CANCELADA' } })
+  })
+  it('estorno parcial não cancela a OP', async () => {
+    mockOp()
+    await service.estornar('op1', '50', 'u1', new Date('2026-03-01'))
+    expect(prisma.ordemPagamento.update).not.toHaveBeenCalled()
+    expect(prisma.movimentoEmpenho.create.mock.calls[0][0].data.valor.toString()).toBe('50')
+  })
+  it('estorno acima do pago da OP é rejeitado', async () => {
+    mockOp()
+    await expect(service.estornar('op1', '201', 'u1', new Date('2026-03-01'))).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+    expect(prisma.movimentoEmpenho.create).not.toHaveBeenCalled()
   })
 })

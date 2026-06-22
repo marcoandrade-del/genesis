@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
+import { validarLancamento, netLiquidadoDaLiquidacao } from './saldos-empenho.js'
 
 export type DadosLiquidacao = {
   empenhoId: string
@@ -52,20 +53,10 @@ export class LiquidacoesService {
       throw new ErroNegocio('CONFLITO', 'Só é possível liquidar empenho ATIVO.')
     }
 
-    // REGRA 4: soma das liquidações ≤ valor empenhado.
-    const disponivel = new Prisma.Decimal(empenho.valor).minus(empenho.valorLiquidado)
-    if (valor.greaterThan(disponivel)) {
-      throw new ErroNegocio(
-        'ENTIDADE_NAO_PROCESSAVEL',
-        `Liquidação excede o saldo do empenho: disponível R$ ${disponivel.toFixed(2)}, liquidação R$ ${valor.toFixed(2)}.`,
-      )
-    }
-
-    // Anterioridade: a liquidação não pode anteceder o empenho.
+    // Teto (Σ liquidações ≤ saldo do empenho) + anterioridade vêm da RAZÃO imutável.
     const data = dados.data ? new Date(dados.data) : new Date()
-    if (data.getTime() < new Date(empenho.data).getTime()) {
-      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Data da liquidação não pode anteceder o empenho.')
-    }
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: dados.empenhoId } })
+    validarLancamento(movimentos, { tipo: 'LIQUIDACAO', valor, data }, { empenho: empenho.data })
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -95,24 +86,26 @@ export class LiquidacoesService {
     }
   }
 
-  /** Cancela liquidação ATIVA sem pagamentos e estorna o liquidado no empenho. */
-  async cancelar(id: string, usuarioId: string, data: Date = new Date()) {
-    const liquidacao = await this.prisma.liquidacao.findUnique({ where: { id } })
+  /**
+   * Estorna a liquidação (da parte ainda não paga). O valor define parcial/total —
+   * o núcleo valida `Σ estornos ≤ saldo da liquidação` e a anterioridade. Ao zerar o
+   * liquidado líquido, vira CANCELADA. Estorna o liquidado no empenho.
+   */
+  async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
+    const liquidacao = await this.prisma.liquidacao.findUnique({ where: { id }, include: { empenho: { select: { data: true } } } })
     if (!liquidacao) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Liquidação não encontrada.')
-    if (liquidacao.status !== 'ATIVA') {
-      throw new ErroNegocio('CONFLITO', `Só é possível cancelar liquidação ATIVA (status: ${liquidacao.status}).`)
-    }
-    if (!new Prisma.Decimal(liquidacao.valorPago).isZero()) {
-      throw new ErroNegocio('CONFLITO', 'Liquidação com pagamentos não pode ser cancelada.')
-    }
+    const v = parseDecimalPositivo(valor, 'Valor do estorno')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: liquidacao.empenhoId } })
+    validarLancamento(movimentos, { tipo: 'ESTORNO_LIQUIDACAO', valor: v, data, liquidacaoId: id }, { empenho: liquidacao.empenho.data, liquidacao: liquidacao.data })
     return this.prisma.$transaction(async (tx) => {
-      const atualizada = await tx.liquidacao.update({ where: { id }, data: { status: 'CANCELADA' } })
-      await tx.empenho.update({ where: { id: liquidacao.empenhoId }, data: { valorLiquidado: { decrement: liquidacao.valor } } })
-      // Razão: ESTORNO_LIQUIDACAO total (cancelamento all-or-nothing; sem pagamentos).
       await tx.movimentoEmpenho.create({
-        data: { entidadeId: liquidacao.entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'ESTORNO_LIQUIDACAO', valor: liquidacao.valor, data, liquidacaoId: id, criadoPorId: usuarioId, historico: `Cancelamento da liquidação ${liquidacao.numero}` },
+        data: { entidadeId: liquidacao.entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'ESTORNO_LIQUIDACAO', valor: v, data, liquidacaoId: id, criadoPorId: usuarioId, historico: `Estorno da liquidação ${liquidacao.numero}` },
       })
-      return atualizada
+      await tx.empenho.update({ where: { id: liquidacao.empenhoId }, data: { valorLiquidado: { decrement: v } } })
+      if (netLiquidadoDaLiquidacao([...movimentos, { tipo: 'ESTORNO_LIQUIDACAO', valor: v, liquidacaoId: id }], id).isZero()) {
+        await tx.liquidacao.update({ where: { id }, data: { status: 'CANCELADA' } })
+      }
+      return { id, estornado: v.toFixed(2) }
     })
   }
 }

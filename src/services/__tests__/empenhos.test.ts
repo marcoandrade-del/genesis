@@ -91,20 +91,37 @@ describe('EmpenhosService.criar — REGRA 2 (conversão de reserva)', () => {
   })
 })
 
-describe('EmpenhosService.anular', () => {
-  it('bloqueia empenho com liquidações', async () => {
-    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', status: 'ATIVO', valorLiquidado: '100', dotacaoDespesaId: 'dot1', valor: new Prisma.Decimal('500') })
-    await expect(service.anular('e1')).rejects.toMatchObject({ code: 'CONFLITO' })
-  })
-  it('anula e estorna o empenhado', async () => {
-    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', entidadeId: 'ent1', numero: '2026NE001', status: 'ATIVO', valorLiquidado: '0', dotacaoDespesaId: 'dot1', valor: new Prisma.Decimal('500') })
+describe('EmpenhosService.estornar', () => {
+  // empenho 500 (na razão) → saldo do empenho = 500
+  function mockEmp(movimentos: unknown[]) {
+    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', entidadeId: 'ent1', numero: '2026NE001', dotacaoDespesaId: 'dot1', data: new Date('2026-01-05') })
+    prisma.movimentoEmpenho.findMany.mockResolvedValue(movimentos)
+  }
+  it('estorno total zera o empenhado e marca ANULADO', async () => {
+    mockEmp([{ tipo: 'EMPENHO', valor: new Prisma.Decimal('500') }])
     prisma.empenho.update.mockResolvedValue({ id: 'e1', status: 'ANULADO' })
-    await service.anular('e1', 'u1')
+    await service.estornar('e1', '500', 'u1', new Date('2026-02-01'))
     expect(prisma.dotacaoDespesa.update.mock.calls[0][0].data.valorEmpenhado.decrement.toString()).toBe('500')
-    // razão: ESTORNO_EMPENHO total
     const m = prisma.movimentoEmpenho.create.mock.calls[0][0].data
     expect(m).toMatchObject({ tipo: 'ESTORNO_EMPENHO', empenhoId: 'e1', criadoPorId: 'u1' })
     expect(m.valor.toString()).toBe('500')
+    expect(prisma.empenho.update).toHaveBeenCalledWith({ where: { id: 'e1' }, data: { status: 'ANULADO' } })
+  })
+  it('estorno parcial não anula', async () => {
+    mockEmp([{ tipo: 'EMPENHO', valor: new Prisma.Decimal('500') }])
+    await service.estornar('e1', '200', 'u1', new Date('2026-02-01'))
+    expect(prisma.empenho.update).not.toHaveBeenCalled()
+    expect(prisma.movimentoEmpenho.create.mock.calls[0][0].data.valor.toString()).toBe('200')
+  })
+  it('estorno acima do saldo a liquidar é rejeitado', async () => {
+    // empenho 500, liquidado 400 → saldo do empenho = 100
+    mockEmp([{ tipo: 'EMPENHO', valor: new Prisma.Decimal('500') }, { tipo: 'LIQUIDACAO', valor: new Prisma.Decimal('400'), liquidacaoId: 'l1' }])
+    await expect(service.estornar('e1', '101', 'u1', new Date('2026-02-01'))).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+    expect(prisma.movimentoEmpenho.create).not.toHaveBeenCalled()
+  })
+  it('empenho inexistente → RECURSO_NAO_ENCONTRADO', async () => {
+    prisma.empenho.findUnique.mockResolvedValue(null)
+    await expect(service.estornar('x', '10', 'u1')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
 })
 

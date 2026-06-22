@@ -90,14 +90,14 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post<{ Params: { id: string } }>('/:id/anular', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { valor: string; data?: string } }>('/:id/estornar', async (req, reply) => {
     const empenho = await app.prisma.empenho.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!empenho) return reply.status(404).send('Empenho não encontrado.')
     try {
-      await service.anular(req.params.id, req.user.sub)
-      return reply.header('HX-Redirect', `/admin/empenhos?${new URLSearchParams({ entidadeId: empenho.entidadeId })}`).status(204).send()
+      await service.estornar(req.params.id, req.body.valor, req.user.sub, req.body.data ? new Date(req.body.data) : undefined)
+      return reply.header('HX-Redirect', `/admin/empenhos/${req.params.id}/ficha`).status(204).send()
     } catch (e: unknown) {
-      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao anular.')
+      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao estornar.')
     }
   })
 }

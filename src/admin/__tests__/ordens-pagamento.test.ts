@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarMock, criarMock, confirmarMock, cancelarMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), confirmarMock: vi.fn(), cancelarMock: vi.fn() }))
+const { listarMock, criarMock, confirmarMock, estornarMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), confirmarMock: vi.fn(), estornarMock: vi.fn() }))
 
 vi.mock('../../services/ordens-pagamento.js', () => ({
   OrdensPagamentoService: class {
     listar = listarMock
     criar = criarMock
     confirmarPagamento = confirmarMock
-    cancelar = cancelarMock
+    estornar = estornarMock
   },
 }))
 
@@ -30,7 +30,7 @@ describe('adminOrdensPagamentoRoutes', () => {
   let app: FastifyInstance
   let prisma: PrismaMock
   beforeEach(async () => {
-    ;[listarMock, criarMock, confirmarMock, cancelarMock].forEach((m) => m.mockReset())
+    ;[listarMock, criarMock, confirmarMock, estornarMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({ registrar: adminOrdensPagamentoRoutes, comView: true, simularAdmin: { sub: 'a1', email: 'a@x.com' } }))
   })
 
@@ -88,12 +88,12 @@ describe('adminOrdensPagamentoRoutes', () => {
     expect(confirmarMock).toHaveBeenCalledWith('op1', 'TED-9')
   })
 
-  it('POST /:id/cancelar', async () => {
+  it('POST /:id/estornar', async () => {
     prisma.ordemPagamento.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
-    cancelarMock.mockResolvedValue({ id: 'op1' })
-    const res = await app.inject({ method: 'POST', url: '/op1/cancelar' })
+    estornarMock.mockResolvedValue({ id: 'op1' })
+    const res = await app.inject({ method: 'POST', url: '/op1/estornar', ...form({ valor: '200' }) })
     expect(res.statusCode).toBe(204)
-    expect(cancelarMock).toHaveBeenCalledWith('op1', expect.any(String))
+    expect(estornarMock).toHaveBeenCalledWith('op1', '200', expect.any(String), undefined)
   })
 
   it('GET / sem entidade selecionada não lista; GET /form e POST / sem entidadeId → 400', async () => {
@@ -104,23 +104,23 @@ describe('adminOrdensPagamentoRoutes', () => {
     expect((await app.inject({ method: 'POST', url: '/', ...form({ numero: 'OP-1' }) })).statusCode).toBe(400)
   })
 
-  it('confirmar/cancelar: OP inexistente → 404; erro do service → 400 com a mensagem', async () => {
+  it('confirmar/estornar: OP inexistente → 404; erro do service → 400 com a mensagem', async () => {
     prisma.ordemPagamento.findUnique.mockResolvedValue(null)
     expect((await app.inject({ method: 'POST', url: '/x/confirmar', ...form({}) })).statusCode).toBe(404)
-    expect((await app.inject({ method: 'POST', url: '/x/cancelar' })).statusCode).toBe(404)
+    expect((await app.inject({ method: 'POST', url: '/x/estornar', ...form({ valor: '1' }) })).statusCode).toBe(404)
 
     prisma.ordemPagamento.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
     confirmarMock.mockRejectedValue(new Error('Apenas OP EMITIDA pode ser confirmada.'))
     const rc = await app.inject({ method: 'POST', url: '/op1/confirmar', ...form({}) })
     expect(rc.statusCode).toBe(400)
     expect(rc.body).toContain('EMITIDA')
-    cancelarMock.mockRejectedValue(new Error('OP já está cancelada.'))
-    const rx = await app.inject({ method: 'POST', url: '/op1/cancelar' })
+    estornarMock.mockRejectedValue(new Error('Estorno excede o pago da OP.'))
+    const rx = await app.inject({ method: 'POST', url: '/op1/estornar', ...form({ valor: '999' }) })
     expect(rx.statusCode).toBe(400)
-    expect(rx.body).toContain('cancelada')
+    expect(rx.body).toContain('excede')
   })
 
-  it('erros não-Error viram mensagem genérica (emitir/confirmar/cancelar)', async () => {
+  it('erros não-Error viram mensagem genérica (emitir/confirmar/estornar)', async () => {
     prisma.liquidacao.findMany.mockResolvedValue([])
     prisma.contaBancaria.findMany.mockResolvedValue([])
     criarMock.mockRejectedValue('string-erro')
@@ -130,7 +130,7 @@ describe('adminOrdensPagamentoRoutes', () => {
     prisma.ordemPagamento.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
     confirmarMock.mockRejectedValue('x')
     expect((await app.inject({ method: 'POST', url: '/op1/confirmar', ...form({}) })).body).toContain('Erro ao confirmar.')
-    cancelarMock.mockRejectedValue('x')
-    expect((await app.inject({ method: 'POST', url: '/op1/cancelar' })).body).toContain('Erro ao cancelar.')
+    estornarMock.mockRejectedValue('x')
+    expect((await app.inject({ method: 'POST', url: '/op1/estornar', ...form({ valor: '1' }) })).body).toContain('Erro ao estornar.')
   })
 })

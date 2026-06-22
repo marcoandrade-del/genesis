@@ -82,6 +82,12 @@ export function netPagoDaOrdem(movs: MovimentoLido[], ordemPagamentoId: string):
   return somaPorTipo(doP, 'PAGAMENTO').minus(somaPorTipo(doP, 'ESTORNO_PAGAMENTO'))
 }
 
+/** Liquidado líquido de UMA liquidação = LIQUIDACAO − ESTORNO_LIQUIDACAO dela (= 0 → cancelada). */
+export function netLiquidadoDaLiquidacao(movs: MovimentoLido[], liquidacaoId: string): Prisma.Decimal {
+  const doL = movs.filter((m) => m.liquidacaoId === liquidacaoId)
+  return somaPorTipo(doL, 'LIQUIDACAO').minus(somaPorTipo(doL, 'ESTORNO_LIQUIDACAO'))
+}
+
 export type NovoLancamento = {
   tipo: TipoMovimentoEmpenho
   valor: Prisma.Decimal

@@ -102,14 +102,14 @@ export async function adminOrdensPagamentoRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post<{ Params: { id: string } }>('/:id/cancelar', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { valor: string; data?: string } }>('/:id/estornar', async (req, reply) => {
     const op = await app.prisma.ordemPagamento.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!op) return reply.status(404).send('OP não encontrada.')
     try {
-      await service.cancelar(req.params.id, req.user.sub)
+      await service.estornar(req.params.id, req.body.valor, req.user.sub, req.body.data ? new Date(req.body.data) : undefined)
       return reply.header('HX-Redirect', `/admin/ordens-pagamento?${new URLSearchParams({ entidadeId: op.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
-      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao cancelar.')
+      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao estornar.')
     }
   })
 }

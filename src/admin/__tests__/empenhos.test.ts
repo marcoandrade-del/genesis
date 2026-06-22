@@ -2,13 +2,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { resumirEmpenho } from '../../services/saldos-empenho.js'
 
-const { listarMock, criarMock, anularMock, fichaMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), anularMock: vi.fn(), fichaMock: vi.fn() }))
+const { listarMock, criarMock, estornarMock, fichaMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), estornarMock: vi.fn(), fichaMock: vi.fn() }))
 
 vi.mock('../../services/empenhos.js', () => ({
   EmpenhosService: class {
     listar = listarMock
     criar = criarMock
-    anular = anularMock
+    estornar = estornarMock
     ficha = fichaMock
   },
 }))
@@ -34,7 +34,7 @@ describe('adminEmpenhosRoutes', () => {
   let app: FastifyInstance
   let prisma: PrismaMock
   beforeEach(async () => {
-    ;[listarMock, criarMock, anularMock, fichaMock].forEach((m) => m.mockReset())
+    ;[listarMock, criarMock, estornarMock, fichaMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({ registrar: adminEmpenhosRoutes, comView: true, simularAdmin: { sub: 'a1', email: 'a@x.com' } }))
   })
 
@@ -101,18 +101,18 @@ describe('adminEmpenhosRoutes', () => {
     expect(res.statusCode).toBe(404)
   })
 
-  it('POST /:id/anular', async () => {
+  it('POST /:id/estornar', async () => {
     prisma.empenho.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
-    anularMock.mockResolvedValue({ id: 'e1' })
-    const res = await app.inject({ method: 'POST', url: '/e1/anular' })
+    estornarMock.mockResolvedValue({ id: 'e1' })
+    const res = await app.inject({ method: 'POST', url: '/e1/estornar', ...form({ valor: '500' }) })
     expect(res.statusCode).toBe(204)
-    expect(anularMock).toHaveBeenCalledWith('e1', expect.any(String))
+    expect(estornarMock).toHaveBeenCalledWith('e1', '500', expect.any(String), undefined)
   })
 
-  it('POST /:id/anular erro vira 400', async () => {
+  it('POST /:id/estornar erro vira 400', async () => {
     prisma.empenho.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
-    anularMock.mockRejectedValue(new Error('com liquidações'))
-    const res = await app.inject({ method: 'POST', url: '/e1/anular' })
+    estornarMock.mockRejectedValue(new Error('excede o saldo'))
+    const res = await app.inject({ method: 'POST', url: '/e1/estornar', ...form({ valor: '999' }) })
     expect(res.statusCode).toBe(400)
   })
 })

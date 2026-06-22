@@ -51,8 +51,12 @@
                 <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Cancelada</span><% } %>
               </td>
               <td class="text-end pe-3">
-                <% if (l.status === 'ATIVA' && l._count.ordensPagamento === 0) { %>
-                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/liquidacoes/<%= l.id %>/cancelar" hx-confirm="Cancelar a liquidação <%= l.numero %>?" data-confirm-titulo="Cancelar liquidação" data-confirm-tipo="danger" data-confirm-ok="Cancelar" title="Cancelar"><i class="bi bi-x-circle"></i></button>
+                <% var dispLiq = Number(l.valor) - Number(l.valorPago) %>
+                <% if (l.status === 'ATIVA' && dispLiq > 0) { %>
+                  <form class="d-inline-flex gap-1 align-items-center justify-content-end" hx-post="/admin/liquidacoes/<%= l.id %>/estornar" hx-confirm="Confirmar o estorno da liquidação <%= l.numero %>?" data-confirm-titulo="Estornar liquidação" data-confirm-tipo="danger" data-confirm-ok="Estornar">
+                    <input type="number" name="valor" step="0.01" min="0.01" max="<%= dispLiq.toFixed(2) %>" value="<%= dispLiq.toFixed(2) %>" class="form-control form-control-sm font-monospace text-end" style="width:100px" required title="Valor a estornar (parte não paga)">
+                    <button class="btn btn-sm btn-outline-danger" title="Estornar"><i class="bi bi-arrow-counterclockwise"></i></button>
+                  </form>
                 <% } %>
               </td>
             </tr>
