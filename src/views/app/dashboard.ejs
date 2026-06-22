@@ -16,8 +16,12 @@
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
       <h2 class="h4 fw-bold mb-1"><%= entidade.nome %></h2>
-      <div class="small text-muted">
-        Exercício <strong><%= ano %></strong> ·
+      <div class="small text-muted d-flex align-items-center gap-2">
+        <span>Exercício <strong><%= ano %></strong></span>
+        <a href="/app/contexto" class="gx-trocar-contexto" title="Trocar o contexto" aria-label="Trocar o contexto">
+          <i class="bi bi-arrow-left-right"></i>
+        </a>
+        <span aria-hidden="true">·</span>
         <% if (nivel === 'ADMIN') { %>
           <span class="badge bg-danger bg-opacity-10 text-danger">Admin</span>
         <% } else if (nivel === 'ESCRITA') { %>
@@ -66,6 +70,14 @@
 
   <style>
     .gx-area-card { transition: box-shadow .15s, opacity .15s; }
+    /* Atalho discreto p/ trocar o contexto (entidade/exercício), ao lado do exercício. */
+    .gx-trocar-contexto {
+      display: inline-grid; place-items: center; width: 24px; height: 24px;
+      border-radius: 6px; color: var(--mute, #868685); text-decoration: none;
+      transition: background .12s, color .12s;
+    }
+    .gx-trocar-contexto:hover { background: rgba(14,15,12,.06); color: var(--ink, #0e0f0c); }
+    .gx-trocar-contexto .bi { font-size: .95rem; }
     /* Grade 2 colunas: [estrela/ícone] | [título/descrição].
        - título (linha 1) e descrição (linha 2) compartilham a coluna 2 → alinhados à esquerda entre si
        - ícone (coluna 1, linha 2) alinha à esquerda com a estrela
@@ -152,26 +164,6 @@
     })();
   </script>
 
-  <div class="row g-3">
-    <div class="col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted mb-1">Município</div>
-          <div class="h5 fw-semibold mb-0">
-            <%= entidade.municipio.nome %> <span class="text-muted">/ <%= entidade.municipio.estado.sigla %></span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6">
-      <div class="card border-0 shadow-sm h-100">
-        <div class="card-body">
-          <div class="small text-muted mb-1">Exercício corrente</div>
-          <div class="h5 fw-semibold mb-0 font-monospace"><%= ano %></div>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 </body>
 </html>

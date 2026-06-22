@@ -49,6 +49,9 @@ describe('appDashboardRoutes', () => {
     expect(res.body).toContain('Curitiba')
     expect(res.body).toContain('2026')
     expect(res.body).toContain('Escrita')
+    // atalho de trocar contexto no header + cards duplicados (Município/Exercício) removidos
+    expect(res.body).toContain('Trocar o contexto')
+    expect(res.body).not.toContain('Exercício corrente')
   })
 
   it('redireciona /app/contexto quando entidade não existe mais', async () => {
