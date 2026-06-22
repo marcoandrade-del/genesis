@@ -153,14 +153,19 @@
   }
   function recalcMz(){
     var tudoOk = MOVS.length===0 ? false : true
+    var pendentes = 0
     document.querySelectorAll('#matriz tbody tr').forEach(function(tr){
       var alvo=parseFloat(tr.dataset.valor)||0, s=0
       tr.querySelectorAll('.mz-in').forEach(function(i){ s+=parseFloat(i.value)||0 })
       var rest=alvo-s
       var cell=tr.querySelector('.mz-rest'); cell.textContent=fmt(rest); cell.className='valor small mz-rest '+(Math.abs(rest)<0.005?'text-success':'text-danger fw-semibold')
-      if(Math.abs(rest)>=0.005) tudoOk=false
+      if(Math.abs(rest)>=0.005){ tudoOk=false; pendentes++ }
     })
-    var b=document.getElementById('mz-bal'); b.textContent=tudoOk?'Tudo distribuído ✓':'Faltam linhas a fechar'; b.className='badge '+(tudoOk?'bg-success':'bg-warning text-dark')
+    var b=document.getElementById('mz-bal')
+    b.textContent = tudoOk ? 'Tudo distribuído ✓'
+      : (pendentes===1 ? 'Falta 1 movimentação a distribuir — a soma das partes deve igualar o valor'
+                       : 'Faltam '+pendentes+' movimentações a distribuir — a soma das partes deve igualar o valor')
+    b.className='badge '+(tudoOk?'bg-success':'bg-warning text-dark')
     document.getElementById('btn-fase3').disabled=!tudoOk
   }
 
