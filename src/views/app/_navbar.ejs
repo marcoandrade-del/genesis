@@ -211,6 +211,20 @@
   .gx-fav-star:hover { background: rgba(14,15,12,.06); color: var(--ink, #0e0f0c); }
   .gx-fav-star.is-fav { color: #e8a200; }
   .gx-fav-star .bi { font-size: 1rem; }
+
+  /* ── Estrela nos pills de topo (itens sem dropdown) ───────────────────────
+     Some por padrão p/ não poluir a command bar; aparece no hover do pill e
+     fica fixa (dourada) quando favoritado. Chip escuro p/ legibilidade no ink. */
+  .gx-pill-wrap { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
+  .gx-fav-star-pill {
+    top: -3px; right: -1px; transform: none; width: 20px; height: 20px;
+    color: rgba(232,235,230,.65); background: rgba(20,22,15,.85);
+    opacity: 0; pointer-events: none;
+  }
+  .gx-pill-wrap:hover .gx-fav-star-pill { opacity: 1; pointer-events: auto; }
+  .gx-fav-star-pill.is-fav { opacity: 1; pointer-events: auto; color: #f4b400; }
+  .gx-fav-star-pill:hover { background: rgba(20,22,15,1); color: #fff; }
+  .gx-fav-star-pill .bi { font-size: .8rem; }
 </style>
 
 <nav class="gx-topbar">
@@ -273,9 +287,19 @@
             </div>
           </div>
         <% } else { %>
-          <a class="gx-pill" data-gx-route="<%= area.rota || '' %>" href="<%= area.rota || '#' %>">
-            <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
-          </a>
+          <div class="gx-pill-wrap">
+            <a class="gx-pill" data-gx-route="<%= area.rota || '' %>" href="<%= area.rota || '#' %>">
+              <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
+            </a>
+            <% if (area.rota) { %>
+              <button type="button" class="gx-fav-star gx-fav-star-pill <%= _favSet.has(area.id) ? 'is-fav' : '' %>"
+                      data-fav-id="<%= area.id %>" data-fav-nome="<%= area.nome %>"
+                      data-fav-rota="<%= area.rota %>" data-fav-icone="<%= area.icone || 'bi-grid' %>"
+                      title="<%= _favSet.has(area.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
+                <i class="bi <%= _favSet.has(area.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
+              </button>
+            <% } %>
+          </div>
         <% } %>
       <% }) %>
     </div>
