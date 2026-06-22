@@ -68,9 +68,9 @@
 
   <style>
     .gx-area-card { transition: box-shadow .15s, opacity .15s; }
-    /* Estrela de favoritar no card (reusa .gx-fav-star do _navbar); fica à esquerda
-       da alça de arrastar, que mantém o canto direito original; sempre visível p/ descoberta. */
-    .gx-fav-star-card { top: .4rem; right: 2.85rem; transform: none; z-index: 3; }
+    /* Estrela de favoritar no card (reusa .gx-fav-star do _navbar): canto superior
+       ESQUERDO, longe do título (centro) e da alça de arrastar (canto direito). */
+    .gx-fav-star-card { top: .4rem; left: .4rem; right: auto; transform: none; z-index: 3; }
     .gx-area-grip {
       position: absolute; top: .35rem; right: .35rem; z-index: 2;
       width: 26px; height: 26px; border: 0; border-radius: 8px; background: transparent;
