@@ -61,7 +61,7 @@ export class EmpenhosService {
         fornecedor: { select: { razaoSocial: true, cnpj: true, cpf: true } },
         dotacaoDespesa: {
           include: {
-            unidadeOrcamentaria: { select: { codigo: true, nome: true } },
+            unidadeOrcamentaria: { select: { codigo: true, nome: true, orgao: { select: { codigo: true, nome: true } } } },
             contaDespesa: { select: { codigo: true, descricao: true } },
             fonteRecurso: { select: { codigo: true, nomenclatura: true } },
           },

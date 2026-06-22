@@ -724,6 +724,7 @@ model Entidade {
   contasReceita            ContaReceitaEntidade[]
   contasDespesa            ContaDespesaEntidade[]
   fontesRecurso            FonteRecursoEntidade[]
+  orgaos                   Orgao[]
   unidadesOrcamentaria     UnidadeOrcamentaria[]
   programas                Programa[]
   orcamentos               Orcamento[]
@@ -948,18 +949,39 @@ model Subfuncao {
 model UnidadeOrcamentaria {
   id                String             @id @default(uuid())
   entidadeId        String
+  orgaoId           String? // Órgão pai (classificação institucional Órgão → Unidade)
   codigo            String
   nome              String
   ativa             Boolean            @default(true)
   criadoEm          DateTime           @default(now())
   atualizadoEm      DateTime           @updatedAt
   entidade          Entidade           @relation(fields: [entidadeId], references: [id])
+  orgao             Orgao?             @relation(fields: [orgaoId], references: [id])
   dotacoes          DotacaoDespesa[]
   documentosDemanda DocumentoDemanda[]
 
   @@unique([entidadeId, codigo])
   @@index([entidadeId])
+  @@index([orgaoId])
   @@map("unidades_orcamentarias")
+}
+
+/// Órgão — nível máximo da classificação institucional (Portaria SOF/MPO 169/2024).
+/// Pai da Unidade Orçamentária (Órgão → Unidade). Cadastrado por entidade.
+model Orgao {
+  id           String                @id @default(uuid())
+  entidadeId   String
+  codigo       String
+  nome         String
+  ativo        Boolean               @default(true)
+  criadoEm     DateTime              @default(now())
+  atualizadoEm DateTime              @updatedAt
+  entidade     Entidade              @relation(fields: [entidadeId], references: [id])
+  unidades     UnidadeOrcamentaria[]
+
+  @@unique([entidadeId, codigo])
+  @@index([entidadeId])
+  @@map("orgaos")
 }
 
 // ─── Tabela de Eventos Contábeis ──────────────────────────────────────────────

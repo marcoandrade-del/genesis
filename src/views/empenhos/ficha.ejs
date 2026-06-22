@@ -27,6 +27,9 @@
     <div class="card border-0 shadow-sm h-100"><div class="card-body">
       <div class="small text-muted mb-2 fw-semibold">Dotação</div>
       <dl class="row small mb-0">
+        <% if (d.unidadeOrcamentaria.orgao) { %>
+          <dt class="col-5">Órgão</dt><dd class="col-7"><span class="font-monospace"><%= d.unidadeOrcamentaria.orgao.codigo %></span> <%= d.unidadeOrcamentaria.orgao.nome %></dd>
+        <% } %>
         <dt class="col-5">Unidade orç.</dt><dd class="col-7"><span class="font-monospace"><%= d.unidadeOrcamentaria.codigo %></span> <%= d.unidadeOrcamentaria.nome %></dd>
         <dt class="col-5">Natureza</dt><dd class="col-7"><span class="font-monospace"><%= d.contaDespesa.codigo %></span> <%= d.contaDespesa.descricao %></dd>
         <dt class="col-5">Fonte</dt><dd class="col-7"><span class="font-monospace"><%= d.fonteRecurso.codigo %></span> <%= d.fonteRecurso.nomenclatura %></dd>

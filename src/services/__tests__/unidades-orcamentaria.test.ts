@@ -38,7 +38,7 @@ describe('UnidadesOrcamentariaService.criar', () => {
     prisma.unidadeOrcamentaria.create.mockResolvedValue({ id: 'uo1' })
     await service.criar('ent1', { codigo: '  02.001 ', nome: '  Educação  ' })
     expect(prisma.unidadeOrcamentaria.create).toHaveBeenCalledWith({
-      data: { entidadeId: 'ent1', codigo: '02.001', nome: 'Educação', ativa: true },
+      data: { entidadeId: 'ent1', codigo: '02.001', nome: 'Educação', ativa: true, orgaoId: null },
     })
   })
 

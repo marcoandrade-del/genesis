@@ -80,7 +80,7 @@ describe('adminEmpenhosRoutes', () => {
         id: 'e1', numero: '2026NE001', entidadeId: 'ent1', tipo: 'ORDINARIO', data: new Date('2026-02-01'), status: 'ATIVO',
         fornecedor: { razaoSocial: 'ACME', cnpj: '00.000.000/0001-00', cpf: null },
         dotacaoDespesa: {
-          unidadeOrcamentaria: { codigo: '02.001', nome: 'Secretaria' },
+          unidadeOrcamentaria: { codigo: '02.001', nome: 'Secretaria', orgao: { codigo: '02', nome: 'Prefeitura Municipal' } },
           contaDespesa: { codigo: '3.3.90.30', descricao: 'Material de consumo' },
           fonteRecurso: { codigo: '500', nomenclatura: 'Recursos Livres' },
         },
@@ -94,6 +94,8 @@ describe('adminEmpenhosRoutes', () => {
     expect(res.body).toContain('2026NE001')
     expect(res.body).toContain('Material de consumo')
     expect(res.body).toContain('Estorno empenho')
+    expect(res.body).toContain('Órgão')
+    expect(res.body).toContain('Prefeitura Municipal')
   })
   it('GET /:id/ficha inexistente → 404', async () => {
     fichaMock.mockRejectedValue(new Error('not found'))
