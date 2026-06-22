@@ -23,6 +23,7 @@ export interface LinhaSaldo {
   reservado: number
   empenhado: number
   disponivel: number
+  origem?: string // só nas linhas por conta (MODELO|DESDOBRAMENTO) — p/ a granularidade do painel
 }
 
 export interface SaldoOrcamentario {
@@ -89,7 +90,7 @@ export class SaldoOrcamentarioService {
     // Roll-up por conta: precisa da árvore ContaDespesaEntidade (folha → ancestrais).
     const contas = await this.prisma.contaDespesaEntidade.findMany({
       where: { entidadeId, ano },
-      select: { id: true, codigo: true, descricao: true, nivel: true, parentId: true },
+      select: { id: true, codigo: true, descricao: true, nivel: true, parentId: true, origem: true },
     })
     const noPorId = new Map(contas.map((c) => [c.id, c]))
     const acumConta = new Map<string, { autorizado: number; reservado: number; empenhado: number }>()
@@ -156,7 +157,7 @@ export class SaldoOrcamentarioService {
     const porConta = [...acumConta.entries()]
       .map(([id, v]) => {
         const node = noPorId.get(id)!
-        return linha(id, node.codigo, node.descricao, node.nivel, v)
+        return { ...linha(id, node.codigo, node.descricao, node.nivel, v), origem: node.origem }
       })
       .sort(ordenarPorCodigo)
 

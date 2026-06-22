@@ -3,6 +3,7 @@ import { OrcamentosService } from '../services/orcamentos.js'
 import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
+import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
 
 /**
  * Área de trabalho "Orçamento" do operador. Diferente do /admin, NÃO há picker
@@ -14,6 +15,7 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
   const dotacoesSvc = new DotacoesDespesaService(app.prisma)
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
+  const cfgDash = new ConfiguracaoDashboardService(app.prisma)
 
   /** Carrega a entidade do contexto; se sumiu, limpa cookie e manda escolher. */
   async function carregarEntidade(req: FastifyRequest, reply: FastifyReply) {
@@ -60,6 +62,8 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     const saldo = await saldoSvc.calcular(entidadeId, ano)
-    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, layout: null })
+    const granularidade = await cfgDash.granularidade(entidadeId)
+    saldo.porConta = aplicarGranularidade(saldo.porConta, granularidade)
+    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, layout: null })
   })
 }
