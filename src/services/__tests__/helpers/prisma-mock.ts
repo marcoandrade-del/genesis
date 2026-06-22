@@ -628,6 +628,12 @@ export function criarPrismaMock() {
       upsert: vi.fn(),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    ordemItemUsuario: {
+      findMany: vi.fn().mockResolvedValue([]),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
     $transaction: vi.fn(),
   }
 

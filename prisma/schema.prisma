@@ -76,6 +76,7 @@ model ItemFuncionalidade {
   atalhos            ItemFuncionalidade[] @relation("Atalhos")
   permissoes         PermissaoAcesso[]
   favoritos          FavoritoItem[]
+  ordensUsuario      OrdemItemUsuario[]
 
   @@map("itens_funcionalidade")
 }
@@ -103,6 +104,7 @@ model Usuario {
   codigosValidacao         CodigoValidacao[]
   favoritos                FavoritoRelatorio[]
   favoritosItem            FavoritoItem[]
+  ordensItem               OrdemItemUsuario[]
   lixeira                  Lixeira[]
   pastas                   PastaFavorito[]
   permissoes               PermissaoAcesso[]
@@ -243,6 +245,20 @@ model FavoritoItem {
 
   @@unique([usuarioId, itemId])
   @@map("favoritos_item")
+}
+
+/// Ordem personalizada das áreas do painel `/app` por usuário. Esparso: só existe
+/// para quem arrastou os cards. Sem linhas → segue `ItemFuncionalidade.ordem` (global).
+model OrdemItemUsuario {
+  id        String             @id @default(uuid())
+  usuarioId String
+  itemId    String
+  ordem     Int
+  item      ItemFuncionalidade @relation(fields: [itemId], references: [id])
+  usuario   Usuario            @relation(fields: [usuarioId], references: [id])
+
+  @@unique([usuarioId, itemId])
+  @@map("ordens_item_usuario")
 }
 
 model FavoritoRelatorio {
