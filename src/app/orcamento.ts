@@ -57,13 +57,21 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
 
   // Saldo orçamentário da despesa do exercício: resumo + agregações (UO, fonte,
   // função e conta com roll-up). Read-only.
-  app.get('/orcamento/saldo', async (req, reply) => {
+  app.get<{ Querystring: { g?: string } }>('/orcamento/saldo', async (req, reply) => {
     const { entidadeId, ano, nivel } = req.contexto
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     const saldo = await saldoSvc.calcular(entidadeId, ano)
-    const granularidade = await cfgDash.granularidade(entidadeId)
+    const temDesdobramento = saldo.porConta.some((l) => l.origem === 'DESDOBRAMENTO')
+    const g = req.query.g
+    let granularidade: 'PADRAO' | 'DESDOBRADO'
+    if (g === 'PADRAO' || g === 'DESDOBRADO') {
+      await cfgDash.definirRelatorio(entidadeId, '/orcamento/saldo', g)
+      granularidade = g
+    } else {
+      granularidade = await cfgDash.granularidadeRelatorio(entidadeId, '/orcamento/saldo')
+    }
     saldo.porConta = aplicarGranularidade(saldo.porConta, granularidade)
-    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, layout: null })
+    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, temDesdobramento, layout: null })
   })
 }

@@ -42,4 +42,35 @@ describe('ConfiguracaoDashboardService', () => {
       update: { granularidadePlano: 'PADRAO' },
     })
   })
+
+  describe('granularidade por relatório (override esparso)', () => {
+    it('usa o override do relatório quando existe', async () => {
+      prisma.preferenciaRelatorioPlano.findUnique.mockResolvedValue({ granularidadePlano: 'PADRAO' })
+      expect(await svc.granularidadeRelatorio('ent1', '/contas')).toBe('PADRAO')
+    })
+
+    it('sem override, cai no default da entidade', async () => {
+      prisma.preferenciaRelatorioPlano.findUnique.mockResolvedValue(null)
+      prisma.configuracaoDashboard.findUnique.mockResolvedValue(null) // default DESDOBRADO
+      expect(await svc.granularidadeRelatorio('ent1', '/contas')).toBe('DESDOBRADO')
+    })
+
+    it('definirRelatorio NÃO grava quando a escolha é igual ao default (remove override)', async () => {
+      prisma.configuracaoDashboard.findUnique.mockResolvedValue(null) // default DESDOBRADO
+      await svc.definirRelatorio('ent1', '/contas', 'DESDOBRADO')
+      expect(prisma.preferenciaRelatorioPlano.deleteMany).toHaveBeenCalledWith({ where: { entidadeId: 'ent1', relatorio: '/contas' } })
+      expect(prisma.preferenciaRelatorioPlano.upsert).not.toHaveBeenCalled()
+    })
+
+    it('definirRelatorio grava override quando a escolha difere do default', async () => {
+      prisma.configuracaoDashboard.findUnique.mockResolvedValue(null) // default DESDOBRADO
+      await svc.definirRelatorio('ent1', '/contas', 'PADRAO')
+      expect(prisma.preferenciaRelatorioPlano.upsert).toHaveBeenCalledWith({
+        where: { entidadeId_relatorio: { entidadeId: 'ent1', relatorio: '/contas' } },
+        create: { entidadeId: 'ent1', relatorio: '/contas', granularidadePlano: 'PADRAO' },
+        update: { granularidadePlano: 'PADRAO' },
+      })
+      expect(prisma.preferenciaRelatorioPlano.deleteMany).not.toHaveBeenCalled()
+    })
+  })
 })

@@ -51,7 +51,15 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
       orcamento ? previsoesSvc.listar(orcamento.id) : Promise.resolve([]),
       contasBancSvc.listar(entidadeId, ano),
     ])
-    const granularidade = await cfgDash.granularidade(entidadeId)
+    const temDesdobramento = resumo.porConta.some((l) => l.origem === 'DESDOBRAMENTO')
+    const g = (req.query as { g?: string } | undefined)?.g
+    let granularidade: 'PADRAO' | 'DESDOBRADO'
+    if (g === 'PADRAO' || g === 'DESDOBRADO') {
+      await cfgDash.definirRelatorio(entidadeId, '/orcamento/arrecadacao', g)
+      granularidade = g
+    } else {
+      granularidade = await cfgDash.granularidadeRelatorio(entidadeId, '/orcamento/arrecadacao')
+    }
     resumo.porConta = aplicarGranularidade(resumo.porConta, granularidade)
     if (opts.status) reply.code(opts.status)
     return reply.view('app/arrecadacao', {
@@ -61,6 +69,7 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
       orcamento,
       resumo,
       granularidade,
+      temDesdobramento,
       movimentos,
       previsoes,
       contasBancarias: contasBanc.filter((c) => c.ativa),

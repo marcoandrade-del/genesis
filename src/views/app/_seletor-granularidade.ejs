@@ -1,0 +1,10 @@
+<%# Seletor de granularidade do plano no relatório. Só aparece quando há
+    desdobramentos locais (senão padrão = desdobrado). Link relativo `?g=...`
+    troca a visão e o sistema memoriza só se diferir do default da entidade. %>
+<% if (typeof temDesdobramento !== 'undefined' && temDesdobramento) { %>
+  <div class="btn-group btn-group-sm align-middle" role="group" aria-label="Granularidade do plano"
+       title="Plano padrão (modelo) × com desdobramentos locais — a escolha é memorizada por relatório">
+    <a href="?g=PADRAO" class="btn py-0 <%= granularidade === 'PADRAO' ? 'btn-info text-white' : 'btn-outline-info' %>"><i class="bi bi-diagram-2 me-1"></i>Padrão</a>
+    <a href="?g=DESDOBRADO" class="btn py-0 <%= granularidade === 'DESDOBRADO' ? 'btn-info text-white' : 'btn-outline-info' %>"><i class="bi bi-diagram-3 me-1"></i>Com desdobr.</a>
+  </div>
+<% } %>

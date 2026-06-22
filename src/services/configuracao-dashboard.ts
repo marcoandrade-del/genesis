@@ -29,6 +29,36 @@ export class ConfiguracaoDashboardService {
       update: { granularidadePlano },
     })
   }
+
+  /**
+   * Granularidade efetiva de UM relatório: override esparso do relatório (se houver)
+   * → senão o default da entidade. A maioria dos relatórios não tem override e segue
+   * o default.
+   */
+  async granularidadeRelatorio(entidadeId: string, relatorio: string): Promise<GranularidadePlano> {
+    const pref = await this.prisma.preferenciaRelatorioPlano.findUnique({
+      where: { entidadeId_relatorio: { entidadeId, relatorio } },
+      select: { granularidadePlano: true },
+    })
+    return pref?.granularidadePlano ?? this.granularidade(entidadeId)
+  }
+
+  /**
+   * Memoriza a escolha de um relatório SÓ se ela diferir do default da entidade
+   * (mantém a tabela esparsa). Se a escolha volta a ser o default, remove o override.
+   */
+  async definirRelatorio(entidadeId: string, relatorio: string, granularidadePlano: GranularidadePlano) {
+    const base = await this.granularidade(entidadeId)
+    if (granularidadePlano === base) {
+      await this.prisma.preferenciaRelatorioPlano.deleteMany({ where: { entidadeId, relatorio } })
+      return
+    }
+    await this.prisma.preferenciaRelatorioPlano.upsert({
+      where: { entidadeId_relatorio: { entidadeId, relatorio } },
+      create: { entidadeId, relatorio, granularidadePlano },
+      update: { granularidadePlano },
+    })
+  }
 }
 
 /**
