@@ -51,6 +51,19 @@ export class ContasReceitaEntidadeService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Previsão já executada não pode ser realocada por aqui: a arrecadação/lançamento
+        // já gerou contábil com a natureza como conta-corrente — repontar dessincronizaria
+        // orçamentário × contábil. Estorne a execução antes de desdobrar.
+        const executadas = await tx.previsaoReceita.count({
+          where: {
+            contaReceitaEntidadeId: pai.id,
+            OR: [{ arrecadacoes: { some: {} } }, { lancamentosTributarios: { some: {} } }],
+          },
+        })
+        if (executadas > 0) {
+          throw new ErroNegocio('CONFLITO', 'Esta conta de receita já possui arrecadação ou lançamento — estorne a execução antes de desdobrar.')
+        }
+
         const filho = await tx.contaReceitaEntidade.create({
           data: {
             entidadeId: pai.entidadeId,
@@ -62,6 +75,12 @@ export class ContasReceitaEntidadeService {
             origem: 'DESDOBRAMENTO',
             parentId: pai.id,
           },
+        })
+        // Reaponta as previsões orçamentárias da mãe para a filha analítica. Sem execução
+        // (garantido acima), é só reclassificação — nenhuma arrecadação/lançamento a mover.
+        await tx.previsaoReceita.updateMany({
+          where: { contaReceitaEntidadeId: pai.id },
+          data: { contaReceitaEntidadeId: filho.id },
         })
         if (pai.admiteMovimento) {
           await tx.contaReceitaEntidade.update({ where: { id: pai.id }, data: { admiteMovimento: false } })
