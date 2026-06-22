@@ -39,7 +39,7 @@ export class LiquidacoesService {
     })
   }
 
-  async criar(entidadeId: string, dados: DadosLiquidacao) {
+  async criar(entidadeId: string, dados: DadosLiquidacao, usuarioId: string) {
     const numero = dados.numero?.trim()
     if (!numero) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Número da liquidação é obrigatório.')
     const valor = parseDecimalPositivo(dados.valor, 'Valor da liquidação')
@@ -61,6 +61,12 @@ export class LiquidacoesService {
       )
     }
 
+    // Anterioridade: a liquidação não pode anteceder o empenho.
+    const data = dados.data ? new Date(dados.data) : new Date()
+    if (data.getTime() < new Date(empenho.data).getTime()) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Data da liquidação não pode anteceder o empenho.')
+    }
+
     try {
       return await this.prisma.$transaction(async (tx) => {
         const liquidacao = await tx.liquidacao.create({
@@ -71,10 +77,14 @@ export class LiquidacoesService {
             valor,
             notaFiscal: trimOuNull(dados.notaFiscal),
             atesteResponsavel: trimOuNull(dados.atesteResponsavel),
-            ...(dados.data ? { data: new Date(dados.data) } : {}),
+            data,
           },
         })
         await tx.empenho.update({ where: { id: dados.empenhoId }, data: { valorLiquidado: { increment: valor } } })
+        // Razão: lançamento LIQUIDACAO da ficha do empenho.
+        await tx.movimentoEmpenho.create({
+          data: { entidadeId, empenhoId: dados.empenhoId, tipo: 'LIQUIDACAO', valor, data, liquidacaoId: liquidacao.id, criadoPorId: usuarioId, historico: `Liquidação ${numero}` },
+        })
         return liquidacao
       })
     } catch (e) {
@@ -86,7 +96,7 @@ export class LiquidacoesService {
   }
 
   /** Cancela liquidação ATIVA sem pagamentos e estorna o liquidado no empenho. */
-  async cancelar(id: string) {
+  async cancelar(id: string, usuarioId: string, data: Date = new Date()) {
     const liquidacao = await this.prisma.liquidacao.findUnique({ where: { id } })
     if (!liquidacao) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Liquidação não encontrada.')
     if (liquidacao.status !== 'ATIVA') {
@@ -98,6 +108,10 @@ export class LiquidacoesService {
     return this.prisma.$transaction(async (tx) => {
       const atualizada = await tx.liquidacao.update({ where: { id }, data: { status: 'CANCELADA' } })
       await tx.empenho.update({ where: { id: liquidacao.empenhoId }, data: { valorLiquidado: { decrement: liquidacao.valor } } })
+      // Razão: ESTORNO_LIQUIDACAO total (cancelamento all-or-nothing; sem pagamentos).
+      await tx.movimentoEmpenho.create({
+        data: { entidadeId: liquidacao.entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'ESTORNO_LIQUIDACAO', valor: liquidacao.valor, data, liquidacaoId: id, criadoPorId: usuarioId, historico: `Cancelamento da liquidação ${liquidacao.numero}` },
+      })
       return atualizada
     })
   }

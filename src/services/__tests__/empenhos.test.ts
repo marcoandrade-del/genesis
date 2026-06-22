@@ -51,11 +51,15 @@ describe('EmpenhosService.criar — empenho direto (sem reserva)', () => {
   })
   it('empenha e incrementa o empenhado', async () => {
     mockBase()
-    prisma.empenho.create.mockResolvedValue({ id: 'e1' })
-    await service.criar('ent1', dadosOk({ valor: '500' }))
+    prisma.empenho.create.mockResolvedValue({ id: 'e1', data: new Date('2026-02-01') })
+    await service.criar('ent1', dadosOk({ valor: '500' }), 'u1')
     const upd = prisma.dotacaoDespesa.update.mock.calls[0][0]
     expect(upd.data.valorEmpenhado.increment.toString()).toBe('500')
     expect(upd.data.valorReservado).toBeUndefined()
+    // razão: lançamento EMPENHO na ficha
+    const m = prisma.movimentoEmpenho.create.mock.calls[0][0].data
+    expect(m).toMatchObject({ tipo: 'EMPENHO', empenhoId: 'e1', criadoPorId: 'u1' })
+    expect(m.valor.toString()).toBe('500')
   })
 })
 
@@ -93,9 +97,13 @@ describe('EmpenhosService.anular', () => {
     await expect(service.anular('e1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
   it('anula e estorna o empenhado', async () => {
-    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', status: 'ATIVO', valorLiquidado: '0', dotacaoDespesaId: 'dot1', valor: new Prisma.Decimal('500') })
+    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', entidadeId: 'ent1', numero: '2026NE001', status: 'ATIVO', valorLiquidado: '0', dotacaoDespesaId: 'dot1', valor: new Prisma.Decimal('500') })
     prisma.empenho.update.mockResolvedValue({ id: 'e1', status: 'ANULADO' })
-    await service.anular('e1')
+    await service.anular('e1', 'u1')
     expect(prisma.dotacaoDespesa.update.mock.calls[0][0].data.valorEmpenhado.decrement.toString()).toBe('500')
+    // razão: ESTORNO_EMPENHO total
+    const m = prisma.movimentoEmpenho.create.mock.calls[0][0].data
+    expect(m).toMatchObject({ tipo: 'ESTORNO_EMPENHO', empenhoId: 'e1', criadoPorId: 'u1' })
+    expect(m.valor.toString()).toBe('500')
   })
 })

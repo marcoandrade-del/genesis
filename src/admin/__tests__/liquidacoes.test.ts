@@ -62,6 +62,6 @@ describe('adminLiquidacoesRoutes', () => {
     cancelarMock.mockResolvedValue({ id: 'l1' })
     const res = await app.inject({ method: 'POST', url: '/l1/cancelar' })
     expect(res.statusCode).toBe(204)
-    expect(cancelarMock).toHaveBeenCalledWith('l1')
+    expect(cancelarMock).toHaveBeenCalledWith('l1', expect.any(String))
   })
 })

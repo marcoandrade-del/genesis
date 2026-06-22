@@ -93,7 +93,7 @@ describe('adminOrdensPagamentoRoutes', () => {
     cancelarMock.mockResolvedValue({ id: 'op1' })
     const res = await app.inject({ method: 'POST', url: '/op1/cancelar' })
     expect(res.statusCode).toBe(204)
-    expect(cancelarMock).toHaveBeenCalledWith('op1')
+    expect(cancelarMock).toHaveBeenCalledWith('op1', expect.any(String))
   })
 
   it('GET / sem entidade selecionada não lista; GET /form e POST / sem entidadeId → 400', async () => {

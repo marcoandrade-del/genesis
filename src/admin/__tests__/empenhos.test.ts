@@ -72,7 +72,7 @@ describe('adminEmpenhosRoutes', () => {
     anularMock.mockResolvedValue({ id: 'e1' })
     const res = await app.inject({ method: 'POST', url: '/e1/anular' })
     expect(res.statusCode).toBe(204)
-    expect(anularMock).toHaveBeenCalledWith('e1')
+    expect(anularMock).toHaveBeenCalledWith('e1', expect.any(String))
   })
 
   it('POST /:id/anular erro vira 400', async () => {

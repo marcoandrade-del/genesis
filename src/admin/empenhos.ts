@@ -71,7 +71,7 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
         ...(b.ataRegistroPrecoId ? { ataRegistroPrecoId: b.ataRegistroPrecoId } : {}),
         ...(b.data ? { data: b.data } : {}),
         ...(b.historico ? { historico: b.historico } : {}),
-      })
+      }, req.user.sub)
       return reply.header('HX-Redirect', `/admin/empenhos?${new URLSearchParams({ entidadeId: b.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       const lookups = await carregarLookups(app, b.entidadeId)
@@ -83,7 +83,7 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     const empenho = await app.prisma.empenho.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!empenho) return reply.status(404).send('Empenho não encontrado.')
     try {
-      await service.anular(req.params.id)
+      await service.anular(req.params.id, req.user.sub)
       return reply.header('HX-Redirect', `/admin/empenhos?${new URLSearchParams({ entidadeId: empenho.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao anular.')

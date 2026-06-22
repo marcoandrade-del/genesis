@@ -83,7 +83,7 @@ export async function adminOrdensPagamentoRoutes(app: FastifyInstance) {
         liquidacaoId: b.liquidacaoId, numero: b.numero, valor: b.valor, contaBancariaId: b.contaBancariaId,
         ...(b.data ? { data: b.data } : {}),
         ...(b.comprovante ? { comprovante: b.comprovante } : {}),
-      })
+      }, req.user.sub)
       return reply.header('HX-Redirect', `/admin/ordens-pagamento?${new URLSearchParams({ entidadeId: b.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       const [liquidacoes, contas] = await Promise.all([carregarLiquidacoes(app, b.entidadeId), carregarContas(app, b.entidadeId)])
@@ -106,7 +106,7 @@ export async function adminOrdensPagamentoRoutes(app: FastifyInstance) {
     const op = await app.prisma.ordemPagamento.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!op) return reply.status(404).send('OP não encontrada.')
     try {
-      await service.cancelar(req.params.id)
+      await service.cancelar(req.params.id, req.user.sub)
       return reply.header('HX-Redirect', `/admin/ordens-pagamento?${new URLSearchParams({ entidadeId: op.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao cancelar.')

@@ -49,7 +49,7 @@ export class EmpenhosService {
     })
   }
 
-  async criar(entidadeId: string, dados: DadosEmpenho) {
+  async criar(entidadeId: string, dados: DadosEmpenho, usuarioId: string) {
     const entidade = await this.prisma.entidade.findUnique({ where: { id: entidadeId } })
     if (!entidade) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Entidade não encontrada.')
 
@@ -96,6 +96,10 @@ export class EmpenhosService {
             ...(dados.data ? { data: new Date(dados.data) } : {}),
           },
         })
+        // Razão imutável: lançamento EMPENHO da ficha (Specs 22-06-2026 §8).
+        await tx.movimentoEmpenho.create({
+          data: { entidadeId, empenhoId: empenho.id, tipo: 'EMPENHO', valor, data: empenho.data, criadoPorId: usuarioId, historico: `Empenho ${numero}` },
+        })
         if (reserva) {
           await tx.reservaDotacao.update({ where: { id: reserva.id }, data: { status: 'BAIXADA' } })
           await tx.dotacaoDespesa.update({
@@ -119,7 +123,7 @@ export class EmpenhosService {
   }
 
   /** Anula um empenho ATIVO sem liquidações e estorna o empenhado na dotação. */
-  async anular(id: string) {
+  async anular(id: string, usuarioId: string, data: Date = new Date()) {
     const empenho = await this.prisma.empenho.findUnique({ where: { id } })
     if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
     if (empenho.status !== 'ATIVO') throw new ErroNegocio('CONFLITO', 'Apenas empenho ATIVO pode ser anulado.')
@@ -131,6 +135,10 @@ export class EmpenhosService {
       await tx.dotacaoDespesa.update({
         where: { id: empenho.dotacaoDespesaId },
         data: { valorEmpenhado: { decrement: empenho.valor } },
+      })
+      // Razão: ESTORNO_EMPENHO total (anulação é all-or-nothing; sem liquidações).
+      await tx.movimentoEmpenho.create({
+        data: { entidadeId: empenho.entidadeId, empenhoId: id, tipo: 'ESTORNO_EMPENHO', valor: empenho.valor, data, criadoPorId: usuarioId, historico: `Anulação do empenho ${empenho.numero}` },
       })
       return atualizado
     })

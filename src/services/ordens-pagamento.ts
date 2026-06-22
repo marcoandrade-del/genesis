@@ -36,7 +36,7 @@ export class OrdensPagamentoService {
     })
   }
 
-  async criar(entidadeId: string, dados: DadosOrdemPagamento) {
+  async criar(entidadeId: string, dados: DadosOrdemPagamento, usuarioId: string) {
     const numero = dados.numero?.trim()
     if (!numero) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Número da OP é obrigatório.')
     if (!dados.contaBancariaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária é obrigatória.')
@@ -83,6 +83,12 @@ export class OrdensPagamentoService {
       )
     }
 
+    // Anterioridade: o pagamento não pode anteceder a liquidação.
+    const data = dados.data ? new Date(dados.data) : new Date()
+    if (data.getTime() < new Date(liquidacao.data).getTime()) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Data do pagamento não pode anteceder a liquidação.')
+    }
+
     try {
       return await this.prisma.$transaction(async (tx) => {
         const op = await tx.ordemPagamento.create({
@@ -94,10 +100,14 @@ export class OrdensPagamentoService {
             contaBancaria: rotuloConta(conta),
             contaBancariaId: conta.id,
             comprovante: trimOuNull(dados.comprovante),
-            ...(dados.data ? { data: new Date(dados.data) } : {}),
+            data,
           },
         })
         await tx.liquidacao.update({ where: { id: dados.liquidacaoId }, data: { valorPago: { increment: valor } } })
+        // Razão: lançamento PAGAMENTO da ficha (empenhoId via liquidação).
+        await tx.movimentoEmpenho.create({
+          data: { entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'PAGAMENTO', valor, data, liquidacaoId: dados.liquidacaoId, ordemPagamentoId: op.id, criadoPorId: usuarioId, historico: `Pagamento ${numero}` },
+        })
         return op
       })
     } catch (e) {
@@ -120,13 +130,20 @@ export class OrdensPagamentoService {
   }
 
   /** Cancela uma OP (EMITIDA ou PAGA) e estorna o valor pago na liquidação. */
-  async cancelar(id: string) {
-    const op = await this.prisma.ordemPagamento.findUnique({ where: { id } })
+  async cancelar(id: string, usuarioId: string, data: Date = new Date()) {
+    const op = await this.prisma.ordemPagamento.findUnique({
+      where: { id },
+      include: { liquidacao: { select: { empenhoId: true } } },
+    })
     if (!op) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Ordem de pagamento não encontrada.')
     if (op.status === 'CANCELADA') throw new ErroNegocio('CONFLITO', 'OP já está cancelada.')
     return this.prisma.$transaction(async (tx) => {
       const atualizada = await tx.ordemPagamento.update({ where: { id }, data: { status: 'CANCELADA' } })
       await tx.liquidacao.update({ where: { id: op.liquidacaoId }, data: { valorPago: { decrement: op.valor } } })
+      // Razão: ESTORNO_PAGAMENTO total da OP.
+      await tx.movimentoEmpenho.create({
+        data: { entidadeId: op.entidadeId, empenhoId: op.liquidacao.empenhoId, tipo: 'ESTORNO_PAGAMENTO', valor: op.valor, data, liquidacaoId: op.liquidacaoId, ordemPagamentoId: id, criadoPorId: usuarioId, historico: `Cancelamento do pagamento ${op.numero}` },
+      })
       return atualizada
     })
   }
