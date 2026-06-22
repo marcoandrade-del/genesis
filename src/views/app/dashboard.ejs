@@ -29,12 +29,21 @@
     </div>
   </div>
 
-  <h3 class="h6 fw-bold text-muted text-uppercase mb-2" style="letter-spacing:.05em">Áreas de trabalho</h3>
-  <div class="row g-3 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h3 class="h6 fw-bold text-muted text-uppercase mb-0" style="letter-spacing:.05em">Áreas de trabalho</h3>
+    <button type="button" id="gx-areas-reset" class="btn btn-link btn-sm text-muted text-decoration-none p-0 <%= typeof temOrdemCustom !== 'undefined' && temOrdemCustom ? '' : 'd-none' %>" title="Voltar à ordem padrão">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Restaurar ordem
+    </button>
+  </div>
+  <p class="small text-muted mb-2" id="gx-areas-dica"><i class="bi bi-grip-vertical me-1"></i>Arraste pelo punho para reordenar as áreas do seu painel.</p>
+  <div class="row g-3 mb-4" id="gx-areas-grid">
     <% (typeof menuApp !== 'undefined' ? menuApp : []).forEach(function (area) { %>
-      <div class="col-md-3 col-sm-6">
-        <a href="<%= area.rota || '#' %>" class="text-decoration-none">
-          <div class="card border-0 shadow-sm h-100">
+      <div class="col-md-3 col-sm-6 gx-area-col" data-item-id="<%= area.id %>">
+        <div class="card border-0 shadow-sm h-100 position-relative gx-area-card">
+          <button type="button" class="gx-area-grip" draggable="true" title="Arrastar para reordenar" aria-label="Reordenar área">
+            <i class="bi bi-grip-vertical"></i>
+          </button>
+          <a href="<%= area.rota || '#' %>" class="text-decoration-none">
             <div class="card-body d-flex align-items-center gap-3">
               <i class="bi <%= area.icone || 'bi-grid' %> fs-3 text-primary"></i>
               <div>
@@ -42,11 +51,89 @@
                 <% if (area.descricao) { %><div class="small text-muted"><%= area.descricao %></div><% } %>
               </div>
             </div>
-          </div>
-        </a>
+          </a>
+        </div>
       </div>
     <% }) %>
   </div>
+
+  <style>
+    .gx-area-card { transition: box-shadow .15s, opacity .15s; }
+    .gx-area-grip {
+      position: absolute; top: .35rem; right: .35rem; z-index: 2;
+      width: 26px; height: 26px; border: 0; border-radius: 8px; background: transparent;
+      color: var(--mute, #868685); cursor: grab; display: grid; place-items: center;
+      opacity: 0; transition: opacity .12s, background .12s;
+    }
+    .gx-area-card:hover .gx-area-grip { opacity: 1; }
+    .gx-area-grip:hover { background: rgba(14,15,12,.06); color: var(--ink, #0e0f0c); }
+    .gx-area-grip:active { cursor: grabbing; }
+    .gx-area-col.gx-dragging { opacity: .45; }
+    .gx-area-col.gx-dragover .gx-area-card { box-shadow: 0 0 0 2px var(--primary, #9fe870); }
+  </style>
+
+  <script>
+    (function () {
+      var grid = document.getElementById('gx-areas-grid');
+      if (!grid) return;
+      var resetBtn = document.getElementById('gx-areas-reset');
+      var arrastado = null;
+
+      function colsOrdenadas() {
+        return Array.prototype.slice.call(grid.querySelectorAll('.gx-area-col'));
+      }
+
+      function salvar() {
+        var itens = colsOrdenadas().map(function (c) { return c.getAttribute('data-item-id'); });
+        fetch('/app/dashboard/ordem', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ itens: itens }),
+        }).then(function () { if (resetBtn) resetBtn.classList.remove('d-none'); }).catch(function () {});
+      }
+
+      grid.addEventListener('dragstart', function (e) {
+        var grip = e.target.closest('.gx-area-grip');
+        if (!grip) { e.preventDefault(); return; }
+        arrastado = grip.closest('.gx-area-col');
+        if (!arrastado) return;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', arrastado.getAttribute('data-item-id') || '');
+        var card = arrastado.querySelector('.gx-area-card');
+        if (card && e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(card, 20, 20);
+        // adia a classe p/ não sumir o drag image
+        setTimeout(function () { arrastado.classList.add('gx-dragging'); }, 0);
+      });
+
+      grid.addEventListener('dragover', function (e) {
+        if (!arrastado) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        var alvo = e.target.closest('.gx-area-col');
+        if (!alvo || alvo === arrastado) return;
+        var r = alvo.getBoundingClientRect();
+        var depois = (e.clientX - r.left) > r.width / 2;
+        grid.insertBefore(arrastado, depois ? alvo.nextSibling : alvo);
+      });
+
+      grid.addEventListener('dragend', function () {
+        if (!arrastado) return;
+        arrastado.classList.remove('gx-dragging');
+        arrastado = null;
+        salvar();
+      });
+
+      if (resetBtn) {
+        resetBtn.addEventListener('click', function () {
+          fetch('/app/dashboard/ordem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+            body: JSON.stringify({ reset: true }),
+          }).then(function () { window.location.reload(); }).catch(function () {});
+        });
+      }
+    })();
+  </script>
 
   <div class="row g-3">
     <div class="col-md-6">
