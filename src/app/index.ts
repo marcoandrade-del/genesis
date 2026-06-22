@@ -18,6 +18,7 @@ import { appComprasRoutes } from './compras.js'
 import { appContasBancariasRoutes } from './contas-bancarias.js'
 import { MenuAppService, type MenuAppNode } from '../services/menu-app.js'
 import { FavoritosAppService } from '../services/favoritos-app.js'
+import { OrdemDashboardService, aplicarOrdemRaizes } from '../services/ordem-dashboard.js'
 import { appFavoritosRoutes } from './favoritos.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
@@ -116,10 +117,15 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.addHook('preHandler', async (req, reply) => {
       const menu = new MenuAppService(req.server.prisma)
       const favoritos = new FavoritosAppService(req.server.prisma)
-      const [menuApp, favoritoIds] = await Promise.all([
+      const ordemSvc = new OrdemDashboardService(req.server.prisma)
+      const [arvore, favoritoIds, ordem] = await Promise.all([
         menu.arvorePermitida(req.user.sub),
         favoritos.idsFavoritos(req.user.sub),
+        ordemSvc.ordemDe(req.user.sub),
       ])
+      // A ordem personalizada das áreas (drag-drop no painel) vale para o menu
+      // superior e para os cards do dashboard — ambos leem este `menuApp`.
+      const menuApp = aplicarOrdemRaizes(arvore, ordem)
       reply.locals = { ...(reply.locals ?? {}), menuApp, favoritoIds: [...favoritoIds] }
     })
 
