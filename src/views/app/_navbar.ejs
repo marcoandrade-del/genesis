@@ -12,15 +12,19 @@
    Opcional: menuApp (árvore permitida), nivel (LEITURA|ESCRITA|ADMIN). %>
 
 <%
-  // Achata as folhas navegáveis (com rota) para alimentar o command palette.
-  // Cada entrada carrega o grupo (área-pai) para dar contexto na busca.
+  // Achata as folhas navegáveis (com rota) para alimentar o command palette e a
+  // barra de favoritos. Cada entrada carrega o id (favorito), a rota e o grupo
+  // (área-pai) que dá contexto na busca.
+  const _favSet = new Set(typeof favoritoIds !== 'undefined' && favoritoIds ? favoritoIds : []);
   const _gxFlat = [];
   (typeof menuApp !== 'undefined' && menuApp ? menuApp : []).forEach(function (area) {
-    if (area.rota) _gxFlat.push({ nome: area.nome, grupo: 'Áreas', rota: area.rota, icone: area.icone || 'bi-grid' });
+    if (area.rota) _gxFlat.push({ id: area.id, nome: area.nome, grupo: 'Áreas', rota: area.rota, icone: area.icone || 'bi-grid' });
     (area.filhos || []).forEach(function (f) {
-      if (f.rota) _gxFlat.push({ nome: f.nome, grupo: area.nome, rota: f.rota, icone: f.icone || 'bi-dot' });
+      if (f.rota) _gxFlat.push({ id: f.id, nome: f.nome, grupo: area.nome, rota: f.rota, icone: f.icone || 'bi-dot' });
     });
   });
+  // Favoritos = itens achatados marcados pelo usuário (já filtrados pela permissão).
+  const _gxFav = _gxFlat.filter(function (it) { return _favSet.has(it.id); });
 %>
 
 <style>
@@ -172,6 +176,41 @@
     .gx-brand small, .gx-search span, .gx-ws-meta { display: none; }
     .gx-workspace { padding: .35rem; }
   }
+
+  /* ── Barra de favoritos (estilo navegador) ────────────────────────────── */
+  .gx-favbar {
+    position: sticky; top: 64px; z-index: 1039;
+    display: flex; align-items: center; gap: .3rem;
+    padding: .3rem .9rem; min-height: 38px;
+    background: var(--canvas, #fff);
+    border-bottom: 1px solid var(--bs-border-color, rgba(14,15,12,.08));
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .gx-favbar::-webkit-scrollbar { display: none; }
+  .gx-favbar[hidden] { display: none; }  /* author display:flex venceria o [hidden] do UA */
+  .gx-favbar-label { flex-shrink: 0; color: var(--mute, #868685); font-size: .85rem;
+    padding-right: .25rem; }
+  .gx-fav {
+    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
+    padding: .28rem .6rem; border-radius: 9999px; text-decoration: none;
+    color: var(--ink, #0e0f0c); font-size: .82rem; font-weight: 600;
+    font-family: 'Inter', sans-serif; transition: background .12s, color .12s;
+  }
+  .gx-fav .bi { font-size: .92rem; color: var(--ink-deep, #163300); opacity: .8; }
+  .gx-fav:hover { background: var(--primary-pale, #e2f6d5); color: var(--ink-deep, #163300); }
+
+  /* ── Estrela de favoritar (sobreposta ao tile do mega-painel) ─────────── */
+  .gx-tile-wrap { position: relative; }
+  .gx-tile-wrap .gx-tile { padding-right: 2.2rem; }
+  .gx-fav-star {
+    position: absolute; top: 50%; right: .35rem; transform: translateY(-50%);
+    width: 30px; height: 30px; border: 0; border-radius: 9999px; cursor: pointer;
+    display: grid; place-items: center; background: transparent;
+    color: var(--mute, #868685); transition: background .12s, color .12s;
+  }
+  .gx-fav-star:hover { background: rgba(14,15,12,.06); color: var(--ink, #0e0f0c); }
+  .gx-fav-star.is-fav { color: #e8a200; }
+  .gx-fav-star .bi { font-size: 1rem; }
 </style>
 
 <nav class="gx-topbar">
@@ -195,22 +234,40 @@
               <div class="gx-mega-head"><%= area.nome %></div>
               <div class="gx-mega-grid">
                 <% if (area.rota) { %>
-                  <a class="gx-tile gx-overview" href="<%= area.rota %>">
-                    <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
-                    <span class="gx-tile-body">
-                      <span class="gx-tile-title">Visão geral</span>
-                      <span class="gx-tile-desc"><%= area.nome %></span>
-                    </span>
-                  </a>
+                  <div class="gx-tile-wrap">
+                    <a class="gx-tile gx-overview" href="<%= area.rota %>">
+                      <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
+                      <span class="gx-tile-body">
+                        <span class="gx-tile-title">Visão geral</span>
+                        <span class="gx-tile-desc"><%= area.nome %></span>
+                      </span>
+                    </a>
+                    <button type="button" class="gx-fav-star <%= _favSet.has(area.id) ? 'is-fav' : '' %>"
+                            data-fav-id="<%= area.id %>" data-fav-nome="<%= area.nome %>"
+                            data-fav-rota="<%= area.rota %>" data-fav-icone="<%= area.icone || 'bi-grid' %>"
+                            title="<%= _favSet.has(area.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
+                      <i class="bi <%= _favSet.has(area.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
+                    </button>
+                  </div>
                 <% } %>
                 <% area.filhos.forEach(function (f) { %>
-                  <a class="gx-tile" href="<%= f.rota || '#' %>">
-                    <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
-                    <span class="gx-tile-body">
-                      <span class="gx-tile-title"><%= f.nome %></span>
-                      <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
-                    </span>
-                  </a>
+                  <div class="gx-tile-wrap">
+                    <a class="gx-tile" href="<%= f.rota || '#' %>">
+                      <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
+                      <span class="gx-tile-body">
+                        <span class="gx-tile-title"><%= f.nome %></span>
+                        <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
+                      </span>
+                    </a>
+                    <% if (f.rota) { %>
+                      <button type="button" class="gx-fav-star <%= _favSet.has(f.id) ? 'is-fav' : '' %>"
+                              data-fav-id="<%= f.id %>" data-fav-nome="<%= f.nome %>"
+                              data-fav-rota="<%= f.rota %>" data-fav-icone="<%= f.icone || 'bi-dot' %>"
+                              title="<%= _favSet.has(f.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
+                        <i class="bi <%= _favSet.has(f.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
+                      </button>
+                    <% } %>
+                  </div>
                 <% }) %>
               </div>
             </div>
@@ -247,6 +304,16 @@
     </a>
   </div>
 </nav>
+
+<%# ── Barra de favoritos: atalhos do usuário (estilo navegador) ──────────── %>
+<div id="gx-favbar" class="gx-favbar" <%= _gxFav.length ? '' : 'hidden' %>>
+  <span class="gx-favbar-label" title="Favoritos"><i class="bi bi-star-fill"></i></span>
+  <% _gxFav.forEach(function (it) { %>
+    <a class="gx-fav" href="<%= it.rota %>" data-fav-id="<%= it.id %>">
+      <i class="bi <%= it.icone %>"></i><span><%= it.nome %></span>
+    </a>
+  <% }) %>
+</div>
 
 <% if (_gxFlat.length) { %>
 <%# ── Command palette: busca/navegação rápida por qualquer item permitido ── %>
@@ -328,6 +395,67 @@
       if ((path === r || path.indexOf(r + '/') === 0) && r.length > bestLen) { best = el; bestLen = r.length; }
     });
     if (best) best.classList.add('is-active');
+  })();
+</script>
+
+<%# ── Favoritar/desfavoritar via estrela + atualização da barra em tempo real ─ %>
+<script>
+  (function () {
+    var bar = document.getElementById('gx-favbar');
+
+    function pintarEstrela(btn, fav) {
+      btn.classList.toggle('is-fav', fav);
+      var i = btn.querySelector('i');
+      if (i) i.className = 'bi ' + (fav ? 'bi-star-fill' : 'bi-star');
+      btn.title = fav ? 'Remover dos favoritos' : 'Favoritar';
+    }
+
+    function adicionarAtalho(d) {
+      if (!bar || bar.querySelector('.gx-fav[data-fav-id="' + d.id + '"]')) return;
+      var a = document.createElement('a');
+      a.className = 'gx-fav'; a.href = d.rota; a.setAttribute('data-fav-id', d.id);
+      var ico = document.createElement('i'); ico.className = 'bi ' + d.icone;
+      var txt = document.createElement('span'); txt.textContent = d.nome;
+      a.appendChild(ico); a.appendChild(txt); bar.appendChild(a);
+    }
+
+    function removerAtalho(id) {
+      if (!bar) return;
+      var el = bar.querySelector('.gx-fav[data-fav-id="' + id + '"]');
+      if (el) el.remove();
+    }
+
+    function sincronizarBarra() {
+      if (bar) bar.hidden = !bar.querySelector('.gx-fav');
+    }
+
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('.gx-fav-star');
+      if (!btn) return;
+      e.preventDefault();
+      var id = btn.getAttribute('data-fav-id');
+      btn.disabled = true;
+      fetch('/app/favoritos/' + encodeURIComponent(id) + '/toggle', {
+        method: 'POST', headers: { 'X-Requested-With': 'fetch' },
+      })
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
+        .then(function (res) {
+          document.querySelectorAll('.gx-fav-star[data-fav-id="' + id + '"]').forEach(function (b) {
+            pintarEstrela(b, res.favoritado);
+          });
+          if (res.favoritado) {
+            adicionarAtalho({
+              id: id, nome: btn.getAttribute('data-fav-nome'),
+              rota: btn.getAttribute('data-fav-rota'), icone: btn.getAttribute('data-fav-icone'),
+            });
+          } else {
+            removerAtalho(id);
+          }
+          sincronizarBarra();
+        })
+        .catch(function () { /* silencioso — mantém o estado atual */ })
+        .finally(function () { btn.disabled = false; });
+    });
   })();
 </script>
 

@@ -17,6 +17,8 @@ import { appRelatoriosRoutes } from './relatorios.js'
 import { appComprasRoutes } from './compras.js'
 import { appContasBancariasRoutes } from './contas-bancarias.js'
 import { MenuAppService, type MenuAppNode } from '../services/menu-app.js'
+import { FavoritosAppService } from '../services/favoritos-app.js'
+import { appFavoritosRoutes } from './favoritos.js'
 
 // `req.contexto` é o contexto de trabalho do usuário (qual entidade e ano ele
 // escolheu na sessão atual). Injetado pelo middleware antes de qualquer rota
@@ -113,7 +115,12 @@ export async function appRoutes(app: FastifyInstance) {
     // preHandler para garantir que req.user já foi populado pelo appAuthMiddleware.
     autenticado.addHook('preHandler', async (req, reply) => {
       const menu = new MenuAppService(req.server.prisma)
-      reply.locals = { ...(reply.locals ?? {}), menuApp: await menu.arvorePermitida(req.user.sub) }
+      const favoritos = new FavoritosAppService(req.server.prisma)
+      const [menuApp, favoritoIds] = await Promise.all([
+        menu.arvorePermitida(req.user.sub),
+        favoritos.idsFavoritos(req.user.sub),
+      ])
+      reply.locals = { ...(reply.locals ?? {}), menuApp, favoritoIds: [...favoritoIds] }
     })
 
     autenticado.register(appContextoRoutes)
@@ -131,5 +138,6 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appComprasRoutes)
     autenticado.register(appContasBancariasRoutes)
     autenticado.register(appConfiguracaoRoutes)
+    autenticado.register(appFavoritosRoutes)
   })
 }
