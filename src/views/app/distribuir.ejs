@@ -41,7 +41,7 @@
         </table>
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-filho"><i class="bi bi-plus-lg"></i> Filho</button>
-          <div class="small font-monospace">Saldo inicial da mãe: <strong id="si-mae">0,00</strong> · digitado: <strong id="si-soma">0,00</strong> <span id="si-bal" class="badge"></span></div>
+          <div class="small font-monospace">Saldo do nível superior: <strong id="si-mae">0,00</strong> · digitado: <strong id="si-soma">0,00</strong> <span id="si-bal" class="badge"></span></div>
           <button type="button" class="btn btn-primary btn-sm" id="btn-fase2">Próximo: distribuir →</button>
         </div>
       </div>
@@ -80,8 +80,18 @@
 <script type="application/json" id="dados-mov"><%- JSON.stringify(movimentos) %></script>
 <script>
   var SI_MAE = <%= saldoInicial %>
+  var COD_PAI = <%- JSON.stringify(conta.codigo) %>
   var MOVS = JSON.parse(document.getElementById('dados-mov').textContent || '[]')
   var children = []
+  // Próximo código do desdobramento, espelhando proximoCodigoDesdobramento (server):
+  // preenche o 1º segmento zerado da máscara; se já estiver cheia, anexa ".NN".
+  function proxCodigo(seq){
+    var segs = COD_PAI.split('.')
+    var i = segs.findIndex(function(s){ return /^0+$/.test(s) })
+    if(i === -1) return COD_PAI + '.' + String(seq).padStart(2,'0')
+    segs[i] = String(seq).padStart(segs[i].length, '0')
+    return segs.join('.')
+  }
   function el(t, p, a){ var e=document.createElement(t); if(p)Object.keys(p).forEach(function(k){e[k]=p[k]}); if(a)Object.keys(a).forEach(function(k){e.setAttribute(k,a[k])}); return e }
   function fmt(n){ return (Number(n)||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) }
   document.getElementById('si-mae').textContent = fmt(SI_MAE)
@@ -89,6 +99,7 @@
   // ── Fase 1 ──
   var FB = document.getElementById('filhos')
   function addFilho(codigo, desc, si){
+    if(!codigo) codigo = proxCodigo(FB.querySelectorAll('tr').length + 1)
     var tr = el('tr')
     var iCod = el('input',{className:'form-control form-control-sm font-monospace f-cod',placeholder:'código',value:codigo||''})
     var iDes = el('input',{className:'form-control form-control-sm f-des',placeholder:'descrição',value:desc||''})
@@ -142,14 +153,19 @@
   }
   function recalcMz(){
     var tudoOk = MOVS.length===0 ? false : true
+    var pendentes = 0
     document.querySelectorAll('#matriz tbody tr').forEach(function(tr){
       var alvo=parseFloat(tr.dataset.valor)||0, s=0
       tr.querySelectorAll('.mz-in').forEach(function(i){ s+=parseFloat(i.value)||0 })
       var rest=alvo-s
       var cell=tr.querySelector('.mz-rest'); cell.textContent=fmt(rest); cell.className='valor small mz-rest '+(Math.abs(rest)<0.005?'text-success':'text-danger fw-semibold')
-      if(Math.abs(rest)>=0.005) tudoOk=false
+      if(Math.abs(rest)>=0.005){ tudoOk=false; pendentes++ }
     })
-    var b=document.getElementById('mz-bal'); b.textContent=tudoOk?'Tudo distribuído ✓':'Faltam linhas a fechar'; b.className='badge '+(tudoOk?'bg-success':'bg-warning text-dark')
+    var b=document.getElementById('mz-bal')
+    b.textContent = tudoOk ? 'Tudo distribuído ✓'
+      : (pendentes===1 ? 'Falta 1 movimentação a distribuir — a soma das partes deve igualar o valor'
+                       : 'Faltam '+pendentes+' movimentações a distribuir — a soma das partes deve igualar o valor')
+    b.className='badge '+(tudoOk?'bg-success':'bg-warning text-dark')
     document.getElementById('btn-fase3').disabled=!tudoOk
   }
 
@@ -195,7 +211,7 @@
   })
 
   // init
-  addFilho(); addFilho(); somaSi()
+  addFilho(); somaSi()
 </script>
 </body>
 </html>
