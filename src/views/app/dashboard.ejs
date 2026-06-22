@@ -52,13 +52,11 @@
               <i class="bi <%= _fav ? 'bi-star-fill' : 'bi-star' %>"></i>
             </button>
           <% } %>
-          <a href="<%= area.rota || '#' %>" class="text-decoration-none">
-            <div class="card-body d-flex align-items-center gap-3">
-              <i class="bi <%= area.icone || 'bi-grid' %> fs-3 text-primary"></i>
-              <div>
-                <div class="fw-semibold text-dark"><%= area.nome %></div>
-                <% if (area.descricao) { %><div class="small text-muted"><%= area.descricao %></div><% } %>
-              </div>
+          <a href="<%= area.rota || '#' %>" class="text-decoration-none d-block">
+            <div class="card-body gx-card-grid">
+              <div class="fw-semibold text-dark gx-card-title"><%= area.nome %></div>
+              <i class="bi <%= area.icone || 'bi-grid' %> fs-3 text-primary gx-card-icon"></i>
+              <% if (area.descricao) { %><div class="small text-muted gx-card-desc"><%= area.descricao %></div><% } %>
             </div>
           </a>
         </div>
@@ -68,9 +66,16 @@
 
   <style>
     .gx-area-card { transition: box-shadow .15s, opacity .15s; }
-    /* Estrela de favoritar no card (reusa .gx-fav-star do _navbar): canto superior
-       ESQUERDO, longe do título (centro) e da alça de arrastar (canto direito). */
-    .gx-fav-star-card { top: .4rem; left: .4rem; right: auto; transform: none; z-index: 3; }
+    /* Grade 2 colunas: [estrela/ícone] | [título/descrição].
+       - título (linha 1) e descrição (linha 2) compartilham a coluna 2 → alinhados à esquerda entre si
+       - ícone (coluna 1, linha 2) alinha à esquerda com a estrela
+       - topo do ícone == topo da descrição (mesma linha, align-items:start) */
+    .gx-card-grid { display: grid; grid-template-columns: auto 1fr; column-gap: .65rem; row-gap: .3rem; align-items: start; }
+    .gx-card-title { grid-column: 2; grid-row: 1; }
+    .gx-card-icon  { grid-column: 1; grid-row: 2; }
+    .gx-card-desc  { grid-column: 2; grid-row: 2; }
+    /* Estrela: canto sup. esquerdo, glifo à esquerda (justify-items:start) no mesmo x do ícone. */
+    .gx-fav-star-card { top: .5rem; left: .6rem; right: auto; transform: none; justify-items: start; z-index: 3; }
     .gx-area-grip {
       position: absolute; top: .35rem; right: .35rem; z-index: 2;
       width: 26px; height: 26px; border: 0; border-radius: 8px; background: transparent;
