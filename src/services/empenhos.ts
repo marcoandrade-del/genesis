@@ -2,6 +2,7 @@ import { PrismaClient, Prisma, type TipoEmpenho } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
+import { resumirEmpenho } from './saldos-empenho.js'
 
 export type DadosEmpenho = {
   dotacaoDespesaId: string
@@ -47,6 +48,32 @@ export class EmpenhosService {
       where: { id },
       include: { fornecedor: true, dotacaoDespesa: true, reservaDotacao: { select: { id: true, numero: true } } },
     })
+  }
+
+  /**
+   * Ficha de empenho: o empenho + a razão imutável (movimentos) + o resumo das 6
+   * colunas/saldos (Specs 22-06-2026 §8). É a "movimentação da despesa" da ficha.
+   */
+  async ficha(id: string) {
+    const empenho = await this.prisma.empenho.findUnique({
+      where: { id },
+      include: {
+        fornecedor: { select: { razaoSocial: true, cnpj: true, cpf: true } },
+        dotacaoDespesa: {
+          include: {
+            unidadeOrcamentaria: { select: { codigo: true, nome: true } },
+            contaDespesa: { select: { codigo: true, descricao: true } },
+            fonteRecurso: { select: { codigo: true, nomenclatura: true } },
+          },
+        },
+      },
+    })
+    if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({
+      where: { empenhoId: id },
+      orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
+    })
+    return { empenho, movimentos, resumo: resumirEmpenho(movimentos) }
   }
 
   async criar(entidadeId: string, dados: DadosEmpenho, usuarioId: string) {

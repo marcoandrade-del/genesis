@@ -58,6 +58,17 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     return reply.view('empenhos/form', { entidadeId, empenho: null, erro: null, ...lookups })
   })
 
+  // Ficha de empenho: razão imutável + as 6 colunas/saldos (Specs 22-06-2026 §8).
+  app.get<{ Params: { id: string } }>('/:id/ficha', async (req, reply) => {
+    const ficha = await service.ficha(req.params.id).catch(() => null)
+    if (!ficha) return reply.status(404).send('Empenho não encontrado.')
+    return reply.view(
+      'empenhos/ficha',
+      { title: `Ficha ${ficha.empenho.numero} — Gênesis Admin`, active: 'empenhos', userEmail: req.user.email, ...ficha },
+      { layout: 'layouts/main' },
+    )
+  })
+
   app.post<{
     Body: { entidadeId: string; dotacaoDespesaId: string; fornecedorId: string; reservaDotacaoId?: string; contratoId?: string; ataRegistroPrecoId?: string; numero: string; tipo: string; data?: string; valor: string; historico?: string }
   }>('/', async (req, reply) => {

@@ -107,3 +107,23 @@ describe('EmpenhosService.anular', () => {
     expect(m.valor.toString()).toBe('500')
   })
 })
+
+describe('EmpenhosService.ficha', () => {
+  it('monta empenho + movimentos + resumo das 6 colunas', async () => {
+    prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', numero: '2026NE1', entidadeId: 'ent1', fornecedor: { razaoSocial: 'ACME' }, dotacaoDespesa: {} })
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: new Prisma.Decimal('1000') },
+      { tipo: 'LIQUIDACAO', valor: new Prisma.Decimal('400'), liquidacaoId: 'l1' },
+      { tipo: 'ESTORNO_EMPENHO', valor: new Prisma.Decimal('200') },
+    ])
+    const f = await service.ficha('e1')
+    expect(f.empenho.numero).toBe('2026NE1')
+    expect(f.movimentos).toHaveLength(3)
+    expect(f.resumo.netEmpenhado.toNumber()).toBe(800) // 1000 − 200
+    expect(f.resumo.saldoEmpenho.toNumber()).toBe(400) // net empenhado 800 − liquidado 400
+  })
+  it('empenho inexistente → RECURSO_NAO_ENCONTRADO', async () => {
+    prisma.empenho.findUnique.mockResolvedValue(null)
+    await expect(service.ficha('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
+  })
+})

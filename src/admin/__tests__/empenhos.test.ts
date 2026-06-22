@@ -1,12 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { Prisma } from '@prisma/client'
+import { resumirEmpenho } from '../../services/saldos-empenho.js'
 
-const { listarMock, criarMock, anularMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), anularMock: vi.fn() }))
+const { listarMock, criarMock, anularMock, fichaMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), anularMock: vi.fn(), fichaMock: vi.fn() }))
 
 vi.mock('../../services/empenhos.js', () => ({
   EmpenhosService: class {
     listar = listarMock
     criar = criarMock
     anular = anularMock
+    ficha = fichaMock
   },
 }))
 
@@ -31,7 +34,7 @@ describe('adminEmpenhosRoutes', () => {
   let app: FastifyInstance
   let prisma: PrismaMock
   beforeEach(async () => {
-    ;[listarMock, criarMock, anularMock].forEach((m) => m.mockReset())
+    ;[listarMock, criarMock, anularMock, fichaMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({ registrar: adminEmpenhosRoutes, comView: true, simularAdmin: { sub: 'a1', email: 'a@x.com' } }))
   })
 
@@ -65,6 +68,37 @@ describe('adminEmpenhosRoutes', () => {
     expect(res.statusCode).toBe(204)
     expect(criarMock.mock.calls[0][0]).toBe('ent1')
     expect(criarMock.mock.calls[0][1]).toMatchObject({ dotacaoDespesaId: 'dot1', fornecedorId: 'f1', reservaDotacaoId: 'r1', tipo: 'ORDINARIO', valor: '500' })
+  })
+
+  it('GET /:id/ficha renderiza a ficha (6 colunas + histórico)', async () => {
+    const movimentos = [
+      { tipo: 'EMPENHO', valor: new Prisma.Decimal('500'), data: new Date('2026-02-01'), historico: 'Empenho 2026NE001' },
+      { tipo: 'LIQUIDACAO', valor: new Prisma.Decimal('200'), data: new Date('2026-03-01'), historico: 'Liquidação LIQ-1', liquidacaoId: 'l1' },
+    ]
+    fichaMock.mockResolvedValue({
+      empenho: {
+        id: 'e1', numero: '2026NE001', entidadeId: 'ent1', tipo: 'ORDINARIO', data: new Date('2026-02-01'), status: 'ATIVO',
+        fornecedor: { razaoSocial: 'ACME', cnpj: '00.000.000/0001-00', cpf: null },
+        dotacaoDespesa: {
+          unidadeOrcamentaria: { codigo: '02.001', nome: 'Secretaria' },
+          contaDespesa: { codigo: '3.3.90.30', descricao: 'Material de consumo' },
+          fonteRecurso: { codigo: '500', nomenclatura: 'Recursos Livres' },
+        },
+      },
+      movimentos,
+      resumo: resumirEmpenho(movimentos),
+    })
+    const res = await app.inject({ method: 'GET', url: '/e1/ficha' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Ficha de Empenho')
+    expect(res.body).toContain('2026NE001')
+    expect(res.body).toContain('Material de consumo')
+    expect(res.body).toContain('Estorno empenho')
+  })
+  it('GET /:id/ficha inexistente → 404', async () => {
+    fichaMock.mockRejectedValue(new Error('not found'))
+    const res = await app.inject({ method: 'GET', url: '/x/ficha' })
+    expect(res.statusCode).toBe(404)
   })
 
   it('POST /:id/anular', async () => {
