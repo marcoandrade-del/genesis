@@ -97,7 +97,17 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       contas.filter((c) => c.origem === 'DESDOBRAMENTO').map((c) => c.parentId).filter(Boolean),
     )
 
-    const granularidade = await cfgDash.granularidade(entidadeId)
+    // Granularidade do relatório: o seletor da tela manda `?g=...` (memoriza só se
+    // diferir do default da entidade); sem param, usa o override do relatório → default.
+    const temDesdobramento = contas.some((c) => c.origem === 'DESDOBRAMENTO')
+    const g = (req.query as { g?: string } | undefined)?.g
+    let granularidade: 'PADRAO' | 'DESDOBRADO'
+    if (g === 'PADRAO' || g === 'DESDOBRADO') {
+      await cfgDash.definirRelatorio(entidadeId, cfg.rota, g)
+      granularidade = g
+    } else {
+      granularidade = await cfgDash.granularidadeRelatorio(entidadeId, cfg.rota)
+    }
     const contasVisiveis = aplicarGranularidade(contas, granularidade)
 
     const dataRef = dataRefDe(req)
@@ -138,6 +148,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       nivel,
       contas: linhas,
       granularidade,
+      temDesdobramento,
       podeEscrever: podeEscrever(nivel),
       comSaldos: !!cfg.saldos,
       dataRef: isoData(dataRef),
@@ -156,7 +167,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
   }
 
   // ── Lista (+ form de desdobrar/editar via ?desdobrar / ?editar) ─────────────
-  app.get<{ Querystring: { desdobrar?: string; editar?: string; data?: string } }>(cfg.rota, async (req, reply) => {
+  app.get<{ Querystring: { desdobrar?: string; editar?: string; data?: string; g?: string } }>(cfg.rota, async (req, reply) => {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
 

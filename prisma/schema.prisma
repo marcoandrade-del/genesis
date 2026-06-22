@@ -756,6 +756,21 @@ model ConfiguracaoDashboard {
   @@map("configuracoes_dashboard")
 }
 
+/// Override ESPARSO da granularidade por relatório: só existe linha quando, naquele
+/// relatório, escolheu-se algo DIFERENTE do default da entidade. Voltou ao default →
+/// a linha é removida (centenas de relatórios; a maioria segue o default). `relatorio`
+/// identifica a tela/relatório (ex.: "/contas", "/orcamento/saldo").
+model PreferenciaRelatorioPlano {
+  id                 String             @id @default(uuid())
+  entidadeId         String
+  relatorio          String
+  granularidadePlano GranularidadePlano
+  atualizadoEm       DateTime           @updatedAt
+
+  @@unique([entidadeId, relatorio])
+  @@map("preferencias_relatorio_plano")
+}
+
 // ─── Conta bancária (padrão Febraban) ────────────────────────────────────────
 // Vinculada à fonte de recurso POR CÓDIGO (não por FK à cópia do exercício):
 // o código TCE/STN é estável entre anos, então a conta sobrevive à virada de

@@ -623,6 +623,11 @@ export function criarPrismaMock() {
       create: vi.fn(),
       update: vi.fn(),
     },
+    preferenciaRelatorioPlano: {
+      findUnique: vi.fn(),
+      upsert: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     $transaction: vi.fn(),
   }
 
