@@ -43,6 +43,15 @@
           <button type="button" class="gx-area-grip" draggable="true" title="Arrastar para reordenar" aria-label="Reordenar área">
             <i class="bi bi-grip-vertical"></i>
           </button>
+          <% if (area.rota) { %>
+            <% const _fav = typeof favoritoIds !== 'undefined' && favoritoIds && favoritoIds.indexOf(area.id) !== -1 %>
+            <button type="button" class="gx-fav-star gx-fav-star-card <%= _fav ? 'is-fav' : '' %>"
+                    data-fav-id="<%= area.id %>" data-fav-nome="<%= area.nome %>"
+                    data-fav-rota="<%= area.rota %>" data-fav-icone="<%= area.icone || 'bi-grid' %>"
+                    title="<%= _fav ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
+              <i class="bi <%= _fav ? 'bi-star-fill' : 'bi-star' %>"></i>
+            </button>
+          <% } %>
           <a href="<%= area.rota || '#' %>" class="text-decoration-none">
             <div class="card-body d-flex align-items-center gap-3">
               <i class="bi <%= area.icone || 'bi-grid' %> fs-3 text-primary"></i>
@@ -59,8 +68,11 @@
 
   <style>
     .gx-area-card { transition: box-shadow .15s, opacity .15s; }
+    /* Estrela de favoritar no card (reusa .gx-fav-star do _navbar); fica no canto,
+       sempre visível p/ descoberta; a alça de arrastar desloca p/ a esquerda dela. */
+    .gx-fav-star-card { top: .4rem; right: .4rem; transform: none; z-index: 3; }
     .gx-area-grip {
-      position: absolute; top: .35rem; right: .35rem; z-index: 2;
+      position: absolute; top: .35rem; right: 2.3rem; z-index: 2;
       width: 26px; height: 26px; border: 0; border-radius: 8px; background: transparent;
       color: var(--mute, #868685); cursor: grab; display: grid; place-items: center;
       opacity: 0; transition: opacity .12s, background .12s;
