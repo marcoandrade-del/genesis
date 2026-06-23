@@ -11,6 +11,8 @@ export type ItemDado = {
   // Conta-corrente (sub-razão): natureza da receita e/ou fonte. Manual = undefined.
   naturezaReceitaCodigo?: string | null
   fonteCodigo?: string | null
+  // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
+  dotacaoDespesaId?: string | null
 }
 
 export type DadosCriarLancamento = {
