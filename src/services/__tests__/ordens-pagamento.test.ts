@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { OrdensPagamentoService } from '../ordens-pagamento.js'
 import { CONTAS_DESPESA } from '../motor-eventos-despesa.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+import { mockMatrizDespesa } from './helpers/despesa-matriz.js'
 
 let prisma: PrismaMock
 let service: OrdensPagamentoService
@@ -25,6 +26,7 @@ function mockContabil() {
     Object.values(CONTAS_DESPESA).map((codigo) => ({ id: 'c-' + codigo, codigo, entidadeId: 'ent1', ano: 2026, admiteMovimento: true })) as never,
   )
   prisma.lancamento.create.mockResolvedValue({ id: 'lanc1' } as never)
+  mockMatrizDespesa(prisma)
 }
 // liquidação 300, já pago 100 (na razão) → saldo da liquidação = 200; empenho na fonte 500
 function mockLiq(over: Partial<Record<string, unknown>> = {}) {

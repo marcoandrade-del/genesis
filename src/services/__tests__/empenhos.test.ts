@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { EmpenhosService } from '../empenhos.js'
 import { CONTAS_DESPESA } from '../motor-eventos-despesa.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+import { mockMatrizDespesa } from './helpers/despesa-matriz.js'
 
 let prisma: PrismaMock
 let service: EmpenhosService
@@ -17,11 +18,12 @@ function dadosOk(over: Partial<Record<string, unknown>> = {}) {
 }
 // Plano contábil completo: folhas da despesa + lançamento criável (disparo da Tabela de Eventos).
 function mockContabil() {
-  prisma.entidade.findUnique.mockResolvedValue({ id: 'ent1' } as never)
+  prisma.entidade.findUnique.mockResolvedValue({ id: 'ent1', municipio: { modeloContabilId: 'm1', estado: { modeloContabilId: 'm1' } } } as never)
   prisma.contaContabilEntidade.findMany.mockResolvedValue(
     Object.values(CONTAS_DESPESA).map((codigo) => ({ id: 'c-' + codigo, codigo, entidadeId: 'ent1', ano: 2026, admiteMovimento: true })) as never,
   )
   prisma.lancamento.create.mockResolvedValue({ id: 'lanc1' } as never)
+  mockMatrizDespesa(prisma)
 }
 // dotação: disponível = 1000 − 200 − 100 = 700; natureza no elemento 3.3.90.30
 function mockBase(dotacaoOver: Partial<Record<string, unknown>> = {}) {

@@ -22,6 +22,7 @@ import 'dotenv/config'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
+import { CONTAS_DESPESA as C, TOKENS as T } from '../src/services/motor-eventos-despesa.js'
 
 const APLICAR = process.argv.includes('--apply')
 const MODELOS = ['PARANÁ', 'PCASP STN']
@@ -56,15 +57,18 @@ const PARAMETROS: Array<{ natureza: string; vpd: string; passivo: string; nome: 
   },
 ]
 
-const EVENTOS: Array<{ codigo: string; descricao: string }> = [
-  { codigo: '600', descricao: 'Empenho — orçamentário: D 6.2.2.1.1 Crédito Disponível / C 6.2.2.1.3.01 Empenhado a Liquidar (cc: dotação)' },
-  { codigo: '601', descricao: 'Empenho — controle DDR: D 8.2.1.1.1 Disponível / C 8.2.1.1.2 Compr. p/ Empenho (cc: dotação)' },
-  { codigo: '700', descricao: 'Liquidação — orçamentário: D 6.2.2.1.3.01 Empenhado a Liquidar / C 6.2.2.1.3.03 Liquidado a Pagar (cc: dotação)' },
-  { codigo: '701', descricao: 'Liquidação — controle DDR: D 8.2.1.1.2 Compr. Empenho / C 8.2.1.1.3 Compr. Liquidação (cc: dotação)' },
-  { codigo: '702', descricao: 'Liquidação — patrimonial (fato gerador da VPD): D VPD classe 3 / C passivo 2.1.x (de/para natureza)' },
-  { codigo: '800', descricao: 'Pagamento — orçamentário: D 6.2.2.1.3.03 Liquidado a Pagar / C 6.2.2.1.3.04 Pago (cc: dotação)' },
-  { codigo: '801', descricao: 'Pagamento — controle DDR: D 8.2.1.1.3 Compr. Liquidação / C 8.2.1.1.4 Utilizada (cc: dotação)' },
-  { codigo: '802', descricao: 'Pagamento — financeiro: D passivo 2.1.x / C 1.1.1.x Caixa/Banco (da conta bancária)' },
+// Matriz da despesa: cada evento, seu GATILHO (estágio que o dispara) e as linhas
+// D/C (códigos do PCASP ou tokens de de/para). É a "Tabela de Eventos" que o motor
+// lê — editável no admin depois. O motor filtra por gatilho, não pelo código.
+const EVENTOS: Array<{ codigo: string; gatilho: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO'; descricao: string; linhas: Array<[string, string]> }> = [
+  { codigo: '600', gatilho: 'EMPENHO', descricao: 'Empenho — orçamentário', linhas: [[C.creditoDisponivel, C.empenhadoALiquidar]] },
+  { codigo: '601', gatilho: 'EMPENHO', descricao: 'Empenho — controle DDR', linhas: [[C.ddrDisponivel, C.ddrComprEmpenho]] },
+  { codigo: '700', gatilho: 'LIQUIDACAO', descricao: 'Liquidação — orçamentário', linhas: [[C.empenhadoALiquidar, C.liquidadoAPagar]] },
+  { codigo: '701', gatilho: 'LIQUIDACAO', descricao: 'Liquidação — controle DDR', linhas: [[C.ddrComprEmpenho, C.ddrComprLiquidacao]] },
+  { codigo: '702', gatilho: 'LIQUIDACAO', descricao: 'Liquidação — patrimonial (VPD / passivo)', linhas: [[T.VPD, T.PASSIVO]] },
+  { codigo: '800', gatilho: 'PAGAMENTO', descricao: 'Pagamento — orçamentário', linhas: [[C.liquidadoAPagar, C.pago]] },
+  { codigo: '801', gatilho: 'PAGAMENTO', descricao: 'Pagamento — controle DDR', linhas: [[C.ddrComprLiquidacao, C.ddrUtilizada]] },
+  { codigo: '802', gatilho: 'PAGAMENTO', descricao: 'Pagamento — financeiro (passivo / caixa)', linhas: [[T.PASSIVO, T.CAIXA]] },
 ]
 
 async function main() {
@@ -94,13 +98,19 @@ async function main() {
 
     for (const e of EVENTOS) {
       if (APLICAR) {
-        await prisma.eventoContabil.upsert({
+        const ev = await prisma.eventoContabil.upsert({
           where: { modeloContabilId_codigo: { modeloContabilId: modelo.id, codigo: e.codigo } },
-          create: { modeloContabilId: modelo.id, codigo: e.codigo, descricao: e.descricao, tipoInscricao: '11 - Natureza da Despesa' },
-          update: { descricao: e.descricao },
+          create: { modeloContabilId: modelo.id, codigo: e.codigo, gatilho: e.gatilho, descricao: e.descricao, tipoInscricao: '11 - Natureza da Despesa' },
+          update: { descricao: e.descricao, gatilho: e.gatilho },
+        })
+        // Substitui as linhas D/C integralmente (idempotente).
+        await prisma.eventoLancamento.deleteMany({ where: { eventoId: ev.id } })
+        await prisma.eventoLancamento.createMany({
+          data: e.linhas.map(([debito, credito], i) => ({ eventoId: ev.id, ordem: i + 1, contaDebitoMascara: debito, contaCreditoMascara: credito })),
         })
       }
-      console.log(`  evento ${e.codigo}  ${e.descricao}`)
+      const pernas = e.linhas.map(([d, c]) => `D ${d} / C ${c}`).join(' ; ')
+      console.log(`  evento ${e.codigo}  ${e.descricao.padEnd(38)} [${pernas}]`)
     }
   }
 

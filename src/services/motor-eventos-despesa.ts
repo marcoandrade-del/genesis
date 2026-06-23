@@ -1,27 +1,33 @@
-import { PrismaClient, Prisma, type OrigemLancamento } from '@prisma/client'
+import { PrismaClient, Prisma, type OrigemLancamento, type GatilhoEvento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import type { ItemDado, LancamentosService } from './lancamentos.js'
 import { resolverParametroDespesa } from './parametros-despesa.js'
 
 /**
- * Motor de Eventos da DESPESA (cut 1 = custeio): transforma cada estágio da
- * execução (empenho/liquidação/pagamento) em lançamentos contábeis automáticos
- * (partida dobrada), espelhando o MotorEventosReceita. Três aspectos por estágio:
+ * Motor de Eventos da DESPESA — **table-driven**: lê a matriz de contabilização
+ * de `EventoContabil`/`EventoLancamento` (configurável por modelo, no admin da
+ * Tabela de Eventos) e transforma cada estágio da execução em lançamentos
+ * automáticos (partida dobrada). O estágio é o prefixo do código do evento:
+ * empenho = 6xx, liquidação = 7xx, pagamento = 8xx.
  *
- *  - **Orçamentário** (classe 6.2.2.1): movimenta o crédito (Disponível →
- *    Empenhado a Liquidar → Liquidado a Pagar → Pago).
- *  - **Controle DDR** (classe 8.2.1.1): Disponível → Compr. Empenho → Compr.
- *    Liquidação → Utilizada.
- *  - **Patrimonial** (liquidação, fato gerador da VPD): D VPD (classe 3) / C
- *    Passivo a pagar (2.1.x) — via `ParametroDespesa` (de/para por natureza).
- *  - **Financeiro** (pagamento): D Passivo (2.1.x) / C Caixa (1.1.1.x da conta
- *    bancária) — baixa o passivo e sai o numerário.
+ * As pernas D/C de cada evento vêm das máscaras do evento. Máscaras literais são
+ * códigos do PCASP (resolvidos para a folha da entidade); **tokens** resolvem no
+ * disparo a contas que dependem da classificação do documento:
+ *  - `@VPD` / `@PASSIVO` → `ParametroDespesa` (de/para por natureza) — patrimonial.
+ *  - `@CAIXA` → folha de caixa da conta bancária do pagamento.
+ *
+ * Token sem resolução (sem de/para, sem caixa) **pula o evento** (a perna é
+ * opcional — ex.: liquidação sem de/para gera só orçamentário+DDR). Código literal
+ * que não é folha no plano da entidade **derruba a transação** (erro de config).
  *
  * Conta-corrente = **dotação** (carrega a funcional-programática completa). O
  * estorno inverte cada par D↔C mantendo as contas.
  */
 
-/** Folhas fixas do PCASP usadas pelos eventos da despesa (verificadas no plano). */
+/**
+ * Folhas canônicas do PCASP da despesa — fonte única usada pelo SEED da matriz
+ * (`scripts/seed_parametros_despesa.ts`). O motor lê a tabela, não estas constantes.
+ */
 export const CONTAS_DESPESA = {
   creditoDisponivel: '6.2.2.1.1.00.00.00.00.00.00.00',
   empenhadoALiquidar: '6.2.2.1.3.01.00.00.00.00.00.00',
@@ -31,9 +37,10 @@ export const CONTAS_DESPESA = {
   ddrComprEmpenho: '8.2.1.1.2.01.00.00.00.00.00.00',
   ddrComprLiquidacao: '8.2.1.1.3.01.00.00.00.00.00.00',
   ddrUtilizada: '8.2.1.1.4.01.00.00.00.00.00.00',
-  /** Caixa de pagamento default (MVP; futuro: derivar da ContaBancaria como na receita). */
-  caixaPagamento: '1.1.1.1.1.00.00.00.00.00.00.00',
 } as const
+
+/** Tokens de máscara resolvidos no disparo (contas que dependem do documento). */
+export const TOKENS = { VPD: '@VPD', PASSIVO: '@PASSIVO', CAIXA: '@CAIXA' } as const
 
 export type ContextoDespesa = {
   entidadeId: string
@@ -42,7 +49,7 @@ export type ContextoDespesa = {
   /** Código da natureza da despesa (ContaDespesaEntidade.codigo) — chave do de/para. */
   naturezaCodigo: string
   valor: Prisma.Decimal | string | number
-  /** Folha de caixa a creditar no pagamento — vinda da ContaBancaria; default se ausente. */
+  /** Folha de caixa a creditar no pagamento — vinda da ContaBancaria (token @CAIXA). */
   caixaCodigo?: string | null
 }
 
@@ -87,81 +94,93 @@ export async function gravarEventos(
   }
 }
 
+type ParametroPatrimonial = { contaVpdCodigo: string; contaPassivoCodigo: string }
+
 export class MotorEventosDespesa {
   constructor(private prisma: PrismaClient) {}
 
-  /** E600 — Empenho: orçamentário + controle DDR. */
-  async resolverEmpenho(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
-    const db = tx ?? this.prisma
-    const C = CONTAS_DESPESA
-    const ids = await this.resolverContas(ctx, [C.creditoDisponivel, C.empenhadoALiquidar, C.ddrDisponivel, C.ddrComprEmpenho], db)
-    const par = this.parBuilder(ctx, ids, opts.estorno)
-    return [
-      par('600', 'Empenho — orçamentário', C.creditoDisponivel, C.empenhadoALiquidar),
-      par('601', 'Empenho — controle DDR', C.ddrDisponivel, C.ddrComprEmpenho),
-    ]
+  /** Empenho — eventos com gatilho EMPENHO na Tabela de Eventos do modelo. */
+  resolverEmpenho(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
+    return this.resolverEstagio(ctx, 'EMPENHO', opts, tx)
   }
 
-  /** E700 — Liquidação: orçamentário + DDR + patrimonial (VPD/passivo, via de/para). */
-  async resolverLiquidacao(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
-    const db = tx ?? this.prisma
-    const C = CONTAS_DESPESA
-    const param = await this.parametroPatrimonial(ctx, db)
-    const codigos = [C.empenhadoALiquidar, C.liquidadoAPagar, C.ddrComprEmpenho, C.ddrComprLiquidacao]
-    if (param) codigos.push(param.contaVpdCodigo, param.contaPassivoCodigo)
-    const ids = await this.resolverContas(ctx, codigos, db)
-    const par = this.parBuilder(ctx, ids, opts.estorno)
-    const eventos = [
-      par('700', 'Liquidação — orçamentário', C.empenhadoALiquidar, C.liquidadoAPagar),
-      par('701', 'Liquidação — controle DDR', C.ddrComprEmpenho, C.ddrComprLiquidacao),
-    ]
-    if (param) eventos.push(par('702', 'Liquidação — patrimonial (VPD / passivo)', param.contaVpdCodigo, param.contaPassivoCodigo))
-    return eventos
+  /** Liquidação — gatilho LIQUIDACAO (orçamentário + DDR + patrimonial via de/para). */
+  resolverLiquidacao(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
+    return this.resolverEstagio(ctx, 'LIQUIDACAO', opts, tx)
   }
 
-  /** E800 — Pagamento: orçamentário + DDR + financeiro (passivo/caixa). */
-  async resolverPagamento(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
-    const db = tx ?? this.prisma
-    const C = CONTAS_DESPESA
-    const param = await this.parametroPatrimonial(ctx, db)
-    const caixa = ctx.caixaCodigo || C.caixaPagamento
-    const codigos = [C.liquidadoAPagar, C.pago, C.ddrComprLiquidacao, C.ddrUtilizada, caixa]
-    if (param) codigos.push(param.contaPassivoCodigo)
-    const ids = await this.resolverContas(ctx, codigos, db)
-    const par = this.parBuilder(ctx, ids, opts.estorno)
-    const eventos = [
-      par('800', 'Pagamento — orçamentário', C.liquidadoAPagar, C.pago),
-      par('801', 'Pagamento — controle DDR', C.ddrComprLiquidacao, C.ddrUtilizada),
-    ]
-    if (param) eventos.push(par('802', 'Pagamento — financeiro (passivo / caixa)', param.contaPassivoCodigo, caixa))
-    return eventos
-  }
-
-  /** Resolve o de/para patrimonial (VPD/passivo) da natureza, por modelo. Null se não houver. */
-  private async parametroPatrimonial(ctx: ContextoDespesa, db: Db) {
-    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
-    const params = await db.parametroDespesa.findMany({ where: { modeloContabilId: modeloId } })
-    return resolverParametroDespesa(params, ctx.naturezaCodigo)
+  /** Pagamento — gatilho PAGAMENTO (orçamentário + DDR + financeiro passivo/caixa). */
+  resolverPagamento(ctx: ContextoDespesa, opts: { estorno?: boolean } = {}, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
+    return this.resolverEstagio(ctx, 'PAGAMENTO', opts, tx)
   }
 
   /**
-   * Builder de um par D-C (eventoCodigo, descrição, conta débito, conta crédito).
-   * No estorno, inverte o lado. Conta-corrente = dotação em todas as pernas.
+   * Resolve os eventos de um estágio (pelo gatilho) lendo a matriz do modelo: para
+   * cada evento, resolve as máscaras D/C (literal ou token); pula o evento se algum
+   * token não resolver; monta os pares com cc=dotação. Estorno inverte D↔C.
    */
-  private parBuilder(ctx: ContextoDespesa, idPorCodigo: Map<string, string>, estorno?: boolean) {
+  private async resolverEstagio(ctx: ContextoDespesa, gatilho: GatilhoEvento, opts: { estorno?: boolean }, tx?: Prisma.TransactionClient): Promise<LancamentoEvento[]> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
+    const eventos = await db.eventoContabil.findMany({
+      where: { modeloContabilId: modeloId, ativo: true, gatilho },
+      orderBy: { codigo: 'asc' },
+      include: { lancamentos: { orderBy: { ordem: 'asc' } } },
+    })
+    if (!eventos.length) return []
+
+    // De/para só é consultado se a matriz usa tokens patrimoniais (evita query no empenho).
+    const usaDePara = eventos.some((e) => e.lancamentos.some((l) => ehTokenDePara(l.contaDebitoMascara) || ehTokenDePara(l.contaCreditoMascara)))
+    const param = usaDePara ? await this.parametroPatrimonial(ctx, modeloId, db) : null
+    const caixa = ctx.caixaCodigo || null
+
+    const resolverMascara = (m: string): { codigo: string | null; token: boolean } => {
+      const t = m.trim()
+      if (t === TOKENS.VPD) return { codigo: param?.contaVpdCodigo ?? null, token: true }
+      if (t === TOKENS.PASSIVO) return { codigo: param?.contaPassivoCodigo ?? null, token: true }
+      if (t === TOKENS.CAIXA) return { codigo: caixa, token: true }
+      return { codigo: t, token: false }
+    }
+
+    // Resolve cada evento; token indisponível → pula o evento inteiro (perna opcional).
+    type Resolvido = { codigo: string; descricao: string; pares: Array<{ debito: string; credito: string }> }
+    const resolvidos: Resolvido[] = []
+    for (const ev of eventos) {
+      const pares: Array<{ debito: string; credito: string }> = []
+      let pular = false
+      for (const l of ev.lancamentos) {
+        const d = resolverMascara(l.contaDebitoMascara)
+        const c = resolverMascara(l.contaCreditoMascara)
+        if ((d.token && !d.codigo) || (c.token && !c.codigo)) { pular = true; break }
+        pares.push({ debito: d.codigo as string, credito: c.codigo as string })
+      }
+      if (!pular && pares.length) resolvidos.push({ codigo: ev.codigo, descricao: ev.descricao, pares })
+    }
+    if (!resolvidos.length) return []
+
+    // Resolve todos os códigos → id da folha da entidade (uma query).
+    const codigos = [...new Set(resolvidos.flatMap((r) => r.pares.flatMap((p) => [p.debito, p.credito])))]
+    const idPorCodigo = await this.resolverContas(ctx, codigos, db)
+
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
-    const dDeb: 'DEBITO' | 'CREDITO' = estorno ? 'CREDITO' : 'DEBITO'
-    const dCred: 'DEBITO' | 'CREDITO' = estorno ? 'DEBITO' : 'CREDITO'
+    const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
+    const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
     const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
       const id = idPorCodigo.get(codigo)
       if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
       return { contaId: id, tipo, valor, dotacaoDespesaId: ctx.dotacaoDespesaId }
     }
-    return (eventoCodigo: string, descricaoEvento: string, contaDebito: string, contaCredito: string): LancamentoEvento => ({
-      eventoCodigo,
-      descricaoEvento,
-      itens: [leg(contaDebito, dDeb), leg(contaCredito, dCred)],
-    })
+    return resolvidos.map((r) => ({
+      eventoCodigo: r.codigo,
+      descricaoEvento: r.descricao,
+      itens: r.pares.flatMap((p) => [leg(p.debito, dDeb), leg(p.credito, dCred)]),
+    }))
+  }
+
+  /** Resolve o de/para patrimonial (VPD/passivo) da natureza, por modelo. Null se não houver. */
+  private async parametroPatrimonial(ctx: ContextoDespesa, modeloId: string, db: Db): Promise<ParametroPatrimonial | null> {
+    const params = await db.parametroDespesa.findMany({ where: { modeloContabilId: modeloId } })
+    return resolverParametroDespesa(params, ctx.naturezaCodigo)
   }
 
   /** Mapeia código→id das folhas necessárias (valida existência e que admitem movimento). */
@@ -187,4 +206,10 @@ export class MotorEventosDespesa {
     if (!modeloId) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A entidade não está vinculada a um modelo contábil.')
     return modeloId
   }
+}
+
+/** Token de de/para patrimonial (resolve via ParametroDespesa). */
+function ehTokenDePara(mascara: string): boolean {
+  const t = mascara.trim()
+  return t === TOKENS.VPD || t === TOKENS.PASSIVO
 }

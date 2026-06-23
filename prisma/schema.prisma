@@ -1050,6 +1050,9 @@ model EventoContabil {
   tipoInscricao                    String? // ex.: "11 - Natureza da Receita". Define o significado dos X.
   classificacaoContabilMascara     String? // ex.: "52121XXXX"
   classificacaoOrcamentariaMascara String? // ex.: "YYYYYYY"
+  // Estágio da execução que dispara o evento automaticamente. NULL = evento não
+  // automático (ex.: restos a pagar, eventos manuais) — o motor não o aciona.
+  gatilho                          GatilhoEvento?
   ativo                            Boolean            @default(true)
   criadoEm                         DateTime           @default(now())
   atualizadoEm                     DateTime           @updatedAt
@@ -1058,7 +1061,17 @@ model EventoContabil {
 
   @@unique([modeloContabilId, codigo])
   @@index([modeloContabilId])
+  @@index([modeloContabilId, gatilho])
   @@map("eventos_contabeis")
+}
+
+// Estágio da execução que aciona um evento contábil (table-driven). O motor filtra
+// os eventos por gatilho, não pelo código — códigos podem ter qualquer convenção.
+enum GatilhoEvento {
+  ARRECADACAO
+  EMPENHO
+  LIQUIDACAO
+  PAGAMENTO
 }
 
 model EventoLancamento {
