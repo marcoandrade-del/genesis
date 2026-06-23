@@ -37,6 +37,16 @@
           placeholder="ex.: Secretaria de Educação" required maxlength="200">
       </div>
       <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Órgão</label>
+        <select name="orgaoId" class="form-select form-select-sm">
+          <option value="">— Sem órgão —</option>
+          <% orgaos.forEach(function(o) { %>
+            <option value="<%= o.id %>" <%= uo && uo.orgaoId === o.id ? 'selected' : '' %>><%= o.codigo %> — <%= o.nome %></option>
+          <% }) %>
+        </select>
+        <div class="form-text small">Classificação institucional: Órgão → Unidade.</div>
+      </div>
+      <div class="col-12 mb-2">
         <div class="form-check">
           <input type="checkbox" class="form-check-input" id="uo-ativa" name="ativa" value="true"
             <%= !uo || uo.ativa ? 'checked' : '' %>>

@@ -30,6 +30,7 @@ import { adminContasReceitaEntidadeRoutes } from './contas-receita-entidade.js'
 import { adminContasContabilEntidadeRoutes } from './contas-contabil-entidade.js'
 import { adminFuncoesRoutes } from './funcoes.js'
 import { adminUnidadesOrcamentariaRoutes } from './unidades-orcamentaria.js'
+import { adminOrgaosRoutes } from './orgaos.js'
 import { adminEventosContabeisRoutes } from './eventos-contabeis.js'
 import { adminProgramasRoutes } from './programas.js'
 import { adminOrcamentosRoutes } from './orcamentos.js'
@@ -156,6 +157,7 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminContasContabilEntidadeRoutes, { prefix: '/contas-contabil-entidade' })
     admin.register(adminFuncoesRoutes, { prefix: '/funcoes' })
     admin.register(adminUnidadesOrcamentariaRoutes, { prefix: '/unidades-orcamentaria' })
+    admin.register(adminOrgaosRoutes, { prefix: '/orgaos' })
     admin.register(adminEventosContabeisRoutes, { prefix: '/eventos-contabeis' })
     admin.register(adminProgramasRoutes, { prefix: '/programas' })
     admin.register(adminOrcamentosRoutes, { prefix: '/orcamentos' })

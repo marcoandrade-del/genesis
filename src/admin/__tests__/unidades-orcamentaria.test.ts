@@ -222,7 +222,7 @@ describe('adminUnidadesOrcamentariaRoutes', () => {
       })
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/unidades-orcamentaria?entidadeId=ent1')
-      expect(atualizarMock).toHaveBeenCalledWith('uo1', { codigo: 'Z', nome: 'W', ativa: true })
+      expect(atualizarMock).toHaveBeenCalledWith('uo1', { codigo: 'Z', nome: 'W', ativa: true, orgaoId: null })
     })
 
     it('respeita ativa=false', async () => {
