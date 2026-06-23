@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acumulado diário · <%= conta.codigo %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  var brl = function(v) { return (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  var natLabel = { DEVEDORA: 'devedora', CREDORA: 'credora', MISTA: 'mista' }
+  // Máximo absoluto do saldo acumulado p/ dimensionar a barra de evolução.
+  var maxAbs = Math.abs(Number(saldoInicial) || 0)
+  dias.forEach(function (d) { maxAbs = Math.max(maxAbs, Math.abs(Number(d.saldo) || 0)) })
+  if (maxAbs === 0) maxAbs = 1
+%>
+
+<div class="container py-4" style="max-width:1000px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/contas" class="text-decoration-none">Plano de Contas</a></li>
+      <li class="breadcrumb-item"><a href="/app/contas/<%= conta.id %>/razao" class="text-decoration-none">Razão</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Acumulado diário</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+      <h2 class="h4 fw-bold mb-0">Acumulado diário <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
+      <div class="small text-muted"><span class="font-monospace"><%= conta.codigo %></span> — <%= conta.descricao %>
+        <% if (natureza) { %><span class="badge bg-light text-muted ms-1">conta <%= natLabel[natureza] || natureza %></span><% } %>
+      </div>
+    </div>
+    <a href="/app/contas/<%= conta.id %>/razao" class="btn btn-sm btn-outline-secondary"><i class="bi bi-journal-text me-1"></i>Ver razão</a>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+      <div class="small text-muted">Saldo inicial</div><div class="h6 fw-bold font-monospace mb-0"><%= brl(saldoInicial) %></div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+      <div class="small text-muted">Total débito</div><div class="h6 fw-bold font-monospace mb-0"><%= brl(totalDebito) %></div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+      <div class="small text-muted">Total crédito</div><div class="h6 fw-bold font-monospace mb-0"><%= brl(totalCredito) %></div>
+    </div></div></div>
+    <div class="col-6 col-md-3"><div class="card border-0 shadow-sm h-100" style="background:var(--canvas-soft)"><div class="card-body py-3">
+      <div class="small text-muted">Saldo final</div><div class="h6 fw-bold font-monospace mb-0 <%= Number(saldoFinal) < 0 ? 'text-danger' : '' %>"><%= brl(saldoFinal) %></div>
+    </div></div></div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom py-2"><span class="fw-semibold small"><i class="bi bi-graph-up me-2"></i>Evolução do saldo por dia (apenas dias com movimento)</span></div>
+    <div class="card-body p-0">
+      <table class="table table-hover table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr><th class="ps-3" style="width:110px">Data</th><th class="text-end">Débito</th><th class="text-end">Crédito</th><th class="text-end pe-3" style="width:160px">Saldo acumulado</th><th style="width:34%"></th></tr>
+        </thead>
+        <tbody>
+          <% if (dias.length === 0) { %>
+            <tr><td colspan="5" class="text-center text-muted py-4"><i class="bi bi-inbox fs-5 d-block mb-1"></i>Sem movimento no exercício.</td></tr>
+          <% } %>
+          <% dias.forEach(function (d) { var w = Math.round(Math.abs(Number(d.saldo)) / maxAbs * 100); %>
+            <tr>
+              <td class="ps-3 small text-muted"><%= d.data %></td>
+              <td class="text-end font-monospace small"><%= d.debito ? brl(d.debito) : '—' %></td>
+              <td class="text-end font-monospace small"><%= d.credito ? brl(d.credito) : '—' %></td>
+              <td class="text-end font-monospace small fw-semibold pe-3 <%= Number(d.saldo) < 0 ? 'text-danger' : '' %>"><%= brl(d.saldo) %></td>
+              <td>
+                <div style="background:var(--canvas-soft, #e8ebe6); border-radius:6px; height:10px; overflow:hidden">
+                  <div style="height:10px; width:<%= w %>%; background:<%= Number(d.saldo) < 0 ? 'var(--bs-danger)' : 'var(--primary, #9fe870)' %>"></div>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="small text-muted mt-2">Saldo no lado natural da conta, a partir do agregado diário materializado (<code>MovimentoDiarioConta</code>). Atualiza a cada lançamento.</p>
+</div>
+</body>
+</html>
