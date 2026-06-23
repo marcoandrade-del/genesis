@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
+import { ArrecadacaoDiariaService } from '../services/arrecadacao-diaria.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { ContasBancariasService } from '../services/contas-bancarias.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
@@ -18,6 +19,7 @@ const ERRO_LEITURA =
  */
 export async function appArrecadacaoRoutes(app: FastifyInstance) {
   const svc = new ArrecadacoesService(app.prisma)
+  const diariaSvc = new ArrecadacaoDiariaService(app.prisma)
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const contasBancSvc = new ContasBancariasService(app.prisma)
   const cfgDash = new ConfiguracaoDashboardService(app.prisma)
@@ -85,6 +87,25 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     return renderTela(req, reply, entidade)
+  })
+
+  // ── Acumulado diário da receita: evolução do arrecadado dia a dia vs previsto ─
+  app.get('/orcamento/arrecadacao/diario', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const { entidadeId, ano } = req.contexto
+    const serie = await diariaSvc.serie(entidadeId, ano)
+    const n = (d: { toNumber(): number }) => d.toNumber()
+    const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    return reply.view('app/arrecadacao-diario', {
+      entidade,
+      ano,
+      temOrcamento: serie.temOrcamento,
+      previstoTotal: n(serie.previstoTotal),
+      arrecadadoTotal: n(serie.arrecadadoTotal),
+      dias: serie.dias.map((d) => ({ data: dataBR(d.data), dia: n(d.arrecadadoDia), acumulado: n(d.arrecadadoAcumulado) })),
+      layout: null,
+    })
   })
 
   // ── Trilha contábil de um movimento (lançamentos gerados) ─────

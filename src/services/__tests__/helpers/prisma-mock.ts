@@ -413,6 +413,7 @@ export function criarPrismaMock() {
       update: vi.fn(),
       delete: vi.fn(),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { valorPrevisto: null } }),
       count: vi.fn().mockResolvedValue(0),
     },
     creditoAdicional: {
@@ -430,6 +431,7 @@ export function criarPrismaMock() {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
+      groupBy: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
     lancamentoTributario: {
