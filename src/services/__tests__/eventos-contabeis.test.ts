@@ -185,6 +185,17 @@ describe('EventosContabeisService.criar', () => {
     await expect(service.criar('m1', dadosOk())).rejects.toThrow('boom')
   })
 
+  it('persiste o gatilho válido e normaliza inválido para null', async () => {
+    prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
+    prisma.eventoContabil.create.mockResolvedValue({ id: 'ev1' })
+    await service.criar('m1', { ...dadosOk(), gatilho: 'LIQUIDACAO' as never })
+    expect(prisma.eventoContabil.create.mock.calls[0][0].data.gatilho).toBe('LIQUIDACAO')
+
+    prisma.eventoContabil.create.mockClear()
+    await service.criar('m1', { ...dadosOk(), gatilho: 'XPTO' as never })
+    expect(prisma.eventoContabil.create.mock.calls[0][0].data.gatilho).toBeNull()
+  })
+
   it('PCASP: barra par que mistura subsistemas (débito orçamentário × crédito patrimonial)', async () => {
     prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
     prisma.conta.findMany.mockResolvedValue([

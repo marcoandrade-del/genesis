@@ -93,6 +93,7 @@ export async function adminEventosContabeisRoutes(app: FastifyInstance) {
     tipoInscricao?: string
     classificacaoContabilMascara?: string
     classificacaoOrcamentariaMascara?: string
+    gatilho?: string
     ativo?: string
     contaDebito?: string | string[]
     contaCredito?: string | string[]
@@ -135,6 +136,7 @@ export async function adminEventosContabeisRoutes(app: FastifyInstance) {
             tipoInscricao: req.body.tipoInscricao ?? '',
             classificacaoContabilMascara: req.body.classificacaoContabilMascara ?? '',
             classificacaoOrcamentariaMascara: req.body.classificacaoOrcamentariaMascara ?? '',
+            gatilho: req.body.gatilho ?? '',
             ativo: req.body.ativo !== 'false',
             lancamentos,
           },
@@ -150,6 +152,7 @@ export async function adminEventosContabeisRoutes(app: FastifyInstance) {
         tipoInscricao: req.body.tipoInscricao,
         classificacaoContabilMascara: req.body.classificacaoContabilMascara,
         classificacaoOrcamentariaMascara: req.body.classificacaoOrcamentariaMascara,
+        gatilho: (req.body.gatilho || null) as never,
         ativo: req.body.ativo !== 'false',
         lancamentos,
       })
@@ -187,6 +190,7 @@ export async function adminEventosContabeisRoutes(app: FastifyInstance) {
             tipoInscricao: req.body.tipoInscricao ?? '',
             classificacaoContabilMascara: req.body.classificacaoContabilMascara ?? '',
             classificacaoOrcamentariaMascara: req.body.classificacaoOrcamentariaMascara ?? '',
+            gatilho: req.body.gatilho ?? '',
             ativo: req.body.ativo !== 'false',
             lancamentos,
           },
@@ -202,6 +206,7 @@ export async function adminEventosContabeisRoutes(app: FastifyInstance) {
         tipoInscricao: req.body.tipoInscricao,
         classificacaoContabilMascara: req.body.classificacaoContabilMascara,
         classificacaoOrcamentariaMascara: req.body.classificacaoOrcamentariaMascara,
+        gatilho: (req.body.gatilho || null) as never,
         ativo: req.body.ativo !== 'false',
         lancamentos,
       })

@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma, type GatilhoEvento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { validarEventoPcasp, type ContaParaRegra } from './pcasp-regras.js'
 
@@ -13,8 +13,15 @@ export type DadosEvento = {
   tipoInscricao?: string | null
   classificacaoContabilMascara?: string | null
   classificacaoOrcamentariaMascara?: string | null
+  /** Estágio que dispara o evento automaticamente (null = não automático). */
+  gatilho?: GatilhoEvento | null
   ativo?: boolean
   lancamentos: DadosLancamentoEvento[]
+}
+
+const GATILHOS: ReadonlyArray<GatilhoEvento> = ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO']
+function normalizarGatilho(g: GatilhoEvento | null | undefined): GatilhoEvento | null {
+  return g && GATILHOS.includes(g) ? g : null
 }
 
 /**
@@ -64,6 +71,7 @@ export class EventosContabeisService {
             tipoInscricao: trimOuNull(dados.tipoInscricao),
             classificacaoContabilMascara: trimOuNull(dados.classificacaoContabilMascara),
             classificacaoOrcamentariaMascara: trimOuNull(dados.classificacaoOrcamentariaMascara),
+            gatilho: normalizarGatilho(dados.gatilho),
             ativo: dados.ativo ?? true,
           },
         })
@@ -107,6 +115,7 @@ export class EventosContabeisService {
             tipoInscricao: trimOuNull(dados.tipoInscricao),
             classificacaoContabilMascara: trimOuNull(dados.classificacaoContabilMascara),
             classificacaoOrcamentariaMascara: trimOuNull(dados.classificacaoOrcamentariaMascara),
+            gatilho: normalizarGatilho(dados.gatilho),
             ativo: dados.ativo ?? existente.ativo,
           },
         })

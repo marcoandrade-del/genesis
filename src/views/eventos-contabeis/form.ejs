@@ -67,6 +67,17 @@
             value="<%= evento && evento.classificacaoOrcamentariaMascara ? evento.classificacaoOrcamentariaMascara : '' %>"
             placeholder="ex.: YYYYYYY" maxlength="50">
         </div>
+        <div class="col-md-4">
+          <label class="form-label small fw-semibold mb-1">Gatilho (estágio que dispara)</label>
+          <% const gat = evento && evento.gatilho ? evento.gatilho : '' %>
+          <select name="gatilho" class="form-select form-select-sm">
+            <option value="">Não automático</option>
+            <% ['ARRECADACAO','EMPENHO','LIQUIDACAO','PAGAMENTO'].forEach(function(g) { %>
+              <option value="<%= g %>" <%= gat === g ? 'selected' : '' %>><%= g.charAt(0) + g.slice(1).toLowerCase() %></option>
+            <% }) %>
+          </select>
+          <div class="form-text small">O motor dispara este evento neste estágio da execução. "Não automático" = manual (ex.: restos a pagar).</div>
+        </div>
         <div class="col-12">
           <div class="form-check">
             <input type="checkbox" class="form-check-input" id="ev-ativo" name="ativo" value="true"
