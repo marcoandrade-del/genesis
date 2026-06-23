@@ -1114,6 +1114,13 @@ model Orcamento {
 // Dotação de despesa: linha LOA com TODAS as dimensões do padrão SIAFI cheio
 // obrigatórias (UO + Função + Subfunção + Programa + Ação + ContaDespesa +
 // Fonte). A combinação dessas 7 dimensões é única por Orçamento.
+/// Esfera orçamentária — qual orçamento financia a dotação (Lei 4.320 / CF art. 165 §5º).
+enum EsferaOrcamentaria {
+  FISCAL
+  SEGURIDADE_SOCIAL
+  INVESTIMENTO
+}
+
 model DotacaoDespesa {
   id                     String               @id @default(uuid())
   orcamentoId            String
@@ -1124,6 +1131,9 @@ model DotacaoDespesa {
   acaoId                 String
   contaDespesaEntidadeId String
   fonteRecursoEntidadeId String
+  esfera                 EsferaOrcamentaria   @default(FISCAL) // qual orçamento financia (Fiscal/Seguridade/Investimento)
+  vinculoVariavelCodigo  String? // detalhamento variável da fonte (ex.: "01.312.0212")
+  vinculoVariavelNome    String? // ex.: "EDUCAÇÃO - CRECHE - COVID-19"
   valorAutorizado        Decimal              @db.Decimal(18, 2)
   // Saldo materializado da execução: disponível = autorizado − reservado − empenhado.
   // Atualizado transacionalmente por reservas (pré-empenho) e empenhos.

@@ -36,6 +36,10 @@
           <dt class="col-5">Sub-elemento</dt><dd class="col-7"><span class="font-monospace"><%= empenho.subElementoConta.codigo %></span> <%= empenho.subElementoConta.descricao %></dd>
         <% } %>
         <dt class="col-5">Fonte</dt><dd class="col-7"><span class="font-monospace"><%= d.fonteRecurso.codigo %></span> <%= d.fonteRecurso.nomenclatura %></dd>
+        <% if (d.vinculoVariavelCodigo || d.vinculoVariavelNome) { %>
+          <dt class="col-5">Vínculo variável</dt><dd class="col-7"><span class="font-monospace"><%= d.vinculoVariavelCodigo || '' %></span> <%= d.vinculoVariavelNome || '' %></dd>
+        <% } %>
+        <dt class="col-5">Esfera</dt><dd class="col-7"><%= ({ FISCAL: 'Fiscal', SEGURIDADE_SOCIAL: 'Seguridade Social', INVESTIMENTO: 'Investimento' })[d.esfera] || d.esfera %></dd>
       </dl>
     </div></div>
   </div>

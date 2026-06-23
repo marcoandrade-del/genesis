@@ -292,6 +292,26 @@ describe('DotacoesDespesaService.criar — caminho feliz e erros', () => {
     expect(prisma.dotacaoDespesa.create.mock.calls[0][0].data.valorAutorizado.toString()).toBe('1000.5')
   })
 
+  it('grava esfera (default FISCAL) e vínculo variável (com trim)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue(ORC_RASCUNHO)
+    mockReferenciasOk()
+    prisma.dotacaoDespesa.create.mockResolvedValue({ id: 'd1' })
+    await service.criar('o1', dadosOk({ vinculoVariavelCodigo: ' 01.312.0212 ', vinculoVariavelNome: ' Educação Creche COVID-19 ' }))
+    const data = prisma.dotacaoDespesa.create.mock.calls[0][0].data
+    expect(data.esfera).toBe('FISCAL')
+    expect(data.vinculoVariavelCodigo).toBe('01.312.0212')
+    expect(data.vinculoVariavelNome).toBe('Educação Creche COVID-19')
+  })
+
+  it('aceita esfera SEGURIDADE_SOCIAL; rejeita esfera inválida', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue(ORC_RASCUNHO)
+    mockReferenciasOk()
+    prisma.dotacaoDespesa.create.mockResolvedValue({ id: 'd1' })
+    await service.criar('o1', dadosOk({ esfera: 'SEGURIDADE_SOCIAL' }))
+    expect(prisma.dotacaoDespesa.create.mock.calls[0][0].data.esfera).toBe('SEGURIDADE_SOCIAL')
+    await expect(service.criar('o1', dadosOk({ esfera: 'XPTO' }))).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
   it('combinação duplicada vira CONFLITO', async () => {
     prisma.orcamento.findUnique.mockResolvedValue(ORC_RASCUNHO)
     mockReferenciasOk()

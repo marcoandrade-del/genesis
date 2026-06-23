@@ -84,6 +84,7 @@ describe('adminEmpenhosRoutes', () => {
           unidadeOrcamentaria: { codigo: '02.001', nome: 'Secretaria', orgao: { codigo: '02', nome: 'Prefeitura Municipal' } },
           contaDespesa: { codigo: '3.3.90.30', descricao: 'Material de consumo' },
           fonteRecurso: { codigo: '500', nomenclatura: 'Recursos Livres' },
+          esfera: 'FISCAL', vinculoVariavelCodigo: '01.312.0212', vinculoVariavelNome: 'Educação Creche COVID-19',
         },
       },
       movimentos,
@@ -99,6 +100,10 @@ describe('adminEmpenhosRoutes', () => {
     expect(res.body).toContain('Prefeitura Municipal')
     expect(res.body).toContain('Sub-elemento')
     expect(res.body).toContain('Gêneros de Alimentação')
+    expect(res.body).toContain('Esfera')
+    expect(res.body).toContain('Fiscal')
+    expect(res.body).toContain('Vínculo variável')
+    expect(res.body).toContain('Educação Creche COVID-19')
   })
 
   it('GET /sub-elementos lista as folhas sob o elemento da dotação', async () => {
