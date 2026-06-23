@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
+import { validarEventoPcasp, type ContaParaRegra } from './pcasp-regras.js'
 
 export type DadosLancamentoEvento = {
   contaDebitoMascara: string
@@ -49,6 +50,8 @@ export class EventosContabeisService {
     const modelo = await this.prisma.modeloContabil.findUnique({ where: { id: modeloContabilId } })
     if (!modelo) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Modelo contábil não encontrado.')
 
+    await this.validarPcasp(modeloContabilId, dados.lancamentos)
+
     const codigo = dados.codigo.trim()
 
     try {
@@ -87,6 +90,8 @@ export class EventosContabeisService {
 
     const existente = await this.prisma.eventoContabil.findUnique({ where: { id } })
     if (!existente) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Evento não encontrado.')
+
+    await this.validarPcasp(existente.modeloContabilId, dados.lancamentos)
 
     const codigo = dados.codigo.trim()
 
@@ -128,6 +133,35 @@ export class EventosContabeisService {
     if (!ev) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Evento não encontrado.')
     // onDelete: Cascade limpa os lançamentos automaticamente.
     await this.prisma.eventoContabil.delete({ where: { id } })
+  }
+
+  /**
+   * Guarda PCASP: resolve os códigos dos pares D/C contra o plano contábil do
+   * modelo (com os atributos PCASP) e barra a configuração se algum par violar as
+   * regras estruturais. Tokens (`@VPD`, `@PASSIVO`…) são resolvidos por de/para no
+   * disparo — aqui são ignorados (não são códigos do plano).
+   */
+  private async validarPcasp(modeloContabilId: string, lancamentos: DadosLancamentoEvento[]) {
+    const codigos = [
+      ...new Set(
+        lancamentos.flatMap((l) => [l.contaDebitoMascara.trim(), l.contaCreditoMascara.trim()]).filter((c) => c && !c.startsWith('@')),
+      ),
+    ]
+    const contas = codigos.length
+      ? await this.prisma.conta.findMany({
+          where: { codigo: { in: codigos }, plano: { modeloContabilId } },
+          select: { codigo: true, admiteMovimento: true, naturezaInformacao: true },
+        })
+      : []
+    const mapa = new Map<string, ContaParaRegra>()
+    for (const c of contas) if (!mapa.has(c.codigo)) mapa.set(c.codigo, c)
+
+    // Pares 100% token não passam pelas regras de conta (validados no de/para).
+    const paresLiterais = lancamentos.filter((l) => !l.contaDebitoMascara.trim().startsWith('@') || !l.contaCreditoMascara.trim().startsWith('@'))
+    const violacoes = validarEventoPcasp(paresLiterais, mapa)
+    if (violacoes.length) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Configuração viola a PCASP:\n- ${violacoes.map((v) => v.mensagem).join('\n- ')}`)
+    }
   }
 
   private validarDados(dados: DadosEvento) {
