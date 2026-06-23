@@ -159,6 +159,7 @@ export class LancamentosService {
           valor: dec(i.valor),
           naturezaReceitaCodigo: i.naturezaReceitaCodigo ?? null,
           fonteCodigo: i.fonteCodigo ?? null,
+          dotacaoDespesaId: i.dotacaoDespesaId ?? null,
         })),
       })
 

@@ -502,10 +502,14 @@ model LancamentoItem {
   // natureza da receita / fonte viajam como DIMENSÃO (não como código mais fundo).
   naturezaReceitaCodigo String? // ex.: "1.3.1.1.01.1.1" (cc da classe 6, VPA)
   fonteCodigo           String? // ex.: "1500" (cc da classe 8 / disponibilidade)
+  // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
+  dotacaoDespesaId      String?
   lancamento   Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
   conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
+  dotacaoDespesa DotacaoDespesa?     @relation(fields: [dotacaoDespesaId], references: [id])
 
   @@index([contaId])
+  @@index([dotacaoDespesaId])
   @@map("lancamento_itens")
 }
 
@@ -567,6 +571,9 @@ enum OrigemLancamento {
   LANCAMENTO_TRIBUTARIO
   INSCRICAO_DIVIDA_ATIVA
   ABERTURA
+  EMPENHO
+  LIQUIDACAO
+  PAGAMENTO
 }
 
 // Tipo de movimento na tela de lançamento tributário: constituição do crédito ou
@@ -1195,6 +1202,7 @@ model DotacaoDespesa {
   reservas               ReservaDotacao[]
   empenhos               Empenho[]
   creditosItens          CreditoAdicionalItem[]
+  lancamentoItens        LancamentoItem[]
 
   @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
   @@index([orcamentoId])

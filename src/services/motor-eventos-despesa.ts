@@ -1,6 +1,6 @@
-import { PrismaClient, Prisma } from '@prisma/client'
+import { PrismaClient, Prisma, type OrigemLancamento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
-import type { ItemDado } from './lancamentos.js'
+import type { ItemDado, LancamentosService } from './lancamentos.js'
 import { resolverParametroDespesa } from './parametros-despesa.js'
 
 /**
@@ -53,6 +53,39 @@ export type LancamentoEvento = {
 }
 
 type Db = PrismaClient | Prisma.TransactionClient
+
+/** Date (coluna @db.Date / DateTime) → 'YYYY-MM-DD' para o disparo contábil. */
+export function isoData(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+/**
+ * Grava os lançamentos contábeis de uma lista de eventos (saída do motor) dentro
+ * de uma transação, com rastreabilidade mão-dupla (origem*). Compartilhado pelos
+ * três estágios da execução (empenho/liquidação/pagamento).
+ */
+export async function gravarEventos(
+  lancamentos: LancamentosService,
+  eventos: LancamentoEvento[],
+  meta: { entidadeId: string; data: string; histBase: string; origemTipo: OrigemLancamento; origemId: string; criadoPorId: string },
+  tx: Prisma.TransactionClient,
+): Promise<void> {
+  for (const ev of eventos) {
+    await lancamentos.criar(
+      {
+        entidadeId: meta.entidadeId,
+        data: meta.data,
+        historico: `${ev.descricaoEvento} — ${meta.histBase}`,
+        itens: ev.itens,
+        criadoPorId: meta.criadoPorId,
+        origemTipo: meta.origemTipo,
+        origemId: meta.origemId,
+        eventoCodigo: ev.eventoCodigo,
+      },
+      tx,
+    )
+  }
+}
 
 export class MotorEventosDespesa {
   constructor(private prisma: PrismaClient) {}
