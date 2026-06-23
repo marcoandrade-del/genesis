@@ -371,6 +371,7 @@ model ModeloContabil {
   fontesRecurso     FonteRecurso[]
   eventos           EventoContabil[]
   parametrosReceita ParametroReceita[]
+  parametrosDespesa ParametroDespesa[]
   estados           Estado[]
   municipios        Municipio[]
 
@@ -618,6 +619,27 @@ model ParametroReceita {
   @@unique([modeloContabilId, naturezaCodigo])
   @@index([modeloContabilId])
   @@map("parametros_receita")
+}
+
+/// de/para da DESPESA (cut 1 = custeio): para uma NATUREZA (casa por prefixo mais
+/// longo, como ParametroReceita), as contas patrimoniais usadas na liquidação
+/// (E700) — `contaVpdCodigo` (VPD classe 3, débito) e `contaPassivoCodigo`
+/// (Passivo a pagar 2.1.x, crédito). Por modelo contábil. A classificação
+/// funcional-programática completa viaja como conta-corrente (dotação) no
+/// LancamentoItem. Capital (4.4.x → incorpora ativo) é ramo à parte (depois).
+model ParametroDespesa {
+  id                 String         @id @default(uuid())
+  modeloContabilId   String
+  naturezaCodigo     String // ex.: "3.1.90" ou "3.3.90.30" — casa por prefixo
+  contaVpdCodigo     String // VPD classe 3 (débito na liquidação)
+  contaPassivoCodigo String // Passivo a pagar 2.1.x (crédito na liquidação)
+  criadoEm           DateTime       @default(now())
+  atualizadoEm       DateTime       @updatedAt
+  modeloContabil     ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+
+  @@unique([modeloContabilId, naturezaCodigo])
+  @@index([modeloContabilId])
+  @@map("parametros_despesa")
 }
 
 // ─── Plano de Contas da Receita (orçamentário) ───────────────────────────────
