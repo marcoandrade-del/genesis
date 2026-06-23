@@ -889,6 +889,7 @@ model ContaDespesaEntidade {
   parent          ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
   filhos          ContaDespesaEntidade[] @relation("SubDespesaEnt")
   dotacoes        DotacaoDespesa[]
+  empenhosSubElemento Empenho[]          @relation("EmpenhoSubElemento")
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
@@ -1764,6 +1765,7 @@ model Empenho {
   reservaDotacaoId   String? // reserva convertida (REGRA 2)
   contratoId         String? // vínculo informativo
   ataRegistroPrecoId String? // vínculo informativo
+  subElementoContaId String? // sub-elemento da natureza (folha sob o elemento da dotação) — Specs 22-06-2026 §8
   numero             String
   tipo               TipoEmpenho
   data               DateTime          @default(now())
@@ -1779,12 +1781,14 @@ model Empenho {
   reservaDotacao     ReservaDotacao?   @relation(fields: [reservaDotacaoId], references: [id])
   contrato           Contrato?         @relation(fields: [contratoId], references: [id])
   ataRegistroPreco   AtaRegistroPreco? @relation(fields: [ataRegistroPrecoId], references: [id])
+  subElementoConta   ContaDespesaEntidade? @relation("EmpenhoSubElemento", fields: [subElementoContaId], references: [id])
   liquidacoes        Liquidacao[]
   movimentos         MovimentoEmpenho[]
 
   @@unique([entidadeId, numero])
   @@index([dotacaoDespesaId])
   @@index([entidadeId])
+  @@index([subElementoContaId])
   @@map("empenhos")
 }
 

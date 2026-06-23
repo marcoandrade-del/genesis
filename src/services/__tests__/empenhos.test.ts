@@ -12,16 +12,18 @@ beforeEach(() => {
 })
 
 function dadosOk(over: Partial<Record<string, unknown>> = {}) {
-  return { dotacaoDespesaId: 'dot1', fornecedorId: 'f1', numero: '2026NE001', tipo: 'ORDINARIO', valor: '500', ...over } as never
+  return { dotacaoDespesaId: 'dot1', fornecedorId: 'f1', numero: '2026NE001', tipo: 'ORDINARIO', valor: '500', subElementoContaId: 'sub1', ...over } as never
 }
-// dotação: disponível = 1000 − 200 − 100 = 700
+// dotação: disponível = 1000 − 200 − 100 = 700; natureza no elemento 3.3.90.30
 function mockBase(dotacaoOver: Partial<Record<string, unknown>> = {}) {
   prisma.entidade.findUnique.mockResolvedValue({ id: 'ent1' })
   prisma.fornecedor.findUnique.mockResolvedValue({ id: 'f1', ativo: true })
   prisma.dotacaoDespesa.findUnique.mockResolvedValue({
     id: 'dot1', valorAutorizado: '1000', valorReservado: '200', valorEmpenhado: '100',
-    orcamento: { entidadeId: 'ent1', status: 'EM_EXECUCAO' }, ...dotacaoOver,
+    orcamento: { entidadeId: 'ent1', status: 'EM_EXECUCAO', ano: 2026 }, contaDespesa: { codigo: '3.3.90.30.00.00' }, ...dotacaoOver,
   })
+  // sub-elemento válido: folha analítica sob o elemento 3.3.90.30
+  prisma.contaDespesaEntidade.findUnique.mockResolvedValue({ id: 'sub1', entidadeId: 'ent1', ano: 2026, admiteMovimento: true, codigo: '3.3.90.30.07.00' } as never)
 }
 function mockReserva(over: Partial<Record<string, unknown>> = {}) {
   prisma.reservaDotacao.findUnique.mockResolvedValue({ id: 'r1', entidadeId: 'ent1', dotacaoDespesaId: 'dot1', valor: new Prisma.Decimal('500'), status: 'ATIVA', ...over })
@@ -48,6 +50,23 @@ describe('EmpenhosService.criar — empenho direto (sem reserva)', () => {
     mockBase()
     await expect(service.criar('ent1', dadosOk({ valor: '800' }))).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
     expect(prisma.empenho.create).not.toHaveBeenCalled()
+  })
+  it('exige sub-elemento (obrigatório)', async () => {
+    mockBase()
+    await expect(service.criar('ent1', dadosOk({ subElementoContaId: '' }), 'u1')).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(prisma.empenho.create).not.toHaveBeenCalled()
+  })
+  it('rejeita sub-elemento fora do elemento da dotação', async () => {
+    mockBase()
+    // sub-elemento de outro elemento (3.3.90.39 ≠ 3.3.90.30)
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue({ id: 'sub1', entidadeId: 'ent1', ano: 2026, admiteMovimento: true, codigo: '3.3.90.39.57.00' } as never)
+    await expect(service.criar('ent1', dadosOk(), 'u1')).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(prisma.empenho.create).not.toHaveBeenCalled()
+  })
+  it('rejeita sub-elemento sintético (não-folha)', async () => {
+    mockBase()
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue({ id: 'sub1', entidadeId: 'ent1', ano: 2026, admiteMovimento: false, codigo: '3.3.90.30.07.00' } as never)
+    await expect(service.criar('ent1', dadosOk(), 'u1')).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
   })
   it('empenha e incrementa o empenhado', async () => {
     mockBase()

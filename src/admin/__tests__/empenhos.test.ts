@@ -79,6 +79,7 @@ describe('adminEmpenhosRoutes', () => {
       empenho: {
         id: 'e1', numero: '2026NE001', entidadeId: 'ent1', tipo: 'ORDINARIO', data: new Date('2026-02-01'), status: 'ATIVO',
         fornecedor: { razaoSocial: 'ACME', cnpj: '00.000.000/0001-00', cpf: null },
+        subElementoConta: { codigo: '3.3.90.30.07.00', descricao: 'Gêneros de Alimentação' },
         dotacaoDespesa: {
           unidadeOrcamentaria: { codigo: '02.001', nome: 'Secretaria', orgao: { codigo: '02', nome: 'Prefeitura Municipal' } },
           contaDespesa: { codigo: '3.3.90.30', descricao: 'Material de consumo' },
@@ -96,6 +97,19 @@ describe('adminEmpenhosRoutes', () => {
     expect(res.body).toContain('Estorno empenho')
     expect(res.body).toContain('Órgão')
     expect(res.body).toContain('Prefeitura Municipal')
+    expect(res.body).toContain('Sub-elemento')
+    expect(res.body).toContain('Gêneros de Alimentação')
+  })
+
+  it('GET /sub-elementos lista as folhas sob o elemento da dotação', async () => {
+    prisma.dotacaoDespesa.findUnique.mockResolvedValue({ orcamento: { entidadeId: 'ent1', ano: 2026 }, contaDespesa: { codigo: '3.3.90.30.00.00' } } as never)
+    prisma.contaDespesaEntidade.findMany.mockResolvedValue([{ id: 's1', codigo: '3.3.90.30.07.00', descricao: 'Gêneros Alimentícios' }] as never)
+    const res = await app.inject({ method: 'GET', url: '/sub-elementos?dotacaoDespesaId=dot1' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Gêneros Alimentícios')
+    // filtra pelas folhas sob o elemento (prefixo dos 4 primeiros segmentos)
+    expect(prisma.contaDespesaEntidade.findMany.mock.calls[0][0].where.codigo).toEqual({ startsWith: '3.3.90.30.' })
+    expect(prisma.contaDespesaEntidade.findMany.mock.calls[0][0].where.admiteMovimento).toBe(true)
   })
   it('GET /:id/ficha inexistente → 404', async () => {
     fichaMock.mockRejectedValue(new Error('not found'))

@@ -69,14 +69,36 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     )
   })
 
+  // Opções de sub-elemento da natureza sob o elemento da dotação escolhida (HTMX).
+  app.get<{ Querystring: { dotacaoDespesaId?: string } }>('/sub-elementos', async (req, reply) => {
+    const dotId = req.query.dotacaoDespesaId?.trim()
+    let subelementos: { id: string; codigo: string; descricao: string }[] = []
+    if (dotId) {
+      const dot = await app.prisma.dotacaoDespesa.findUnique({
+        where: { id: dotId },
+        include: { orcamento: { select: { entidadeId: true, ano: true } }, contaDespesa: { select: { codigo: true } } },
+      })
+      if (dot) {
+        const elementoPrefixo = dot.contaDespesa.codigo.split('.').slice(0, 4).join('.') + '.'
+        subelementos = await app.prisma.contaDespesaEntidade.findMany({
+          where: { entidadeId: dot.orcamento.entidadeId, ano: dot.orcamento.ano, admiteMovimento: true, codigo: { startsWith: elementoPrefixo } },
+          orderBy: { codigo: 'asc' },
+          select: { id: true, codigo: true, descricao: true },
+        })
+      }
+    }
+    return reply.view('empenhos/_subelemento-options', { subelementos })
+  })
+
   app.post<{
-    Body: { entidadeId: string; dotacaoDespesaId: string; fornecedorId: string; reservaDotacaoId?: string; contratoId?: string; ataRegistroPrecoId?: string; numero: string; tipo: string; data?: string; valor: string; historico?: string }
+    Body: { entidadeId: string; dotacaoDespesaId: string; fornecedorId: string; reservaDotacaoId?: string; contratoId?: string; ataRegistroPrecoId?: string; subElementoContaId?: string; numero: string; tipo: string; data?: string; valor: string; historico?: string }
   }>('/', async (req, reply) => {
     const b = req.body
     if (!b.entidadeId?.trim()) return reply.status(400).send('Entidade não informada.')
     try {
       await service.criar(b.entidadeId, {
         dotacaoDespesaId: b.dotacaoDespesaId, fornecedorId: b.fornecedorId, numero: b.numero, tipo: b.tipo as never, valor: b.valor,
+        subElementoContaId: b.subElementoContaId ?? '',
         ...(b.reservaDotacaoId ? { reservaDotacaoId: b.reservaDotacaoId } : {}),
         ...(b.contratoId ? { contratoId: b.contratoId } : {}),
         ...(b.ataRegistroPrecoId ? { ataRegistroPrecoId: b.ataRegistroPrecoId } : {}),

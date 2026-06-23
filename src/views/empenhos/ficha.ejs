@@ -32,6 +32,9 @@
         <% } %>
         <dt class="col-5">Unidade orç.</dt><dd class="col-7"><span class="font-monospace"><%= d.unidadeOrcamentaria.codigo %></span> <%= d.unidadeOrcamentaria.nome %></dd>
         <dt class="col-5">Natureza</dt><dd class="col-7"><span class="font-monospace"><%= d.contaDespesa.codigo %></span> <%= d.contaDespesa.descricao %></dd>
+        <% if (empenho.subElementoConta) { %>
+          <dt class="col-5">Sub-elemento</dt><dd class="col-7"><span class="font-monospace"><%= empenho.subElementoConta.codigo %></span> <%= empenho.subElementoConta.descricao %></dd>
+        <% } %>
         <dt class="col-5">Fonte</dt><dd class="col-7"><span class="font-monospace"><%= d.fonteRecurso.codigo %></span> <%= d.fonteRecurso.nomenclatura %></dd>
       </dl>
     </div></div>

@@ -10,6 +10,7 @@ export type DadosEmpenho = {
   reservaDotacaoId?: string | null
   contratoId?: string | null
   ataRegistroPrecoId?: string | null
+  subElementoContaId: string
   numero: string
   tipo: TipoEmpenho
   data?: Date | string | null
@@ -59,6 +60,7 @@ export class EmpenhosService {
       where: { id },
       include: {
         fornecedor: { select: { razaoSocial: true, cnpj: true, cpf: true } },
+        subElementoConta: { select: { codigo: true, descricao: true } },
         dotacaoDespesa: {
           include: {
             unidadeOrcamentaria: { select: { codigo: true, nome: true, orgao: { select: { codigo: true, nome: true } } } },
@@ -91,6 +93,7 @@ export class EmpenhosService {
     const dotacao = await this.carregarDotacao(dados.dotacaoDespesaId, entidadeId)
     const reserva = await this.carregarReserva(dados.reservaDotacaoId, entidadeId, dados.dotacaoDespesaId)
     await this.validarVinculos(dados, entidadeId)
+    await this.validarSubElemento(dados.subElementoContaId, dotacao.contaDespesa.codigo, entidadeId, dotacao.orcamento.ano)
 
     if (reserva) {
       if (valor.greaterThan(reserva.valor)) {
@@ -116,6 +119,7 @@ export class EmpenhosService {
             reservaDotacaoId: reserva?.id ?? null,
             contratoId: trimOuNull(dados.contratoId),
             ataRegistroPrecoId: trimOuNull(dados.ataRegistroPrecoId),
+            subElementoContaId: dados.subElementoContaId.trim(),
             numero,
             tipo: dados.tipo,
             valor,
@@ -176,7 +180,7 @@ export class EmpenhosService {
     if (!dotacaoDespesaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Dotação é obrigatória.')
     const dotacao = await this.prisma.dotacaoDespesa.findUnique({
       where: { id: dotacaoDespesaId },
-      include: { orcamento: { select: { entidadeId: true, status: true } } },
+      include: { orcamento: { select: { entidadeId: true, status: true, ano: true } }, contaDespesa: { select: { codigo: true } } },
     })
     if (!dotacao || dotacao.orcamento.entidadeId !== entidadeId) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Dotação inválida para esta entidade.')
@@ -213,6 +217,27 @@ export class EmpenhosService {
     if (ataId) {
       const a = await this.prisma.ataRegistroPreco.findUnique({ where: { id: ataId } })
       if (!a || a.entidadeId !== entidadeId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Ata inválida para esta entidade.')
+    }
+  }
+
+  /**
+   * Sub-elemento da natureza no empenho (obrigatório — Lei 4.320 / TCE-PR SIM-AM):
+   * folha analítica do plano de despesa, da mesma entidade/exercício, SOB o elemento
+   * da dotação (mesmos 4 primeiros segmentos da natureza). Aceita desdobramentos locais.
+   */
+  private async validarSubElemento(subElementoContaId: string, naturezaDotacaoCodigo: string, entidadeId: string, ano: number) {
+    const id = subElementoContaId?.trim()
+    if (!id) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Sub-elemento da despesa é obrigatório.')
+    const sub = await this.prisma.contaDespesaEntidade.findUnique({ where: { id } })
+    if (!sub || sub.entidadeId !== entidadeId || sub.ano !== ano) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Sub-elemento inválido para esta entidade/exercício.')
+    }
+    if (!sub.admiteMovimento) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'O sub-elemento deve ser uma conta analítica (folha) da natureza.')
+    }
+    const elementoPrefixo = naturezaDotacaoCodigo.split('.').slice(0, 4).join('.') + '.'
+    if (!sub.codigo.startsWith(elementoPrefixo)) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', `O sub-elemento (${sub.codigo}) deve pertencer ao elemento da dotação (${elementoPrefixo}*).`)
     }
   }
 }
