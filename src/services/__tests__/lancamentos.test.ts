@@ -50,6 +50,7 @@ function mockHappyPath() {
   prisma.lancamento.create.mockResolvedValue({ id: 'lanc1', entidadeId: 'ent1', data: new Date('2026-05-25') })
   prisma.lancamentoItem.createMany.mockResolvedValue({ count: 2 })
   prisma.resumoMensalConta.upsert.mockResolvedValue({})
+  prisma.movimentoDiarioConta.upsert.mockResolvedValue({})
 }
 
 describe('extrairAnoMes', () => {
@@ -128,6 +129,12 @@ describe('LancamentosService.criar — validações', () => {
     expect(callCaixa.where.entidadeId_contaId_ano_mes).toMatchObject({ entidadeId: 'ent1', ano: 2026, mes: 5 })
     expect(callCaixa.create.totalDebito.toString()).toBe('100')
     expect(callCaixa.update.totalDebito.increment.toString()).toBe('100')
+
+    // Agregado diário materializado em paralelo ao mensal (mesmo movimento).
+    expect(prisma.movimentoDiarioConta.upsert).toHaveBeenCalledTimes(2)
+    const diaCaixa = prisma.movimentoDiarioConta.upsert.mock.calls.map((c) => c[0]).find((c) => c.where.entidadeId_contaId_data.contaId === 'c1')!
+    expect(diaCaixa.create.totalDebito.toString()).toBe('100')
+    expect(diaCaixa.update.totalDebito.increment.toString()).toBe('100')
   })
 
   it('rejeita com menos de 2 itens', async () => {

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { ContasContabilEntidadeService } from '../services/contas-contabil-entidade.js'
 import { SaldoContabilService } from '../services/saldo-contabil.js'
 import { RazaoContabilService, type Razao } from '../services/razao-contabil.js'
+import { SaldoDiarioService } from '../services/saldo-diario.js'
 import { DesdobramentoDistribuicaoService, type FilhoNovo, type Distribuicao } from '../services/desdobramento-distribuicao.js'
 import type { Natureza } from '../services/saldo-contabil.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
@@ -90,6 +91,38 @@ export async function appContasRoutes(app: FastifyInstance) {
         eventoCodigo: m.eventoCodigo ?? null,
       })),
       totaisPorDia: r.totaisPorDia.map((t) => ({ dia: String(t.dia).padStart(2, '0'), debito: n(t.debito), credito: n(t.credito) })),
+      layout: null,
+    })
+  })
+
+  // ── Acumulado diário da conta: série do saldo corrido dia a dia (materializado) ──
+  const saldoDiarioSvc = new SaldoDiarioService(app.prisma)
+
+  app.get<{ Params: { id: string } }>('/contas/:id/diario', async (req, reply) => {
+    const { entidadeId, ano } = req.contexto
+    const entidade = await app.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
+    })
+    if (!entidade) return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
+
+    const conta = await app.prisma.contaContabilEntidade.findUnique({
+      where: { id: req.params.id },
+      select: { id: true, codigo: true, descricao: true, entidadeId: true },
+    })
+    if (!conta || conta.entidadeId !== entidadeId) return reply.redirect('/app/contas')
+
+    const serie = await saldoDiarioSvc.serie(entidadeId, conta.id, ano)
+    const n = (d: { toNumber(): number }) => d.toNumber()
+    const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    return reply.view('app/diario', {
+      entidade, ano, conta,
+      natureza: serie.natureza,
+      saldoInicial: n(serie.saldoInicial),
+      totalDebito: n(serie.totalDebito),
+      totalCredito: n(serie.totalCredito),
+      saldoFinal: n(serie.saldoFinal),
+      dias: serie.dias.map((d) => ({ data: dataBR(d.data), debito: n(d.debito), credito: n(d.credito), saldo: n(d.saldoAcumulado) })),
       layout: null,
     })
   })

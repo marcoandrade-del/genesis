@@ -160,10 +160,17 @@ export class LancamentosService {
         })),
       })
 
+      const dataDia = new Date(dados.data)
       for (const [contaId, { debito, credito }] of totaisPorConta) {
         await t.resumoMensalConta.upsert({
           where: { entidadeId_contaId_ano_mes: { entidadeId: dados.entidadeId, contaId, ano, mes } },
           create: { entidadeId: dados.entidadeId, contaId, ano, mes, totalDebito: debito, totalCredito: credito },
+          update: { totalDebito: { increment: debito }, totalCredito: { increment: credito } },
+        })
+        // Agregado diário (acumulado por conta×dia) — materializa o movimento do dia.
+        await t.movimentoDiarioConta.upsert({
+          where: { entidadeId_contaId_data: { entidadeId: dados.entidadeId, contaId, data: dataDia } },
+          create: { entidadeId: dados.entidadeId, contaId, data: dataDia, totalDebito: debito, totalCredito: credito },
           update: { totalDebito: { increment: debito }, totalCredito: { increment: credito } },
         })
       }
@@ -196,6 +203,10 @@ export class LancamentosService {
       for (const [contaId, { debito, credito }] of totaisPorConta) {
         await tx.resumoMensalConta.update({
           where: { entidadeId_contaId_ano_mes: { entidadeId: lanc.entidadeId, contaId, ano, mes } },
+          data: { totalDebito: { decrement: debito }, totalCredito: { decrement: credito } },
+        })
+        await tx.movimentoDiarioConta.update({
+          where: { entidadeId_contaId_data: { entidadeId: lanc.entidadeId, contaId, data: lanc.data } },
           data: { totalDebito: { decrement: debito }, totalCredito: { decrement: credito } },
         })
       }

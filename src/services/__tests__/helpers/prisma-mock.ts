@@ -318,6 +318,13 @@ export function criarPrismaMock() {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
+    movimentoDiarioConta: {
+      findMany: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn(),
+      update: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      count: vi.fn().mockResolvedValue(0),
+    },
     funcao: {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
