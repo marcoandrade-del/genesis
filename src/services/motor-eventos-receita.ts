@@ -73,6 +73,14 @@ export const CONTAS_EVENTO = {
   ddrDisponibilidade: '8.2.1.1.1.01.00.00.00.00.00.00', // RECURSOS DISPONÍVEIS PARA O EXERCÍCIO
 } as const
 
+/**
+ * Tokens de máscara resolvidos no disparo da arrecadação (contas que dependem do
+ * documento): `@CAIXA` (folha de caixa da conta bancária), `@DDR_CONTROLE`
+ * (ordinário/vinculado conforme a fonte) e `@CONTRAPARTIDA` (VPA/passivo/ativo da
+ * de/para — `ParametroReceita`).
+ */
+export const TOKENS = { CAIXA: '@CAIXA', DDR_CONTROLE: '@DDR_CONTROLE', CONTRAPARTIDA: '@CONTRAPARTIDA' } as const
+
 export type ContextoArrecadacao = {
   entidadeId: string
   ano: number
@@ -114,86 +122,71 @@ export class MotorEventosReceita {
     const db = tx ?? this.prisma
     const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
     const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
+    // SELEÇÃO (regra de negócio, fica em código): orçamentário + DDR sempre; o
+    // patrimonial só se a parametrização da natureza indicar (E300/400/500/560).
     const patrimonial = patrimonialArrecadacao(parametro, ctx.naturezaCodigo)
+    const codigos = ['100', '200', ...(patrimonial ? [patrimonial.codigo] : [])]
 
-    const ddrControle = ctx.fonteVinculada
-      ? CONTAS_EVENTO.ddrControleVinculado
-      : CONTAS_EVENTO.ddrControleOrdinario
+    // CONTAS D/C (configuráveis): vêm da Tabela de Eventos do modelo (gatilho
+    // ARRECADACAO). Tokens resolvem o que depende do documento.
+    const eventos = await db.eventoContabil.findMany({
+      where: { modeloContabilId: modeloId, ativo: true, gatilho: 'ARRECADACAO', codigo: { in: codigos } },
+      include: { lancamentos: { orderBy: { ordem: 'asc' } } },
+    })
+    const porCodigo = new Map(eventos.map((e) => [e.codigo, e]))
+
+    const ddrControle = ctx.fonteVinculada ? CONTAS_EVENTO.ddrControleVinculado : CONTAS_EVENTO.ddrControleOrdinario
     const caixa = ctx.caixaCodigo || CONTAS_EVENTO.caixaArrecadacao
 
-    const codigos = [
-      CONTAS_EVENTO.receitaARealizar,
-      CONTAS_EVENTO.receitaRealizada,
-      ddrControle,
-      CONTAS_EVENTO.ddrDisponibilidade,
-    ]
-    if (patrimonial) codigos.push(caixa, patrimonial.contrapartida)
+    // Resolve uma máscara → { código, conta-corrente }. cc DERIVADA: DDR/caixa → fonte,
+    // demais → natureza (reproduz exatamente o de/para de cc anterior).
+    const resolverMascara = (m: string): { codigo: string; cc: 'natureza' | 'fonte' } => {
+      const t = m.trim()
+      if (t === TOKENS.CAIXA) return { codigo: caixa, cc: 'fonte' }
+      if (t === TOKENS.DDR_CONTROLE) return { codigo: ddrControle, cc: 'fonte' }
+      if (t === TOKENS.CONTRAPARTIDA) return { codigo: patrimonial?.contrapartida ?? t, cc: 'natureza' }
+      const classe = t.charAt(0)
+      return { codigo: t, cc: classe === '7' || classe === '8' ? 'fonte' : 'natureza' }
+    }
 
-    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, codigos, db)
+    // Eventos a disparar, na ordem de seleção; evento ausente na tabela é pulado.
+    const resolvidos = codigos
+      .map((c) => porCodigo.get(c))
+      .filter((e): e is NonNullable<typeof e> => !!e)
+      .map((ev) => ({
+        codigo: ev.codigo,
+        descricao: ev.descricao,
+        pares: ev.lancamentos.map((l) => ({ d: resolverMascara(l.contaDebitoMascara), c: resolverMascara(l.contaCreditoMascara) })),
+      }))
+
+    const todos = [...new Set(resolvidos.flatMap((e) => e.pares.flatMap((p) => [p.d.codigo, p.c.codigo])))]
+    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, todos, db)
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
 
-    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO', cc: { natureza?: string; fonte?: string }): ItemDado => {
-      const id = idPorCodigo.get(codigo)
+    const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
+    const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
+    const leg = (r: { codigo: string; cc: 'natureza' | 'fonte' }, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
+      const id = idPorCodigo.get(r.codigo)
       if (!id) {
         throw new ErroNegocio(
           'ENTIDADE_NAO_PROCESSAVEL',
-          `Integração contábil indisponível: conta "${codigo}" não existe como folha no plano da entidade (exercício ${ctx.ano}).`,
+          `Integração contábil indisponível: conta "${r.codigo}" não existe como folha no plano da entidade (exercício ${ctx.ano}).`,
         )
       }
       return {
         contaId: id,
         tipo,
         valor,
-        naturezaReceitaCodigo: cc.natureza ?? null,
-        fonteCodigo: cc.fonte ?? null,
+        naturezaReceitaCodigo: r.cc === 'natureza' ? ctx.naturezaCodigo : null,
+        fonteCodigo: r.cc === 'fonte' ? ctx.fonteCodigo : null,
       }
     }
 
-    // No estorno, inverte o lado de cada perna (mesmas contas).
-    const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
-    const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
-    const par = (
-      codigo: string,
-      descricao: string,
-      deb: { codigo: string; cc: { natureza?: string; fonte?: string } },
-      cred: { codigo: string; cc: { natureza?: string; fonte?: string } },
-    ): LancamentoEvento => ({
-      eventoCodigo: codigo,
-      descricaoEvento: descricao,
-      itens: [leg(deb.codigo, dDeb, deb.cc), leg(cred.codigo, dCred, cred.cc)],
-    })
-
-    const eventos: LancamentoEvento[] = [
-      // E100 — Orçamentário: D Receita Realizada / C Receita a Realizar (cc natureza)
-      par(
-        '100',
-        'Arrecadação orçamentária',
-        { codigo: CONTAS_EVENTO.receitaRealizada, cc: { natureza: ctx.naturezaCodigo } },
-        { codigo: CONTAS_EVENTO.receitaARealizar, cc: { natureza: ctx.naturezaCodigo } },
-      ),
-      // E200 — Controle DDR: D Controle da Disponibilidade / C Disponibilidade por Destinação (cc fonte)
-      par(
-        '200',
-        'Disponibilidade por destinação de recursos (DDR)',
-        { codigo: ddrControle, cc: { fonte: ctx.fonteCodigo } },
-        { codigo: CONTAS_EVENTO.ddrDisponibilidade, cc: { fonte: ctx.fonteCodigo } },
-      ),
-    ]
-
-    // Evento patrimonial da arrecadação: D Caixa / C contrapartida — VPA/passivo/ativo
-    // (E300/E400/E500, regime de caixa) ou baixa do crédito a receber (E560, tributária).
-    if (patrimonial) {
-      eventos.push(
-        par(
-          patrimonial.codigo,
-          patrimonial.descricao,
-          { codigo: caixa, cc: { fonte: ctx.fonteCodigo } },
-          { codigo: patrimonial.contrapartida, cc: { natureza: ctx.naturezaCodigo } },
-        ),
-      )
-    }
-
-    return eventos
+    return resolvidos.map((e) => ({
+      eventoCodigo: e.codigo,
+      descricaoEvento: e.descricao,
+      itens: e.pares.flatMap((p) => [leg(p.d, dDeb), leg(p.c, dCred)]),
+    }))
   }
 
   /**

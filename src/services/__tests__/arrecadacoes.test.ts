@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { ArrecadacoesService } from '../arrecadacoes.js'
 import { CONTAS_EVENTO } from '../motor-eventos-receita.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+import { mockMatrizReceita } from './helpers/receita-matriz.js'
 
 let prisma: PrismaMock
 let service: ArrecadacoesService
@@ -56,6 +57,7 @@ function armarDisparo() {
     return Promise.resolve([])
   })
   prisma.lancamento.create.mockResolvedValue({ id: 'lx' })
+  mockMatrizReceita(prisma) // contas D/C da arrecadação vêm da "tabela"
 }
 
 describe('ArrecadacoesService.criar', () => {
