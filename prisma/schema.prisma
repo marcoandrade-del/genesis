@@ -1069,6 +1069,8 @@ model EventoContabil {
 // os eventos por gatilho, não pelo código — códigos podem ter qualquer convenção.
 enum GatilhoEvento {
   ARRECADACAO
+  LANCAMENTO_TRIBUTARIO
+  INSCRICAO_DIVIDA_ATIVA
   EMPENHO
   LIQUIDACAO
   PAGAMENTO

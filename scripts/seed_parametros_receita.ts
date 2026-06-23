@@ -58,15 +58,16 @@ const PARAMETROS: Array<{
 // tokens). O motor seleciona em código QUAL evento patrimonial dispara (300/400/
 // 500/560) conforme a parametrização; as CONTAS vêm daqui. E550/E570 são fluxos à
 // parte (lançamento tributário / dívida ativa) — seguem code-driven, sem gatilho.
-const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: 'ARRECADACAO'; linhas?: Array<[string, string]> }> = [
+type GatilhoReceita = 'ARRECADACAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA'
+const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoReceita; linhas?: Array<[string, string]> }> = [
   { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária (cc: natureza)', linhas: [[CE.receitaRealizada, CE.receitaARealizar]] },
   { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por Destinação (DDR) (cc: fonte)', linhas: [[TR.DDR_CONTROLE, CE.ddrDisponibilidade]] },
   { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação Patrimonial Aumentativa (receita efetiva)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (não-efetiva, passivo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
   { codigo: '500', gatilho: 'ARRECADACAO', descricao: 'Mutação por alienação de bens (não-efetiva, baixa de ativo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
-  { codigo: '550', descricao: 'Lançamento de crédito tributário (competência) — D 1.1.2.x Créditos a Receber / C VPA classe 4' },
+  { codigo: '550', gatilho: 'LANCAMENTO_TRIBUTARIO', descricao: 'Lançamento de crédito tributário (D ativo / C VPA)', linhas: [[TR.ATIVO, TR.CONTRAPARTIDA]] },
   { codigo: '560', gatilho: 'ARRECADACAO', descricao: 'Arrecadação da receita lançada (baixa do crédito a receber)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
-  { codigo: '570', descricao: 'Inscrição em dívida ativa — D 1.2.1.x Dívida Ativa / C 1.1.2.x baixa do crédito a receber circulante (reclassificação)' },
+  { codigo: '570', gatilho: 'INSCRICAO_DIVIDA_ATIVA', descricao: 'Inscrição em dívida ativa (D dívida ativa / C baixa do circulante)', linhas: [[TR.DIVIDA_ATIVA, TR.ATIVO]] },
 ]
 
 async function main() {

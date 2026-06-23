@@ -9,6 +9,8 @@ export const MATRIZ_RECEITA = [
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (passivo)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },
   { codigo: '500', gatilho: 'ARRECADACAO', descricao: 'Mutação por alienação de bens (baixa de ativo)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },
   { codigo: '560', gatilho: 'ARRECADACAO', descricao: 'Arrecadação de receita lançada (baixa do crédito a receber)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },
+  { codigo: '550', gatilho: 'LANCAMENTO_TRIBUTARIO', descricao: 'Lançamento de crédito tributário (direito a receber)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.ATIVO, contaCreditoMascara: T.CONTRAPARTIDA }] },
+  { codigo: '570', gatilho: 'INSCRICAO_DIVIDA_ATIVA', descricao: 'Inscrição em dívida ativa (reclassificação do crédito)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.DIVIDA_ATIVA, contaCreditoMascara: T.ATIVO }] },
 ]
 
 /** Mocka `eventoContabil.findMany` p/ devolver a matriz da arrecadação (gatilho + codigo in). */

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { LancamentoTributarioService } from '../lancamento-tributario.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+import { mockMatrizReceita } from './helpers/receita-matriz.js'
 
 const ATIVO = '1.1.2.1.1.01.05.00.00.00.00.00'
 const VPA = '4.1.1.2.1.02.00.00.00.00.00.00'
@@ -30,6 +31,7 @@ function armar() {
     return Promise.resolve([])
   })
   prisma.lancamento.create.mockResolvedValue({ id: 'lc1' })
+  mockMatrizReceita(prisma) // contas D/C de E550/E570 vêm da "tabela"
 }
 
 const dados = (over = {}) => ({ previsaoId: 'p1', data: '2026-06-10', valor: '500', criadoPorId: 'u1', ...over })
