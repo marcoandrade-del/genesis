@@ -547,6 +547,7 @@ enum OrigemLancamento {
   ARRECADACAO
   LANCAMENTO_TRIBUTARIO
   INSCRICAO_DIVIDA_ATIVA
+  ABERTURA
 }
 
 // Tipo de movimento na tela de lançamento tributário: constituição do crédito ou

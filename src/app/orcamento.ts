@@ -4,6 +4,10 @@ import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
+import { AberturaContabilService } from '../services/abertura-contabil.js'
+import { ErroNegocio, statusDeErro } from '../errors.js'
+
+const ERRO_LEITURA = 'Acesso somente leitura nesta entidade.'
 
 /**
  * Área de trabalho "Orçamento" do operador. Diferente do /admin, NÃO há picker
@@ -16,6 +20,7 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
   const cfgDash = new ConfiguracaoDashboardService(app.prisma)
+  const aberturaSvc = new AberturaContabilService(app.prisma)
 
   /** Carrega a entidade do contexto; se sumiu, limpa cookie e manda escolher. */
   async function carregarEntidade(req: FastifyRequest, reply: FastifyReply) {
@@ -30,29 +35,71 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
     return entidade
   }
 
-  app.get('/orcamento', async (req, reply) => {
+  /** Renderiza a tela do orçamento, recarregando todos os dados (+ status da abertura). */
+  async function renderOrcamento(
+    req: FastifyRequest,
+    reply: FastifyReply,
+    entidade: { id: string },
+    opts: { erro?: string; ok?: string; status?: number } = {},
+  ) {
     const { entidadeId, ano, nivel } = req.contexto
-    const entidade = await carregarEntidade(req, reply)
-    if (!entidade) return
-
     const orcamento = await orcamentos.buscarPorEntidadeAno(entidadeId, ano)
     const [dotacoes, previsoes] = orcamento
       ? await Promise.all([dotacoesSvc.listar(orcamento.id), previsoesSvc.listar(orcamento.id)])
       : [[], []]
     const totalDespesa = dotacoes.reduce((acc, d) => acc + Number(d.valorAutorizado), 0)
     const totalReceita = previsoes.reduce((acc, p) => acc + Number(p.valorPrevisto), 0)
+    const abertura = await aberturaSvc.status(entidadeId, ano)
 
+    if (opts.status) reply.code(opts.status)
     return reply.view('app/orcamento', {
-      entidade,
-      ano,
-      nivel,
-      orcamento,
-      dotacoes,
-      previsoes,
-      totalDespesa,
-      totalReceita,
-      layout: null,
+      entidade, ano, nivel, orcamento, dotacoes, previsoes, totalDespesa, totalReceita, abertura,
+      podeEscrever: nivel === 'ESCRITA' || nivel === 'ADMIN',
+      erro: opts.erro ?? null, ok: opts.ok ?? null, layout: null,
     })
+  }
+
+  app.get('/orcamento', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    return renderOrcamento(req, reply, entidade)
+  })
+
+  // Contabiliza a abertura do exercício (PCASP): gera os lançamentos de abertura
+  // do orçamentário + transporta os saldos patrimoniais; LOA APROVADO → EM_EXECUCAO.
+  app.post('/orcamento/abertura/contabilizar', async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    if (nivel !== 'ESCRITA' && nivel !== 'ADMIN') {
+      return renderOrcamento(req, reply, entidade, { erro: ERRO_LEITURA, status: 403 })
+    }
+    try {
+      const r = await aberturaSvc.contabilizar(entidadeId, ano, req.user.sub)
+      return renderOrcamento(req, reply, entidade, {
+        ok: `Abertura contabilizada: ${r.previsoes} previsão(ões), ${r.dotacoes} dotação(ões), ${r.contasTransportadas} conta(s) transportada(s).`,
+      })
+    } catch (e) {
+      if (e instanceof ErroNegocio) return renderOrcamento(req, reply, entidade, { erro: e.message, status: statusDeErro(e.code) })
+      throw e
+    }
+  })
+
+  // Estorna a abertura (reverte os lançamentos + transporte; EM_EXECUCAO → APROVADO).
+  app.post('/orcamento/abertura/estornar', async (req, reply) => {
+    const { entidadeId, ano, nivel } = req.contexto
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    if (nivel !== 'ESCRITA' && nivel !== 'ADMIN') {
+      return renderOrcamento(req, reply, entidade, { erro: ERRO_LEITURA, status: 403 })
+    }
+    try {
+      await aberturaSvc.estornar(entidadeId, ano)
+      return renderOrcamento(req, reply, entidade, { ok: 'Abertura estornada — o orçamento voltou a Aprovado.' })
+    } catch (e) {
+      if (e instanceof ErroNegocio) return renderOrcamento(req, reply, entidade, { erro: e.message, status: statusDeErro(e.code) })
+      throw e
+    }
   })
 
   // Saldo orçamentário da despesa do exercício: resumo + agregações (UO, fonte,
