@@ -32,6 +32,7 @@
       <span class="badge bg-secondary bg-opacity-10 text-secondary">Natureza: <%= natureza ? nat[natureza] : '—' %></span>
       <span class="badge bg-light text-dark">Exercício <%= ano %></span>
     </div>
+    <a href="/app/contas/<%= conta.id %>/diario" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up me-1"></i>Acumulado diário</a>
   </div>
 
   <%# Seletor de mês %>

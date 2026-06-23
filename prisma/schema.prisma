@@ -536,6 +536,24 @@ model SaldoInicialAno {
   @@map("saldos_iniciais_ano")
 }
 
+// Agregado DIÁRIO por (entidade × conta-da-entidade × dia). Materializa o
+// movimento de cada dia (mesmo lugar de manutenção do ResumoMensalConta), para
+// dar o "acumulado diário" (saldo corrido dia a dia) sem re-somar todos os
+// lançamentos — leitura rápida mesmo com milhares de lançamentos.
+model MovimentoDiarioConta {
+  entidadeId   String
+  contaId      String
+  data         DateTime              @db.Date
+  totalDebito  Decimal               @default(0) @db.Decimal(18, 2)
+  totalCredito Decimal               @default(0) @db.Decimal(18, 2)
+  entidade     Entidade              @relation(fields: [entidadeId], references: [id])
+  conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
+
+  @@id([entidadeId, contaId, data])
+  @@index([entidadeId, data])
+  @@map("movimentos_diarios_conta")
+}
+
 enum TipoLancamento {
   DEBITO
   CREDITO
@@ -732,6 +750,7 @@ model Entidade {
   lancamentos              Lancamento[]
   resumos                  ResumoMensalConta[]
   saldosIniciais           SaldoInicialAno[]
+  movimentosDiarios        MovimentoDiarioConta[]
   planosContratacao        PlanoContratacaoAnual[]
   documentosDemanda        DocumentoDemanda[]
   reservasDotacao          ReservaDotacao[]
@@ -842,6 +861,7 @@ model ContaContabilEntidade {
   lancamentoItens LancamentoItem[]
   resumos         ResumoMensalConta[]
   saldosIniciais  SaldoInicialAno[]
+  movimentosDiarios MovimentoDiarioConta[]
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
