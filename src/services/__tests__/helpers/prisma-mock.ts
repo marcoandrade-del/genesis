@@ -314,6 +314,7 @@ export function criarPrismaMock() {
       findUnique: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
+      upsert: vi.fn(),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
     },
