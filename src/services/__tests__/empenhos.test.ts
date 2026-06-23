@@ -211,4 +211,22 @@ describe('EmpenhosService.ficha', () => {
     prisma.empenho.findUnique.mockResolvedValue(null)
     await expect(service.ficha('x')).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
   })
+
+  it('trilhaContabil reúne os lançamentos do empenho + liquidações + OPs', async () => {
+    prisma.liquidacao.findMany.mockResolvedValue([{ id: 'l1', ordensPagamento: [{ id: 'op1' }] }] as never)
+    prisma.lancamento.findMany.mockResolvedValue([{ eventoCodigo: '600', itens: [] }] as never)
+    await service.trilhaContabil('e1')
+    const where = prisma.lancamento.findMany.mock.calls[0][0].where
+    expect(where.OR).toEqual([
+      { origemTipo: 'EMPENHO', origemId: 'e1' },
+      { origemTipo: 'LIQUIDACAO', origemId: { in: ['l1'] } },
+      { origemTipo: 'PAGAMENTO', origemId: { in: ['op1'] } },
+    ])
+  })
+  it('trilhaContabil sem liquidações busca só os lançamentos do empenho', async () => {
+    prisma.liquidacao.findMany.mockResolvedValue([] as never)
+    prisma.lancamento.findMany.mockResolvedValue([] as never)
+    await service.trilhaContabil('e1')
+    expect(prisma.lancamento.findMany.mock.calls[0][0].where.OR).toEqual([{ origemTipo: 'EMPENHO', origemId: 'e1' }])
+  })
 })

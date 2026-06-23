@@ -190,6 +190,11 @@ async function main() {
     await ordens.estornar(op.id, ESTORNO, usuarioId, new Date())
     await mostrarLancamentos('PAGAMENTO', op.id, true)
 
+    // FICHA: trilha contábil reúne todo o ciclo (empenho + liquidação + pagamento + estorno).
+    log('── FICHA — trilha contábil (Fase 5) ────────────────')
+    const ficha = await empenhos.ficha(emp.id)
+    log(`  trilha: ${ficha.trilha.length} lançamento(s) — eventos [${ficha.trilha.map((l) => 'E' + l.eventoCodigo).join(', ')}]`)
+
     log('\n✅ Cadeia executada e validada ao vivo. Limpando os artefatos…')
     ok = true
   } finally {

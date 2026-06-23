@@ -83,7 +83,32 @@ export class EmpenhosService {
       where: { empenhoId: id },
       orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
     })
-    return { empenho, movimentos, resumo: resumirEmpenho(movimentos) }
+    return { empenho, movimentos, resumo: resumirEmpenho(movimentos), trilha: await this.trilhaContabil(id) }
+  }
+
+  /**
+   * Trilha contábil do empenho: os lançamentos automáticos (E6xx/E7xx/E8xx) que a
+   * execução disparou via Tabela de Eventos, em todo o ciclo do empenho (o próprio
+   * empenho + suas liquidações + as ordens de pagamento delas). Rastreabilidade →.
+   */
+  async trilhaContabil(empenhoId: string) {
+    const liquidacoes = await this.prisma.liquidacao.findMany({
+      where: { empenhoId },
+      select: { id: true, ordensPagamento: { select: { id: true } } },
+    })
+    const liqIds = liquidacoes.map((l) => l.id)
+    const opIds = liquidacoes.flatMap((l) => l.ordensPagamento.map((o) => o.id))
+    return this.prisma.lancamento.findMany({
+      where: {
+        OR: [
+          { origemTipo: 'EMPENHO', origemId: empenhoId },
+          ...(liqIds.length ? [{ origemTipo: 'LIQUIDACAO' as const, origemId: { in: liqIds } }] : []),
+          ...(opIds.length ? [{ origemTipo: 'PAGAMENTO' as const, origemId: { in: opIds } }] : []),
+        ],
+      },
+      include: { itens: { orderBy: { tipo: 'desc' }, include: { conta: { select: { codigo: true, descricao: true } } } } }, // DEBITO antes de CREDITO
+      orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
+    })
   }
 
   async criar(entidadeId: string, dados: DadosEmpenho, usuarioId: string) {

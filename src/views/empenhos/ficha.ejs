@@ -82,7 +82,8 @@
   <% } %>
 </div></div>
 
-<div class="card border-0 shadow-sm"><div class="card-body p-0">
+<div class="card border-0 shadow-sm mb-3"><div class="card-body p-0">
+  <div class="small text-muted fw-semibold px-3 pt-3">Razão imutável da execução</div>
   <table class="table table-sm align-middle mb-0">
     <thead class="table-light"><tr>
       <th class="ps-3" style="width:110px">Data</th><th>Lançamento</th><th>Histórico</th><th class="text-end pe-3" style="width:140px">Valor R$</th>
@@ -101,4 +102,39 @@
       <% }) %>
     </tbody>
   </table>
+</div></div>
+
+<%# Trilha contábil: lançamentos automáticos (partida dobrada) gerados pela execução. %>
+<div class="card border-0 shadow-sm"><div class="card-body">
+  <div class="small text-muted mb-2 fw-semibold"><i class="bi bi-diagram-3 me-1"></i>Trilha contábil — <%= trilha.length %> lançamento(s) gerado(s) na partida dobrada</div>
+  <% if (trilha.length === 0) { %>
+    <div class="alert alert-secondary py-2 small mb-0"><i class="bi bi-info-circle me-1"></i>Nenhum lançamento contábil — empenho anterior à integração, ou entidade sem o plano de contas da despesa.</div>
+  <% } %>
+  <% trilha.forEach(function(l) { %>
+    <div class="border rounded mb-2 p-2">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-dark bg-opacity-10 text-dark font-monospace">E<%= l.eventoCodigo %></span>
+        <span class="small text-muted"><%= l.historico %></span>
+        <span class="ms-auto small font-monospace text-muted"><%= dia(l.data) %></span>
+      </div>
+      <table class="table table-sm align-middle mb-0">
+        <tbody>
+          <% l.itens.forEach(function(it) { %>
+            <tr>
+              <td style="width:34px" class="text-center">
+                <% if (it.tipo === 'DEBITO') { %><span class="badge bg-primary bg-opacity-10 text-primary" title="Débito">D</span>
+                <% } else { %><span class="badge bg-success bg-opacity-10 text-success" title="Crédito">C</span><% } %>
+              </td>
+              <td class="small">
+                <span class="font-monospace"><%= it.conta ? it.conta.codigo : '—' %></span>
+                <span class="text-muted"><%= it.conta ? it.conta.descricao : '' %></span>
+                <% if (it.dotacaoDespesaId) { %><span class="badge bg-light text-muted ms-1" title="Conta-corrente: dotação">dotação</span><% } %>
+              </td>
+              <td class="text-end font-monospace small" style="white-space:nowrap"><%= brl(it.valor) %></td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% }) %>
 </div></div>
