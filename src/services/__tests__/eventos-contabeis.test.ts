@@ -11,6 +11,11 @@ let service: EventosContabeisService
 beforeEach(() => {
   prisma = criarPrismaMock()
   service = new EventosContabeisService(prisma as never)
+  // Por padrão, toda conta pedida existe como folha ORÇAMENTÁRIA (par válido na PCASP).
+  prisma.conta.findMany.mockImplementation((args: never) => {
+    const ins: string[] = (args as { where?: { codigo?: { in?: string[] } } })?.where?.codigo?.in ?? []
+    return Promise.resolve(ins.map((codigo) => ({ codigo, admiteMovimento: true, naturezaInformacao: 'ORCAMENTARIA' })) as never)
+  })
 })
 
 function dadosOk() {
@@ -178,6 +183,37 @@ describe('EventosContabeisService.criar', () => {
     prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
     prisma.eventoContabil.create.mockRejectedValue(new Error('boom'))
     await expect(service.criar('m1', dadosOk())).rejects.toThrow('boom')
+  })
+
+  it('persiste o gatilho válido e normaliza inválido para null', async () => {
+    prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
+    prisma.eventoContabil.create.mockResolvedValue({ id: 'ev1' })
+    await service.criar('m1', { ...dadosOk(), gatilho: 'LIQUIDACAO' as never })
+    expect(prisma.eventoContabil.create.mock.calls[0][0].data.gatilho).toBe('LIQUIDACAO')
+
+    prisma.eventoContabil.create.mockClear()
+    await service.criar('m1', { ...dadosOk(), gatilho: 'XPTO' as never })
+    expect(prisma.eventoContabil.create.mock.calls[0][0].data.gatilho).toBeNull()
+  })
+
+  it('PCASP: barra par que mistura subsistemas (débito orçamentário × crédito patrimonial)', async () => {
+    prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
+    prisma.conta.findMany.mockResolvedValue([
+      { codigo: '6.2.2.1.1.00.00.00.00.00.00.00', admiteMovimento: true, naturezaInformacao: 'ORCAMENTARIA' },
+      { codigo: '2.1.3.1.1.01.01.00.00.00.00.00', admiteMovimento: true, naturezaInformacao: 'PATRIMONIAL' },
+    ] as never)
+    await expect(
+      service.criar('m1', { ...dadosOk(), lancamentos: [{ contaDebitoMascara: '6.2.2.1.1.00.00.00.00.00.00.00', contaCreditoMascara: '2.1.3.1.1.01.01.00.00.00.00.00' }] }),
+    ).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL', message: expect.stringContaining('PCASP') })
+    expect(prisma.eventoContabil.create).not.toHaveBeenCalled()
+  })
+
+  it('PCASP: barra conta de débito inexistente no plano do modelo', async () => {
+    prisma.modeloContabil.findUnique.mockResolvedValue(MODELO)
+    prisma.conta.findMany.mockResolvedValue([{ codigo: '6.2.2.1.3.01.00.00.00.00.00.00', admiteMovimento: true, naturezaInformacao: 'ORCAMENTARIA' }] as never)
+    await expect(
+      service.criar('m1', { ...dadosOk(), lancamentos: [{ contaDebitoMascara: '9.9.9.9.9', contaCreditoMascara: '6.2.2.1.3.01.00.00.00.00.00.00' }] }),
+    ).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
   })
 })
 

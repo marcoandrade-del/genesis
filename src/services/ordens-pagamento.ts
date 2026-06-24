@@ -3,6 +3,8 @@ import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { rotuloConta } from './contas-bancarias.js'
 import { validarLancamento, netPagoDaOrdem } from './saldos-empenho.js'
+import { MotorEventosDespesa, gravarEventos, isoData } from './motor-eventos-despesa.js'
+import { LancamentosService } from './lancamentos.js'
 
 export type DadosOrdemPagamento = {
   liquidacaoId: string
@@ -20,7 +22,13 @@ export type DadosOrdemPagamento = {
  * uma liquidação não pode exceder o valor liquidado (controle via `valorPago`).
  */
 export class OrdensPagamentoService {
-  constructor(private prisma: PrismaClient) {}
+  private motor: MotorEventosDespesa
+  private lancamentos: LancamentosService
+
+  constructor(private prisma: PrismaClient) {
+    this.motor = new MotorEventosDespesa(prisma)
+    this.lancamentos = new LancamentosService(prisma)
+  }
 
   listar(entidadeId: string) {
     return this.prisma.ordemPagamento.findMany({
@@ -43,12 +51,18 @@ export class OrdensPagamentoService {
     if (!dados.contaBancariaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária é obrigatória.')
     const valor = parseDecimalPositivo(dados.valor, 'Valor da OP')
 
-    // Inclui a fonte do empenho (via dotação) para a trava conta×fonte abaixo.
+    // Inclui a fonte do empenho (via dotação) para a trava conta×fonte abaixo, e a
+    // natureza (sub-elemento) + exercício + dotação para o disparo contábil.
     const liquidacao = await this.prisma.liquidacao.findUnique({
       where: { id: dados.liquidacaoId },
       include: {
         empenho: {
-          select: { data: true, dotacaoDespesa: { select: { fonteRecurso: { select: { codigo: true, nomenclatura: true } } } } },
+          select: {
+            data: true,
+            dotacaoDespesaId: true,
+            dotacaoDespesa: { select: { orcamento: { select: { ano: true } }, contaDespesa: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true, nomenclatura: true } } } },
+            subElementoConta: { select: { codigo: true } },
+          },
         },
       },
     })
@@ -100,6 +114,20 @@ export class OrdensPagamentoService {
         await tx.movimentoEmpenho.create({
           data: { entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'PAGAMENTO', valor, data, liquidacaoId: dados.liquidacaoId, ordemPagamentoId: op.id, criadoPorId: usuarioId, historico: `Pagamento ${numero}` },
         })
+        // Integração contábil (Tabela de Eventos): pagamento dispara orçamentário +
+        // DDR + financeiro (passivo/caixa), saindo o numerário pela conta bancária.
+        await this.dispararPagamento(tx, {
+          entidadeId,
+          ano: liquidacao.empenho.dotacaoDespesa.orcamento.ano,
+          dotacaoDespesaId: liquidacao.empenho.dotacaoDespesaId,
+          naturezaCodigo: liquidacao.empenho.subElementoConta?.codigo ?? liquidacao.empenho.dotacaoDespesa.contaDespesa.codigo,
+          caixaCodigo: conta.contaContabilCodigo,
+          valor,
+          data: isoData(data),
+          historico: `Pagamento ${numero}`,
+          origemId: op.id,
+          criadoPorId: usuarioId,
+        })
         return op
       })
     } catch (e) {
@@ -129,7 +157,21 @@ export class OrdensPagamentoService {
   async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
     const op = await this.prisma.ordemPagamento.findUnique({
       where: { id },
-      include: { liquidacao: { select: { empenhoId: true } } },
+      include: {
+        contaBancariaRef: { select: { contaContabilCodigo: true } },
+        liquidacao: {
+          select: {
+            empenhoId: true,
+            empenho: {
+              select: {
+                dotacaoDespesaId: true,
+                dotacaoDespesa: { select: { orcamento: { select: { ano: true } }, contaDespesa: { select: { codigo: true } } } },
+                subElementoConta: { select: { codigo: true } },
+              },
+            },
+          },
+        },
+      },
     })
     if (!op) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Ordem de pagamento não encontrada.')
     const v = parseDecimalPositivo(valor, 'Valor do estorno')
@@ -143,7 +185,62 @@ export class OrdensPagamentoService {
       if (netPagoDaOrdem([...movimentos, { tipo: 'ESTORNO_PAGAMENTO', valor: v, ordemPagamentoId: id }], id).isZero()) {
         await tx.ordemPagamento.update({ where: { id }, data: { status: 'CANCELADA' } })
       }
+      // Integração contábil: o estorno do pagamento inverte os eventos da OP.
+      await this.dispararPagamento(tx, {
+        entidadeId: op.entidadeId,
+        ano: op.liquidacao.empenho.dotacaoDespesa.orcamento.ano,
+        dotacaoDespesaId: op.liquidacao.empenho.dotacaoDespesaId,
+        naturezaCodigo: op.liquidacao.empenho.subElementoConta?.codigo ?? op.liquidacao.empenho.dotacaoDespesa.contaDespesa.codigo,
+        caixaCodigo: op.contaBancariaRef?.contaContabilCodigo ?? null,
+        valor: v,
+        data: isoData(data),
+        historico: `Estorno do pagamento ${op.numero}`,
+        origemId: id,
+        criadoPorId: usuarioId,
+        estorno: true,
+      })
       return { id, estornado: v.toFixed(2) }
     })
+  }
+
+  /**
+   * Dispara os lançamentos contábeis do pagamento (E800 orçamentário + E801 DDR
+   * + E802 financeiro passivo/caixa) via Tabela de Eventos, na transação. `estorno`
+   * inverte cada par D↔C. Falha (rollback) se o plano não tiver as folhas.
+   */
+  private async dispararPagamento(
+    tx: Prisma.TransactionClient,
+    args: {
+      entidadeId: string
+      ano: number
+      dotacaoDespesaId: string
+      naturezaCodigo: string
+      caixaCodigo?: string | null
+      valor: Prisma.Decimal
+      data: string
+      historico: string
+      origemId: string
+      criadoPorId: string
+      estorno?: boolean
+    },
+  ) {
+    const eventos = await this.motor.resolverPagamento(
+      {
+        entidadeId: args.entidadeId,
+        ano: args.ano,
+        dotacaoDespesaId: args.dotacaoDespesaId,
+        naturezaCodigo: args.naturezaCodigo,
+        caixaCodigo: args.caixaCodigo,
+        valor: args.valor,
+      },
+      { estorno: args.estorno },
+      tx,
+    )
+    await gravarEventos(
+      this.lancamentos,
+      eventos,
+      { entidadeId: args.entidadeId, data: args.data, histBase: args.historico, origemTipo: 'PAGAMENTO', origemId: args.origemId, criadoPorId: args.criadoPorId },
+      tx,
+    )
   }
 }

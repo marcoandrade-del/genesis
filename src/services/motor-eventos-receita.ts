@@ -1,4 +1,4 @@
-import { PrismaClient, Prisma, type TipoMutacao, type IndicadorReconhecimento } from '@prisma/client'
+import { PrismaClient, Prisma, type TipoMutacao, type IndicadorReconhecimento, type GatilhoEvento } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import type { ItemDado } from './lancamentos.js'
 
@@ -73,6 +73,24 @@ export const CONTAS_EVENTO = {
   ddrDisponibilidade: '8.2.1.1.1.01.00.00.00.00.00.00', // RECURSOS DISPONÍVEIS PARA O EXERCÍCIO
 } as const
 
+/**
+ * Tokens de máscara resolvidos no disparo da arrecadação (contas que dependem do
+ * documento): `@CAIXA` (folha de caixa da conta bancária), `@DDR_CONTROLE`
+ * (ordinário/vinculado conforme a fonte) e `@CONTRAPARTIDA` (VPA/passivo/ativo da
+ * de/para — `ParametroReceita`).
+ */
+export const TOKENS = {
+  CAIXA: '@CAIXA',
+  DDR_CONTROLE: '@DDR_CONTROLE',
+  CONTRAPARTIDA: '@CONTRAPARTIDA',
+  ATIVO: '@ATIVO', // créditos a receber (1.1.2.x) — lançamento tributário / dívida ativa
+  DIVIDA_ATIVA: '@DIVIDA_ATIVA', // dívida ativa (1.2.1.x) — inscrição
+} as const
+
+/** Resolve uma máscara para conta-corrente, dado o resolvedor de tokens do estágio. */
+type CcResolvido = { codigo: string; cc: 'natureza' | 'fonte' }
+type ResolverToken = (token: string) => CcResolvido | null
+
 export type ContextoArrecadacao = {
   entidadeId: string
   ano: number
@@ -114,86 +132,86 @@ export class MotorEventosReceita {
     const db = tx ?? this.prisma
     const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
     const parametro = await this.parametroPara(modeloId, ctx.naturezaCodigo, db)
+    // SELEÇÃO (regra de negócio, fica em código): orçamentário + DDR sempre; o
+    // patrimonial só se a parametrização da natureza indicar (E300/400/500/560).
     const patrimonial = patrimonialArrecadacao(parametro, ctx.naturezaCodigo)
-
-    const ddrControle = ctx.fonteVinculada
-      ? CONTAS_EVENTO.ddrControleVinculado
-      : CONTAS_EVENTO.ddrControleOrdinario
+    // SELEÇÃO em código; as CONTAS D/C vêm da Tabela de Eventos (gatilho ARRECADACAO).
+    const codigos = ['100', '200', ...(patrimonial ? [patrimonial.codigo] : [])]
+    const ddrControle = ctx.fonteVinculada ? CONTAS_EVENTO.ddrControleVinculado : CONTAS_EVENTO.ddrControleOrdinario
     const caixa = ctx.caixaCodigo || CONTAS_EVENTO.caixaArrecadacao
+    const resolverToken: ResolverToken = (t) => {
+      if (t === TOKENS.CAIXA) return { codigo: caixa, cc: 'fonte' }
+      if (t === TOKENS.DDR_CONTROLE) return { codigo: ddrControle, cc: 'fonte' }
+      if (t === TOKENS.CONTRAPARTIDA) return patrimonial ? { codigo: patrimonial.contrapartida, cc: 'natureza' } : null
+      return null
+    }
+    return this.montarEventos(ctx, modeloId, 'ARRECADACAO', codigos, resolverToken, opts, db)
+  }
 
-    const codigos = [
-      CONTAS_EVENTO.receitaARealizar,
-      CONTAS_EVENTO.receitaRealizada,
-      ddrControle,
-      CONTAS_EVENTO.ddrDisponibilidade,
-    ]
-    if (patrimonial) codigos.push(caixa, patrimonial.contrapartida)
+  /**
+   * Núcleo table-driven: carrega os eventos do `gatilho` (na ordem de `codigos`, ou
+   * todos do gatilho), resolve cada máscara D/C (literal ou token via `resolverToken`)
+   * e monta os pares com cc derivada (DDR/caixa → fonte, demais → natureza). Estorno
+   * inverte D↔C. Evento ausente na tabela é pulado; conta literal não-folha derruba.
+   */
+  private async montarEventos(
+    ctx: { entidadeId: string; ano: number; naturezaCodigo: string; fonteCodigo?: string | null; valor: Prisma.Decimal | string | number },
+    modeloId: string,
+    gatilho: GatilhoEvento,
+    codigos: string[] | null,
+    resolverToken: ResolverToken,
+    opts: { estorno?: boolean },
+    db: Db,
+  ): Promise<LancamentoEvento[]> {
+    const eventos = await db.eventoContabil.findMany({
+      where: { modeloContabilId: modeloId, ativo: true, gatilho, ...(codigos ? { codigo: { in: codigos } } : {}) },
+      orderBy: { codigo: 'asc' },
+      include: { lancamentos: { orderBy: { ordem: 'asc' } } },
+    })
+    const porCodigo = new Map(eventos.map((e) => [e.codigo, e]))
 
-    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, codigos, db)
+    const resolverMascara = (m: string): CcResolvido => {
+      const t = m.trim()
+      if (t.startsWith('@')) {
+        const r = resolverToken(t)
+        if (r) return r
+      }
+      const classe = t.charAt(0)
+      return { codigo: t, cc: classe === '7' || classe === '8' ? 'fonte' : 'natureza' }
+    }
+
+    const resolvidos = (codigos ?? eventos.map((e) => e.codigo))
+      .map((c) => porCodigo.get(c))
+      .filter((e): e is NonNullable<typeof e> => !!e)
+      .map((ev) => ({
+        codigo: ev.codigo,
+        descricao: ev.descricao,
+        pares: ev.lancamentos.map((l) => ({ d: resolverMascara(l.contaDebitoMascara), c: resolverMascara(l.contaCreditoMascara) })),
+      }))
+
+    const todos = [...new Set(resolvidos.flatMap((e) => e.pares.flatMap((p) => [p.d.codigo, p.c.codigo])))]
+    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, todos, db)
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
+    const fonte = ctx.fonteCodigo ?? null
 
-    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO', cc: { natureza?: string; fonte?: string }): ItemDado => {
-      const id = idPorCodigo.get(codigo)
+    const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
+    const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
+    const leg = (r: CcResolvido, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
+      const id = idPorCodigo.get(r.codigo)
       if (!id) {
         throw new ErroNegocio(
           'ENTIDADE_NAO_PROCESSAVEL',
-          `Integração contábil indisponível: conta "${codigo}" não existe como folha no plano da entidade (exercício ${ctx.ano}).`,
+          `Integração contábil indisponível: conta "${r.codigo}" não existe como folha no plano da entidade (exercício ${ctx.ano}).`,
         )
       }
-      return {
-        contaId: id,
-        tipo,
-        valor,
-        naturezaReceitaCodigo: cc.natureza ?? null,
-        fonteCodigo: cc.fonte ?? null,
-      }
+      return { contaId: id, tipo, valor, naturezaReceitaCodigo: r.cc === 'natureza' ? ctx.naturezaCodigo : null, fonteCodigo: r.cc === 'fonte' ? fonte : null }
     }
 
-    // No estorno, inverte o lado de cada perna (mesmas contas).
-    const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
-    const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
-    const par = (
-      codigo: string,
-      descricao: string,
-      deb: { codigo: string; cc: { natureza?: string; fonte?: string } },
-      cred: { codigo: string; cc: { natureza?: string; fonte?: string } },
-    ): LancamentoEvento => ({
-      eventoCodigo: codigo,
-      descricaoEvento: descricao,
-      itens: [leg(deb.codigo, dDeb, deb.cc), leg(cred.codigo, dCred, cred.cc)],
-    })
-
-    const eventos: LancamentoEvento[] = [
-      // E100 — Orçamentário: D Receita Realizada / C Receita a Realizar (cc natureza)
-      par(
-        '100',
-        'Arrecadação orçamentária',
-        { codigo: CONTAS_EVENTO.receitaRealizada, cc: { natureza: ctx.naturezaCodigo } },
-        { codigo: CONTAS_EVENTO.receitaARealizar, cc: { natureza: ctx.naturezaCodigo } },
-      ),
-      // E200 — Controle DDR: D Controle da Disponibilidade / C Disponibilidade por Destinação (cc fonte)
-      par(
-        '200',
-        'Disponibilidade por destinação de recursos (DDR)',
-        { codigo: ddrControle, cc: { fonte: ctx.fonteCodigo } },
-        { codigo: CONTAS_EVENTO.ddrDisponibilidade, cc: { fonte: ctx.fonteCodigo } },
-      ),
-    ]
-
-    // Evento patrimonial da arrecadação: D Caixa / C contrapartida — VPA/passivo/ativo
-    // (E300/E400/E500, regime de caixa) ou baixa do crédito a receber (E560, tributária).
-    if (patrimonial) {
-      eventos.push(
-        par(
-          patrimonial.codigo,
-          patrimonial.descricao,
-          { codigo: caixa, cc: { fonte: ctx.fonteCodigo } },
-          { codigo: patrimonial.contrapartida, cc: { natureza: ctx.naturezaCodigo } },
-        ),
-      )
-    }
-
-    return eventos
+    return resolvidos.map((e) => ({
+      eventoCodigo: e.codigo,
+      descricaoEvento: e.descricao,
+      itens: e.pares.flatMap((p) => [leg(p.d, dDeb), leg(p.c, dCred)]),
+    }))
   }
 
   /**
@@ -216,22 +234,13 @@ export class MotorEventosReceita {
         `A natureza ${ctx.naturezaCodigo} não está configurada como tributária (competência) com conta de ativo — não há crédito a constituir.`,
       )
     }
-    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, [parametro.contaAtivoCodigo, parametro.contaContrapartidaCodigo], db)
-    const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
-    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
-      const id = idPorCodigo.get(codigo)
-      if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
-      return { contaId: id, tipo, valor, naturezaReceitaCodigo: ctx.naturezaCodigo, fonteCodigo: null }
+    const ativo = parametro.contaAtivoCodigo
+    const resolverToken: ResolverToken = (t) => {
+      if (t === TOKENS.ATIVO) return { codigo: ativo, cc: 'natureza' }
+      if (t === TOKENS.CONTRAPARTIDA) return { codigo: parametro.contaContrapartidaCodigo, cc: 'natureza' }
+      return null
     }
-    const dAtivo: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
-    const dVpa: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
-    return [
-      {
-        eventoCodigo: '550',
-        descricaoEvento: 'Lançamento de crédito tributário (direito a receber)',
-        itens: [leg(parametro.contaAtivoCodigo, dAtivo), leg(parametro.contaContrapartidaCodigo, dVpa)],
-      },
-    ]
+    return this.montarEventos(ctx, modeloId, 'LANCAMENTO_TRIBUTARIO', null, resolverToken, opts, db)
   }
 
   /**
@@ -253,22 +262,14 @@ export class MotorEventosReceita {
         `A natureza ${ctx.naturezaCodigo} não tem conta de dívida ativa configurada — não há o que inscrever.`,
       )
     }
-    const idPorCodigo = await this.resolverContas(ctx.entidadeId, ctx.ano, [parametro.contaDividaAtivaCodigo, parametro.contaAtivoCodigo], db)
-    const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
-    const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
-      const id = idPorCodigo.get(codigo)
-      if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
-      return { contaId: id, tipo, valor, naturezaReceitaCodigo: ctx.naturezaCodigo, fonteCodigo: null }
+    const ativo = parametro.contaAtivoCodigo
+    const dividaAtiva = parametro.contaDividaAtivaCodigo
+    const resolverToken: ResolverToken = (t) => {
+      if (t === TOKENS.DIVIDA_ATIVA) return { codigo: dividaAtiva, cc: 'natureza' }
+      if (t === TOKENS.ATIVO) return { codigo: ativo, cc: 'natureza' }
+      return null
     }
-    const dDA: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
-    const dCirc: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
-    return [
-      {
-        eventoCodigo: '570',
-        descricaoEvento: 'Inscrição em dívida ativa (reclassificação do crédito)',
-        itens: [leg(parametro.contaDividaAtivaCodigo, dDA), leg(parametro.contaAtivoCodigo, dCirc)],
-      },
-    ]
+    return this.montarEventos(ctx, modeloId, 'INSCRICAO_DIVIDA_ATIVA', null, resolverToken, opts, db)
   }
 
   /** Saldo (devedor: D − C) de uma conta-folha da entidade no exercício, pelo código. */

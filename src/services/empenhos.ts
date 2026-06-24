@@ -3,6 +3,8 @@ import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
 import { resumirEmpenho, validarLancamento } from './saldos-empenho.js'
+import { MotorEventosDespesa, gravarEventos, isoData } from './motor-eventos-despesa.js'
+import { LancamentosService } from './lancamentos.js'
 
 export type DadosEmpenho = {
   dotacaoDespesaId: string
@@ -30,7 +32,13 @@ const TIPOS: ReadonlyArray<TipoEmpenho> = ['ORDINARIO', 'GLOBAL', 'ESTIMATIVO']
  * saldo disponível. Tudo na mesma transação.
  */
 export class EmpenhosService {
-  constructor(private prisma: PrismaClient) {}
+  private motor: MotorEventosDespesa
+  private lancamentos: LancamentosService
+
+  constructor(private prisma: PrismaClient) {
+    this.motor = new MotorEventosDespesa(prisma)
+    this.lancamentos = new LancamentosService(prisma)
+  }
 
   listar(entidadeId: string) {
     return this.prisma.empenho.findMany({
@@ -75,7 +83,32 @@ export class EmpenhosService {
       where: { empenhoId: id },
       orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
     })
-    return { empenho, movimentos, resumo: resumirEmpenho(movimentos) }
+    return { empenho, movimentos, resumo: resumirEmpenho(movimentos), trilha: await this.trilhaContabil(id) }
+  }
+
+  /**
+   * Trilha contábil do empenho: os lançamentos automáticos (E6xx/E7xx/E8xx) que a
+   * execução disparou via Tabela de Eventos, em todo o ciclo do empenho (o próprio
+   * empenho + suas liquidações + as ordens de pagamento delas). Rastreabilidade →.
+   */
+  async trilhaContabil(empenhoId: string) {
+    const liquidacoes = await this.prisma.liquidacao.findMany({
+      where: { empenhoId },
+      select: { id: true, ordensPagamento: { select: { id: true } } },
+    })
+    const liqIds = liquidacoes.map((l) => l.id)
+    const opIds = liquidacoes.flatMap((l) => l.ordensPagamento.map((o) => o.id))
+    return this.prisma.lancamento.findMany({
+      where: {
+        OR: [
+          { origemTipo: 'EMPENHO', origemId: empenhoId },
+          ...(liqIds.length ? [{ origemTipo: 'LIQUIDACAO' as const, origemId: { in: liqIds } }] : []),
+          ...(opIds.length ? [{ origemTipo: 'PAGAMENTO' as const, origemId: { in: opIds } }] : []),
+        ],
+      },
+      include: { itens: { orderBy: { tipo: 'desc' }, include: { conta: { select: { codigo: true, descricao: true } } } } }, // DEBITO antes de CREDITO
+      orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
+    })
   }
 
   async criar(entidadeId: string, dados: DadosEmpenho, usuarioId: string) {
@@ -143,6 +176,19 @@ export class EmpenhosService {
             data: { valorEmpenhado: { increment: valor } },
           })
         }
+        // Integração contábil (Tabela de Eventos): o empenho dispara os
+        // lançamentos automáticos (E600/E601) na mesma transação.
+        await this.dispararEmpenho(tx, {
+          entidadeId,
+          ano: dotacao.orcamento.ano,
+          dotacaoDespesaId: dados.dotacaoDespesaId,
+          naturezaCodigo: dotacao.contaDespesa.codigo,
+          valor,
+          data: isoData(empenho.data),
+          historico: `Empenho ${numero}`,
+          origemId: empenho.id,
+          criadoPorId: usuarioId,
+        })
         return empenho
       })
     } catch (e) {
@@ -159,7 +205,10 @@ export class EmpenhosService {
    * empenhado, vira ANULADO. Estorna o empenhado na dotação.
    */
   async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
-    const empenho = await this.prisma.empenho.findUnique({ where: { id } })
+    const empenho = await this.prisma.empenho.findUnique({
+      where: { id },
+      include: { dotacaoDespesa: { include: { orcamento: { select: { ano: true } }, contaDespesa: { select: { codigo: true } } } } },
+    })
     if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
     const v = parseDecimalPositivo(valor, 'Valor do estorno')
     const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: id } })
@@ -172,8 +221,55 @@ export class EmpenhosService {
       if (resumirEmpenho([...movimentos, { tipo: 'ESTORNO_EMPENHO', valor: v }]).netEmpenhado.isZero()) {
         await tx.empenho.update({ where: { id }, data: { status: 'ANULADO' } })
       }
+      // Integração contábil: o estorno do empenho inverte E600/E601 na mesma transação.
+      await this.dispararEmpenho(tx, {
+        entidadeId: empenho.entidadeId,
+        ano: empenho.dotacaoDespesa.orcamento.ano,
+        dotacaoDespesaId: empenho.dotacaoDespesaId,
+        naturezaCodigo: empenho.dotacaoDespesa.contaDespesa.codigo,
+        valor: v,
+        data: isoData(data),
+        historico: `Estorno do empenho ${empenho.numero}`,
+        origemId: empenho.id,
+        criadoPorId: usuarioId,
+        estorno: true,
+      })
       return { id, estornado: v.toFixed(2) }
     })
+  }
+
+  /**
+   * Dispara os lançamentos contábeis do empenho (E600 orçamentário + E601 DDR)
+   * via Tabela de Eventos, dentro da transação. `estorno` inverte cada par D↔C.
+   * Como na receita, falha (rollback) se o plano da entidade não tiver as folhas:
+   * num sistema contábil, plano incompleto é erro de configuração e deve aparecer.
+   */
+  private async dispararEmpenho(
+    tx: Prisma.TransactionClient,
+    args: {
+      entidadeId: string
+      ano: number
+      dotacaoDespesaId: string
+      naturezaCodigo: string
+      valor: Prisma.Decimal
+      data: string
+      historico: string
+      origemId: string
+      criadoPorId: string
+      estorno?: boolean
+    },
+  ) {
+    const eventos = await this.motor.resolverEmpenho(
+      { entidadeId: args.entidadeId, ano: args.ano, dotacaoDespesaId: args.dotacaoDespesaId, naturezaCodigo: args.naturezaCodigo, valor: args.valor },
+      { estorno: args.estorno },
+      tx,
+    )
+    await gravarEventos(
+      this.lancamentos,
+      eventos,
+      { entidadeId: args.entidadeId, data: args.data, histBase: args.historico, origemTipo: 'EMPENHO', origemId: args.origemId, criadoPorId: args.criadoPorId },
+      tx,
+    )
   }
 
   private async carregarDotacao(dotacaoDespesaId: string, entidadeId: string) {

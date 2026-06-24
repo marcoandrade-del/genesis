@@ -16,6 +16,7 @@ import 'dotenv/config'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient, type TipoMutacao, type IndicadorReconhecimento } from '@prisma/client'
+import { CONTAS_EVENTO as CE, TOKENS as TR } from '../src/services/motor-eventos-receita.js'
 
 const APLICAR = process.argv.includes('--apply')
 const MODELOS = ['PARANÁ', 'PCASP STN']
@@ -53,15 +54,20 @@ const PARAMETROS: Array<{
   { natureza: '1.1.1.4.51.1.2', tipoMutacao: 'EFETIVA', contrapartida: '4.4.2.4.1.07.00.00.00.00.00.00', nome: 'ISSQN Multas e Juros → VPA multas e juros sobre ISS' },
 ]
 
-const EVENTOS: Array<{ codigo: string; descricao: string }> = [
-  { codigo: '100', descricao: 'Arrecadação orçamentária — D 6.2.1.2 Receita Realizada / C 6.2.1.1 Receita a Realizar (cc: natureza)' },
-  { codigo: '200', descricao: 'Disponibilidade por Destinação (DDR) — D 7.2.1.1.x Controle / C 8.2.1.1.1.01 (cc: fonte)' },
-  { codigo: '300', descricao: 'Variação Patrimonial Aumentativa (receita efetiva) — D 1.1.1.1.1.x Caixa / C VPA classe 4 (de/para NR→VPA)' },
-  { codigo: '400', descricao: 'Mutação por operação de crédito (receita não-efetiva, capital 2.1) — D 1.1.1.1.1.x Caixa / C passivo classe 2' },
-  { codigo: '500', descricao: 'Mutação por alienação de bens (receita não-efetiva, capital 2.2) — D 1.1.1.1.1.x Caixa / C baixa de ativo classe 1' },
-  { codigo: '550', descricao: 'Lançamento de crédito tributário (competência) — D 1.1.2.x Créditos a Receber / C VPA classe 4' },
-  { codigo: '560', descricao: 'Arrecadação da receita lançada — D 1.1.1.1.1.x Caixa / C 1.1.2.x baixa do crédito a receber (sem VPA nova)' },
-  { codigo: '570', descricao: 'Inscrição em dívida ativa — D 1.2.1.x Dívida Ativa / C 1.1.2.x baixa do crédito a receber circulante (reclassificação)' },
+// Matriz da arrecadação: gatilho ARRECADACAO + linhas D/C (códigos do PCASP ou
+// tokens). O motor seleciona em código QUAL evento patrimonial dispara (300/400/
+// 500/560) conforme a parametrização; as CONTAS vêm daqui. E550/E570 são fluxos à
+// parte (lançamento tributário / dívida ativa) — seguem code-driven, sem gatilho.
+type GatilhoReceita = 'ARRECADACAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA'
+const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoReceita; linhas?: Array<[string, string]> }> = [
+  { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária (cc: natureza)', linhas: [[CE.receitaRealizada, CE.receitaARealizar]] },
+  { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por Destinação (DDR) (cc: fonte)', linhas: [[TR.DDR_CONTROLE, CE.ddrDisponibilidade]] },
+  { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação Patrimonial Aumentativa (receita efetiva)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
+  { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (não-efetiva, passivo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
+  { codigo: '500', gatilho: 'ARRECADACAO', descricao: 'Mutação por alienação de bens (não-efetiva, baixa de ativo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
+  { codigo: '550', gatilho: 'LANCAMENTO_TRIBUTARIO', descricao: 'Lançamento de crédito tributário (D ativo / C VPA)', linhas: [[TR.ATIVO, TR.CONTRAPARTIDA]] },
+  { codigo: '560', gatilho: 'ARRECADACAO', descricao: 'Arrecadação da receita lançada (baixa do crédito a receber)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
+  { codigo: '570', gatilho: 'INSCRICAO_DIVIDA_ATIVA', descricao: 'Inscrição em dívida ativa (D dívida ativa / C baixa do circulante)', linhas: [[TR.DIVIDA_ATIVA, TR.ATIVO]] },
 ]
 
 async function main() {
@@ -98,13 +104,20 @@ async function main() {
 
     for (const e of EVENTOS) {
       if (APLICAR) {
-        await prisma.eventoContabil.upsert({
+        const ev = await prisma.eventoContabil.upsert({
           where: { modeloContabilId_codigo: { modeloContabilId: modelo.id, codigo: e.codigo } },
-          create: { modeloContabilId: modelo.id, codigo: e.codigo, descricao: e.descricao, tipoInscricao: '11 - Natureza da Receita' },
-          update: { descricao: e.descricao },
+          create: { modeloContabilId: modelo.id, codigo: e.codigo, descricao: e.descricao, gatilho: e.gatilho ?? null, tipoInscricao: '11 - Natureza da Receita' },
+          update: { descricao: e.descricao, gatilho: e.gatilho ?? null },
         })
+        if (e.linhas) {
+          await prisma.eventoLancamento.deleteMany({ where: { eventoId: ev.id } })
+          await prisma.eventoLancamento.createMany({
+            data: e.linhas.map(([debito, credito], i) => ({ eventoId: ev.id, ordem: i + 1, contaDebitoMascara: debito, contaCreditoMascara: credito })),
+          })
+        }
       }
-      console.log(`  evento ${e.codigo}  ${e.descricao}`)
+      const pernas = e.linhas ? ` [${e.linhas.map(([d, c]) => `D ${d} / C ${c}`).join(' ; ')}]` : ''
+      console.log(`  evento ${e.codigo}  ${e.gatilho ?? '—'}  ${e.descricao}${pernas}`)
     }
   }
 

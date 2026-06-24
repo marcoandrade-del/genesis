@@ -89,9 +89,21 @@ describe('adminEmpenhosRoutes', () => {
       },
       movimentos,
       resumo: resumirEmpenho(movimentos),
+      trilha: [
+        {
+          eventoCodigo: '600', historico: 'Empenho — orçamentário — Empenho 2026NE001', data: new Date('2026-02-01'),
+          itens: [
+            { tipo: 'DEBITO', valor: new Prisma.Decimal('500'), dotacaoDespesaId: 'dot1', conta: { codigo: '6.2.2.1.1.00.00.00.00.00.00.00', descricao: 'Crédito Disponível' } },
+            { tipo: 'CREDITO', valor: new Prisma.Decimal('500'), dotacaoDespesaId: 'dot1', conta: { codigo: '6.2.2.1.3.01.00.00.00.00.00.00', descricao: 'Empenhado a Liquidar' } },
+          ],
+        },
+      ],
     })
     const res = await app.inject({ method: 'GET', url: '/e1/ficha' })
     expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Trilha contábil')
+    expect(res.body).toContain('E600')
+    expect(res.body).toContain('Empenhado a Liquidar')
     expect(res.body).toContain('Ficha de Empenho')
     expect(res.body).toContain('2026NE001')
     expect(res.body).toContain('Material de consumo')

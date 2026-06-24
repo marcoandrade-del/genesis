@@ -371,6 +371,7 @@ model ModeloContabil {
   fontesRecurso     FonteRecurso[]
   eventos           EventoContabil[]
   parametrosReceita ParametroReceita[]
+  parametrosDespesa ParametroDespesa[]
   estados           Estado[]
   municipios        Municipio[]
 
@@ -501,10 +502,14 @@ model LancamentoItem {
   // natureza da receita / fonte viajam como DIMENSÃO (não como código mais fundo).
   naturezaReceitaCodigo String? // ex.: "1.3.1.1.01.1.1" (cc da classe 6, VPA)
   fonteCodigo           String? // ex.: "1500" (cc da classe 8 / disponibilidade)
+  // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
+  dotacaoDespesaId      String?
   lancamento   Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
   conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
+  dotacaoDespesa DotacaoDespesa?     @relation(fields: [dotacaoDespesaId], references: [id])
 
   @@index([contaId])
+  @@index([dotacaoDespesaId])
   @@map("lancamento_itens")
 }
 
@@ -566,6 +571,9 @@ enum OrigemLancamento {
   LANCAMENTO_TRIBUTARIO
   INSCRICAO_DIVIDA_ATIVA
   ABERTURA
+  EMPENHO
+  LIQUIDACAO
+  PAGAMENTO
 }
 
 // Tipo de movimento na tela de lançamento tributário: constituição do crédito ou
@@ -618,6 +626,27 @@ model ParametroReceita {
   @@unique([modeloContabilId, naturezaCodigo])
   @@index([modeloContabilId])
   @@map("parametros_receita")
+}
+
+/// de/para da DESPESA (cut 1 = custeio): para uma NATUREZA (casa por prefixo mais
+/// longo, como ParametroReceita), as contas patrimoniais usadas na liquidação
+/// (E700) — `contaVpdCodigo` (VPD classe 3, débito) e `contaPassivoCodigo`
+/// (Passivo a pagar 2.1.x, crédito). Por modelo contábil. A classificação
+/// funcional-programática completa viaja como conta-corrente (dotação) no
+/// LancamentoItem. Capital (4.4.x → incorpora ativo) é ramo à parte (depois).
+model ParametroDespesa {
+  id                 String         @id @default(uuid())
+  modeloContabilId   String
+  naturezaCodigo     String // ex.: "3.1.90" ou "3.3.90.30" — casa por prefixo
+  contaVpdCodigo     String // VPD classe 3 (débito na liquidação)
+  contaPassivoCodigo String // Passivo a pagar 2.1.x (crédito na liquidação)
+  criadoEm           DateTime       @default(now())
+  atualizadoEm       DateTime       @updatedAt
+  modeloContabil     ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+
+  @@unique([modeloContabilId, naturezaCodigo])
+  @@index([modeloContabilId])
+  @@map("parametros_despesa")
 }
 
 // ─── Plano de Contas da Receita (orçamentário) ───────────────────────────────
@@ -1021,6 +1050,9 @@ model EventoContabil {
   tipoInscricao                    String? // ex.: "11 - Natureza da Receita". Define o significado dos X.
   classificacaoContabilMascara     String? // ex.: "52121XXXX"
   classificacaoOrcamentariaMascara String? // ex.: "YYYYYYY"
+  // Estágio da execução que dispara o evento automaticamente. NULL = evento não
+  // automático (ex.: restos a pagar, eventos manuais) — o motor não o aciona.
+  gatilho                          GatilhoEvento?
   ativo                            Boolean            @default(true)
   criadoEm                         DateTime           @default(now())
   atualizadoEm                     DateTime           @updatedAt
@@ -1029,7 +1061,19 @@ model EventoContabil {
 
   @@unique([modeloContabilId, codigo])
   @@index([modeloContabilId])
+  @@index([modeloContabilId, gatilho])
   @@map("eventos_contabeis")
+}
+
+// Estágio da execução que aciona um evento contábil (table-driven). O motor filtra
+// os eventos por gatilho, não pelo código — códigos podem ter qualquer convenção.
+enum GatilhoEvento {
+  ARRECADACAO
+  LANCAMENTO_TRIBUTARIO
+  INSCRICAO_DIVIDA_ATIVA
+  EMPENHO
+  LIQUIDACAO
+  PAGAMENTO
 }
 
 model EventoLancamento {
@@ -1173,6 +1217,7 @@ model DotacaoDespesa {
   reservas               ReservaDotacao[]
   empenhos               Empenho[]
   creditosItens          CreditoAdicionalItem[]
+  lancamentoItens        LancamentoItem[]
 
   @@unique([orcamentoId, unidadeOrcamentariaId, funcaoId, subfuncaoId, programaId, acaoId, contaDespesaEntidadeId, fonteRecursoEntidadeId], name: "dotacao_unica")
   @@index([orcamentoId])

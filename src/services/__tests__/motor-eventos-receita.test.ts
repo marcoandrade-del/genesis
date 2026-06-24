@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
 import { MotorEventosReceita, CONTAS_EVENTO } from '../motor-eventos-receita.js'
+import { mockMatrizReceita } from './helpers/receita-matriz.js'
 
 const MODELO = 'modelo-pr'
 const ENT = 'ent-1'
@@ -30,6 +31,7 @@ function comFolhas(mock: PrismaMock, folhas: string[] = TODAS_FOLHAS) {
       folhas.filter((c) => pedidos.includes(c)).map((codigo) => ({ id: `id:${codigo}`, codigo, admiteMovimento: true })),
     )
   })
+  mockMatrizReceita(mock) // contas D/C da arrecadação vêm da "tabela"
 }
 
 function motor(mock: PrismaMock) {

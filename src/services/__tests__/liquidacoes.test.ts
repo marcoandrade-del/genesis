@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { LiquidacoesService } from '../liquidacoes.js'
+import { CONTAS_DESPESA } from '../motor-eventos-despesa.js'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
+import { mockMatrizDespesa } from './helpers/despesa-matriz.js'
 
 let prisma: PrismaMock
 let service: LiquidacoesService
@@ -15,13 +17,25 @@ function dadosOk(over: Partial<Record<string, unknown>> = {}) {
   return { empenhoId: 'e1', numero: 'LIQ-001', valor: '300', notaFiscal: 'NF-1', ...over } as never
 }
 const D = (v: string | number) => new Prisma.Decimal(v)
+// contexto da despesa carregado junto ao empenho (p/ o disparo contábil).
+const empenhoCtx = { dotacaoDespesaId: 'dot1', dotacaoDespesa: { orcamento: { ano: 2026 } }, subElementoConta: { codigo: '3.3.90.30.07.00' } }
+// Plano contábil completo: folhas da despesa + modelo + lançamento criável.
+function mockContabil() {
+  prisma.entidade.findUnique.mockResolvedValue({ id: 'ent1', municipio: { modeloContabilId: 'm1', estado: { modeloContabilId: 'm1' } } } as never)
+  prisma.contaContabilEntidade.findMany.mockResolvedValue(
+    Object.values(CONTAS_DESPESA).map((codigo) => ({ id: 'c-' + codigo, codigo, entidadeId: 'ent1', ano: 2026, admiteMovimento: true })) as never,
+  )
+  prisma.lancamento.create.mockResolvedValue({ id: 'lanc1' } as never)
+  mockMatrizDespesa(prisma)
+}
 // empenho 500, já liquidado 100 → saldo do empenho (razão) = 400
 function mockEmpenho(over: Partial<Record<string, unknown>> = {}) {
-  prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', entidadeId: 'ent1', data: new Date('2026-01-05'), status: 'ATIVO', valor: '500', valorLiquidado: '100', ...over })
+  prisma.empenho.findUnique.mockResolvedValue({ id: 'e1', entidadeId: 'ent1', data: new Date('2026-01-05'), status: 'ATIVO', valor: '500', valorLiquidado: '100', ...empenhoCtx, ...over })
   prisma.movimentoEmpenho.findMany.mockResolvedValue([
     { tipo: 'EMPENHO', valor: D(500) },
     { tipo: 'LIQUIDACAO', valor: D(100), liquidacaoId: 'lx' },
   ])
+  mockContabil()
 }
 
 describe('LiquidacoesService.criar', () => {
@@ -49,6 +63,51 @@ describe('LiquidacoesService.criar', () => {
     expect(m).toMatchObject({ tipo: 'LIQUIDACAO', empenhoId: 'e1', liquidacaoId: 'l1', criadoPorId: 'u1' })
     expect(m.valor.toString()).toBe('400')
   })
+  it('dispara E700 + E701 (sem de/para → sem patrimonial), origem LIQUIDACAO', async () => {
+    mockEmpenho()
+    prisma.liquidacao.create.mockResolvedValue({ id: 'l1' })
+    await service.criar('ent1', dadosOk({ valor: '300' }), 'u1')
+    const lancs = prisma.lancamento.create.mock.calls.map((c) => c[0].data)
+    expect(lancs.map((l: { eventoCodigo: string }) => l.eventoCodigo)).toEqual(['700', '701'])
+    expect(lancs.every((l: { origemTipo: string; origemId: string }) => l.origemTipo === 'LIQUIDACAO' && l.origemId === 'l1')).toBe(true)
+    // E700: D empenhado a liquidar / C liquidado a pagar
+    const itens700 = prisma.lancamentoItem.createMany.mock.calls[0][0].data
+    expect(itens700.find((i: { tipo: string }) => i.tipo === 'DEBITO').contaId).toBe('c-' + CONTAS_DESPESA.empenhadoALiquidar)
+  })
+
+  it('dispara E700 + E701 + E702 patrimonial (D VPD / C passivo) quando há de/para', async () => {
+    mockEmpenho()
+    const VPD = '3.3.2.1.1.01.00.00.00.00.00.00'
+    const PASSIVO = '2.1.3.1.1.01.00.00.00.00.00.00'
+    prisma.parametroDespesa.findMany.mockResolvedValue([{ naturezaCodigo: '3.3.90', contaVpdCodigo: VPD, contaPassivoCodigo: PASSIVO }] as never)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue(
+      [...Object.values(CONTAS_DESPESA), VPD, PASSIVO].map((codigo) => ({ id: 'c-' + codigo, codigo, entidadeId: 'ent1', ano: 2026, admiteMovimento: true })) as never,
+    )
+    prisma.liquidacao.create.mockResolvedValue({ id: 'l1' })
+    await service.criar('ent1', dadosOk({ valor: '300' }), 'u1')
+    const lancs = prisma.lancamento.create.mock.calls.map((c) => c[0].data)
+    expect(lancs.map((l: { eventoCodigo: string }) => l.eventoCodigo)).toEqual(['700', '701', '702'])
+    const itens702 = prisma.lancamentoItem.createMany.mock.calls[2][0].data
+    expect(itens702.find((i: { tipo: string }) => i.tipo === 'DEBITO').contaId).toBe('c-' + VPD)
+    expect(itens702.find((i: { tipo: string }) => i.tipo === 'CREDITO').contaId).toBe('c-' + PASSIVO)
+  })
+
+  it('empenho legado (sem sub-elemento) usa a natureza da dotação no de/para', async () => {
+    // subElementoConta null + contaDespesa da dotação no elemento 3.3.90.30
+    mockEmpenho({ subElementoConta: null, dotacaoDespesa: { orcamento: { ano: 2026 }, contaDespesa: { codigo: '3.3.90.30.00.00' } } })
+    const VPD = '3.3.2.1.1.01.00.00.00.00.00.00'
+    const PASSIVO = '2.1.3.1.1.01.00.00.00.00.00.00'
+    prisma.parametroDespesa.findMany.mockResolvedValue([{ naturezaCodigo: '3.3.90', contaVpdCodigo: VPD, contaPassivoCodigo: PASSIVO }] as never)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue(
+      [...Object.values(CONTAS_DESPESA), VPD, PASSIVO].map((codigo) => ({ id: 'c-' + codigo, codigo, entidadeId: 'ent1', ano: 2026, admiteMovimento: true })) as never,
+    )
+    prisma.liquidacao.create.mockResolvedValue({ id: 'l1' })
+    await service.criar('ent1', dadosOk({ valor: '300' }), 'u1')
+    // resolve o de/para pela natureza da dotação → patrimonial E702 presente
+    const lancs = prisma.lancamento.create.mock.calls.map((c) => c[0].data)
+    expect(lancs.map((l: { eventoCodigo: string }) => l.eventoCodigo)).toEqual(['700', '701', '702'])
+  })
+
   it('rejeita liquidação com data anterior ao empenho', async () => {
     mockEmpenho() // empenho em 2026-01-05
     await expect(service.criar('ent1', dadosOk({ valor: '100', data: '2026-01-04' }), 'u1')).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
@@ -64,8 +123,9 @@ describe('LiquidacoesService.criar', () => {
 describe('LiquidacoesService.estornar', () => {
   // liquidação L1 de 300 (na razão), sem pagamento → saldo da liquidação = 300
   function mockL1(movimentos: unknown[]) {
-    prisma.liquidacao.findUnique.mockResolvedValue({ id: 'l1', entidadeId: 'ent1', numero: 'LIQ-001', empenhoId: 'e1', valor: D(300), data: new Date('2026-02-01'), empenho: { data: new Date('2026-01-05') } })
+    prisma.liquidacao.findUnique.mockResolvedValue({ id: 'l1', entidadeId: 'ent1', numero: 'LIQ-001', empenhoId: 'e1', valor: D(300), data: new Date('2026-02-01'), empenho: { data: new Date('2026-01-05'), ...empenhoCtx } })
     prisma.movimentoEmpenho.findMany.mockResolvedValue(movimentos)
+    mockContabil()
   }
   it('estorno total zera o liquidado e marca CANCELADA', async () => {
     mockL1([{ tipo: 'EMPENHO', valor: D(500) }, { tipo: 'LIQUIDACAO', valor: D(300), liquidacaoId: 'l1' }])
