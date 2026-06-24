@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Despesa — acumulado diário · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  var brl = function(v) { return (Number(v) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  var fixT = Number(fixadoTotal) || 0
+  var pct = function(v) { return fixT > 0 ? (Number(v) / fixT * 100) : 0 }
+%>
+
+<div class="container py-4" style="max-width:1100px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/orcamento" class="text-decoration-none">Orçamento</a></li>
+      <li class="breadcrumb-item"><a href="/app/orcamento/saldo" class="text-decoration-none">Saldo orçamentário</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Acumulado diário</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h2 class="h4 fw-bold mb-0">Despesa — acumulado diário <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
+    <a href="/app/orcamento/saldo" class="btn btn-sm btn-outline-secondary"><i class="bi bi-bar-chart-steps me-1"></i>Voltar ao saldo</a>
+  </div>
+
+  <% if (!temOrcamento) { %>
+    <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Não há orçamento (LOA) cadastrado para este exercício.</div>
+  <% } else { %>
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+        <div class="small text-muted">Fixado</div><div class="h5 fw-bold font-monospace mb-0"><%= brl(fixadoTotal) %></div>
+      </div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+        <div class="small text-muted">Empenhado<%= fixT > 0 ? ' (' + Math.round(pct(empenhadoTotal)) + '%)' : '' %></div>
+        <div class="h5 fw-bold font-monospace mb-0"><%= brl(empenhadoTotal) %></div>
+      </div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
+        <div class="small text-muted">Liquidado</div><div class="h5 fw-bold font-monospace mb-0"><%= brl(liquidadoTotal) %></div>
+      </div></div></div>
+      <div class="col-md-3"><div class="card border-0 shadow-sm h-100" style="background:var(--canvas-soft)"><div class="card-body py-3">
+        <div class="small text-muted">Pago</div><div class="h5 fw-bold font-monospace mb-0"><%= brl(pagoTotal) %></div>
+      </div></div></div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-white border-bottom py-2"><span class="fw-semibold small"><i class="bi bi-graph-up-arrow me-2"></i>Evolução da execução por dia (acumulado vs fixado)</span></div>
+      <div class="card-body p-0">
+        <table class="table table-hover table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th class="ps-3" style="width:110px">Data</th>
+              <th class="text-end">Empenhado no dia</th>
+              <th class="text-end">Empenhado</th>
+              <th class="text-end">Liquidado</th>
+              <th class="text-end">Pago</th>
+              <th class="text-end pe-3" style="width:80px">% fix.</th>
+              <th style="width:26%"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% if (dias.length === 0) { %>
+              <tr><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-inbox fs-5 d-block mb-1"></i>Nenhuma execução de despesa registrada no exercício.</td></tr>
+            <% } %>
+            <% dias.forEach(function (d) { var w = Math.min(100, Math.round(pct(d.empenhado))); %>
+              <tr>
+                <td class="ps-3 small text-muted"><%= d.data %></td>
+                <td class="text-end font-monospace small <%= d.empenhadoDia < 0 ? 'text-danger' : '' %>"><%= d.empenhadoDia < 0 ? '−' : '' %><%= brl(Math.abs(d.empenhadoDia)) %></td>
+                <td class="text-end font-monospace small fw-semibold"><%= brl(d.empenhado) %></td>
+                <td class="text-end font-monospace small text-muted"><%= brl(d.liquidado) %></td>
+                <td class="text-end font-monospace small text-muted"><%= brl(d.pago) %></td>
+                <td class="text-end font-monospace small pe-3 text-muted"><%= fixT > 0 ? Math.round(pct(d.empenhado)) + '%' : '—' %></td>
+                <td>
+                  <div style="background:var(--canvas-soft, #e8ebe6); border-radius:6px; height:10px; overflow:hidden">
+                    <div style="height:10px; width:<%= w %>%; background:var(--primary, #9fe870)"></div>
+                  </div>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="small text-muted mt-2">Líquido por dia (movimento − estorno) por fase, acumulado no exercício, a partir dos movimentos de empenho. A barra é o empenhado acumulado sobre o fixado total.</p>
+  <% } %>
+</div>
+</body>
+</html>
