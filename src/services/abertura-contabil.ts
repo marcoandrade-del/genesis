@@ -69,7 +69,7 @@ export class AberturaContabilService {
       orcamentoId: orcamento.id,
       status: orcamento.status,
       contabilizada,
-      podeContabilizar: orcamento.status === 'APROVADO',
+      podeContabilizar: orcamento.status === 'PUBLICADO',
       podeEstornar: contabilizada && !temExecucao,
       temExecucao,
     }
@@ -84,13 +84,13 @@ export class AberturaContabilService {
       },
     })
     if (!orcamento) {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Não há orçamento (LOA) para ${ano} — crie e aprove o orçamento antes de contabilizar a abertura.`)
-    }
-    if (orcamento.status === 'RASCUNHO') {
-      throw new ErroNegocio('CONFLITO', 'O orçamento ainda está em rascunho — aprove a LOA antes de contabilizar a abertura.')
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Não há orçamento (LOA) para ${ano} — crie e publique o orçamento antes de contabilizar a abertura.`)
     }
     if (orcamento.status === 'EM_EXECUCAO') {
       throw new ErroNegocio('CONFLITO', `A abertura do exercício ${ano} já foi contabilizada.`)
+    }
+    if (orcamento.status !== 'PUBLICADO') {
+      throw new ErroNegocio('CONFLITO', 'A LOA precisa estar publicada antes de contabilizar a abertura.')
     }
 
     const contas = await this.resolverContasControle(entidadeId, ano)
@@ -142,6 +142,9 @@ export class AberturaContabilService {
           update: { valor: t.valor },
         })
       }
+      await tx.transicaoStatusOrcamento.create({
+        data: { orcamentoId: orcamento.id, de: orcamento.status, para: 'EM_EXECUCAO', autorId: usuarioId, observacao: 'Abertura do exercício contabilizada.' },
+      })
       await tx.orcamento.update({ where: { id: orcamento.id }, data: { status: 'EM_EXECUCAO' } })
 
       return {
@@ -155,7 +158,7 @@ export class AberturaContabilService {
     return resumo
   }
 
-  async estornar(entidadeId: string, ano: number): Promise<void> {
+  async estornar(entidadeId: string, ano: number, usuarioId: string): Promise<void> {
     const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } } })
     if (!orcamento) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Orçamento não encontrado.')
     if (orcamento.status !== 'EM_EXECUCAO') {
@@ -191,7 +194,10 @@ export class AberturaContabilService {
       }
       // Limpa o transporte de saldos do ano (a abertura é a única origem dele).
       await tx.saldoInicialAno.deleteMany({ where: { entidadeId, ano } })
-      await tx.orcamento.update({ where: { id: orcamento.id }, data: { status: 'APROVADO' } })
+      await tx.transicaoStatusOrcamento.create({
+        data: { orcamentoId: orcamento.id, de: 'EM_EXECUCAO', para: 'PUBLICADO', autorId: usuarioId, observacao: 'Abertura do exercício estornada.' },
+      })
+      await tx.orcamento.update({ where: { id: orcamento.id }, data: { status: 'PUBLICADO' } })
     })
   }
 

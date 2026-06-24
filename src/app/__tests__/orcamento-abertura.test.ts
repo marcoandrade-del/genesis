@@ -64,7 +64,7 @@ describe('appOrcamentoRoutes — abertura PCASP', () => {
   it('estorna a abertura (ESCRITA)', async () => {
     const res = await app.inject({ method: 'POST', url: '/orcamento/abertura/estornar' })
     expect(res.statusCode).toBe(200)
-    expect(a.estornar).toHaveBeenCalledWith('ent1', 2026)
+    expect(a.estornar).toHaveBeenCalledWith('ent1', 2026, 'u1')
     expect(res.body).toContain('estornada')
   })
 })

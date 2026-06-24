@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { MotorEventosReceita } from './motor-eventos-receita.js'
 import { LancamentosService } from './lancamentos.js'
+import { orcamentoPodeExecutar } from './orcamentos.js'
 
 export interface DadosLancamentoTributario {
   previsaoId: string
@@ -43,8 +44,8 @@ export class LancamentoTributarioService {
   async criar(orcamentoId: string, dados: DadosLancamentoTributario) {
     const orcamento = await this.prisma.orcamento.findUnique({ where: { id: orcamentoId } })
     if (!orcamento) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Orçamento não encontrado.')
-    if (orcamento.status === 'RASCUNHO') {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O orçamento ainda está em rascunho — aprove-o antes de lançar créditos.')
+    if (!orcamentoPodeExecutar(orcamento.status)) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A LOA precisa estar aprovada antes de lançar créditos.')
     }
     if (!dados.previsaoId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Selecione a previsão (natureza × fonte).')
     if (!dados.data?.trim() || Number.isNaN(Date.parse(dados.data))) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Informe uma data válida.')

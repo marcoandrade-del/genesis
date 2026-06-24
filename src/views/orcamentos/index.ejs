@@ -86,13 +86,16 @@
                 <% if (o.observacoes) { %><div class="small text-muted"><%= o.observacoes %></div><% } %>
               </td>
               <td class="small">
-                <% if (o.status === 'RASCUNHO') { %>
-                  <span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
-                <% } else if (o.status === 'APROVADO') { %>
-                  <span class="badge bg-primary bg-opacity-10 text-primary">Aprovado</span>
-                <% } else { %>
-                  <span class="badge bg-success bg-opacity-10 text-success">Em Execução</span>
-                <% } %>
+                <%
+                  var sb = ({
+                    RASCUNHO: ['secondary', 'Rascunho'],
+                    ENVIADO_AO_LEGISLATIVO: ['info', 'No Legislativo'],
+                    APROVADO: ['primary', 'Aprovado'],
+                    PUBLICADO: ['warning', 'Publicado'],
+                    EM_EXECUCAO: ['success', 'Em Execução'],
+                  })[o.status] || ['secondary', o.status]
+                %>
+                <span class="badge bg-<%= sb[0] %> bg-opacity-10 text-<%= sb[0] %>"><%= sb[1] %></span>
               </td>
               <td class="text-center"><span class="badge bg-light text-dark"><%= o._count.dotacoes %></span></td>
               <td class="text-center"><span class="badge bg-light text-dark"><%= o._count.previsoes %></span></td>

@@ -162,51 +162,67 @@ describe('OrcamentosService.atualizar', () => {
 describe('OrcamentosService.alterarStatus', () => {
   it('404 quando não existe', async () => {
     prisma.orcamento.findUnique.mockResolvedValue(null)
-    await expect(service.alterarStatus('xx', 'APROVADO')).rejects.toMatchObject({
+    await expect(service.alterarStatus('xx', 'ENVIADO_AO_LEGISLATIVO', 'u1')).rejects.toMatchObject({
       code: 'RECURSO_NAO_ENCONTRADO',
     })
   })
 
-  it('RASCUNHO → APROVADO seta dataAprovacao quando não há', async () => {
-    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'RASCUNHO', dataAprovacao: null })
+  it('RASCUNHO → ENVIADO_AO_LEGISLATIVO grava a transição na trilha (de/para/autor/observação)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'RASCUNHO', dataAprovacao: null, dataPublicacao: null })
     prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
-    await service.alterarStatus('o1', 'APROVADO')
+    await service.alterarStatus('o1', 'ENVIADO_AO_LEGISLATIVO', 'u1', 'Encaminhado à Câmara')
+    expect(prisma.transicaoStatusOrcamento.create.mock.calls[0][0].data).toMatchObject({
+      orcamentoId: 'o1', de: 'RASCUNHO', para: 'ENVIADO_AO_LEGISLATIVO', autorId: 'u1', observacao: 'Encaminhado à Câmara',
+    })
+    expect(prisma.orcamento.update.mock.calls[0][0].data.status).toBe('ENVIADO_AO_LEGISLATIVO')
+  })
+
+  it('ENVIADO_AO_LEGISLATIVO → APROVADO seta dataAprovacao quando não há', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'ENVIADO_AO_LEGISLATIVO', dataAprovacao: null, dataPublicacao: null })
+    prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
+    await service.alterarStatus('o1', 'APROVADO', 'u1')
     const data = prisma.orcamento.update.mock.calls[0][0].data
     expect(data.status).toBe('APROVADO')
     expect(data.dataAprovacao).toBeInstanceOf(Date)
   })
 
-  it('RASCUNHO → APROVADO preserva dataAprovacao existente', async () => {
+  it('→ APROVADO preserva dataAprovacao existente', async () => {
     const prev = new Date('2025-12-20')
-    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'RASCUNHO', dataAprovacao: prev })
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'ENVIADO_AO_LEGISLATIVO', dataAprovacao: prev, dataPublicacao: null })
     prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
-    await service.alterarStatus('o1', 'APROVADO')
+    await service.alterarStatus('o1', 'APROVADO', 'u1')
+    expect(prisma.orcamento.update.mock.calls[0][0].data.dataAprovacao).toBeUndefined()
+  })
+
+  it('APROVADO → PUBLICADO seta dataPublicacao quando não há', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'APROVADO', dataAprovacao: new Date(), dataPublicacao: null })
+    prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
+    await service.alterarStatus('o1', 'PUBLICADO', 'u1')
     const data = prisma.orcamento.update.mock.calls[0][0].data
-    expect(data.dataAprovacao).toBeUndefined()
+    expect(data.status).toBe('PUBLICADO')
+    expect(data.dataPublicacao).toBeInstanceOf(Date)
   })
 
-  it('APROVADO → EM_EXECUCAO permitido', async () => {
-    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'APROVADO', dataAprovacao: new Date() })
+  it('ENVIADO_AO_LEGISLATIVO → RASCUNHO permitido (devolução)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'ENVIADO_AO_LEGISLATIVO', dataAprovacao: null, dataPublicacao: null })
     prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
-    await service.alterarStatus('o1', 'EM_EXECUCAO')
-    expect(prisma.orcamento.update.mock.calls[0][0].data.status).toBe('EM_EXECUCAO')
-  })
-
-  it('APROVADO → RASCUNHO permitido', async () => {
-    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'APROVADO', dataAprovacao: new Date() })
-    prisma.orcamento.update.mockResolvedValue({ id: 'o1' })
-    await service.alterarStatus('o1', 'RASCUNHO')
+    await service.alterarStatus('o1', 'RASCUNHO', 'u1')
     expect(prisma.orcamento.update.mock.calls[0][0].data.status).toBe('RASCUNHO')
   })
 
-  it('EM_EXECUCAO é estado terminal', async () => {
+  it('EM_EXECUCAO é estado terminal (não muda por aqui)', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'EM_EXECUCAO' })
-    await expect(service.alterarStatus('o1', 'RASCUNHO')).rejects.toMatchObject({ code: 'CONFLITO' })
+    await expect(service.alterarStatus('o1', 'PUBLICADO', 'u1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
 
-  it('rejeita transição não permitida (RASCUNHO → EM_EXECUCAO)', async () => {
+  it('rejeita transição não permitida (RASCUNHO → APROVADO direto)', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'RASCUNHO' })
-    await expect(service.alterarStatus('o1', 'EM_EXECUCAO')).rejects.toMatchObject({ code: 'CONFLITO' })
+    await expect(service.alterarStatus('o1', 'APROVADO', 'u1')).rejects.toMatchObject({ code: 'CONFLITO' })
+  })
+
+  it('EM_EXECUCAO não é alcançável por aqui (só pela abertura contábil)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1', status: 'PUBLICADO' })
+    await expect(service.alterarStatus('o1', 'EM_EXECUCAO', 'u1')).rejects.toMatchObject({ code: 'CONFLITO' })
   })
 })
 

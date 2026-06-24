@@ -2,6 +2,7 @@ import { PrismaClient, Prisma, type ArrecadacaoTipo } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { MotorEventosReceita } from './motor-eventos-receita.js'
 import { LancamentosService } from './lancamentos.js'
+import { orcamentoPodeExecutar } from './orcamentos.js'
 
 export interface DadosArrecadacao {
   previsaoId: string
@@ -66,8 +67,8 @@ export class ArrecadacoesService {
   async criar(orcamentoId: string, dados: DadosArrecadacao) {
     const orcamento = await this.prisma.orcamento.findUnique({ where: { id: orcamentoId } })
     if (!orcamento) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Orçamento não encontrado.')
-    if (orcamento.status === 'RASCUNHO') {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O orçamento ainda está em rascunho — aprove-o antes de registrar arrecadações.')
+    if (!orcamentoPodeExecutar(orcamento.status)) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A LOA precisa estar aprovada antes de registrar arrecadações.')
     }
 
     if (!dados.previsaoId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Selecione a previsão (conta × fonte).')

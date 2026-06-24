@@ -2,6 +2,7 @@ import { PrismaClient, Prisma, type TipoEmpenho } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
+import { orcamentoPodeExecutar } from './orcamentos.js'
 import { resumirEmpenho, validarLancamento } from './saldos-empenho.js'
 import { MotorEventosDespesa, gravarEventos, isoData } from './motor-eventos-despesa.js'
 import { LancamentosService } from './lancamentos.js'
@@ -281,8 +282,8 @@ export class EmpenhosService {
     if (!dotacao || dotacao.orcamento.entidadeId !== entidadeId) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Dotação inválida para esta entidade.')
     }
-    if (dotacao.orcamento.status === 'RASCUNHO') {
-      throw new ErroNegocio('CONFLITO', 'Não é possível empenhar contra orçamento em RASCUNHO.')
+    if (!orcamentoPodeExecutar(dotacao.orcamento.status)) {
+      throw new ErroNegocio('CONFLITO', 'Não é possível empenhar: a LOA precisa estar aprovada.')
     }
     return dotacao
   }

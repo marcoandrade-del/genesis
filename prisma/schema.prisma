@@ -111,6 +111,7 @@ model Usuario {
   relatoriosPersonalizados RelatorioPersonalizado[]
   cabecalhosRelatorio      CabecalhoRelatorio[]
   rodapesRelatorio         RodapeRelatorio[]
+  transicoesOrcamento      TransicaoStatusOrcamento[]
 
   @@map("usuarios")
 }
@@ -1152,28 +1153,49 @@ model Acao {
 // créditos adicionais (fora deste PR).
 enum StatusOrcamento {
   RASCUNHO
+  ENVIADO_AO_LEGISLATIVO
   APROVADO
+  PUBLICADO
   EM_EXECUCAO
 }
 
 model Orcamento {
-  id            String            @id @default(uuid())
-  entidadeId    String
-  ano           Int
-  status        StatusOrcamento   @default(RASCUNHO)
-  leiNumero     String?
-  dataAprovacao DateTime?
-  observacoes   String?
-  criadoEm      DateTime          @default(now())
-  atualizadoEm  DateTime          @updatedAt
-  entidade      Entidade          @relation(fields: [entidadeId], references: [id])
-  dotacoes      DotacaoDespesa[]
-  previsoes     PrevisaoReceita[]
-  creditos      CreditoAdicional[]
+  id             String            @id @default(uuid())
+  entidadeId     String
+  ano            Int
+  status         StatusOrcamento   @default(RASCUNHO)
+  leiNumero      String?
+  dataAprovacao  DateTime?
+  dataPublicacao DateTime?
+  observacoes    String?
+  criadoEm       DateTime          @default(now())
+  atualizadoEm   DateTime          @updatedAt
+  entidade       Entidade          @relation(fields: [entidadeId], references: [id])
+  dotacoes       DotacaoDespesa[]
+  previsoes      PrevisaoReceita[]
+  creditos       CreditoAdicional[]
+  transicoes     TransicaoStatusOrcamento[]
 
   @@unique([entidadeId, ano])
   @@index([entidadeId])
   @@map("orcamentos")
+}
+
+/// Trilha imutável das transições de status do orçamento (LOA): quem mudou, de
+/// qual estado para qual, quando e por quê. Auditoria do fluxo de aprovação da LOA.
+model TransicaoStatusOrcamento {
+  id          String          @id @default(uuid())
+  orcamentoId String
+  de          StatusOrcamento
+  para        StatusOrcamento
+  autorId     String
+  observacao  String?
+  criadoEm    DateTime        @default(now())
+  orcamento   Orcamento       @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  autor       Usuario         @relation(fields: [autorId], references: [id])
+
+  @@index([orcamentoId])
+  @@map("transicoes_status_orcamento")
 }
 
 // Dotação de despesa: linha LOA com TODAS as dimensões do padrão SIAFI cheio

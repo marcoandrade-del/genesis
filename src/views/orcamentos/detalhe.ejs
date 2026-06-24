@@ -1,48 +1,58 @@
 <%
   function fmt(v) { return Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+  function dataBR(d) { return new Date(d).toLocaleDateString('pt-BR') }
   const ent = orcamento.entidade
   const editavel = orcamento.status === 'RASCUNHO'
+  const STATUS_BADGE = {
+    RASCUNHO: ['secondary', 'Rascunho'],
+    ENVIADO_AO_LEGISLATIVO: ['info', 'No Legislativo'],
+    APROVADO: ['primary', 'Aprovado'],
+    PUBLICADO: ['warning', 'Publicado'],
+    EM_EXECUCAO: ['success', 'Em Execução'],
+  }
+  function statusBadge(s) { const b = STATUS_BADGE[s] || ['secondary', s]; return '<span class="badge bg-' + b[0] + ' bg-opacity-10 text-' + b[0] + '">' + b[1] + '</span>' }
 %>
 
 <div class="d-flex justify-content-between align-items-start mb-3">
   <div>
     <h2 class="h5 fw-bold mb-1">
       Orçamento <span class="font-monospace text-muted"><%= orcamento.ano %></span>
-      <% if (orcamento.status === 'RASCUNHO') { %>
-        <span class="badge bg-secondary bg-opacity-10 text-secondary ms-2">Rascunho</span>
-      <% } else if (orcamento.status === 'APROVADO') { %>
-        <span class="badge bg-primary bg-opacity-10 text-primary ms-2">Aprovado</span>
-      <% } else { %>
-        <span class="badge bg-success bg-opacity-10 text-success ms-2">Em Execução</span>
-      <% } %>
+      <span class="ms-2"><%- statusBadge(orcamento.status) %></span>
     </h2>
     <div class="small text-muted">
       <%= ent.municipio.estado.sigla %> · <%= ent.municipio.nome %> · <%= ent.nome %>
       <% if (orcamento.leiNumero) { %> · <strong><%= orcamento.leiNumero %></strong><% } %>
-      <% if (orcamento.dataAprovacao) { %> · aprovado em <%= new Date(orcamento.dataAprovacao).toLocaleDateString('pt-BR') %><% } %>
+      <% if (orcamento.dataAprovacao) { %> · aprovado em <%= dataBR(orcamento.dataAprovacao) %><% } %>
+      <% if (orcamento.dataPublicacao) { %> · publicado em <%= dataBR(orcamento.dataPublicacao) %><% } %>
     </div>
   </div>
   <div class="d-flex gap-2">
     <a href="/admin/orcamentos?entidadeId=<%= orcamento.entidadeId %>" class="btn btn-sm btn-outline-secondary">
       <i class="bi bi-arrow-left me-1"></i>Voltar
     </a>
+    <% function botaoStatus(novo, classe, icone, rotulo) { %>
+      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
+        <input type="hidden" name="status" value="<%= novo %>">
+        <button class="btn btn-sm <%= classe %>"><i class="bi <%= icone %> me-1"></i><%= rotulo %></button>
+      </form>
+    <% } %>
     <% if (orcamento.status === 'RASCUNHO') { %>
-      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
-        <input type="hidden" name="status" value="APROVADO">
-        <button class="btn btn-sm btn-primary"><i class="bi bi-check-circle me-1"></i>Aprovar</button>
-      </form>
+      <%- botaoStatus('ENVIADO_AO_LEGISLATIVO', 'btn-primary', 'bi-send', 'Encaminhar ao Legislativo') %>
+    <% } else if (orcamento.status === 'ENVIADO_AO_LEGISLATIVO') { %>
+      <%- botaoStatus('APROVADO', 'btn-primary', 'bi-check-circle', 'Aprovar') %>
+      <%- botaoStatus('RASCUNHO', 'btn-outline-secondary', 'bi-arrow-counterclockwise', 'Devolver p/ rascunho') %>
     <% } else if (orcamento.status === 'APROVADO') { %>
-      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
-        <input type="hidden" name="status" value="EM_EXECUCAO">
-        <button class="btn btn-sm btn-success"><i class="bi bi-play-circle me-1"></i>Iniciar execução</button>
-      </form>
-      <form method="post" action="/admin/orcamentos/<%= orcamento.id %>/status" class="d-inline">
-        <input type="hidden" name="status" value="RASCUNHO">
-        <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-counterclockwise me-1"></i>Voltar para rascunho</button>
-      </form>
+      <%- botaoStatus('PUBLICADO', 'btn-success', 'bi-megaphone', 'Publicar') %>
+      <%- botaoStatus('ENVIADO_AO_LEGISLATIVO', 'btn-outline-secondary', 'bi-arrow-counterclockwise', 'Devolver ao Legislativo') %>
+    <% } else if (orcamento.status === 'PUBLICADO') { %>
+      <%- botaoStatus('APROVADO', 'btn-outline-secondary', 'bi-arrow-counterclockwise', 'Despublicar') %>
     <% } %>
   </div>
 </div>
+
+<% if (orcamento.status === 'PUBLICADO') { %>
+  <div class="alert alert-light border py-2 small mb-4"><i class="bi bi-info-circle me-1"></i>LOA publicada. A execução do exercício começa pela <strong>abertura contábil</strong> na Área de Trabalho (/app), que contabiliza a abertura e coloca o orçamento em execução.</div>
+<% } %>
 
 <div class="row g-3 mb-4">
   <div class="col-md-6">
@@ -175,6 +185,36 @@
                 </button>
               </td>
             <% } %>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Trilha de aprovação ----------------------------------------------------->
+<h3 class="h6 fw-bold mb-2 mt-4">Trilha de aprovação (<%= trilha.length %>)</h3>
+<div class="card border-0 shadow-sm">
+  <div class="card-body p-0">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width:170px">Quando</th>
+          <th>Transição</th>
+          <th>Autor</th>
+          <th class="pe-3">Observação</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (trilha.length === 0) { %>
+          <tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-clock-history d-block mb-1"></i>Sem transições registradas.</td></tr>
+        <% } %>
+        <% trilha.forEach(function(t) { %>
+          <tr>
+            <td class="ps-3 small text-muted"><%= new Date(t.criadoEm).toLocaleString('pt-BR') %></td>
+            <td class="small"><%- statusBadge(t.de) %> <i class="bi bi-arrow-right mx-1 text-muted"></i> <%- statusBadge(t.para) %></td>
+            <td class="small"><%= t.autor.nomeCompleto || t.autor.emailPrincipal %></td>
+            <td class="small text-muted pe-3"><%= t.observacao || '—' %></td>
           </tr>
         <% }) %>
       </tbody>

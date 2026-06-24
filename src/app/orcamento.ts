@@ -96,8 +96,8 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
       return renderOrcamento(req, reply, entidade, { erro: ERRO_LEITURA, status: 403 })
     }
     try {
-      await aberturaSvc.estornar(entidadeId, ano)
-      return renderOrcamento(req, reply, entidade, { ok: 'Abertura estornada — o orçamento voltou a Aprovado.' })
+      await aberturaSvc.estornar(entidadeId, ano, req.user.sub)
+      return renderOrcamento(req, reply, entidade, { ok: 'Abertura estornada — o orçamento voltou a Publicado.' })
     } catch (e) {
       if (e instanceof ErroNegocio) return renderOrcamento(req, reply, entidade, { erro: e.message, status: statusDeErro(e.code) })
       throw e
