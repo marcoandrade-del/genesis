@@ -21,11 +21,18 @@
       <div class="col-12 mb-1"><label class="form-label small fw-semibold">Dotação <span class="text-danger">*</span></label>
         <% if (dotacoes.length === 0) { %><div class="alert alert-warning py-2 small mb-1">Nenhuma dotação disponível (precisa de orçamento APROVADO/EM EXECUÇÃO).</div><% } %>
         <select name="dotacaoDespesaId" class="form-select form-select-sm" required
+          hx-get="/admin/empenhos/sub-elementos" hx-trigger="change" hx-target="#sub-options" hx-swap="innerHTML"
           onchange="document.getElementById('emp-saldo').textContent = this.options[this.selectedIndex].dataset.disp ? ('Saldo disponível: R$ ' + this.options[this.selectedIndex].dataset.disp) : ''">
           <option value="" data-disp="">— Selecione —</option>
           <% dotacoes.forEach(function(d){ %><option value="<%= d.id %>" data-disp="<%= d.disponivel %>" <%= empenho && empenho.dotacaoDespesaId === d.id ? 'selected' : '' %>><%= d.rotulo %> (<%= d.ano %>) — disp. R$ <%= d.disponivel %></option><% }) %>
         </select>
         <div id="emp-saldo" class="form-text text-success fw-semibold"></div></div>
+
+      <div class="col-12 mb-1"><label class="form-label small fw-semibold">Sub-elemento <span class="text-danger">*</span></label>
+        <select name="subElementoContaId" id="sub-options" class="form-select form-select-sm" required>
+          <option value="">— escolha a dotação primeiro —</option>
+        </select>
+        <div class="form-text">Detalha o objeto do gasto sob o elemento da dotação (obrigatório — TCE-PR). Inclui desdobramentos locais.</div></div>
 
       <div class="col-6 mb-1"><label class="form-label small fw-semibold">Fornecedor <span class="text-danger">*</span></label>
         <select name="fornecedorId" class="form-select form-select-sm" required>

@@ -52,9 +52,7 @@
                 <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Anulado</span><% } %>
               </td>
               <td class="text-end pe-3">
-                <% if (e.status === 'ATIVO' && e._count.liquidacoes === 0) { %>
-                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/empenhos/<%= e.id %>/anular" hx-confirm="Anular o empenho <%= e.numero %>? O valor será estornado à dotação." data-confirm-titulo="Anular empenho" data-confirm-tipo="danger" data-confirm-ok="Anular" title="Anular"><i class="bi bi-x-circle me-1"></i>Anular</button>
-                <% } %>
+                <a class="btn btn-sm btn-outline-secondary" href="/admin/empenhos/<%= e.id %>/ficha" title="Ficha de empenho (estorno aqui)"><i class="bi bi-card-list me-1"></i>Ficha</a>
               </td>
             </tr>
           <% }) %>

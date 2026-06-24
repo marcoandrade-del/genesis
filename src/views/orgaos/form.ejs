@@ -1,0 +1,39 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-bank me-2 text-primary"></i><%= orgao ? 'Editar Órgão' : 'Novo Órgão' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (orgao) { %>hx-put="/admin/orgaos/<%= orgao.id %>"<% } else { %>hx-post="/admin/orgaos"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!orgao) { %><input type="hidden" name="entidadeId" value="<%= entidadeId %>"><% } %>
+
+    <div class="row g-2">
+      <div class="col-4 mb-2">
+        <label class="form-label small fw-semibold">Código <span class="text-danger">*</span></label>
+        <input type="text" name="codigo" class="form-control form-control-sm font-monospace" value="<%= orgao ? orgao.codigo : '' %>" placeholder="ex.: 02" required maxlength="20">
+      </div>
+      <div class="col-8 mb-2">
+        <label class="form-label small fw-semibold">Nome <span class="text-danger">*</span></label>
+        <input type="text" name="nome" class="form-control form-control-sm" value="<%= orgao ? orgao.nome : '' %>" placeholder="ex.: Prefeitura Municipal" required maxlength="200">
+      </div>
+      <div class="col-12 mb-2">
+        <div class="form-check">
+          <input type="checkbox" class="form-check-input" id="orgao-ativo" name="ativo" value="true" <%= !orgao || orgao.ativo ? 'checked' : '' %>>
+          <label class="form-check-label small" for="orgao-ativo">Ativo</label>
+        </div>
+        <div class="form-text small">O órgão é o nível máximo da classificação institucional (Órgão → Unidade Orçamentária).</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>

@@ -5,6 +5,7 @@ export type DadosUnidadeOrcamentaria = {
   codigo: string
   nome: string
   ativa?: boolean
+  orgaoId?: string | null
 }
 
 /**
@@ -37,7 +38,7 @@ export class UnidadesOrcamentariaService {
 
     try {
       return await this.prisma.unidadeOrcamentaria.create({
-        data: { entidadeId, codigo, nome, ativa: dados.ativa ?? true },
+        data: { entidadeId, codigo, nome, ativa: dados.ativa ?? true, orgaoId: dados.orgaoId?.trim() || null },
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -62,7 +63,7 @@ export class UnidadesOrcamentariaService {
     try {
       return await this.prisma.unidadeOrcamentaria.update({
         where: { id },
-        data: { codigo, nome, ativa: dados.ativa ?? uo.ativa },
+        data: { codigo, nome, ativa: dados.ativa ?? uo.ativa, orgaoId: dados.orgaoId !== undefined ? dados.orgaoId?.trim() || null : uo.orgaoId },
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

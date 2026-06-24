@@ -10,7 +10,12 @@ export type DadosDotacaoDespesa = {
   contaDespesaEntidadeId: string
   fonteRecursoEntidadeId: string
   valorAutorizado: string | number
+  esfera?: string | null
+  vinculoVariavelCodigo?: string | null
+  vinculoVariavelNome?: string | null
 }
+
+const ESFERAS = ['FISCAL', 'SEGURIDADE_SOCIAL', 'INVESTIMENTO'] as const
 
 /**
  * Dotação de despesa: linha LOA com TODAS as 7 dimensões do padrão SIAFI cheio
@@ -40,7 +45,7 @@ export class DotacoesDespesaService {
   }
 
   async criar(orcamentoId: string, dados: DadosDotacaoDespesa) {
-    const { valor, ids } = this.validar(dados)
+    const { valor, ids, extras } = this.validar(dados)
     const orcamento = await this.carregarOrcamentoEditavel(orcamentoId)
     await this.validarReferencias(orcamento.entidadeId, orcamento.ano, ids)
 
@@ -49,6 +54,7 @@ export class DotacoesDespesaService {
         data: {
           orcamentoId,
           ...ids,
+          ...extras,
           valorAutorizado: valor,
         },
       })
@@ -66,14 +72,14 @@ export class DotacoesDespesaService {
   async atualizar(id: string, dados: DadosDotacaoDespesa) {
     const existente = await this.prisma.dotacaoDespesa.findUnique({ where: { id } })
     if (!existente) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Dotação não encontrada.')
-    const { valor, ids } = this.validar(dados)
+    const { valor, ids, extras } = this.validar(dados)
     const orcamento = await this.carregarOrcamentoEditavel(existente.orcamentoId)
     await this.validarReferencias(orcamento.entidadeId, orcamento.ano, ids)
 
     try {
       return await this.prisma.dotacaoDespesa.update({
         where: { id },
-        data: { ...ids, valorAutorizado: valor },
+        data: { ...ids, ...extras, valorAutorizado: valor },
       })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -120,6 +126,10 @@ export class DotacoesDespesaService {
     if (valor.isNegative()) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Valor autorizado não pode ser negativo.')
     }
+    const esfera = (dados.esfera ?? 'FISCAL').trim() || 'FISCAL'
+    if (!ESFERAS.includes(esfera as (typeof ESFERAS)[number])) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', `Esfera inválida: "${esfera}". Use FISCAL, SEGURIDADE_SOCIAL ou INVESTIMENTO.`)
+    }
     return {
       valor,
       ids: {
@@ -130,6 +140,11 @@ export class DotacoesDespesaService {
         acaoId: dados.acaoId,
         contaDespesaEntidadeId: dados.contaDespesaEntidadeId,
         fonteRecursoEntidadeId: dados.fonteRecursoEntidadeId,
+      },
+      extras: {
+        esfera: esfera as (typeof ESFERAS)[number],
+        vinculoVariavelCodigo: dados.vinculoVariavelCodigo?.trim() || null,
+        vinculoVariavelNome: dados.vinculoVariavelNome?.trim() || null,
       },
     }
   }

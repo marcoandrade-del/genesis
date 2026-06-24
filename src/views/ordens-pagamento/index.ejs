@@ -51,12 +51,17 @@
                 <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Cancelada</span><% } %>
               </td>
               <td class="text-end pe-3">
-                <% if (o.status === 'EMITIDA') { %>
-                  <button class="btn btn-sm btn-outline-success me-1" hx-post="/admin/ordens-pagamento/<%= o.id %>/confirmar" hx-confirm="Confirmar o pagamento da OP <%= o.numero %>?" data-confirm-titulo="Confirmar pagamento" data-confirm-ok="Confirmar" title="Confirmar pagamento"><i class="bi bi-check2-circle"></i></button>
-                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/ordens-pagamento/<%= o.id %>/cancelar" hx-confirm="Cancelar a OP <%= o.numero %>?" data-confirm-titulo="Cancelar OP" data-confirm-tipo="danger" data-confirm-ok="Cancelar" title="Cancelar"><i class="bi bi-x-circle"></i></button>
-                <% } else if (o.status === 'PAGA') { %>
-                  <button class="btn btn-sm btn-outline-danger" hx-post="/admin/ordens-pagamento/<%= o.id %>/cancelar" hx-confirm="Cancelar a OP paga <%= o.numero %>? O valor será estornado." data-confirm-titulo="Cancelar OP" data-confirm-tipo="danger" data-confirm-ok="Cancelar" title="Cancelar"><i class="bi bi-x-circle"></i></button>
-                <% } %>
+                <div class="d-inline-flex gap-1 align-items-center justify-content-end">
+                  <% if (o.status === 'EMITIDA') { %>
+                    <button class="btn btn-sm btn-outline-success" hx-post="/admin/ordens-pagamento/<%= o.id %>/confirmar" hx-confirm="Confirmar o pagamento da OP <%= o.numero %>?" data-confirm-titulo="Confirmar pagamento" data-confirm-ok="Confirmar" title="Confirmar pagamento"><i class="bi bi-check2-circle"></i></button>
+                  <% } %>
+                  <% if (o.status !== 'CANCELADA') { %>
+                    <form class="d-inline-flex gap-1 align-items-center" hx-post="/admin/ordens-pagamento/<%= o.id %>/estornar" hx-confirm="Confirmar o estorno do pagamento da OP <%= o.numero %>?" data-confirm-titulo="Estornar pagamento" data-confirm-tipo="danger" data-confirm-ok="Estornar">
+                      <input type="number" name="valor" step="0.01" min="0.01" max="<%= Number(o.valor).toFixed(2) %>" value="<%= Number(o.valor).toFixed(2) %>" class="form-control form-control-sm font-monospace text-end" style="width:100px" required title="Valor a estornar">
+                      <button class="btn btn-sm btn-outline-danger" title="Estornar"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    </form>
+                  <% } %>
+                </div>
               </td>
             </tr>
           <% }) %>

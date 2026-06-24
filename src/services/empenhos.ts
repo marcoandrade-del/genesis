@@ -2,6 +2,7 @@ import { PrismaClient, Prisma, type TipoEmpenho } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
+import { resumirEmpenho, validarLancamento } from './saldos-empenho.js'
 
 export type DadosEmpenho = {
   dotacaoDespesaId: string
@@ -9,6 +10,7 @@ export type DadosEmpenho = {
   reservaDotacaoId?: string | null
   contratoId?: string | null
   ataRegistroPrecoId?: string | null
+  subElementoContaId: string
   numero: string
   tipo: TipoEmpenho
   data?: Date | string | null
@@ -49,7 +51,34 @@ export class EmpenhosService {
     })
   }
 
-  async criar(entidadeId: string, dados: DadosEmpenho) {
+  /**
+   * Ficha de empenho: o empenho + a razão imutável (movimentos) + o resumo das 6
+   * colunas/saldos (Specs 22-06-2026 §8). É a "movimentação da despesa" da ficha.
+   */
+  async ficha(id: string) {
+    const empenho = await this.prisma.empenho.findUnique({
+      where: { id },
+      include: {
+        fornecedor: { select: { razaoSocial: true, cnpj: true, cpf: true } },
+        subElementoConta: { select: { codigo: true, descricao: true } },
+        dotacaoDespesa: {
+          include: {
+            unidadeOrcamentaria: { select: { codigo: true, nome: true, orgao: { select: { codigo: true, nome: true } } } },
+            contaDespesa: { select: { codigo: true, descricao: true } },
+            fonteRecurso: { select: { codigo: true, nomenclatura: true } },
+          },
+        },
+      },
+    })
+    if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({
+      where: { empenhoId: id },
+      orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
+    })
+    return { empenho, movimentos, resumo: resumirEmpenho(movimentos) }
+  }
+
+  async criar(entidadeId: string, dados: DadosEmpenho, usuarioId: string) {
     const entidade = await this.prisma.entidade.findUnique({ where: { id: entidadeId } })
     if (!entidade) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Entidade não encontrada.')
 
@@ -64,6 +93,7 @@ export class EmpenhosService {
     const dotacao = await this.carregarDotacao(dados.dotacaoDespesaId, entidadeId)
     const reserva = await this.carregarReserva(dados.reservaDotacaoId, entidadeId, dados.dotacaoDespesaId)
     await this.validarVinculos(dados, entidadeId)
+    await this.validarSubElemento(dados.subElementoContaId, dotacao.contaDespesa.codigo, entidadeId, dotacao.orcamento.ano)
 
     if (reserva) {
       if (valor.greaterThan(reserva.valor)) {
@@ -89,12 +119,17 @@ export class EmpenhosService {
             reservaDotacaoId: reserva?.id ?? null,
             contratoId: trimOuNull(dados.contratoId),
             ataRegistroPrecoId: trimOuNull(dados.ataRegistroPrecoId),
+            subElementoContaId: dados.subElementoContaId.trim(),
             numero,
             tipo: dados.tipo,
             valor,
             historico: trimOuNull(dados.historico),
             ...(dados.data ? { data: new Date(dados.data) } : {}),
           },
+        })
+        // Razão imutável: lançamento EMPENHO da ficha (Specs 22-06-2026 §8).
+        await tx.movimentoEmpenho.create({
+          data: { entidadeId, empenhoId: empenho.id, tipo: 'EMPENHO', valor, data: empenho.data, criadoPorId: usuarioId, historico: `Empenho ${numero}` },
         })
         if (reserva) {
           await tx.reservaDotacao.update({ where: { id: reserva.id }, data: { status: 'BAIXADA' } })
@@ -118,21 +153,26 @@ export class EmpenhosService {
     }
   }
 
-  /** Anula um empenho ATIVO sem liquidações e estorna o empenhado na dotação. */
-  async anular(id: string) {
+  /**
+   * Estorna o empenho (do saldo a liquidar). O valor define se é parcial ou total —
+   * o núcleo valida `Σ estornos ≤ saldo do empenho` e a anterioridade. Ao zerar o net
+   * empenhado, vira ANULADO. Estorna o empenhado na dotação.
+   */
+  async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
     const empenho = await this.prisma.empenho.findUnique({ where: { id } })
     if (!empenho) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Empenho não encontrado.')
-    if (empenho.status !== 'ATIVO') throw new ErroNegocio('CONFLITO', 'Apenas empenho ATIVO pode ser anulado.')
-    if (!new Prisma.Decimal(empenho.valorLiquidado).isZero()) {
-      throw new ErroNegocio('CONFLITO', 'Empenho com liquidações não pode ser anulado.')
-    }
+    const v = parseDecimalPositivo(valor, 'Valor do estorno')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: id } })
+    validarLancamento(movimentos, { tipo: 'ESTORNO_EMPENHO', valor: v, data }, { empenho: empenho.data })
     return this.prisma.$transaction(async (tx) => {
-      const atualizado = await tx.empenho.update({ where: { id }, data: { status: 'ANULADO' } })
-      await tx.dotacaoDespesa.update({
-        where: { id: empenho.dotacaoDespesaId },
-        data: { valorEmpenhado: { decrement: empenho.valor } },
+      await tx.movimentoEmpenho.create({
+        data: { entidadeId: empenho.entidadeId, empenhoId: id, tipo: 'ESTORNO_EMPENHO', valor: v, data, criadoPorId: usuarioId, historico: `Estorno do empenho ${empenho.numero}` },
       })
-      return atualizado
+      await tx.dotacaoDespesa.update({ where: { id: empenho.dotacaoDespesaId }, data: { valorEmpenhado: { decrement: v } } })
+      if (resumirEmpenho([...movimentos, { tipo: 'ESTORNO_EMPENHO', valor: v }]).netEmpenhado.isZero()) {
+        await tx.empenho.update({ where: { id }, data: { status: 'ANULADO' } })
+      }
+      return { id, estornado: v.toFixed(2) }
     })
   }
 
@@ -140,7 +180,7 @@ export class EmpenhosService {
     if (!dotacaoDespesaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Dotação é obrigatória.')
     const dotacao = await this.prisma.dotacaoDespesa.findUnique({
       where: { id: dotacaoDespesaId },
-      include: { orcamento: { select: { entidadeId: true, status: true } } },
+      include: { orcamento: { select: { entidadeId: true, status: true, ano: true } }, contaDespesa: { select: { codigo: true } } },
     })
     if (!dotacao || dotacao.orcamento.entidadeId !== entidadeId) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Dotação inválida para esta entidade.')
@@ -177,6 +217,27 @@ export class EmpenhosService {
     if (ataId) {
       const a = await this.prisma.ataRegistroPreco.findUnique({ where: { id: ataId } })
       if (!a || a.entidadeId !== entidadeId) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Ata inválida para esta entidade.')
+    }
+  }
+
+  /**
+   * Sub-elemento da natureza no empenho (obrigatório — Lei 4.320 / TCE-PR SIM-AM):
+   * folha analítica do plano de despesa, da mesma entidade/exercício, SOB o elemento
+   * da dotação (mesmos 4 primeiros segmentos da natureza). Aceita desdobramentos locais.
+   */
+  private async validarSubElemento(subElementoContaId: string, naturezaDotacaoCodigo: string, entidadeId: string, ano: number) {
+    const id = subElementoContaId?.trim()
+    if (!id) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Sub-elemento da despesa é obrigatório.')
+    const sub = await this.prisma.contaDespesaEntidade.findUnique({ where: { id } })
+    if (!sub || sub.entidadeId !== entidadeId || sub.ano !== ano) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Sub-elemento inválido para esta entidade/exercício.')
+    }
+    if (!sub.admiteMovimento) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'O sub-elemento deve ser uma conta analítica (folha) da natureza.')
+    }
+    const elementoPrefixo = naturezaDotacaoCodigo.split('.').slice(0, 4).join('.') + '.'
+    if (!sub.codigo.startsWith(elementoPrefixo)) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', `O sub-elemento (${sub.codigo}) deve pertencer ao elemento da dotação (${elementoPrefixo}*).`)
     }
   }
 }

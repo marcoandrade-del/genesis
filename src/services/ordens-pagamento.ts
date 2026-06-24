@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { trimOuNull, parseDecimalPositivo } from './planos-contratacao.js'
 import { rotuloConta } from './contas-bancarias.js'
+import { validarLancamento, netPagoDaOrdem } from './saldos-empenho.js'
 
 export type DadosOrdemPagamento = {
   liquidacaoId: string
@@ -36,7 +37,7 @@ export class OrdensPagamentoService {
     })
   }
 
-  async criar(entidadeId: string, dados: DadosOrdemPagamento) {
+  async criar(entidadeId: string, dados: DadosOrdemPagamento, usuarioId: string) {
     const numero = dados.numero?.trim()
     if (!numero) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Número da OP é obrigatório.')
     if (!dados.contaBancariaId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Conta bancária é obrigatória.')
@@ -47,7 +48,7 @@ export class OrdensPagamentoService {
       where: { id: dados.liquidacaoId },
       include: {
         empenho: {
-          select: { dotacaoDespesa: { select: { fonteRecurso: { select: { codigo: true, nomenclatura: true } } } } },
+          select: { data: true, dotacaoDespesa: { select: { fonteRecurso: { select: { codigo: true, nomenclatura: true } } } } },
         },
       },
     })
@@ -75,13 +76,10 @@ export class OrdensPagamentoService {
       )
     }
 
-    const disponivel = new Prisma.Decimal(liquidacao.valor).minus(liquidacao.valorPago)
-    if (valor.greaterThan(disponivel)) {
-      throw new ErroNegocio(
-        'ENTIDADE_NAO_PROCESSAVEL',
-        `Pagamento excede o saldo da liquidação: disponível R$ ${disponivel.toFixed(2)}, OP R$ ${valor.toFixed(2)}.`,
-      )
-    }
+    // Teto (Σ pagamentos ≤ saldo da liquidação) + anterioridade vêm da RAZÃO imutável.
+    const data = dados.data ? new Date(dados.data) : new Date()
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: liquidacao.empenhoId } })
+    validarLancamento(movimentos, { tipo: 'PAGAMENTO', valor, data, liquidacaoId: dados.liquidacaoId }, { empenho: liquidacao.empenho.data, liquidacao: liquidacao.data })
 
     try {
       return await this.prisma.$transaction(async (tx) => {
@@ -94,10 +92,14 @@ export class OrdensPagamentoService {
             contaBancaria: rotuloConta(conta),
             contaBancariaId: conta.id,
             comprovante: trimOuNull(dados.comprovante),
-            ...(dados.data ? { data: new Date(dados.data) } : {}),
+            data,
           },
         })
         await tx.liquidacao.update({ where: { id: dados.liquidacaoId }, data: { valorPago: { increment: valor } } })
+        // Razão: lançamento PAGAMENTO da ficha (empenhoId via liquidação).
+        await tx.movimentoEmpenho.create({
+          data: { entidadeId, empenhoId: liquidacao.empenhoId, tipo: 'PAGAMENTO', valor, data, liquidacaoId: dados.liquidacaoId, ordemPagamentoId: op.id, criadoPorId: usuarioId, historico: `Pagamento ${numero}` },
+        })
         return op
       })
     } catch (e) {
@@ -119,15 +121,29 @@ export class OrdensPagamentoService {
     })
   }
 
-  /** Cancela uma OP (EMITIDA ou PAGA) e estorna o valor pago na liquidação. */
-  async cancelar(id: string) {
-    const op = await this.prisma.ordemPagamento.findUnique({ where: { id } })
+  /**
+   * Estorna o pagamento de uma OP. O valor define parcial/total — o núcleo valida
+   * `Σ estornos ≤ pago da OP` e a anterioridade. Ao zerar o pago líquido, vira
+   * CANCELADA. Estorna o valor pago na liquidação.
+   */
+  async estornar(id: string, valor: string | number, usuarioId: string, data: Date = new Date()) {
+    const op = await this.prisma.ordemPagamento.findUnique({
+      where: { id },
+      include: { liquidacao: { select: { empenhoId: true } } },
+    })
     if (!op) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Ordem de pagamento não encontrada.')
-    if (op.status === 'CANCELADA') throw new ErroNegocio('CONFLITO', 'OP já está cancelada.')
+    const v = parseDecimalPositivo(valor, 'Valor do estorno')
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({ where: { empenhoId: op.liquidacao.empenhoId } })
+    validarLancamento(movimentos, { tipo: 'ESTORNO_PAGAMENTO', valor: v, data, ordemPagamentoId: id }, { empenho: data, ordemPagamento: op.data })
     return this.prisma.$transaction(async (tx) => {
-      const atualizada = await tx.ordemPagamento.update({ where: { id }, data: { status: 'CANCELADA' } })
-      await tx.liquidacao.update({ where: { id: op.liquidacaoId }, data: { valorPago: { decrement: op.valor } } })
-      return atualizada
+      await tx.movimentoEmpenho.create({
+        data: { entidadeId: op.entidadeId, empenhoId: op.liquidacao.empenhoId, tipo: 'ESTORNO_PAGAMENTO', valor: v, data, liquidacaoId: op.liquidacaoId, ordemPagamentoId: id, criadoPorId: usuarioId, historico: `Estorno do pagamento ${op.numero}` },
+      })
+      await tx.liquidacao.update({ where: { id: op.liquidacaoId }, data: { valorPago: { decrement: v } } })
+      if (netPagoDaOrdem([...movimentos, { tipo: 'ESTORNO_PAGAMENTO', valor: v, ordemPagamentoId: id }], id).isZero()) {
+        await tx.ordemPagamento.update({ where: { id }, data: { status: 'CANCELADA' } })
+      }
+      return { id, estornado: v.toFixed(2) }
     })
   }
 }

@@ -743,6 +743,7 @@ model Entidade {
   contasReceita            ContaReceitaEntidade[]
   contasDespesa            ContaDespesaEntidade[]
   fontesRecurso            FonteRecursoEntidade[]
+  orgaos                   Orgao[]
   unidadesOrcamentaria     UnidadeOrcamentaria[]
   programas                Programa[]
   orcamentos               Orcamento[]
@@ -760,6 +761,7 @@ model Entidade {
   empenhos                 Empenho[]
   liquidacoes              Liquidacao[]
   ordensPagamento          OrdemPagamento[]
+  movimentosEmpenho        MovimentoEmpenho[]
   cabecalhosRelatorio      CabecalhoRelatorio[]
   rodapesRelatorio         RodapeRelatorio[]
   relatoriosPersonalizados RelatorioPersonalizado[]
@@ -908,6 +910,7 @@ model ContaDespesaEntidade {
   parent          ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
   filhos          ContaDespesaEntidade[] @relation("SubDespesaEnt")
   dotacoes        DotacaoDespesa[]
+  empenhosSubElemento Empenho[]          @relation("EmpenhoSubElemento")
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
@@ -968,18 +971,39 @@ model Subfuncao {
 model UnidadeOrcamentaria {
   id                String             @id @default(uuid())
   entidadeId        String
+  orgaoId           String? // Órgão pai (classificação institucional Órgão → Unidade)
   codigo            String
   nome              String
   ativa             Boolean            @default(true)
   criadoEm          DateTime           @default(now())
   atualizadoEm      DateTime           @updatedAt
   entidade          Entidade           @relation(fields: [entidadeId], references: [id])
+  orgao             Orgao?             @relation(fields: [orgaoId], references: [id])
   dotacoes          DotacaoDespesa[]
   documentosDemanda DocumentoDemanda[]
 
   @@unique([entidadeId, codigo])
   @@index([entidadeId])
+  @@index([orgaoId])
   @@map("unidades_orcamentarias")
+}
+
+/// Órgão — nível máximo da classificação institucional (Portaria SOF/MPO 169/2024).
+/// Pai da Unidade Orçamentária (Órgão → Unidade). Cadastrado por entidade.
+model Orgao {
+  id           String                @id @default(uuid())
+  entidadeId   String
+  codigo       String
+  nome         String
+  ativo        Boolean               @default(true)
+  criadoEm     DateTime              @default(now())
+  atualizadoEm DateTime              @updatedAt
+  entidade     Entidade              @relation(fields: [entidadeId], references: [id])
+  unidades     UnidadeOrcamentaria[]
+
+  @@unique([entidadeId, codigo])
+  @@index([entidadeId])
+  @@map("orgaos")
 }
 
 // ─── Tabela de Eventos Contábeis ──────────────────────────────────────────────
@@ -1111,6 +1135,13 @@ model Orcamento {
 // Dotação de despesa: linha LOA com TODAS as dimensões do padrão SIAFI cheio
 // obrigatórias (UO + Função + Subfunção + Programa + Ação + ContaDespesa +
 // Fonte). A combinação dessas 7 dimensões é única por Orçamento.
+/// Esfera orçamentária — qual orçamento financia a dotação (Lei 4.320 / CF art. 165 §5º).
+enum EsferaOrcamentaria {
+  FISCAL
+  SEGURIDADE_SOCIAL
+  INVESTIMENTO
+}
+
 model DotacaoDespesa {
   id                     String               @id @default(uuid())
   orcamentoId            String
@@ -1121,6 +1152,9 @@ model DotacaoDespesa {
   acaoId                 String
   contaDespesaEntidadeId String
   fonteRecursoEntidadeId String
+  esfera                 EsferaOrcamentaria   @default(FISCAL) // qual orçamento financia (Fiscal/Seguridade/Investimento)
+  vinculoVariavelCodigo  String? // detalhamento variável da fonte (ex.: "01.312.0212")
+  vinculoVariavelNome    String? // ex.: "EDUCAÇÃO - CRECHE - COVID-19"
   valorAutorizado        Decimal              @db.Decimal(18, 2)
   // Saldo materializado da execução: disponível = autorizado − reservado − empenhado.
   // Atualizado transacionalmente por reservas (pré-empenho) e empenhos.
@@ -1762,6 +1796,7 @@ model Empenho {
   reservaDotacaoId   String? // reserva convertida (REGRA 2)
   contratoId         String? // vínculo informativo
   ataRegistroPrecoId String? // vínculo informativo
+  subElementoContaId String? // sub-elemento da natureza (folha sob o elemento da dotação) — Specs 22-06-2026 §8
   numero             String
   tipo               TipoEmpenho
   data               DateTime          @default(now())
@@ -1777,11 +1812,14 @@ model Empenho {
   reservaDotacao     ReservaDotacao?   @relation(fields: [reservaDotacaoId], references: [id])
   contrato           Contrato?         @relation(fields: [contratoId], references: [id])
   ataRegistroPreco   AtaRegistroPreco? @relation(fields: [ataRegistroPrecoId], references: [id])
+  subElementoConta   ContaDespesaEntidade? @relation("EmpenhoSubElemento", fields: [subElementoContaId], references: [id])
   liquidacoes        Liquidacao[]
+  movimentos         MovimentoEmpenho[]
 
   @@unique([entidadeId, numero])
   @@index([dotacaoDespesaId])
   @@index([entidadeId])
+  @@index([subElementoContaId])
   @@map("empenhos")
 }
 
@@ -1807,6 +1845,7 @@ model Liquidacao {
   entidade          Entidade         @relation(fields: [entidadeId], references: [id])
   empenho           Empenho          @relation(fields: [empenhoId], references: [id])
   ordensPagamento   OrdemPagamento[]
+  movimentos        MovimentoEmpenho[]
 
   @@unique([entidadeId, numero])
   @@index([empenhoId])
@@ -1837,10 +1876,53 @@ model OrdemPagamento {
   entidade        Entidade             @relation(fields: [entidadeId], references: [id])
   liquidacao      Liquidacao           @relation(fields: [liquidacaoId], references: [id])
   contaBancariaRef ContaBancaria?      @relation(fields: [contaBancariaId], references: [id])
+  movimentos      MovimentoEmpenho[]
 
   @@unique([entidadeId, numero])
   @@index([liquidacaoId])
   @@index([entidadeId])
   @@index([contaBancariaId])
   @@map("ordens_pagamento")
+}
+
+/// Razão imutável da execução da despesa (a "Ficha de Empenho"). Cada linha é um
+/// LANÇAMENTO financeiro de um estágio — nunca se altera nem exclui; a correção é
+/// por ESTORNO (lançamento de tipo contrário, parcial, somado em coluna à parte).
+/// Specs 22-06-2026 §8. FONTE DA VERDADE das 6 colunas da movimentação da despesa:
+/// empenhado/estorno · liquidado/estorno · pago/estorno (cada uma = Σ valor por tipo).
+/// `valor` é sempre POSITIVO; o `tipo` dá o sinal. Tetos (Σ ≤ saldo do estágio) e a
+/// anterioridade de data são garantidos no service, dentro da transação.
+model MovimentoEmpenho {
+  id               String               @id @default(uuid())
+  entidadeId       String
+  empenhoId        String // a ficha — todo movimento pertence a um empenho
+  tipo             TipoMovimentoEmpenho
+  valor            Decimal              @db.Decimal(18, 2) // sempre > 0; o tipo dá o sinal
+  data             DateTime             @db.Date
+  // Documento de origem, denormalizado p/ somar saldo por documento sem join:
+  liquidacaoId     String? // ≥ liquidação (LIQUIDACAO/ESTORNO_LIQUIDACAO/PAGAMENTO/ESTORNO_PAGAMENTO)
+  ordemPagamentoId String? // ≥ pagamento (PAGAMENTO/ESTORNO_PAGAMENTO)
+  historico        String?
+  documento        String? // ato/portaria do estorno
+  criadoEm         DateTime             @default(now())
+  criadoPorId      String
+  entidade         Entidade             @relation(fields: [entidadeId], references: [id])
+  empenho          Empenho              @relation(fields: [empenhoId], references: [id])
+  liquidacao       Liquidacao?          @relation(fields: [liquidacaoId], references: [id])
+  ordemPagamento   OrdemPagamento?      @relation(fields: [ordemPagamentoId], references: [id])
+
+  @@index([empenhoId])
+  @@index([liquidacaoId])
+  @@index([ordemPagamentoId])
+  @@index([entidadeId, data])
+  @@map("movimentos_empenho")
+}
+
+enum TipoMovimentoEmpenho {
+  EMPENHO
+  ESTORNO_EMPENHO
+  LIQUIDACAO
+  ESTORNO_LIQUIDACAO
+  PAGAMENTO
+  ESTORNO_PAGAMENTO
 }

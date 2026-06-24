@@ -60,7 +60,7 @@ export async function adminLiquidacoesRoutes(app: FastifyInstance) {
         ...(b.data ? { data: b.data } : {}),
         ...(b.notaFiscal ? { notaFiscal: b.notaFiscal } : {}),
         ...(b.atesteResponsavel ? { atesteResponsavel: b.atesteResponsavel } : {}),
-      })
+      }, req.user.sub)
       return reply.header('HX-Redirect', `/admin/liquidacoes?${new URLSearchParams({ entidadeId: b.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       const empenhos = await carregarEmpenhos(app, b.entidadeId)
@@ -68,14 +68,14 @@ export async function adminLiquidacoesRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post<{ Params: { id: string } }>('/:id/cancelar', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { valor: string; data?: string } }>('/:id/estornar', async (req, reply) => {
     const liq = await app.prisma.liquidacao.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!liq) return reply.status(404).send('Liquidação não encontrada.')
     try {
-      await service.cancelar(req.params.id)
+      await service.estornar(req.params.id, req.body.valor, req.user.sub, req.body.data ? new Date(req.body.data) : undefined)
       return reply.header('HX-Redirect', `/admin/liquidacoes?${new URLSearchParams({ entidadeId: liq.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
-      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao cancelar.')
+      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao estornar.')
     }
   })
 }

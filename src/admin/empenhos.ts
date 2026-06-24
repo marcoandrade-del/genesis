@@ -58,20 +58,53 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     return reply.view('empenhos/form', { entidadeId, empenho: null, erro: null, ...lookups })
   })
 
+  // Ficha de empenho: razão imutável + as 6 colunas/saldos (Specs 22-06-2026 §8).
+  app.get<{ Params: { id: string } }>('/:id/ficha', async (req, reply) => {
+    const ficha = await service.ficha(req.params.id).catch(() => null)
+    if (!ficha) return reply.status(404).send('Empenho não encontrado.')
+    return reply.view(
+      'empenhos/ficha',
+      { title: `Ficha ${ficha.empenho.numero} — Gênesis Admin`, active: 'empenhos', userEmail: req.user.email, ...ficha },
+      { layout: 'layouts/main' },
+    )
+  })
+
+  // Opções de sub-elemento da natureza sob o elemento da dotação escolhida (HTMX).
+  app.get<{ Querystring: { dotacaoDespesaId?: string } }>('/sub-elementos', async (req, reply) => {
+    const dotId = req.query.dotacaoDespesaId?.trim()
+    let subelementos: { id: string; codigo: string; descricao: string }[] = []
+    if (dotId) {
+      const dot = await app.prisma.dotacaoDespesa.findUnique({
+        where: { id: dotId },
+        include: { orcamento: { select: { entidadeId: true, ano: true } }, contaDespesa: { select: { codigo: true } } },
+      })
+      if (dot) {
+        const elementoPrefixo = dot.contaDespesa.codigo.split('.').slice(0, 4).join('.') + '.'
+        subelementos = await app.prisma.contaDespesaEntidade.findMany({
+          where: { entidadeId: dot.orcamento.entidadeId, ano: dot.orcamento.ano, admiteMovimento: true, codigo: { startsWith: elementoPrefixo } },
+          orderBy: { codigo: 'asc' },
+          select: { id: true, codigo: true, descricao: true },
+        })
+      }
+    }
+    return reply.view('empenhos/_subelemento-options', { subelementos })
+  })
+
   app.post<{
-    Body: { entidadeId: string; dotacaoDespesaId: string; fornecedorId: string; reservaDotacaoId?: string; contratoId?: string; ataRegistroPrecoId?: string; numero: string; tipo: string; data?: string; valor: string; historico?: string }
+    Body: { entidadeId: string; dotacaoDespesaId: string; fornecedorId: string; reservaDotacaoId?: string; contratoId?: string; ataRegistroPrecoId?: string; subElementoContaId?: string; numero: string; tipo: string; data?: string; valor: string; historico?: string }
   }>('/', async (req, reply) => {
     const b = req.body
     if (!b.entidadeId?.trim()) return reply.status(400).send('Entidade não informada.')
     try {
       await service.criar(b.entidadeId, {
         dotacaoDespesaId: b.dotacaoDespesaId, fornecedorId: b.fornecedorId, numero: b.numero, tipo: b.tipo as never, valor: b.valor,
+        subElementoContaId: b.subElementoContaId ?? '',
         ...(b.reservaDotacaoId ? { reservaDotacaoId: b.reservaDotacaoId } : {}),
         ...(b.contratoId ? { contratoId: b.contratoId } : {}),
         ...(b.ataRegistroPrecoId ? { ataRegistroPrecoId: b.ataRegistroPrecoId } : {}),
         ...(b.data ? { data: b.data } : {}),
         ...(b.historico ? { historico: b.historico } : {}),
-      })
+      }, req.user.sub)
       return reply.header('HX-Redirect', `/admin/empenhos?${new URLSearchParams({ entidadeId: b.entidadeId })}`).status(204).send()
     } catch (e: unknown) {
       const lookups = await carregarLookups(app, b.entidadeId)
@@ -79,14 +112,14 @@ export async function adminEmpenhosRoutes(app: FastifyInstance) {
     }
   })
 
-  app.post<{ Params: { id: string } }>('/:id/anular', async (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { valor: string; data?: string } }>('/:id/estornar', async (req, reply) => {
     const empenho = await app.prisma.empenho.findUnique({ where: { id: req.params.id }, select: { entidadeId: true } })
     if (!empenho) return reply.status(404).send('Empenho não encontrado.')
     try {
-      await service.anular(req.params.id)
-      return reply.header('HX-Redirect', `/admin/empenhos?${new URLSearchParams({ entidadeId: empenho.entidadeId })}`).status(204).send()
+      await service.estornar(req.params.id, req.body.valor, req.user.sub, req.body.data ? new Date(req.body.data) : undefined)
+      return reply.header('HX-Redirect', `/admin/empenhos/${req.params.id}/ficha`).status(204).send()
     } catch (e: unknown) {
-      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao anular.')
+      return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao estornar.')
     }
   })
 }

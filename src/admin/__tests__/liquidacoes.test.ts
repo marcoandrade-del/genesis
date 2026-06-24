@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { listarMock, criarMock, cancelarMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), cancelarMock: vi.fn() }))
+const { listarMock, criarMock, estornarMock } = vi.hoisted(() => ({ listarMock: vi.fn(), criarMock: vi.fn(), estornarMock: vi.fn() }))
 
 vi.mock('../../services/liquidacoes.js', () => ({
   LiquidacoesService: class {
     listar = listarMock
     criar = criarMock
-    cancelar = cancelarMock
+    estornar = estornarMock
   },
 }))
 
@@ -29,7 +29,7 @@ describe('adminLiquidacoesRoutes', () => {
   let app: FastifyInstance
   let prisma: PrismaMock
   beforeEach(async () => {
-    ;[listarMock, criarMock, cancelarMock].forEach((m) => m.mockReset())
+    ;[listarMock, criarMock, estornarMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({ registrar: adminLiquidacoesRoutes, comView: true, simularAdmin: { sub: 'a1', email: 'a@x.com' } }))
   })
 
@@ -57,11 +57,11 @@ describe('adminLiquidacoesRoutes', () => {
     expect(criarMock.mock.calls[0][1]).toMatchObject({ empenhoId: 'e1', numero: 'LIQ-001', valor: '300', notaFiscal: 'NF-1' })
   })
 
-  it('POST /:id/cancelar', async () => {
+  it('POST /:id/estornar', async () => {
     prisma.liquidacao.findUnique.mockResolvedValue({ entidadeId: 'ent1' })
-    cancelarMock.mockResolvedValue({ id: 'l1' })
-    const res = await app.inject({ method: 'POST', url: '/l1/cancelar' })
+    estornarMock.mockResolvedValue({ id: 'l1' })
+    const res = await app.inject({ method: 'POST', url: '/l1/estornar', ...form({ valor: '300' }) })
     expect(res.statusCode).toBe(204)
-    expect(cancelarMock).toHaveBeenCalledWith('l1')
+    expect(estornarMock).toHaveBeenCalledWith('l1', '300', expect.any(String), undefined)
   })
 })

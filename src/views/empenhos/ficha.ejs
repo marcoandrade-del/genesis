@@ -1,0 +1,104 @@
+<% const brl = (d) => Number(d).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) %>
+<% const dia = (d) => new Date(d).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %>
+<% const TIPO_MOV = { EMPENHO: 'Empenho', ESTORNO_EMPENHO: 'Estorno de empenho', LIQUIDACAO: 'Liquidação', ESTORNO_LIQUIDACAO: 'Estorno de liquidação', PAGAMENTO: 'Pagamento', ESTORNO_PAGAMENTO: 'Estorno de pagamento' } %>
+<% const ehEstorno = (t) => t.indexOf('ESTORNO') === 0 %>
+<% const d = empenho.dotacaoDespesa %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h2 class="h5 fw-bold mb-0">Ficha de Empenho <span class="font-monospace"><%= empenho.numero %></span></h2>
+  <a class="btn btn-outline-secondary btn-sm" href="/admin/empenhos?entidadeId=<%= empenho.entidadeId %>"><i class="bi bi-arrow-left me-1"></i>Voltar</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted mb-2 fw-semibold">Identificação</div>
+      <dl class="row small mb-0">
+        <dt class="col-5">Tipo</dt><dd class="col-7"><%= empenho.tipo.charAt(0) + empenho.tipo.slice(1).toLowerCase() %></dd>
+        <dt class="col-5">Data de emissão</dt><dd class="col-7"><%= dia(empenho.data) %></dd>
+        <dt class="col-5">Situação</dt><dd class="col-7">
+          <% if (empenho.status === 'ATIVO') { %><span class="badge bg-success bg-opacity-10 text-success">Ativo</span>
+          <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Anulado</span><% } %></dd>
+        <dt class="col-5">Credor</dt><dd class="col-7"><%= empenho.fornecedor.razaoSocial %><br><span class="font-monospace text-muted"><%= empenho.fornecedor.cnpj || empenho.fornecedor.cpf || '' %></span></dd>
+      </dl>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card border-0 shadow-sm h-100"><div class="card-body">
+      <div class="small text-muted mb-2 fw-semibold">Dotação</div>
+      <dl class="row small mb-0">
+        <% if (d.unidadeOrcamentaria.orgao) { %>
+          <dt class="col-5">Órgão</dt><dd class="col-7"><span class="font-monospace"><%= d.unidadeOrcamentaria.orgao.codigo %></span> <%= d.unidadeOrcamentaria.orgao.nome %></dd>
+        <% } %>
+        <dt class="col-5">Unidade orç.</dt><dd class="col-7"><span class="font-monospace"><%= d.unidadeOrcamentaria.codigo %></span> <%= d.unidadeOrcamentaria.nome %></dd>
+        <dt class="col-5">Natureza</dt><dd class="col-7"><span class="font-monospace"><%= d.contaDespesa.codigo %></span> <%= d.contaDespesa.descricao %></dd>
+        <% if (empenho.subElementoConta) { %>
+          <dt class="col-5">Sub-elemento</dt><dd class="col-7"><span class="font-monospace"><%= empenho.subElementoConta.codigo %></span> <%= empenho.subElementoConta.descricao %></dd>
+        <% } %>
+        <dt class="col-5">Fonte</dt><dd class="col-7"><span class="font-monospace"><%= d.fonteRecurso.codigo %></span> <%= d.fonteRecurso.nomenclatura %></dd>
+        <% if (d.vinculoVariavelCodigo || d.vinculoVariavelNome) { %>
+          <dt class="col-5">Vínculo variável</dt><dd class="col-7"><span class="font-monospace"><%= d.vinculoVariavelCodigo || '' %></span> <%= d.vinculoVariavelNome || '' %></dd>
+        <% } %>
+        <dt class="col-5">Esfera</dt><dd class="col-7"><%= ({ FISCAL: 'Fiscal', SEGURIDADE_SOCIAL: 'Seguridade Social', INVESTIMENTO: 'Investimento' })[d.esfera] || d.esfera %></dd>
+      </dl>
+    </div></div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3"><div class="card-body">
+  <div class="small text-muted mb-2 fw-semibold">Movimentação da despesa</div>
+  <div class="row text-center g-2">
+    <% const colunas = [
+      { rot: 'Empenhado', v: resumo.empenhado, est: false },
+      { rot: 'Estorno empenho', v: resumo.estornoEmpenho, est: true },
+      { rot: 'Liquidado', v: resumo.liquidado, est: false },
+      { rot: 'Estorno liquid.', v: resumo.estornoLiquidacao, est: true },
+      { rot: 'Pago', v: resumo.pago, est: false },
+      { rot: 'Estorno pgto', v: resumo.estornoPagamento, est: true },
+    ] %>
+    <% colunas.forEach(function(c) { %>
+      <div class="col-6 col-md-2">
+        <div class="border rounded py-2 h-100">
+          <div class="small text-muted"><%= c.rot %></div>
+          <div class="font-monospace fw-semibold <%= c.est ? 'text-danger' : '' %>"><%= brl(c.v) %></div>
+        </div>
+      </div>
+    <% }) %>
+  </div>
+  <div class="d-flex flex-wrap justify-content-end gap-3 mt-3 small">
+    <span>Saldo a liquidar: <strong class="font-monospace"><%= brl(resumo.saldoEmpenho) %></strong></span>
+    <span>Saldo a pagar: <strong class="font-monospace"><%= brl(resumo.saldoAPagar) %></strong></span>
+  </div>
+  <% const saldoEmp = Number(resumo.saldoEmpenho) %>
+  <% if (saldoEmp > 0) { %>
+    <form class="row g-2 align-items-end justify-content-end mt-2 pt-3 border-top" hx-post="/admin/empenhos/<%= empenho.id %>/estornar"
+      hx-confirm="Confirmar o estorno do empenho?" data-confirm-titulo="Estornar empenho" data-confirm-tipo="danger" data-confirm-ok="Estornar">
+      <div class="col-auto"><label class="form-label small mb-1">Estornar empenho — valor</label>
+        <input type="number" name="valor" step="0.01" min="0.01" max="<%= saldoEmp.toFixed(2) %>" value="<%= saldoEmp.toFixed(2) %>" class="form-control form-control-sm font-monospace text-end" style="width:140px" required></div>
+      <div class="col-auto"><label class="form-label small mb-1">Data</label>
+        <input type="date" name="data" value="<%= new Date().toISOString().slice(0, 10) %>" class="form-control form-control-sm" required></div>
+      <div class="col-auto"><button class="btn btn-outline-danger btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Estornar</button></div>
+    </form>
+  <% } %>
+</div></div>
+
+<div class="card border-0 shadow-sm"><div class="card-body p-0">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr>
+      <th class="ps-3" style="width:110px">Data</th><th>Lançamento</th><th>Histórico</th><th class="text-end pe-3" style="width:140px">Valor R$</th>
+    </tr></thead>
+    <tbody>
+      <% if (movimentos.length === 0) { %>
+        <tr><td colspan="4" class="text-center text-muted py-4"><i class="bi bi-inbox d-block mb-1"></i>Sem lançamentos na razão.</td></tr>
+      <% } %>
+      <% movimentos.forEach(function(m) { %>
+        <tr>
+          <td class="ps-3 small font-monospace"><%= dia(m.data) %></td>
+          <td class="small"><span class="<%= ehEstorno(m.tipo) ? 'text-danger' : '' %>"><%= TIPO_MOV[m.tipo] %></span></td>
+          <td class="small text-muted"><%= m.historico || '' %></td>
+          <td class="text-end pe-3 font-monospace <%= ehEstorno(m.tipo) ? 'text-danger' : '' %>"><%= ehEstorno(m.tipo) ? '−' : '' %><%= brl(m.valor) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div></div>
