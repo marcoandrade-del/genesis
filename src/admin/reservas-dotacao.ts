@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { ReservasDotacaoService, saldoDisponivel } from '../services/reservas-dotacao.js'
+import { STATUS_EXECUTAVEIS } from '../services/orcamentos.js'
 
 /**
  * Admin de Reservas de Dotação (pré-empenho). Picker cascata
@@ -115,7 +116,7 @@ export async function adminReservasDotacaoRoutes(app: FastifyInstance) {
 async function carregarLookups(app: FastifyInstance, entidadeId: string) {
   const [dotacoesRaw, termos] = await Promise.all([
     app.prisma.dotacaoDespesa.findMany({
-      where: { orcamento: { entidadeId, status: { not: 'RASCUNHO' } } },
+      where: { orcamento: { entidadeId, status: { in: [...STATUS_EXECUTAVEIS] } } },
       include: {
         unidadeOrcamentaria: { select: { codigo: true } },
         contaDespesa: { select: { codigo: true } },

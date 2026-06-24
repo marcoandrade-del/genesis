@@ -7,16 +7,32 @@ export type DadosOrcamento = {
   observacoes?: string | null
 }
 
+// Fluxo de aprovação da LOA, espelhando o ciclo real (Executivo → Legislativo →
+// sanção → publicação → execução). EM_EXECUCAO NÃO é alcançável por aqui: só pela
+// abertura contábil (que gera os lançamentos), a partir de PUBLICADO.
 const TRANSICOES_VALIDAS: Record<StatusOrcamento, ReadonlyArray<StatusOrcamento>> = {
-  RASCUNHO: ['APROVADO'],
-  APROVADO: ['EM_EXECUCAO', 'RASCUNHO'],
+  RASCUNHO: ['ENVIADO_AO_LEGISLATIVO'],
+  ENVIADO_AO_LEGISLATIVO: ['APROVADO', 'RASCUNHO'],
+  APROVADO: ['PUBLICADO', 'ENVIADO_AO_LEGISLATIVO'],
+  PUBLICADO: ['APROVADO'],
   EM_EXECUCAO: [],
+}
+
+// Estados em que a LOA já vale (aprovada em diante) e a execução é permitida —
+// empenho/arrecadação/reserva/crédito/lançamento tributário. RASCUNHO e
+// ENVIADO_AO_LEGISLATIVO (ainda sem aprovação) bloqueiam.
+export const STATUS_EXECUTAVEIS: ReadonlyArray<StatusOrcamento> = ['APROVADO', 'PUBLICADO', 'EM_EXECUCAO']
+
+/** A LOA pode receber execução (já está aprovada em diante)? */
+export function orcamentoPodeExecutar(status: StatusOrcamento): boolean {
+  return STATUS_EXECUTAVEIS.includes(status)
 }
 
 /**
  * Orçamento (LOA) por entidade × ano. Cabeçalho que agrupa dotações de despesa
- * e previsões de receita. Após APROVADO o conteúdo é imutável; o admin pode
- * reverter para RASCUNHO enquanto não houve início de execução.
+ * e previsões de receita. O conteúdo é editável só em RASCUNHO; o status segue o
+ * fluxo de aprovação (rascunho → Legislativo → aprovado → publicado → execução),
+ * com trilha de quem mudou o quê (`TransicaoStatusOrcamento`).
  */
 export class OrcamentosService {
   constructor(private prisma: PrismaClient) {}
@@ -86,7 +102,12 @@ export class OrcamentosService {
     })
   }
 
-  async alterarStatus(id: string, novoStatus: StatusOrcamento) {
+  /**
+   * Avança o status no fluxo de aprovação, registrando a transição na trilha
+   * (autor + de/para + observação) na MESMA transação. Carimba `dataAprovacao` /
+   * `dataPublicacao` na primeira vez que atinge cada marco.
+   */
+  async alterarStatus(id: string, novoStatus: StatusOrcamento, autorId: string, observacao?: string | null) {
     const existente = await this.prisma.orcamento.findUnique({ where: { id } })
     if (!existente) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Orçamento não encontrado.')
     const permitidos = TRANSICOES_VALIDAS[existente.status]
@@ -96,12 +117,27 @@ export class OrcamentosService {
         `Transição inválida: ${existente.status} → ${novoStatus}.`,
       )
     }
-    return this.prisma.orcamento.update({
-      where: { id },
-      data: {
-        status: novoStatus,
-        ...(novoStatus === 'APROVADO' && !existente.dataAprovacao ? { dataAprovacao: new Date() } : {}),
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await tx.transicaoStatusOrcamento.create({
+        data: { orcamentoId: id, de: existente.status, para: novoStatus, autorId, observacao: trimOuNull(observacao) },
+      })
+      return tx.orcamento.update({
+        where: { id },
+        data: {
+          status: novoStatus,
+          ...(novoStatus === 'APROVADO' && !existente.dataAprovacao ? { dataAprovacao: new Date() } : {}),
+          ...(novoStatus === 'PUBLICADO' && !existente.dataPublicacao ? { dataPublicacao: new Date() } : {}),
+        },
+      })
+    })
+  }
+
+  /** Trilha das transições de status (mais recente primeiro), com o autor. */
+  trilha(orcamentoId: string) {
+    return this.prisma.transicaoStatusOrcamento.findMany({
+      where: { orcamentoId },
+      orderBy: { criadoEm: 'desc' },
+      include: { autor: { select: { nomeCompleto: true, emailPrincipal: true } } },
     })
   }
 

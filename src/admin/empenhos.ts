@@ -1,11 +1,12 @@
 import type { FastifyInstance } from 'fastify'
 import { EmpenhosService } from '../services/empenhos.js'
 import { saldoDisponivel } from '../services/reservas-dotacao.js'
+import { STATUS_EXECUTAVEIS } from '../services/orcamentos.js'
 
 async function carregarLookups(app: FastifyInstance, entidadeId: string) {
   const [dotacoesRaw, fornecedores, reservasRaw, contratos, atas] = await Promise.all([
     app.prisma.dotacaoDespesa.findMany({
-      where: { orcamento: { entidadeId, status: { not: 'RASCUNHO' } } },
+      where: { orcamento: { entidadeId, status: { in: [...STATUS_EXECUTAVEIS] } } },
       include: { unidadeOrcamentaria: { select: { codigo: true } }, contaDespesa: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } }, orcamento: { select: { ano: true } } },
       orderBy: { criadoEm: 'asc' },
     }),

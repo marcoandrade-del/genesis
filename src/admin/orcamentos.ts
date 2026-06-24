@@ -4,12 +4,15 @@ import { OrcamentosService } from '../services/orcamentos.js'
 import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 
-const STATUS_VALIDOS: ReadonlyArray<StatusOrcamento> = ['RASCUNHO', 'APROVADO', 'EM_EXECUCAO']
+// EM_EXECUCAO não entra: é alcançado só pela abertura contábil (/app), a partir
+// de PUBLICADO. O admin opera o fluxo de aprovação até a publicação.
+const STATUS_VALIDOS: ReadonlyArray<StatusOrcamento> = ['RASCUNHO', 'ENVIADO_AO_LEGISLATIVO', 'APROVADO', 'PUBLICADO']
 
 /**
  * Admin de Orçamentos (LOA): listagem cascata Estado→Município→Entidade,
  * cabeçalho do Orçamento + drill-in para Dotações de Despesa e Previsões de
- * Receita. Ciclo de status RASCUNHO → APROVADO → EM_EXECUCAO.
+ * Receita. Fluxo de aprovação RASCUNHO → ENVIADO_AO_LEGISLATIVO → APROVADO →
+ * PUBLICADO (→ EM_EXECUCAO via abertura contábil no /app).
  */
 export async function adminOrcamentosRoutes(app: FastifyInstance) {
   const orcamentos = new OrcamentosService(app.prisma)
@@ -129,12 +132,12 @@ export async function adminOrcamentosRoutes(app: FastifyInstance) {
     }
   })
 
-  // ── STATUS (RASCUNHO → APROVADO → EM_EXECUCAO) ──────────────────────────────
-  app.post<{ Params: { id: string }; Body: { status: string } }>('/:id/status', async (req, reply) => {
+  // ── STATUS (fluxo de aprovação da LOA) ──────────────────────────────────────
+  app.post<{ Params: { id: string }; Body: { status: string; observacao?: string } }>('/:id/status', async (req, reply) => {
     const novoStatus = req.body.status as StatusOrcamento
     if (!STATUS_VALIDOS.includes(novoStatus)) return reply.status(400).send('Status inválido.')
     try {
-      await orcamentos.alterarStatus(req.params.id, novoStatus)
+      await orcamentos.alterarStatus(req.params.id, novoStatus, req.user.sub, req.body.observacao)
       return reply.header('HX-Redirect', `/admin/orcamentos/${req.params.id}`).status(204).send()
     } catch (e: unknown) {
       return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao alterar status.')
@@ -155,7 +158,11 @@ export async function adminOrcamentosRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>('/:id', async (req, reply) => {
     const orcamento = await orcamentos.buscarPorId(req.params.id)
     if (!orcamento) return reply.status(404).send('Orçamento não encontrado.')
-    const [dots, prevs] = await Promise.all([dotacoes.listar(orcamento.id), previsoes.listar(orcamento.id)])
+    const [dots, prevs, trilha] = await Promise.all([
+      dotacoes.listar(orcamento.id),
+      previsoes.listar(orcamento.id),
+      orcamentos.trilha(orcamento.id),
+    ])
     const totalDespesa = dots.reduce((acc, d) => acc + Number(d.valorAutorizado), 0)
     const totalReceita = prevs.reduce((acc, p) => acc + Number(p.valorPrevisto), 0)
     return reply.view(
@@ -167,6 +174,7 @@ export async function adminOrcamentosRoutes(app: FastifyInstance) {
         orcamento,
         dotacoes: dots,
         previsoes: prevs,
+        trilha,
         totalDespesa,
         totalReceita,
       },

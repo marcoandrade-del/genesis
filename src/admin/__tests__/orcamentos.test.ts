@@ -8,6 +8,7 @@ const {
   orcAtualizarMock,
   orcAlterarStatusMock,
   orcExcluirMock,
+  orcTrilhaMock,
 } = vi.hoisted(() => ({
   orcListarMock: vi.fn(),
   orcBuscarMock: vi.fn(),
@@ -16,6 +17,7 @@ const {
   orcAtualizarMock: vi.fn(),
   orcAlterarStatusMock: vi.fn(),
   orcExcluirMock: vi.fn(),
+  orcTrilhaMock: vi.fn(),
 }))
 
 const { dotListarMock, dotCriarMock, dotAtualizarMock, dotExcluirMock } = vi.hoisted(() => ({
@@ -41,6 +43,7 @@ vi.mock('../../services/orcamentos.js', () => ({
     atualizar = orcAtualizarMock
     alterarStatus = orcAlterarStatusMock
     excluir = orcExcluirMock
+    trilha = orcTrilhaMock
   },
 }))
 vi.mock('../../services/dotacoes-despesa.js', () => ({
@@ -106,6 +109,7 @@ describe('adminOrcamentosRoutes', () => {
       orcAtualizarMock,
       orcAlterarStatusMock,
       orcExcluirMock,
+      orcTrilhaMock,
       dotListarMock,
       dotCriarMock,
       dotAtualizarMock,
@@ -115,6 +119,7 @@ describe('adminOrcamentosRoutes', () => {
       prevAtualizarMock,
       prevExcluirMock,
     ].forEach((m) => m.mockReset())
+    orcTrilhaMock.mockResolvedValue([])
     ;({ app, prisma } = await criarApp({
       registrar: adminOrcamentosRoutes,
       comView: true,

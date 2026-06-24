@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma, type CreditoAdicionalTipo } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 import { saldoDisponivel } from './reservas-dotacao.js'
+import { orcamentoPodeExecutar } from './orcamentos.js'
 
 export interface DadosItemCredito {
   dotacaoId: string
@@ -54,8 +55,8 @@ export class CreditosAdicionaisService {
   async criar(orcamentoId: string, dados: DadosCriarCredito) {
     const orcamento = await this.prisma.orcamento.findUnique({ where: { id: orcamentoId } })
     if (!orcamento) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Orçamento não encontrado.')
-    if (orcamento.status === 'RASCUNHO') {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O orçamento ainda está em rascunho — aprove-o antes de lançar créditos adicionais.')
+    if (!orcamentoPodeExecutar(orcamento.status)) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A LOA precisa estar aprovada antes de lançar créditos adicionais.')
     }
 
     if (!TIPOS_VALIDOS.includes(dados.tipo)) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Tipo de crédito inválido.')

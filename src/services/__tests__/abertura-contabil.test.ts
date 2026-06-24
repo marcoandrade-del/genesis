@@ -43,9 +43,9 @@ describe('AberturaContabilService', () => {
       prisma.orcamento.findUnique.mockResolvedValue(null)
       await expect(service.contabilizar('ent1', 2026, 'u1')).rejects.toThrow(/não há orçamento/i)
     })
-    it('erro quando o orçamento está em RASCUNHO', async () => {
-      prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'RASCUNHO', previsoes: [], dotacoes: [] })
-      await expect(service.contabilizar('ent1', 2026, 'u1')).rejects.toThrow(/aprove a loa/i)
+    it('erro quando o orçamento não está publicado (ex.: APROVADO)', async () => {
+      prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'APROVADO', previsoes: [], dotacoes: [] })
+      await expect(service.contabilizar('ent1', 2026, 'u1')).rejects.toThrow(/publicada/i)
     })
     it('erro quando já está EM_EXECUCAO (idempotente)', async () => {
       prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'EM_EXECUCAO', previsoes: [], dotacoes: [] })
@@ -56,7 +56,7 @@ describe('AberturaContabilService', () => {
   describe('contabilizar — geração', () => {
     beforeEach(() => {
       prisma.orcamento.findUnique.mockResolvedValue({
-        id: 'orc1', status: 'APROVADO',
+        id: 'orc1', status: 'PUBLICADO',
         previsoes: [{ valorPrevisto: '1000', contaReceita: { codigo: '1.1.1.3.01' }, fonteRecurso: { codigo: '1500' } }],
         dotacoes: [{ valorAutorizado: '800', fonteRecurso: { codigo: '1500' } }],
       })
@@ -91,7 +91,7 @@ describe('AberturaContabilService', () => {
     })
 
     it('transporta só o balanço (classes 1 e 2), em magnitude, mapeando código→ano novo', async () => {
-      prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1', status: 'APROVADO', previsoes: [], dotacoes: [] })
+      prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1', status: 'PUBLICADO', previsoes: [], dotacoes: [] })
       mockContas({
         anoAnterior: [
           { id: 'a1', codigo: '1.1.1.1.1.01.00.00.00.00.00.00' }, // ativo +500
@@ -122,10 +122,10 @@ describe('AberturaContabilService', () => {
     it('bloqueia quando a execução já começou (lançamentos não-abertura no ano)', async () => {
       prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'EM_EXECUCAO' })
       prisma.lancamento.count.mockResolvedValue(3)
-      await expect(service.estornar('ent1', 2026)).rejects.toThrow(/execução já começou/i)
+      await expect(service.estornar('ent1', 2026, 'u1')).rejects.toThrow(/execução já começou/i)
     })
 
-    it('reverte: apaga os lançamentos de abertura, limpa o transporte e volta a APROVADO', async () => {
+    it('reverte: apaga os lançamentos de abertura, limpa o transporte e volta a PUBLICADO', async () => {
       prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1', status: 'EM_EXECUCAO' })
       prisma.lancamento.count.mockResolvedValue(0)
       prisma.lancamento.findMany.mockResolvedValue([
@@ -134,11 +134,11 @@ describe('AberturaContabilService', () => {
           { contaId: 'cPrevisao', tipo: 'CREDITO', valor: dec(1000) },
         ] },
       ])
-      await service.estornar('ent1', 2026)
+      await service.estornar('ent1', 2026, 'u1')
       expect(prisma.lancamento.delete).toHaveBeenCalledWith({ where: { id: 'l1' } })
       expect(prisma.resumoMensalConta.update).toHaveBeenCalled()
       expect(prisma.saldoInicialAno.deleteMany).toHaveBeenCalledWith({ where: { entidadeId: 'ent1', ano: 2026 } })
-      expect(prisma.orcamento.update).toHaveBeenCalledWith({ where: { id: 'orc1' }, data: { status: 'APROVADO' } })
+      expect(prisma.orcamento.update).toHaveBeenCalledWith({ where: { id: 'orc1' }, data: { status: 'PUBLICADO' } })
     })
   })
 
@@ -147,9 +147,9 @@ describe('AberturaContabilService', () => {
       prisma.orcamento.findUnique.mockResolvedValue(null)
       expect(await service.status('ent1', 2026)).toMatchObject({ status: 'SEM_ORCAMENTO', podeContabilizar: false })
     })
-    it('podeContabilizar quando APROVADO', async () => {
-      prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'APROVADO' })
-      expect(await service.status('ent1', 2026)).toMatchObject({ status: 'APROVADO', podeContabilizar: true, contabilizada: false })
+    it('podeContabilizar quando PUBLICADO', async () => {
+      prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'PUBLICADO' })
+      expect(await service.status('ent1', 2026)).toMatchObject({ status: 'PUBLICADO', podeContabilizar: true, contabilizada: false })
     })
     it('contabilizada + podeEstornar quando EM_EXECUCAO e sem execução', async () => {
       prisma.orcamento.findUnique.mockResolvedValue({ id: 'o', status: 'EM_EXECUCAO' })

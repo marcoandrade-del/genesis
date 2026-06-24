@@ -31,9 +31,16 @@
     <h2 class="h4 fw-bold mb-0">Orçamento (LOA) — <span class="font-monospace"><%= ano %></span></h2>
     <div class="d-flex align-items-center gap-2">
       <% if (orcamento) { %>
-        <% if (orcamento.status === 'RASCUNHO') { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Rascunho</span>
-        <% } else if (orcamento.status === 'APROVADO') { %><span class="badge bg-primary bg-opacity-10 text-primary">Aprovado</span>
-        <% } else { %><span class="badge bg-success bg-opacity-10 text-success">Em Execução</span><% } %>
+        <%
+          var sb = ({
+            RASCUNHO: ['secondary', 'Rascunho'],
+            ENVIADO_AO_LEGISLATIVO: ['info', 'No Legislativo'],
+            APROVADO: ['primary', 'Aprovado'],
+            PUBLICADO: ['warning', 'Publicado'],
+            EM_EXECUCAO: ['success', 'Em Execução'],
+          })[orcamento.status] || ['secondary', orcamento.status]
+        %>
+        <span class="badge bg-<%= sb[0] %> bg-opacity-10 text-<%= sb[0] %>"><%= sb[1] %></span>
       <% } %>
       <a href="/app/orcamento/saldo" class="btn btn-sm btn-outline-primary">
         <i class="bi bi-wallet2 me-1"></i>Ver saldos
@@ -53,12 +60,12 @@
         <div>
           <div class="fw-semibold"><i class="bi bi-journal-check me-1"></i>Abertura do exercício (PCASP)</div>
           <div class="small text-muted">
-            <% if (abertura.status === 'RASCUNHO') { %>
-              A LOA precisa estar <strong>Aprovada</strong> antes de contabilizar a abertura.
-            <% } else if (abertura.status === 'APROVADO') { %>
+            <% if (abertura.status === 'PUBLICADO') { %>
               Gera os lançamentos de abertura (previsão da receita + fixação da despesa) e transporta os saldos do exercício anterior. Inicia a execução.
-            <% } else { %>
+            <% } else if (abertura.status === 'EM_EXECUCAO') { %>
               Abertura contabilizada — orçamento <strong>em execução</strong><% if (abertura.temExecucao) { %>, com movimentos no exercício<% } %>.
+            <% } else { %>
+              A LOA precisa estar <strong>Publicada</strong> antes de contabilizar a abertura.
             <% } %>
           </div>
         </div>
@@ -70,7 +77,7 @@
           <% } else if (abertura.contabilizada) { %>
             <span class="badge bg-success bg-opacity-10 text-success me-1"><i class="bi bi-check-circle me-1"></i>Contabilizada</span>
             <% if (abertura.podeEstornar && podeEscrever) { %>
-              <form method="post" action="/app/orcamento/abertura/estornar" class="d-inline" onsubmit="return confirm('Estornar a abertura? Os lançamentos de abertura serão removidos e o orçamento voltará a Aprovado.')">
+              <form method="post" action="/app/orcamento/abertura/estornar" class="d-inline" onsubmit="return confirm('Estornar a abertura? Os lançamentos de abertura serão removidos e o orçamento voltará a Publicado.')">
                 <button type="submit" class="btn btn-outline-danger btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i>Estornar</button>
               </form>
             <% } %>
