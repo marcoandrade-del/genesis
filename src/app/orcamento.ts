@@ -3,6 +3,7 @@ import { OrcamentosService } from '../services/orcamentos.js'
 import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
+import { DespesaDiariaService } from '../services/despesa-diaria.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
 import { AberturaContabilService } from '../services/abertura-contabil.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
@@ -19,6 +20,7 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
   const dotacoesSvc = new DotacoesDespesaService(app.prisma)
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
+  const despesaDiariaSvc = new DespesaDiariaService(app.prisma)
   const cfgDash = new ConfiguracaoDashboardService(app.prisma)
   const aberturaSvc = new AberturaContabilService(app.prisma)
 
@@ -120,5 +122,33 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
     }
     saldo.porConta = aplicarGranularidade(saldo.porConta, granularidade)
     return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, temDesdobramento, layout: null })
+  })
+
+  // Acumulado diário da despesa: evolução do empenhado/liquidado/pago dia a dia
+  // vs o fixado, lida do ledger MovimentoEmpenho. Read-only. Espelha a receita (#113).
+  app.get('/orcamento/despesa/diario', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const { entidadeId, ano } = req.contexto
+    const serie = await despesaDiariaSvc.serie(entidadeId, ano)
+    const n = (d: { toNumber(): number }) => d.toNumber()
+    const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    return reply.view('app/despesa-diario', {
+      entidade,
+      ano,
+      temOrcamento: serie.temOrcamento,
+      fixadoTotal: n(serie.fixadoTotal),
+      empenhadoTotal: n(serie.empenhadoTotal),
+      liquidadoTotal: n(serie.liquidadoTotal),
+      pagoTotal: n(serie.pagoTotal),
+      dias: serie.dias.map((d) => ({
+        data: dataBR(d.data),
+        empenhadoDia: n(d.empenhadoDia),
+        empenhado: n(d.empenhadoAcumulado),
+        liquidado: n(d.liquidadoAcumulado),
+        pago: n(d.pagoAcumulado),
+      })),
+      layout: null,
+    })
   })
 }
