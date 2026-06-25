@@ -75,6 +75,18 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
         ref: '#57',
       },
+      {
+        titulo: 'Navegação dinâmica do /app + menu superior (Command Bar)',
+        descricao: 'Menus do operador derivados do menu do core; barra de comando superior redesenhada.',
+        status: 'PRONTO',
+        ref: '#66/#79',
+      },
+      {
+        titulo: 'Área de Trabalho customizável (operador)',
+        descricao: 'Barra de favoritos estilo navegador (#102), painel de cards reordenável por arrasto per-user (#105) e configuração de granularidade dos planos por entidade/relatório (#99/#100).',
+        status: 'PRONTO',
+        ref: '#102/#105',
+      },
     ],
   },
   {
@@ -160,6 +172,18 @@ export const ESCOPO: readonly AreaEscopo[] = [
         descricao: 'Copia os planos do ano novo do modelo para entidades existentes; complementa a cópia automática do onboarding e a ressincronização.',
         status: 'PRONTO',
       },
+      {
+        titulo: 'Desdobramento de contas no operador (/app)',
+        descricao: 'Desdobrar contábil/receita/despesa na entidade; conta com saldo/movimento usa fluxo de DISTRIBUIÇÃO (rateio retroativo, recompõe saldos, zera a mãe → sintética); guard impede sintética com movimento preso.',
+        status: 'PRONTO',
+        ref: '#77/#85',
+      },
+      {
+        titulo: 'Plano de contas do operador: saldos, razão e lançamento manual',
+        descricao: 'Saldos por natureza com roll-up do balancete e "saldo em <data>" (#81); razão da conta drill-down (#82); lançamento contábil manual em partida dobrada (#84).',
+        status: 'PRONTO',
+        ref: '#81/#82/#84',
+      },
     ],
   },
   {
@@ -180,9 +204,9 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Execução orçamentária',
-        descricao: 'Empenho → liquidação → pagamento (via Compras), consulta de saldo com roll-up (#61), créditos adicionais (#62) e arrecadação da receita com estorno e previsto × arrecadado.',
+        descricao: 'Empenho → liquidação → pagamento (via Compras), consulta de saldo com roll-up (#61), créditos adicionais (#62) e arrecadação da receita com estorno e previsto × arrecadado (#71).',
         status: 'PRONTO',
-        ref: '#61/#62',
+        ref: '#61/#62/#71',
       },
       {
         titulo: 'Contas bancárias (Febraban) × fontes de recurso',
@@ -190,9 +214,64 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
       },
       {
-        titulo: 'Integração bancária CNAB (remessa/retorno 240/400)',
-        descricao: 'Arquivos de pagamento e conciliação por banco, sobre o cadastro Febraban.',
+        titulo: 'Fluxo de aprovação da LOA',
+        descricao: 'Status RASCUNHO → ENVIADO_AO_LEGISLATIVO → APROVADO → PUBLICADO → EM_EXECUCAO com trilha auditável (de/para, autor, observação, data); execução travada por status.',
+        status: 'PRONTO',
+        ref: '#116',
+      },
+      {
+        titulo: 'Abertura do exercício (PCASP) — contabiliza a LOA',
+        descricao: 'Lança a previsão (D 6.2.1.1.0 / C 5.2.1.1.1) e a fixação (D 5.2.2.1.1.01 / C 6.2.2.1.1) + transporte dos saldos do ano anterior; idempotente e reversível.',
+        status: 'PRONTO',
+        ref: '#110',
+      },
+      {
+        titulo: 'Acumulado diário (contábil, receita e despesa)',
+        descricao: 'Saldo contábil por conta × dia materializado (#112); arrecadado × previsto/dia (#113) e empenhado/liquidado/pago/dia vs fixado (#115) lidos direto do ledger datado.',
+        status: 'PRONTO',
+        ref: '#112/#113/#115',
+      },
+      {
+        titulo: 'Integração bancária CNAB — remessa de pagamentos',
+        descricao: 'Conciliação por retorno (CSV/OFX/CNAB 240) já entregue (ver Contábil — Integração); falta gerar arquivos de REMESSA de pagamento (CNAB 240/400).',
         status: 'A_FAZER',
+      },
+    ],
+  },
+  {
+    nome: 'Contábil — Integração automática (Tabela de Eventos)',
+    icone: 'arrow-left-right',
+    descricao: 'Cada fato orçamentário/financeiro gera lançamentos PCASP em partida dobrada, configurados por tabela editável no admin.',
+    itens: [
+      {
+        titulo: 'Receita → contabilidade (E100/E200/E300)',
+        descricao: 'Arrecadação dispara orçamentário, DDR e patrimonial (caixa pela conta bancária); conta-corrente como dimensão; receita não-efetiva (E400/E500); trilha mão-dupla.',
+        status: 'PRONTO',
+        ref: '#90/#91/#92/#93',
+      },
+      {
+        titulo: 'Receita tributária (lançamento, dívida ativa, multas)',
+        descricao: 'Reconhecimento por competência (E550), baixa na arrecadação (E560), inscrição em dívida ativa (E570) e multas/juros; baixa parcial controlada.',
+        status: 'PRONTO',
+        ref: '#95/#97/#98',
+      },
+      {
+        titulo: 'Despesa → contabilidade (E600/E700/E800)',
+        descricao: 'Empenho, liquidação (com perna patrimonial) e pagamento (perna financeira pela conta bancária) na mesma transação; cc = dotação; estorno inverte D↔C.',
+        status: 'PRONTO',
+        ref: '#109/#114',
+      },
+      {
+        titulo: 'Tabela de Eventos editável + regras PCASP',
+        descricao: 'As contas D/C de cada evento vêm de tabela no admin (não do código): máscaras PCASP + tokens resolvidos no disparo, gatilho explícito e validação PCASP (analítica, D=C, subsistema) no save.',
+        status: 'PRONTO',
+        ref: '#114',
+      },
+      {
+        titulo: 'Conciliação bancária',
+        descricao: 'Casa o extrato (CSV/OFX/CNAB 240) com as arrecadações 1:1; auto-match por valor + data; import por arquivo no navegador.',
+        status: 'PRONTO',
+        ref: '#94/#96',
       },
     ],
   },
