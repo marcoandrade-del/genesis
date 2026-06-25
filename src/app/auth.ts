@@ -48,9 +48,10 @@ export async function appAuthRoutes(app: FastifyInstance) {
         })
       }
 
-      // Usuário só pode entrar no /app se tiver ao menos um acesso ativo.
+      // Usuário só pode entrar no /app se tiver ao menos um acesso ativo a
+      // uma entidade ativa (entidade desativada não conta).
       const temAcesso = await app.prisma.acessoEntidade.findFirst({
-        where: { usuarioId: usuario.id, ativo: true },
+        where: { usuarioId: usuario.id, ativo: true, entidade: { ativo: true } },
         select: { id: true },
       })
       if (!temAcesso) {

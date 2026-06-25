@@ -166,8 +166,27 @@ describe('appContextoMiddleware', () => {
     expect(res.headers.location).toBe('/app/contexto')
   })
 
+  it('redireciona quando a entidade está inativa', async () => {
+    prisma.acessoEntidade.findUnique.mockResolvedValue({
+      ativo: true,
+      nivel: 'ESCRITA',
+      entidade: { ativo: false },
+    })
+    const res = await app.inject({
+      method: 'GET',
+      url: '/app/qualquer',
+      cookies: { genesis_exercicio: 'ent1:2026' },
+    })
+    expect(res.headers.location).toBe('/app/contexto')
+    expect(String(res.headers['set-cookie'])).toContain('genesis_exercicio=')
+  })
+
   it('injeta req.contexto quando tudo válido', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ ativo: true, nivel: 'ESCRITA' })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({
+      ativo: true,
+      nivel: 'ESCRITA',
+      entidade: { ativo: true },
+    })
     const res = await app.inject({
       method: 'GET',
       url: '/app/qualquer',

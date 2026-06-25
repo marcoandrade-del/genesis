@@ -27,10 +27,10 @@ export type DadosAcesso = {
 export class AcessosEntidadeService {
   constructor(private prisma: PrismaClient) {}
 
-  /** Lista acessos de um usuário, com dados da entidade. */
+  /** Lista acessos de um usuário, com dados da entidade. Só entidades ativas. */
   listarPorUsuario(usuarioId: string) {
     return this.prisma.acessoEntidade.findMany({
-      where: { usuarioId, ativo: true },
+      where: { usuarioId, ativo: true, entidade: { ativo: true } },
       include: {
         entidade: {
           include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
@@ -61,8 +61,10 @@ export class AcessosEntidadeService {
   ): Promise<boolean> {
     const acesso = await this.prisma.acessoEntidade.findUnique({
       where: { usuarioId_entidadeId: { usuarioId, entidadeId } },
+      include: { entidade: { select: { ativo: true } } },
     })
-    if (!acesso || !acesso.ativo) return false
+    // Entidade desativada bloqueia o acesso mesmo com AcessoEntidade ativo.
+    if (!acesso || !acesso.ativo || !acesso.entidade.ativo) return false
     return PESO[acesso.nivel] >= PESO[nivelMinimo]
   }
 

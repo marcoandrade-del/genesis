@@ -92,8 +92,10 @@ export async function appContextoMiddleware(req: FastifyRequest, reply: FastifyR
   const acessos = new AcessosEntidadeService(req.server.prisma)
   const acesso = await req.server.prisma.acessoEntidade.findUnique({
     where: { usuarioId_entidadeId: { usuarioId: req.user.sub, entidadeId: cookie.entidadeId } },
+    include: { entidade: { select: { ativo: true } } },
   })
-  if (!acesso || !acesso.ativo) {
+  // Entidade desativada invalida o contexto mesmo com AcessoEntidade ativo.
+  if (!acesso || !acesso.ativo || !acesso.entidade.ativo) {
     return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
   }
   void acessos

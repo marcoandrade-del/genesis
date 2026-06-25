@@ -23,7 +23,7 @@ describe('AcessosEntidadeService.listarPorUsuario', () => {
     prisma.acessoEntidade.findMany.mockResolvedValue([])
     await service.listarPorUsuario('u1')
     expect(prisma.acessoEntidade.findMany).toHaveBeenCalledWith({
-      where: { usuarioId: 'u1', ativo: true },
+      where: { usuarioId: 'u1', ativo: true, entidade: { ativo: true } },
       include: {
         entidade: {
           include: { municipio: { include: { estado: { select: { sigla: true, nome: true } } } } },
@@ -65,42 +65,51 @@ describe('AcessosEntidadeService.usuarioPodeAcessar', () => {
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'LEITURA')).toBe(false)
   })
 
+  it('retorna false quando a entidade está inativa', async () => {
+    prisma.acessoEntidade.findUnique.mockResolvedValue({
+      nivel: 'ADMIN',
+      ativo: true,
+      entidade: { ativo: false },
+    })
+    expect(await service.usuarioPodeAcessar('u1', 'ent1', 'LEITURA')).toBe(false)
+  })
+
   it('LEITURA cumpre LEITURA', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'LEITURA')).toBe(true)
   })
 
   it('LEITURA não cumpre ESCRITA', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'ESCRITA')).toBe(false)
   })
 
   it('ESCRITA cumpre LEITURA', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'LEITURA')).toBe(true)
   })
 
   it('ESCRITA cumpre ESCRITA', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'ESCRITA')).toBe(true)
   })
 
   it('ESCRITA não cumpre ADMIN', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ESCRITA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'ADMIN')).toBe(false)
   })
 
   it('ADMIN cumpre tudo', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'LEITURA')).toBe(true)
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'ESCRITA')).toBe(true)
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'ADMIN', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1', 'ADMIN')).toBe(true)
   })
 
   it('default nivelMinimo = LEITURA', async () => {
-    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true })
+    prisma.acessoEntidade.findUnique.mockResolvedValue({ nivel: 'LEITURA', ativo: true, entidade: { ativo: true } })
     expect(await service.usuarioPodeAcessar('u1', 'ent1')).toBe(true)
   })
 })
@@ -245,7 +254,7 @@ describe('AcessosEntidadeService.atualizar', () => {
   it('atualiza ambos', async () => {
     prisma.acessoEntidade.findUnique.mockResolvedValue({ id: 'a1' })
     prisma.acessoEntidade.update.mockResolvedValue({ id: 'a1' })
-    await service.atualizar('a1', { nivel: 'ESCRITA', ativo: true })
+    await service.atualizar('a1', { nivel: 'ESCRITA', ativo: true, entidade: { ativo: true } })
     expect(prisma.acessoEntidade.update.mock.calls[0][0].data).toEqual({
       nivel: 'ESCRITA',
       ativo: true,

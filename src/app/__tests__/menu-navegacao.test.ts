@@ -14,7 +14,7 @@ async function montar() {
   // appAuthMiddleware + appContextoMiddleware
   prisma.usuario.findUnique.mockResolvedValue({ ativo: true, emailValidado: true })
   prisma.acessoEntidade.findFirst.mockResolvedValue({ id: 'a1' })
-  prisma.acessoEntidade.findUnique.mockResolvedValue({ ativo: true, nivel: 'ESCRITA' })
+  prisma.acessoEntidade.findUnique.mockResolvedValue({ ativo: true, nivel: 'ESCRITA', entidade: { ativo: true } })
   prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
   return { app, prisma }
 }
