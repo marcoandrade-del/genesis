@@ -41,3 +41,4 @@
 - [Realização da despesa (spec+progresso)](spec-realizacao-despesa-2026-06-22.md) — épico #109: razão imutável+estorno value-driven, ficha 6 colunas, classificação completa (9 dimensões); motor contábil E600/E700/E800 em #114 (Fase 1: ParametroDespesa)
 - [Oxy Dashboards × Gênesis](oxy-dashboards-integracao.md) — 2º projeto do Marco (BI+IA); Gênesis=registro, Oxy=BI/IA/LRF; integra via MSC/Siconfi + views rel_*; memoriais LRF vivem no Oxy
 - [Infra de memória (path/sync/git)](memoria-infra-versionada.md) — projeto movido p/ Projetos/genesis (chave nova do harness); chave antiga é symlink; sync_memory.py copia p/ in-repo; .claude/memory versionado no git; escrever memória no dir canônico
+- [Claude dirige o versionamento](feedback-claude-dirige-versionamento.md) — Marco delega o controle do repo ao Claude; conduzir branch→PR→CI→merge→limpeza, código via PR+CI, memória/docs direto na master; confirmar só o arriscado
