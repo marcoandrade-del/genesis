@@ -68,11 +68,25 @@ async function main() {
 
     const pendentes = await svc.listarPendentes()
     const aparece = pendentes.some((p) => p.id === sol.id)
-    log(`✔ aparece na fila de pendentes: ${aparece}`)
+    log(`✔ aparece na fila global: ${aparece}`)
     if (!aparece) throw new Error('Solicitação não apareceu na fila de pendentes.')
 
-    await svc.aprovar(sol.id, usuario.id, 'ESCRITA', 'aprovado no smoke')
-    log('✔ aprovada concedendo ESCRITA')
+    const daEntidade = await svc.listarPendentesDaEntidade(entidade.id)
+    log(`✔ aparece na fila DA ENTIDADE: ${daEntidade.some((p) => p.id === sol.id)}`)
+    if (!daEntidade.some((p) => p.id === sol.id)) throw new Error('Não apareceu na fila da entidade.')
+
+    // Guarda de escopo (PR-2): aprovar com outra entidade deve ser barrado.
+    let barrou = false
+    try {
+      await svc.aprovar(sol.id, usuario.id, 'ESCRITA', 'x', 'ENTIDADE-ERRADA')
+    } catch {
+      barrou = true
+    }
+    log(`✔ aprovar com entidade errada foi barrado: ${barrou}`)
+    if (!barrou) throw new Error('Guarda de escopo não barrou a entidade errada.')
+
+    await svc.aprovar(sol.id, usuario.id, 'ESCRITA', 'aprovado no smoke', entidade.id)
+    log('✔ aprovada (escopo correto) concedendo ESCRITA')
 
     const acesso = await prisma.acessoEntidade.findUnique({
       where: { usuarioId_entidadeId: { usuarioId: usuario.id, entidadeId: entidade.id } },

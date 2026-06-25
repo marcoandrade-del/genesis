@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acessos da entidade · <%= entidade.nome %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<div class="container py-4" style="max-width:920px">
+  <h2 class="h4 fw-bold mb-1">Acessos da entidade</h2>
+  <p class="text-muted small mb-4"><%= entidade.nome %> · você administra os acessos a esta entidade.</p>
+
+  <% if (erro) { %>
+    <div class="alert alert-danger small"><i class="bi bi-exclamation-circle me-1"></i><%= erro %></div>
+  <% } %>
+
+  <!-- Solicitações pendentes ------------------------------------------------->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-light fw-semibold small">
+      Solicitações pendentes (<%= pendentes.length %>)
+    </div>
+    <% if (pendentes.length === 0) { %>
+      <div class="card-body small text-muted">Nenhuma solicitação pendente.</div>
+    <% } else { %>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr><th class="ps-3">Solicitante</th><th>Pedido</th><th>Justificativa</th><th class="text-end pe-3" style="width:380px">Decisão</th></tr>
+          </thead>
+          <tbody>
+            <% pendentes.forEach(function(s) { %>
+              <tr>
+                <td class="ps-3">
+                  <div class="fw-semibold small"><%= s.usuario.nomeCompleto %></div>
+                  <div class="text-muted" style="font-size:.75rem"><%= s.usuario.emailPrincipal %></div>
+                </td>
+                <td class="small"><%= s.nivelSolicitado %></td>
+                <td class="small text-muted"><%= s.justificativa || '—' %></td>
+                <td class="pe-3">
+                  <form method="POST" class="d-flex gap-1 justify-content-end align-items-center">
+                    <select name="nivelConcedido" class="form-select form-select-sm" style="width:auto">
+                      <% niveis.forEach(function(n) { %>
+                        <option value="<%= n %>" <%= n === s.nivelSolicitado ? 'selected' : '' %>><%= n %></option>
+                      <% }) %>
+                    </select>
+                    <input name="observacao" class="form-control form-control-sm" placeholder="Obs." style="width:110px">
+                    <button class="btn btn-sm btn-success" formaction="/app/entidade/acessos/solicitacoes/<%= s.id %>/aprovar">Aprovar</button>
+                    <button class="btn btn-sm btn-outline-danger" formaction="/app/entidade/acessos/solicitacoes/<%= s.id %>/rejeitar"
+                      onclick="return confirm('Rejeitar esta solicitação?')">Rejeitar</button>
+                  </form>
+                </td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </div>
+
+  <!-- Acessos atuais --------------------------------------------------------->
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-light fw-semibold small">
+      Acessos atuais (<%= acessos.length %>)
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr><th class="ps-3">Usuário</th><th class="text-end pe-3" style="width:320px">Nível / ações</th></tr>
+        </thead>
+        <tbody>
+          <% acessos.forEach(function(a) { %>
+            <tr>
+              <td class="ps-3">
+                <div class="fw-semibold small">
+                  <%= a.usuario.nomeCompleto %>
+                  <% if (a.usuario.id === meuId) { %><span class="badge bg-secondary bg-opacity-10 text-secondary ms-1">você</span><% } %>
+                </div>
+                <div class="text-muted" style="font-size:.75rem"><%= a.usuario.emailPrincipal %></div>
+              </td>
+              <td class="pe-3">
+                <% if (a.usuario.id === meuId) { %>
+                  <div class="text-end small text-muted"><%= a.nivel %></div>
+                <% } else { %>
+                  <form method="POST" action="/app/entidade/acessos/<%= a.id %>" class="d-flex gap-1 justify-content-end align-items-center">
+                    <select name="nivel" class="form-select form-select-sm" style="width:auto">
+                      <% niveis.forEach(function(n) { %>
+                        <option value="<%= n %>" <%= n === a.nivel ? 'selected' : '' %>><%= n %></option>
+                      <% }) %>
+                    </select>
+                    <button class="btn btn-sm btn-outline-primary" type="submit">Salvar</button>
+                    <button class="btn btn-sm btn-outline-danger" type="submit" name="acao" value="revogar"
+                      onclick="return confirm('Revogar o acesso deste usuário?')">Revogar</button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>
