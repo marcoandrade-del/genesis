@@ -96,6 +96,16 @@ describe('SolicitacoesAcessoService.listarPendentes', () => {
   })
 })
 
+describe('SolicitacoesAcessoService.listarPendentesDaEntidade', () => {
+  it('filtra por entidade + PENDENTE, mais antigas primeiro', async () => {
+    prisma.solicitacaoAcessoEntidade.findMany.mockResolvedValue([])
+    await service.listarPendentesDaEntidade('ent1')
+    expect(prisma.solicitacaoAcessoEntidade.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: 'PENDENTE', entidadeId: 'ent1' }, orderBy: { criadoEm: 'asc' } }),
+    )
+  })
+})
+
 describe('SolicitacoesAcessoService.cancelar', () => {
   it('rejeita inexistente', async () => {
     prisma.solicitacaoAcessoEntidade.findUnique.mockResolvedValue(null)
@@ -175,6 +185,23 @@ describe('SolicitacoesAcessoService.aprovar', () => {
     await service.aprovar('s1', 'adm', 'LEITURA')
     expect(prisma.solicitacaoAcessoEntidade.update.mock.calls[0][0].data.observacaoDecisao).toBeNull()
   })
+
+  it('aprova quando entidadeEsperada confere', async () => {
+    prisma.solicitacaoAcessoEntidade.findUnique.mockResolvedValue({
+      id: 's1', usuarioId: 'u1', entidadeId: 'ent1', status: 'PENDENTE',
+    })
+    prisma.acessoEntidade.upsert.mockResolvedValue({ id: 'a1' })
+    prisma.solicitacaoAcessoEntidade.update.mockResolvedValue({ id: 's1', status: 'APROVADA' })
+    await service.aprovar('s1', 'adm', 'LEITURA', undefined, 'ent1')
+    expect(prisma.acessoEntidade.upsert).toHaveBeenCalled()
+  })
+
+  it('barra (NAO_AUTORIZADO) quando entidadeEsperada difere', async () => {
+    prisma.solicitacaoAcessoEntidade.findUnique.mockResolvedValue({
+      id: 's1', usuarioId: 'u1', entidadeId: 'ent1', status: 'PENDENTE',
+    })
+    await expect(service.aprovar('s1', 'adm', 'LEITURA', undefined, 'ent2')).rejects.toThrow('outra entidade')
+  })
 })
 
 describe('SolicitacoesAcessoService.rejeitar', () => {
@@ -202,5 +229,17 @@ describe('SolicitacoesAcessoService.rejeitar', () => {
     await service.rejeitar('s1', 'adm', '  fora do escopo  ')
     const data = prisma.solicitacaoAcessoEntidade.update.mock.calls[0][0].data
     expect(data.observacaoDecisao).toBe('fora do escopo')
+  })
+
+  it('rejeita quando entidadeEsperada confere', async () => {
+    prisma.solicitacaoAcessoEntidade.findUnique.mockResolvedValue({ id: 's1', entidadeId: 'ent1', status: 'PENDENTE' })
+    prisma.solicitacaoAcessoEntidade.update.mockResolvedValue({ id: 's1', status: 'REJEITADA' })
+    await service.rejeitar('s1', 'adm', undefined, 'ent1')
+    expect(prisma.solicitacaoAcessoEntidade.update).toHaveBeenCalled()
+  })
+
+  it('barra (NAO_AUTORIZADO) quando entidadeEsperada difere', async () => {
+    prisma.solicitacaoAcessoEntidade.findUnique.mockResolvedValue({ id: 's1', entidadeId: 'ent1', status: 'PENDENTE' })
+    await expect(service.rejeitar('s1', 'adm', undefined, 'ent2')).rejects.toThrow('outra entidade')
   })
 })

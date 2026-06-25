@@ -323,6 +323,12 @@
       <i class="bi bi-arrow-left-right gx-ws-swap"></i>
     </a>
 
+    <% if (typeof nivel !== 'undefined' && nivel === 'ADMIN') { %>
+      <a href="/app/entidade/acessos" class="gx-icon-btn" title="Acessos da entidade" aria-label="Acessos da entidade">
+        <i class="bi bi-people"></i>
+      </a>
+    <% } %>
+
     <a href="/app/logout" class="gx-icon-btn" title="Sair" aria-label="Sair">
       <i class="bi bi-box-arrow-right"></i>
     </a>

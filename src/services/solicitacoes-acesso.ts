@@ -88,6 +88,15 @@ export class SolicitacoesAcessoService {
     })
   }
 
+  /** Pendentes de UMA entidade (para o admin da entidade no /app). */
+  listarPendentesDaEntidade(entidadeId: string) {
+    return this.prisma.solicitacaoAcessoEntidade.findMany({
+      where: { status: 'PENDENTE', entidadeId },
+      include: { usuario: { select: { id: true, nomeCompleto: true, emailPrincipal: true } } },
+      orderBy: { criadoEm: 'asc' },
+    })
+  }
+
   /** Usuário cancela a própria solicitação pendente. */
   async cancelar(id: string, usuarioId: string) {
     const sol = await this.prisma.solicitacaoAcessoEntidade.findUnique({ where: { id } })
@@ -113,6 +122,7 @@ export class SolicitacoesAcessoService {
     aprovadorId: string,
     nivelConcedido: NivelAcessoEntidade | string,
     observacao?: string,
+    entidadeEsperada?: string,
   ) {
     if (!NIVEIS_VALIDOS.includes(nivelConcedido as NivelAcessoEntidade)) {
       throw new ErroNegocio(
@@ -122,6 +132,9 @@ export class SolicitacoesAcessoService {
     }
     const sol = await this.prisma.solicitacaoAcessoEntidade.findUnique({ where: { id } })
     if (!sol) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Solicitação não encontrada.')
+    if (entidadeEsperada && sol.entidadeId !== entidadeEsperada) {
+      throw new ErroNegocio('NAO_AUTORIZADO', 'Solicitação pertence a outra entidade.')
+    }
     if (sol.status !== 'PENDENTE') throw new ErroNegocio('CONFLITO', 'Solicitação já foi decidida.')
 
     const nivel = nivelConcedido as NivelAcessoEntidade
@@ -145,9 +158,12 @@ export class SolicitacoesAcessoService {
   }
 
   /** Rejeita a solicitação pendente. */
-  async rejeitar(id: string, aprovadorId: string, observacao?: string) {
+  async rejeitar(id: string, aprovadorId: string, observacao?: string, entidadeEsperada?: string) {
     const sol = await this.prisma.solicitacaoAcessoEntidade.findUnique({ where: { id } })
     if (!sol) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Solicitação não encontrada.')
+    if (entidadeEsperada && sol.entidadeId !== entidadeEsperada) {
+      throw new ErroNegocio('NAO_AUTORIZADO', 'Solicitação pertence a outra entidade.')
+    }
     if (sol.status !== 'PENDENTE') throw new ErroNegocio('CONFLITO', 'Solicitação já foi decidida.')
     return this.prisma.solicitacaoAcessoEntidade.update({
       where: { id },
