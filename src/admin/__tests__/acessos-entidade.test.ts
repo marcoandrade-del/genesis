@@ -5,11 +5,17 @@ const {
   concederMock,
   atualizarMock,
   revogarMock,
+  listarPendentesMock,
+  aprovarMock,
+  rejeitarMock,
 } = vi.hoisted(() => ({
   listarPorUsuarioMock: vi.fn(),
   concederMock: vi.fn(),
   atualizarMock: vi.fn(),
   revogarMock: vi.fn(),
+  listarPendentesMock: vi.fn(),
+  aprovarMock: vi.fn(),
+  rejeitarMock: vi.fn(),
 }))
 
 vi.mock('../../services/acessos-entidade.js', () => ({
@@ -21,6 +27,17 @@ vi.mock('../../services/acessos-entidade.js', () => ({
     conceder = concederMock
     atualizar = atualizarMock
     revogar = revogarMock
+  },
+}))
+
+vi.mock('../../services/solicitacoes-acesso.js', () => ({
+  SolicitacoesAcessoService: class {
+    listarPendentes = listarPendentesMock
+    aprovar = aprovarMock
+    rejeitar = rejeitarMock
+    criar = vi.fn()
+    listarMinhas = vi.fn()
+    cancelar = vi.fn()
   },
 }))
 
@@ -55,7 +72,15 @@ describe('adminAcessosEntidadeRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[listarPorUsuarioMock, concederMock, atualizarMock, revogarMock].forEach((m) => m.mockReset())
+    ;[
+      listarPorUsuarioMock,
+      concederMock,
+      atualizarMock,
+      revogarMock,
+      listarPendentesMock,
+      aprovarMock,
+      rejeitarMock,
+    ].forEach((m) => m.mockReset())
     ;({ app, prisma } = await criarApp({
       registrar: adminAcessosEntidadeRoutes,
       comView: true,
@@ -249,6 +274,87 @@ describe('adminAcessosEntidadeRoutes', () => {
       const res = await app.inject({ method: 'DELETE', url: '/a1' })
       expect(res.statusCode).toBe(400)
       expect(res.body).toContain('Erro ao revogar')
+    })
+  })
+
+  describe('fila de solicitações', () => {
+    const PEND = {
+      id: 's1',
+      nivelSolicitado: 'ESCRITA',
+      justificativa: 'preciso lançar',
+      usuario: { id: 'u1', nomeCompleto: 'Fulano', emailPrincipal: 'f@x.com' },
+      entidade: { nome: 'Prefeitura', municipio: { nome: 'Curitiba', estado: { sigla: 'PR' } } },
+    }
+
+    it('GET /solicitacoes renderiza pendentes', async () => {
+      listarPendentesMock.mockResolvedValue([PEND])
+      const res = await app.inject({ method: 'GET', url: '/solicitacoes' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Solicitações de acesso')
+      expect(res.body).toContain('Fulano')
+      expect(res.body).toContain('Aprovar')
+    })
+
+    it('GET /solicitacoes estado vazio', async () => {
+      listarPendentesMock.mockResolvedValue([])
+      const res = await app.inject({ method: 'GET', url: '/solicitacoes' })
+      expect(res.body).toContain('Nenhuma solicitação pendente')
+    })
+
+    it('aprovar: HX-Redirect e chama o service com o nível decidido', async () => {
+      aprovarMock.mockResolvedValue({ id: 's1' })
+      const res = await app.inject({
+        method: 'POST',
+        url: '/solicitacoes/s1/aprovar',
+        ...form({ nivelConcedido: 'LEITURA', observacao: 'ok' }),
+      })
+      expect(res.statusCode).toBe(204)
+      expect(res.headers['hx-redirect']).toBe('/admin/acessos-entidade/solicitacoes')
+      expect(aprovarMock).toHaveBeenCalledWith('s1', 'a1', 'LEITURA', 'ok')
+    })
+
+    it('aprovar: 400 quando service lança Error', async () => {
+      aprovarMock.mockRejectedValue(new Error('nível inválido'))
+      const res = await app.inject({
+        method: 'POST',
+        url: '/solicitacoes/s1/aprovar',
+        ...form({ nivelConcedido: 'LEITURA' }),
+      })
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('nível inválido')
+    })
+
+    it('aprovar: 400 genérico quando erro não-Error (e nível ausente)', async () => {
+      aprovarMock.mockRejectedValue('boom')
+      const res = await app.inject({ method: 'POST', url: '/solicitacoes/s1/aprovar', ...form({}) })
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('Erro ao aprovar')
+      expect(aprovarMock).toHaveBeenCalledWith('s1', 'a1', '', undefined)
+    })
+
+    it('rejeitar: HX-Redirect e chama o service', async () => {
+      rejeitarMock.mockResolvedValue({ id: 's1' })
+      const res = await app.inject({
+        method: 'POST',
+        url: '/solicitacoes/s1/rejeitar',
+        ...form({ observacao: 'fora do escopo' }),
+      })
+      expect(res.statusCode).toBe(204)
+      expect(res.headers['hx-redirect']).toBe('/admin/acessos-entidade/solicitacoes')
+      expect(rejeitarMock).toHaveBeenCalledWith('s1', 'a1', 'fora do escopo')
+    })
+
+    it('rejeitar: 400 quando service lança Error', async () => {
+      rejeitarMock.mockRejectedValue(new Error('xx'))
+      const res = await app.inject({ method: 'POST', url: '/solicitacoes/s1/rejeitar', ...form({}) })
+      expect(res.statusCode).toBe(400)
+    })
+
+    it('rejeitar: 400 genérico quando erro não-Error', async () => {
+      rejeitarMock.mockRejectedValue('boom')
+      const res = await app.inject({ method: 'POST', url: '/solicitacoes/s1/rejeitar', ...form({}) })
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toContain('Erro ao rejeitar')
     })
   })
 })

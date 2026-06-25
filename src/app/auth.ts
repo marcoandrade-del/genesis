@@ -48,20 +48,8 @@ export async function appAuthRoutes(app: FastifyInstance) {
         })
       }
 
-      // Usuário só pode entrar no /app se tiver ao menos um acesso ativo a
-      // uma entidade ativa (entidade desativada não conta).
-      const temAcesso = await app.prisma.acessoEntidade.findFirst({
-        where: { usuarioId: usuario.id, ativo: true, entidade: { ativo: true } },
-        select: { id: true },
-      })
-      if (!temAcesso) {
-        return reply.view('app/login', {
-          error: 'Você não tem acesso a nenhuma entidade. Procure o administrador para conceder permissão.',
-          email,
-          layout: null,
-        })
-      }
-
+      // Qualquer usuário ativo e validado entra; quem não tem acesso a nenhuma
+      // entidade cai no contexto vazio, de onde pode SOLICITAR acesso.
       const token = app.jwt.sign(
         { sub: usuario.id, email: usuario.emailPrincipal },
         { expiresIn: '8h' },

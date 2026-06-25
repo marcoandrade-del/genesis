@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { appAuthRoutes } from './auth.js'
 import { appContextoRoutes, parseContextoCookie } from './contexto.js'
+import { appSolicitacaoAcessoRoutes } from './solicitacao-acesso.js'
 import { appDashboardRoutes } from './dashboard.js'
 import { appOrcamentoRoutes } from './orcamento.js'
 import { appCreditosAdicionaisRoutes } from './creditos-adicionais.js'
@@ -81,9 +82,16 @@ export async function appAuthMiddleware(req: FastifyRequest, reply: FastifyReply
  * `/app/contexto`. Exceto a própria rota de escolha de contexto.
  */
 export async function appContextoMiddleware(req: FastifyRequest, reply: FastifyReply) {
-  // Rota de escolha não exige contexto pré-existente.
+  // Rotas que não exigem contexto pré-existente: a escolha de contexto e o
+  // fluxo de solicitação de acesso (acessível a quem ainda não tem entidade).
   const rawPath = req.url.split('?')[0]!.replace(/^\/app\/?/, '')
-  if (rawPath === 'contexto') return
+  if (
+    rawPath === 'contexto' ||
+    rawPath.startsWith('solicitar-acesso') ||
+    rawPath.startsWith('minhas-solicitacoes')
+  ) {
+    return
+  }
 
   const cookie = parseContextoCookie(req.cookies['genesis_exercicio'])
   if (!cookie) return reply.redirect('/app/contexto')
@@ -129,6 +137,7 @@ export async function appRoutes(app: FastifyInstance) {
     })
 
     autenticado.register(appContextoRoutes)
+    autenticado.register(appSolicitacaoAcessoRoutes)
     autenticado.register(appDashboardRoutes)
     autenticado.register(appOrcamentoRoutes)
     autenticado.register(appCreditosAdicionaisRoutes)

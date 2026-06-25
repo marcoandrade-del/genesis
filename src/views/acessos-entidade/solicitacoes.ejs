@@ -1,0 +1,68 @@
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      <i class="bi bi-inbox me-1 text-primary"></i>Solicitações de acesso
+    </h2>
+    <div class="small text-muted">Pendentes de decisão (<%= pendentes.length %>)</div>
+  </div>
+</div>
+
+<% if (pendentes.length === 0) { %>
+  <div class="alert alert-secondary small mb-0">
+    <i class="bi bi-check2-circle me-1"></i>Nenhuma solicitação pendente.
+  </div>
+<% } else { %>
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Solicitante</th>
+            <th>Entidade</th>
+            <th style="width:110px">Nível pedido</th>
+            <th>Justificativa</th>
+            <th class="text-end pe-3" style="width:360px">Decisão</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pendentes.forEach(function(s) { %>
+            <tr>
+              <td class="ps-3">
+                <div class="fw-semibold small"><%= s.usuario.nomeCompleto %></div>
+                <div class="text-muted" style="font-size:.75rem"><%= s.usuario.emailPrincipal %></div>
+              </td>
+              <td>
+                <div class="fw-semibold small"><%= s.entidade.nome %></div>
+                <div class="text-muted" style="font-size:.75rem">
+                  <%= s.entidade.municipio.estado.sigla %> · <%= s.entidade.municipio.nome %>
+                </div>
+              </td>
+              <td class="small"><%= s.nivelSolicitado %></td>
+              <td class="small text-muted"><%= s.justificativa || '—' %></td>
+              <td class="pe-3">
+                <div class="d-flex gap-1 justify-content-end align-items-center">
+                  <select name="nivelConcedido" class="form-select form-select-sm" style="width:auto">
+                    <% niveis.forEach(function(n) { %>
+                      <option value="<%= n %>" <%= n === s.nivelSolicitado ? 'selected' : '' %>><%= n %></option>
+                    <% }) %>
+                  </select>
+                  <input name="observacao" class="form-control form-control-sm" placeholder="Observação" style="width:120px">
+                  <button class="btn btn-sm btn-success"
+                    hx-post="/admin/acessos-entidade/solicitacoes/<%= s.id %>/aprovar"
+                    hx-include="closest tr">Aprovar</button>
+                  <button class="btn btn-sm btn-outline-danger"
+                    hx-post="/admin/acessos-entidade/solicitacoes/<%= s.id %>/rejeitar"
+                    hx-include="closest tr"
+                    data-confirm-titulo="Rejeitar solicitação"
+                    data-confirm-detalhe="O usuário será notificado da rejeição."
+                    data-confirm-ok="Rejeitar"
+                    data-confirm-tipo="perigo">Rejeitar</button>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
