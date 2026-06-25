@@ -440,6 +440,7 @@ export function criarPrismaMock() {
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       delete: vi.fn(),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       aggregate: vi.fn().mockResolvedValue({ _sum: { valorPrevisto: null } }),

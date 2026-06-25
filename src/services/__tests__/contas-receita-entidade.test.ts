@@ -53,6 +53,22 @@ describe('desdobrar', () => {
     })
     expect(prisma.contaReceitaEntidade.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { admiteMovimento: false } })
   })
+  it('reaponta as previsões (sem execução) da mãe para a filha', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(PAI)
+    prisma.contaReceitaEntidade.create.mockResolvedValue({ id: 'f1', entidadeId: 'e1', ano: 2026 })
+    await service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'IPTU' })
+    expect(prisma.previsaoReceita.updateMany).toHaveBeenCalledWith({
+      where: { contaReceitaEntidadeId: 'p1' },
+      data: { contaReceitaEntidadeId: 'f1' },
+    })
+  })
+  it('CONFLITO quando a conta tem previsão já executada (arrecadação/lançamento)', async () => {
+    prisma.contaReceitaEntidade.findUnique.mockResolvedValue(PAI)
+    prisma.previsaoReceita.count.mockResolvedValue(1)
+    await expect(service.desdobrar('p1', { codigo: '1.1.1.01', descricao: 'IPTU' })).rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaReceitaEntidade.create).not.toHaveBeenCalled()
+    expect(prisma.previsaoReceita.updateMany).not.toHaveBeenCalled()
+  })
   it('RECURSO_NAO_ENCONTRADO quando conta não existe', async () => {
     prisma.contaReceitaEntidade.findUnique.mockResolvedValue(null)
     await expect(service.desdobrar('xx', { codigo: '1', descricao: 'X' })).rejects.toMatchObject({ code: 'RECURSO_NAO_ENCONTRADO' })
