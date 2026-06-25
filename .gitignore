@@ -8,8 +8,9 @@ coverage/
 # Prisma
 /generated/prisma
 
-# Claude Code — configurações e memórias locais
-.claude/
+# Claude Code — configurações locais ficam fora; memória é versionada
+.claude/*
+!.claude/memory/
 claude.md.bkp
 
 # Documentos de requisitos / melhorias (fora do versionamento)

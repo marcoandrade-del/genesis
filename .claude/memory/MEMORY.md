@@ -1,0 +1,42 @@
+# Memory Index
+
+- [⚠️ Coordenação entre sessões](coordenacao-sessoes.md) — QUADRO VIVO: ler ao iniciar e atualizar ao assumir/concluir trabalho; quem está em qual branch/PR e zonas de colisão
+- [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
+- [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
+- [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
+- [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas
+- [Spec Modelos Contábeis](project_contabil.md) — Próximo trabalho: sistema contábil (plano de contas, modelos, estados/municípios)
+- [Três planos de contas (setor público)](contabil-tres-planos-de-contas.md) — contábil/receita/despesa em tabelas separadas; layout das fontes TCE-PR
+- [Regras do orçamentário](contabil-regras-orcamentario.md) — modelo TCE imutável vs desdobramento da entidade; saldo por fonte com rollup; fonte→contas bancárias (Febraban)
+- [Revisão de regras 2026-06-01](spec-revisao-2026-06-01.md) — 7 gaps; pacote permissão+login+exercício COMPLETO (PR-A/B/C/D/D2 mergeados); Compras #35/36/38 abertos (outra sessão)
+- [Specs usabilidade 2026-06-09](spec-usabilidade-2026-06-09.md) — pivot p/ usabilidade: /app menus dinâmicos, drill-down Estados→Municípios→Entidades+planos, picker de view/campos em relatórios, formatação cabeçalho/rodapé; gap #5 PR-3 pausado
+- [Skills e Configurações](project_skills.md) — Design system Linear, skills instaladas, hooks configurados
+- [Regra: salvar erros](salvar-erros-em-memoria.md) — todo erro meu vira arquivo feedback no mesmo turno
+- [Prisma: `generate` após `migrate dev`](prisma-generate-apos-migrate.md) — neste setup, o client em node_modules não atualiza sozinho
+- [Tema: text-primary vira ink](text-primary-remapeado-no-tema.md) — usar var(--primary) direto se precisar de lime fora do CTA
+- [Módulo Compras: plano 3 PRs](compras-modulo-plano.md) — Lei 14.133; PR-1/2/3 ✅ TODOS mergeados em master (#35/#36/#38)
+- [Merge stack squash: usar -X ours](merge-stack-squash-x-ours.md) — mergear PRs encadeadas+squash sem perder outra frente; nunca `git checkout --ours`
+- [Reabrir PR p/ re-disparar CI](reabrir-pr-para-redisparar-ci.md) — head sem run + ci.yml sem workflow_dispatch → `gh pr close && reopen`
+- [Não operar worktree de outra sessão](feedback-nao-operar-worktree-de-outra-sessao.md) — coord só mergeia PR + sinaliza no quadro; a sessão dona é que rebaseia
+- [Diff antes de rodar import](feedback-import-diff-antes-de-rodar.md) — diferenciar arquivo×banco em memória antes de escrever; openpyxl lê código numérico como float (.0) → coagir a int; "idempotente" ≠ "não escreve"
+- [Compras no /app (operador): plano](compras-no-app-plano.md) — trazer Compras p/ área do usuário escopada ao contexto; reusa services; aguarda #42 mergear
+- [Gerador de Relatórios: plano 3 PRs](relatorios-gerador-plano.md) — /app, escopo por entidade; R1 cabeçalho/rodapé+editor WYSIWYG em andamento
+- [Orçamento Maringá 2026 importado](orcamento-maringa-importado.md) — LOA real no banco dev (403 previsões + 2.325 dotações); fonte 9999 na despesa, receita bruta; script aguarda PR
+- [Import em massa não dispara sync](contabil-import-massa-bypassa-sync.md) — importar plano-MODELO via script fura o SincronizadorContas → entidades defasam; remediar com scripts/ressincronizar_entidades_modelo.ts (feito p/ Maringá 2026-06-09)
+- [Drift de migração no banco dev](prisma-migrate-drift-genesis.md) — NÃO `migrate reset`; aplicar migração via diff+db execute+resolve
+- [Bug do engine de migração Prisma 7.7](prisma-migrate-engine-bug-7.7.md) — `H.replace` crasha diff/db execute/resolve; aplicar migração via psql + INSERT à mão em _prisma_migrations
+- [Rodar/dirigir o app admin](rodar-app-admin.md) — npm run dev (3000); admin é cookie-auth, cunhar JWT p/ navegar via script
+- [curl POST sem corpo vira GET](feedback-curl-post-sem-corpo-vira-get.md) — rota POST-only dá 404 (view "não encontrado"); usar -X POST em ações sem body
+- [reply.locals injeta view compartilhada](fastify-view-reply-locals.md) — hook seta reply.locals.X → aparece em toda view sem tocar rota; usado no menu dinâmico do /app (#66)
+- [EJS: JSON em atributo de evento](ejs-json-em-atributo-de-evento.md) — onsubmit/onclick exige `<%=`; `<%-` mata prompt/confirm (bug do hub, fix no #69); em `<script>` é o contrário
+- [Drag debug muta banco dev](feedback-drag-debug-muta-banco.md) — dirigir drag-drop via Playwright avulso completa o drop e escreve no banco; interceptar endpoints como o e2e ou não dar mouse.up
+- [Saldo do balancete por natureza](feedback-saldo-balancete-natureza.md) — rollup em saldo devedor COM SINAL; credora/retificadora subtrai; nunca somar saldos "positivos por natureza" (MCASP p.531)
+- [Integração receita→contábil (Tabela de Eventos)](integracao-receita-eventos.md) — arrecadação dispara E100/E200/E300; conta-corrente=dimensão no LancamentoItem (não código); de/para NR→VPA em ParametroReceita; PR #90
+- [Conciliação bancária](conciliacao-bancaria.md) — extrato × arrecadações por conta (1:1, audita); parsers CSV/OFX/CNAB; auto-match valor+data; PR #94/#96
+- [Config dashboard: granularidade dos planos](config-dashboard-granularidade.md) — por entidade, painéis exibem plano padrão (modelo) ou com desdobramentos locais; PADRAO colapsa, totais batem; PR #99; seletor por relatório com memória
+- [Construir com defaults](feedback-construir-com-defaults.md) — direção clara → construir anunciando escolhas, não fazer várias perguntas; perguntar só o caro/bifurcante
+- [Favoritos + painel reordenável do /app](app-favoritos-e-painel-ordenavel.md) — barra de favoritos (#102) + reordenar cards por arrasto (#105); reusa FavoritoItem; OrdemItemUsuario esparso; ambos por usuário
+- [Despesa: proposta de eventos contábeis](despesa-eventos-contabeis-proposta.md) — E600/E700/E800 (empenho/liquidação/pagamento → partida dobrada); contas PCASP confirmadas; OUTRA sessão constrói (feat/despesa-realizacao-ledger); de/para deve cobrir a funcional-programática completa, não só natureza
+- [Abertura do exercício (PCASP)](abertura-exercicio-pcasp.md) — PR #110: contabiliza a LOA aprovada (previsão D 6.2.1.1.0/C 5.2.1.1.1; fixação D 5.2.2.1.1.01/C 6.2.2.1.1) + transporte SaldoInicialAno (magnitude); APROVADO→EM_EXECUCAO; cadeia orçamento→abertura→**acumulado diário** (próxima camada: materializar saldo conta×dia)
+- [Realização da despesa (spec+progresso)](spec-realizacao-despesa-2026-06-22.md) — épico #109: razão imutável+estorno value-driven, ficha 6 colunas, classificação completa (9 dimensões); motor contábil E600/E700/E800 em #114 (Fase 1: ParametroDespesa)
+- [Oxy Dashboards × Gênesis](oxy-dashboards-integracao.md) — 2º projeto do Marco (BI+IA); Gênesis=registro, Oxy=BI/IA/LRF; integra via MSC/Siconfi + views rel_*; memoriais LRF vivem no Oxy
