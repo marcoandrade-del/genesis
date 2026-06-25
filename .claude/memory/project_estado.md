@@ -103,7 +103,7 @@ originSessionId: 9fa83edc-4dde-4e46-a383-cf51b57cffad
 > Os grandes épicos fecharam (receita, despesa, contábil table-driven, abertura PCASP, acumulado diário, aprovação da LOA). O backlog agora é de itens menores / a definir.
 
 1. **Modelo Rondônia — fonte específica.** Os 3 planos do RO estão provisoriamente idênticos ao PARANÁ. **⏳ Aguarda o Marco padronizar a fonte RO e reenviar** → re-importar receita/despesa do RO.
-2. **UX de acesso a entidades no /app.** Hoje só o admin concede via `/admin/acessos-entidade/usuario/:id`. Marco quer algo na tela inicial do /app — decisão pendente: fluxo de SOLICITAÇÃO (usuário pede→admin aprova) vs AUTOCONCESSÃO p/ ADMIN de entidade.
+2. ~~UX de acesso a entidades no /app~~ ✅ **FEITO** (#117 + #118): SOLICITAÇÃO **e** autoconcessão. Usuário sem acesso entra e solicita (`/app/solicitar-acesso` + `minhas-solicitacoes`); aprovação no admin do sistema (`/admin/acessos-entidade/solicitacoes`, #117) **e** no painel do admin da entidade (`/app/entidade/acessos`, #118 — aprova/rejeita + nível/revogação, escopado, anti-lockout). Modelo `SolicitacaoAcessoEntidade`. Bootstrap do 1º admin segue no admin do sistema.
 3. ~~Contexto /app não refiltra `Entidade.ativo`~~ ✅ **FEITO** (`0a8405d`): seletor de contexto (`listarPorUsuario`), validação do POST (`usuarioPodeAcessar`), middleware por request e gate de login (`temAcesso`) passam a exigir `Entidade.ativo`; entidade desativada mid-sessão derruba o contexto.
 4. **Consolidação mensal do município** (candidato levantado, não detalhado).
 5. **Próxima grande frente a definir com o Marco.**
