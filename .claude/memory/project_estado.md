@@ -104,7 +104,7 @@ originSessionId: 9fa83edc-4dde-4e46-a383-cf51b57cffad
 
 1. **Modelo Rondônia — fonte específica.** Os 3 planos do RO estão provisoriamente idênticos ao PARANÁ. **⏳ Aguarda o Marco padronizar a fonte RO e reenviar** → re-importar receita/despesa do RO.
 2. **UX de acesso a entidades no /app.** Hoje só o admin concede via `/admin/acessos-entidade/usuario/:id`. Marco quer algo na tela inicial do /app — decisão pendente: fluxo de SOLICITAÇÃO (usuário pede→admin aprova) vs AUTOCONCESSÃO p/ ADMIN de entidade.
-3. **Contexto /app não refiltra `Entidade.ativo`** — entidade desativada continua aparecendo p/ quem já tinha acesso (inconsistência menor).
+3. ~~Contexto /app não refiltra `Entidade.ativo`~~ ✅ **FEITO** (`0a8405d`): seletor de contexto (`listarPorUsuario`), validação do POST (`usuarioPodeAcessar`), middleware por request e gate de login (`temAcesso`) passam a exigir `Entidade.ativo`; entidade desativada mid-sessão derruba o contexto.
 4. **Consolidação mensal do município** (candidato levantado, não detalhado).
 5. **Próxima grande frente a definir com o Marco.**
 
