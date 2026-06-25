@@ -48,67 +48,82 @@ originSessionId: 9fa83edc-4dde-4e46-a383-cf51b57cffad
 
 **Design System Wise — aplicado:**
 - `DESIGN.md` versionado com paleta + tokens (ink #0e0f0c, lime #9fe870, sage #e8ebe6, Manrope+Inter)
-- `src/views/layouts/_theme.ejs` (204 linhas) — override Bootstrap via CSS custom properties, zero alteração de markup nas 60+ views
-- Mockup standalone em `mockups/design-system.html`
+- `src/views/layouts/_theme.ejs` — override Bootstrap via CSS custom properties, zero alteração de markup nas views
 - Gotcha: `.text-primary` é remapeado para `var(--ink)` (memória [[text-primary-remapeado-no-tema]])
 - Regra de cor: **lime SÓ para CTA**; ink para texto brand; sage para neutro
-- Inspeção visual local: não há mais seeds versionados (os `seed_*_temp.ts` foram removidos no PR #16). Para popular o banco, criar admin + fixtures contábeis ad-hoc via `npx tsx -e` usando os services. O banco local já tem fixtures contábeis (PR/Curitiba → plano PCASP 2026 → 9 contas → 3 lançamentos) persistidas.
 
-**Testes (Vitest) — ~2654 testes, cobertura 100% no código novo:**
-- Testes ficam em `src/{admin,routes,services}/__tests__/*.test.ts` — **NÃO** em `tests/` (a CLAUDE.md global menciona pytest/`tests/`, mas é genérica; ignorar para o Gênesis)
+**Testes (Vitest) — ~3088 testes, cobertura 100% no código novo:**
+- Testes ficam em `src/{admin,routes,services,app}/__tests__/*.test.ts` — **NÃO** em `tests/` (a CLAUDE.md global menciona pytest/`tests/`, mas é genérica; ignorar para o Gênesis)
 - Padrão: cada módulo tem `X.test.ts` + frequentemente um `X-extras.test.ts` (testes extras criados só para fechar branches restantes)
-- Esforço concluído em mai/2026: ~40 commits levando cobertura de linhas **e branches** de cada arquivo a 100%
-- E2E com Playwright em `e2e/` (drag-and-drop com prioridade de modifiers)
-- Helper `prisma-mock.ts` com `$transaction` suportando array e callback (interactive)
-- `vitest.config.ts` exclui `dist/` para evitar duplicação de testes compilados
+- E2E com Playwright em `e2e/` — **roda no CI** (job com Postgres + `e2e/seed.ts`, desde #76)
+- Helper `prisma-mock.ts` com `$transaction` suportando array e callback (interactive) — 🔴 **zona de colisão** entre sessões (todo delegate novo é adicionado aqui)
 - Rodar: `npm test` (= `vitest run`, tudo mockado, sem DATABASE_URL); cobertura: `npm run test:coverage`; e2e: `npm run test:e2e`
 
 **CI (GitHub Actions):**
 - `.github/workflows/ci.yml` dispara em push para master e PRs
-- Steps: checkout → setup-node@v4 (Node 24, cache npm) → `npm ci` → `npx prisma generate` → `npm test`
+- Steps: checkout → setup-node (Node 24, cache npm) → `npm ci` → `npx prisma generate` → `npm test`; job e2e separado com Postgres + Playwright
+- ⚠️ `ci.yml` não tem `workflow_dispatch` → rebase/force-push não re-dispara CI; reabrir PR (`gh pr close && reopen`) força o evento ([[reabrir-pr-para-redisparar-ci]])
 
-**Tipo de item (formulário) — auto-preenchido por contexto:**
-- Filho de MENU (profundidade=0) → select com FUNCIONALIDADE/SUBMENU
-- Filho de SUBMENU (profundidade≥1) → travado em FUNCIONALIDADE
-- Server-side bloqueia SUBMENU em profundidade ≥1
+## Estado atual (consolidado 2026-06-25 — nenhuma frente ativa, tudo em master)
 
-## Estado atual (consolidado 2026-06-08 — todas as sessões paralelas encerradas)
+**Área do operador `/app` (multi-entidade × exercício) — COMPLETA:** login próprio (`/app/login`, cookie `genesis_user_token`) + escolha de contexto (`/app/contexto`, cookie `genesis_exercicio`=`entidadeId:ano`) + dashboard. Middlewares `appAuthMiddleware`+`appContextoMiddleware`; `req.contexto.{entidadeId,ano,nivel}`. **Navegação dinâmica** (#66): menus do /app vêm do menu do core. **Menu superior "Gênesis Command Bar"** (#79). **Área de Trabalho customizável**: barra de favoritos do operador estilo navegador (#102), painel reordenável por arrasto per-user (#105), finalização favoritos/layout/contexto (#107). **Config do dashboard** (#99/#100): granularidade dos planos padrão×desdobrado por entidade e por relatório (memória esparsa). Áreas escopadas: Orçamento, Lançamentos, Plano de Contas, Compras (read-only), Relatórios. Link cruzado admin↔app (#48).
 
-**Área do operador `/app` (multi-entidade × exercício) — COMPLETA:** login próprio (`/app/login`, cookie `genesis_user_token`) + escolha de contexto (`/app/contexto`, cookie `genesis_exercicio`=`entidadeId:ano`) + dashboard. Middlewares `appAuthMiddleware`+`appContextoMiddleware`; `req.contexto.{entidadeId,ano,nivel}` (nível via `AcessoEntidade`). Áreas escopadas: Orçamento (+ saldo `/app/orcamento/saldo` com roll-up #61 + créditos adicionais `/app/orcamento/creditos` #62), Lançamentos, Plano de Contas, Compras (read-only, 3 fases: C-App-1 catálogo/PCA/DOD/Reservas + C-App-2/3 fornecedores/processos/contratos/atas/empenhos/liquidações/OPs — #59), Relatórios. Link cruzado admin↔app (#48).
+**Permissão por entidade — COMPLETA:** `AcessoEntidade` (usuário×entidade×nível LEITURA/ESCRITA/ADMIN) + UI admin (#32/#33). Navegação encadeada Estado→Município→Entidade + planos por linha (#63); filtro "só ativas" (#64).
 
-**Permissão por entidade — COMPLETA:** `AcessoEntidade` (usuário×entidade×nível LEITURA/ESCRITA/ADMIN) + UI admin (#32/#33).
+**Módulo Compras Públicas (Lei 14.133):** admin COMPLETO — stack planejamento⊂seleção⊂execução (#35/#36/#38), 11 telas; catálogo CATMAT via CSV (#52), 162.919 itens no dev. **No /app: read-only completo** (#45/#59) — catálogo/PCA/DOD/Reservas + fornecedores/processos/contratos/atas/empenhos/liquidações/OPs, escopado ao contexto.
 
-**Módulo Compras Públicas (Lei 14.133) — admin COMPLETO:** stack planejamento⊂seleção⊂execução (#35/#36/#38), 11 telas (documentos-demanda, itens-catalogo, planos-contratacao, reservas-dotacao, atas, fornecedores, processos, contratos, empenhos, liquidacoes, ordens-pagamento). Importação de catálogo CATMAT via CSV no admin (#52); 162.919 itens no banco dev.
+**Planos de contas 2026 — COMPLETOS no banco dev (2 modelos):** modelo **PARANÁ/TCE-PR**: Contábil PCASP Estendido 8.760 (#46, `NIVEL_MAX=9`), Receita 1.808, Despesa 3.902 (#47); **atributos PCASP** (NaturezaInformacao/NaturezaSaldo/SuperavitFinanceiro + funcao) nas contas (#60). modelo **PCASP Rondônia**: os 3 planos importados, **PROVISORIAMENTE IDÊNTICO AO PARANÁ**. **⏳ Marco vai padronizar a fonte RO específica e mandar depois** — aí re-importar receita/despesa do RO. **Ressalva STN:** arquivos "Padrão" no `~/Downloads` têm gaps (receita STN=662 com 11 níveis agregadores faltantes; despesa STN=907 limpa). Converter STN: cabeçalho na **linha 3**; receita cod=col 11/desc=13/nível=14, despesa cod=6/desc=8/nível=9.
 
-**Planos de contas 2026 — COMPLETOS no banco dev (2 modelos) + tooling em `scripts/`:** modelo **PARANÁ/TCE-PR**: Contábil PCASP Estendido 8.760 (#46, `NIVEL_MAX=9`), Receita 1.808, Despesa 3.902 (#47). modelo **PCASP Rondônia** (2026-06-09): os 3 planos importados — Contábil 8.760 (atributos PCASP entram no próprio import, sem backfill), Receita 1.808, Despesa 3.902. **PROVISORIAMENTE IDÊNTICO AO PARANÁ** (reusa os CSVs do PR). Greenfield. Estado RO vinculado. **⏳ Marco vai padronizar a fonte RO específica e mandar depois** — aí re-importar receita/despesa do RO. Decisões: receita usa descrição CURTA `dsDesdobramento` (NÃO Especificação) nos dois modelos. **Ressalva p/ quando voltar:** os arquivos STN "Padrão" no `~/Downloads` (`Plano de Contas Padrao da Receita 2026`, `...Despesa Orcamentaria 2026`) têm gaps — receita STN=662 contas mas **11 níveis agregadores faltantes** (ramos 1.2.1.5/1.2.2.1/1.3.4.3/1.6.3.2/1.7.1.1) + 1 código malformado; despesa STN=907 limpa. Converter STN: cabeçalho na **linha 3** (≠ TCE-PR linha 7); receita cod=col 11/desc=13/nível=14, despesa cod=6/desc=8/nível=9.
+**Plano de contas — modelo↔entidade + desdobramento — COMPLETO:** **sincronização automática modelo→entidades** no save (#55, `src/services/sincronizador-contas.ts`; atômico, bloqueia se há desdobramento/fonte em uso). **Toda conta nasce ANALÍTICA**; vira sintética ao ganhar filho e volta ao perder o último (invariante `admiteMovimento ⟺ sem filhos`). **Desdobramento no /app** (#77) nos 3 planos + fix do código (preenche o 1º segmento ZERADO da máscara PCASP). **Desdobrar em vários filhos + editar descrição** (#83). **Desdobrar com DISTRIBUIÇÃO** (épico #85: #86 motor / #87 tela 3 fases / #88 guard): conta com saldo/movimento reaponta `LancamentoItem` com rateio, recompõe `ResumoMensalConta`/`SaldoInicialAno`, zera a mãe→sintética; guard impede sintética-com-movimento-preso. **Brasão/logotipo da entidade** (#56, reusa `Entidade.brasao`).
 
-**Plano de contas — modelo↔entidade (#55):** **sincronização automática modelo→entidades** no save (criar/editar/excluir conta dos 3 planos + fontes; bloqueia se há desdobramento abaixo ou fonte em uso; atômico) — `src/services/sincronizador-contas.ts`. **Toda conta nasce ANALÍTICA** (admite movimento); vira sintética ao ganhar o 1º filho e volta a analítica ao perder o último — invariante `admiteMovimento ⟺ sem filhos`, nos 3 planos e nas cópias da entidade. **Excluir desdobramento** na árvore da entidade (só `origem=DESDOBRAMENTO`; cópias MODELO são geridas no plano-modelo; reverte o pai). Atalho **"Planos ▾"** na lista de modelos. **Brasão/logotipo da entidade (#56):** upload (PNG/JPG/GIF/WEBP ≤1 MB, data URL) no cadastro reusando `Entidade.brasao` que o gerador de relatórios já consome (elemento `BRASAO`).
+**Plano de contas do OPERADOR (`/app`) — COMPLETO (Specs 16-06):** **saldos** (#81: saldo inicial/débito/crédito/atual por natureza, roll-up do balancete, "saldo em <data>"), **razão** (#82: resumo mensal→dia→movimentos com saldo corrente), **fix do balancete por natureza** (#83: credora/retificadora SUBTRAI no rollup, saldo devedor COM SINAL — MCASP p.531, [[feedback-saldo-balancete-natureza]]), **lançamento contábil MANUAL** (#84: partida dobrada com picker datalist das ~6.7k analíticas, ∑D=∑C ao vivo, reflete em saldos/razão).
 
-**Gerador de Relatórios (`/app`) — COMPLETO:** templates de cabeçalho/rodapé (editor WYSIWYG), relatórios com query SQL em **sandbox isolado por entidade** (role read-only `genesis_report_ro` + views `rel_*` + GUC `app.entidade`), prévia HTML, organização em pastas, **exportação em 8 formatos** (HTML/TXT/PDF/CSV/XLS/DOC/XML/JSON; deps `exceljs`/`docx`) (#53), **total geral + total por página automáticos** (#54). Fixes: nome único (#49), prefixo `/app` no form do editor (#51). Ver [[relatorios-gerador-plano]].
+**Orçamento — ciclo COMPLETO:** **saldo orçamentário** com roll-up (#61, `/app/orcamento/saldo`), **créditos adicionais** (#62: suplementar/especial/extraordinário, reforço/anulação, aplicação imediata no `valorAutorizado`), **arrecadação da receita** (#71: `Arrecadacao` movimento imutável + `valorArrecadado` materializado, previsto×arrecadado por fonte/conta), **abertura de exercício / virada de ano** (#72: copia planos do ano novo p/ entidade existente), **fluxo de aprovação da LOA** (#116: status `RASCUNHO → ENVIADO_AO_LEGISLATIVO → APROVADO → PUBLICADO → EM_EXECUCAO` + trilha auditável `TransicaoStatusOrcamento`; abertura contábil exige `PUBLICADO`; `EM_EXECUCAO` só via abertura; trava de execução via helper `orcamentoPodeExecutar`).
 
-**Painel de Escopo (#57, gap #1):** `/admin/escopo` — visualização HTML do roadmap (o que é o sistema, o que foi feito, o que falta) com KPIs + barra de progresso + seção por área com badges de status. Fonte da verdade = **arquivo versionado tipado** `src/services/escopo.ts` (áreas × itens × status PRONTO/EM_ANDAMENTO/A_FAZER + ref de PR) + `resumirEscopo()`. **Atualizar `src/services/escopo.ts` no mesmo PR de cada feature nova** (o painel acompanha o código). Link "Escopo" na sidebar. Sem banco, sem CRUD.
+**Integração contábil — RECEITA via Tabela de Eventos — ÉPICO COMPLETO (#90→#98):** arrecadação dispara lançamentos automáticos (partida dobrada) pelo `MotorEventosReceita`: **E100** orçamentário, **E200** DDR, **E300** patrimonial (caixa pela conta bancária da arrecadação, #91); conta-corrente = DIMENSÃO no `LancamentoItem` (não código). Trilha mão-dupla visível (#92). Receita NÃO-EFETIVA E400/E500 (#93). **Conciliação bancária** (#94/#96: extrato×arrecadações 1:1, parsers CSV/OFX/CNAB 240, import por arquivo via FileReader). Receita **tributária** (#95 lançamento E550/baixa E560; #97 dívida ativa E570 + multas E300; #98 baixa parcial controlada). Ver [[integracao-receita-eventos]], [[conciliacao-bancaria]].
 
-## O que falta (backlog priorizado — candidatos a "próxima funcionalidade")
+**Integração contábil — DESPESA — ÉPICO COMPLETO (#109/#114):** **realização da despesa** Fase 1 (#109: razão imutável da ficha de empenho, ledger `MovimentoEmpenho`, estorno value-driven, classificação completa). **Motor da despesa** Fases 1→5 (#114): empenho→**E600**+E601, liquidação→**E700**/E701+**E702** patrimonial, pagamento→**E800**/E801+**E802** financeiro (caixa pela conta bancária); cc=dotação; estorno inverte D↔C. Ver [[despesa-eventos-contabeis-proposta]], [[spec-realizacao-despesa-2026-06-22]].
 
-1. **Execução orçamentária (gap #5) — EM ANDAMENTO (3 PRs).** Fluxo empenho→liquidação→pagamento já existe (via Compras, com saldo materializado em `DotacaoDespesa.valor{Autorizado,Reservado,Empenhado}` e dedução transacional nos services de reserva/empenho). ✅ **PR-1 #61**: consulta read-only de saldo `/app/orcamento/saldo` (`src/services/saldo-orcamentario.ts` — resumo + agregações por UO/fonte/função + por conta com roll-up na árvore). ✅ **PR-2 #62**: créditos adicionais (`CreditoAdicional`+`CreditoAdicionalItem`; suplementar/especial/extraordinário; reforço/anulação; aplicação imediata no `valorAutorizado`; `/app/orcamento/creditos`; `src/services/creditos-adicionais.ts`). ⏳ **PR-3 (falta)**: arrecadação da receita (previsão→arrecadado; precisa schema — `PrevisaoReceita` só tem valorPrevisto). Ver [[contabil-regras-orcamentario]].
-2. ~~Compras no `/app` — C-App-2 (Seleção) e C-App-3 (Execução)~~ ✅ **FEITO read-only** (PR #59): 7 telas de consulta (fornecedores/processos/contratos/atas + empenhos/liquidações/OPs) escopadas ao contexto, hub em 3 fases. Reusa só `listar` dos services; criação/edição segue no /admin. Ver [[compras-no-app-plano]].
-3. ~~Sync modelo→entidades (gap #2)~~ ✅ **FEITO** (PR #55, `src/services/sincronizador-contas.ts`): criar/editar/excluir conta-modelo (contábil/receita/despesa) + fontes propaga p/ as cópias `origem=MODELO` no save (atômico); bloqueia se há desdobramento abaixo. Sem migração.
-4. ~~Atributos PCASP no plano (gap #4)~~ ✅ **FEITO** (PR #60): enums NaturezaInformacao/NaturezaSaldo/SuperavitFinanceiro + funcao em `Conta` (só plano-modelo) + importador estendido + `scripts/backfill_pcasp_atributos_2026.ts` (rodado no dev: 8760 contas) + coluna "Natureza (PCASP)" na árvore. Dados da planilha TCE-PR.
-5. ~~Dashboard HTML de escopo (gap #1)~~ ✅ **FEITO** (PR #57, `/admin/escopo` + `src/services/escopo.ts`). Lembrar de atualizar o roadmap a cada feature.
+**Integração contábil — TABLE-DRIVEN + regras PCASP (#114):** as contas D/C de cada evento vêm da **Tabela de Eventos** (`EventoContabil`/`EventoLancamento`, editável no admin `/admin/eventos-contabeis`), não do código. Máscaras literais = códigos PCASP; **tokens** resolvem no disparo (`@VPD`/`@PASSIVO`/`@CAIXA`/`@DDR_CONTROLE`/`@ATIVO`/`@DIVIDA_ATIVA`…). **Gatilho** explícito (`EventoContabil.gatilho`) — motor filtra por gatilho, não pelo código. **Regras PCASP** (`pcasp-regras.ts`) no save: barra conta sintética/inexistente, exige D=C, bloqueia mistura de subsistemas P/O/C. Herança tabela+de/para no `ModeloContabil`, ligados por código.
+
+**Abertura do exercício (PCASP) — COMPLETO (#110):** contabiliza a LOA: Parte A orçamentário (previsão D 6.2.1.1.0/C 5.2.1.1.1; fixação D 5.2.2.1.1.01/C 6.2.2.1.1) + Parte B transporte `SaldoInicialAno`=|saldo final ano−1| (classes 1/2). Idempotente + reversível; `OrigemLancamento+=ABERTURA`. Ver [[abertura-exercicio-pcasp]].
+
+**Acumulado diário — TRÍADE COMPLETA:** **contábil** materializado (#112: `MovimentoDiarioConta` entidade×conta×dia + `SaldoDiarioService` + tela `/app/contas/:id/diario`), **receita** (#113: `ArrecadacaoDiariaService` lê o ledger `Arrecadacao`, arrecadado×previsto/dia), **despesa** (#115: `DespesaDiariaService` lê o ledger `MovimentoEmpenho`, 3 séries empenhado/liquidado/pago/dia vs fixado). Receita/despesa NÃO materializam (leem o ledger datado direto).
+
+**Contas bancárias Febraban (#75):** `ContaBancaria` (banco/agência/conta, vínculo à fonte POR CÓDIGO + `contaContabilCodigo` folha 1.1.1.x) + CRUD `/app/contas-bancarias` + trava conta×fonte na emissão de OP.
+
+**Gerador de Relatórios (`/app`) — COMPLETO:** templates de cabeçalho/rodapé (editor WYSIWYG + formatação rica/réguas/brasão #70), query SQL em **sandbox isolado por entidade** (role `genesis_report_ro` + views `rel_*` + GUC `app.entidade`), prévia HTML, pastas, **exportação em 8 formatos** (#53), **totais configuráveis por coluna** (#69) + painel de totais no design (#73), **picker de view/colunas** no editor (#68). Ver [[relatorios-gerador-plano]].
+
+**Painel de Escopo (#57):** `/admin/escopo` — roadmap em HTML (KPIs + progresso + badges por área). Fonte da verdade = `src/services/escopo.ts` (tipado). **Atualizar no mesmo PR de cada feature nova.**
+
+**Dados reais no dev:** LOA 2026 da **Prefeitura de Maringá** importada do Portal da Transparência (#74 versionou o script) — 403 previsões + 2.325 dotações (fixado 2,84bi exato). Caveats: fonte 9999 na despesa, receita bruta > despesa. Ver [[orcamento-maringa-importado]].
+
+## O que falta (backlog — candidatos a "próxima funcionalidade")
+
+> Os grandes épicos fecharam (receita, despesa, contábil table-driven, abertura PCASP, acumulado diário, aprovação da LOA). O backlog agora é de itens menores / a definir.
+
+1. **Modelo Rondônia — fonte específica.** Os 3 planos do RO estão provisoriamente idênticos ao PARANÁ. **⏳ Aguarda o Marco padronizar a fonte RO e reenviar** → re-importar receita/despesa do RO.
+2. **UX de acesso a entidades no /app.** Hoje só o admin concede via `/admin/acessos-entidade/usuario/:id`. Marco quer algo na tela inicial do /app — decisão pendente: fluxo de SOLICITAÇÃO (usuário pede→admin aprova) vs AUTOCONCESSÃO p/ ADMIN de entidade.
+3. **Contexto /app não refiltra `Entidade.ativo`** — entidade desativada continua aparecendo p/ quem já tinha acesso (inconsistência menor).
+4. **Consolidação mensal do município** (candidato levantado, não detalhado).
+5. **Próxima grande frente a definir com o Marco.**
 
 ## Decisões técnicas importantes
 
-- Prisma 7 exige `driverAdapters` em `previewFeatures` e `new PrismaClient({ adapter })`
-- Em Prisma 7 com driver adapter, `datasource db` no schema.prisma não precisa de `url` — `prisma generate` roda sem DATABASE_URL
-- Runner de dev é `tsx` (sem watch — restart manual após mudança em .ts)
-- `exactOptionalPropertyTypes: true` no tsconfig
-- SortableJS com `forceFallback:true` (necessário para handle em `<button>`); ler `evt.originalEvent.ctrlKey` no onEnd é inconsistente — usar variável `_ddCtrlAtivo` mantida por keydown/keyup
+- Prisma 7 exige `driverAdapters` em `previewFeatures` e `new PrismaClient({ adapter })`; com driver adapter, `datasource db` não precisa de `url` (generate roda sem DATABASE_URL)
+- Runner de dev é `tsx` (sem watch — restart manual após mudança em .ts ou .ejs; view engine não cacheia EJS em dev)
+- `exactOptionalPropertyTypes: true` no tsconfig; erros `TS6059` de `scripts/*.ts` fora do `rootDir` são pré-existentes e NÃO travam o CI
+- ⚠️ **Engine de migração Prisma 7.7 quebra localmente** com `H.replace` (afeta `migrate diff`/`db execute`/`migrate resolve`) → aplicar `migration.sql` via `psql` + INSERT à mão em `_prisma_migrations` (checksum `sha256sum`); `generate`/`validate` funcionam ([[prisma-migrate-engine-bug-7.7]]). NÃO `migrate reset` ([[prisma-migrate-drift-genesis]])
+- `prisma generate` após `migrate dev` não atualiza o client em node_modules sozinho neste setup ([[prisma-generate-apos-migrate]])
+- Import em massa de plano-MODELO via script fura o `SincronizadorContas` → entidades defasam; remediar com `scripts/ressincronizar_entidades_modelo.ts` ([[contabil-import-massa-bypassa-sync]])
+- Conta-corrente contábil = DIMENSÃO no `LancamentoItem`, não código concatenado (classe 6 e DDR são folhas)
+- SortableJS com `forceFallback:true` (handle em `<button>`); usar variável `_ddCtrlAtivo` por keydown/keyup (ler `ctrlKey` no onEnd é inconsistente)
+- JSON dentro de atributo de evento (onsubmit/onclick) SEMPRE com `<%=`, nunca `<%-` (em `<script>` é o contrário) ([[ejs-json-em-atributo-de-evento]])
+- Forms sob `/app` precisam de URL absoluta `/app/...`; `inject` de teste sem prefixo não pega o bug ([[rodar-app-admin]]). curl POST sem corpo vira GET → usar `-X POST` ([[feedback-curl-post-sem-corpo-vira-get]])
 - Testes mockam `email.js`/`sms.js` (nodemailer + Twilio) para não vazar para SMTP real
-- `FavoritoItem` voltou ao schema (migration `20260506182330_add_favorito_item`) — favoritos de item por sistema
-- Itens podem ter `referenciaId` → "atalho" para outro item; `criarAtalho()` em `ItensService` (não permite atalho de atalho)
-- Feedback ao admin via `HX-Trigger: {"mostrarInfo": {titulo, texto}}` — handler em `main.ejs` exibe modal informativo (semCancelar)
-- Em `admin/menus.ts`: helpers `render{Sistema,Modulo,Menu,Item}Edit(reply, id, erro)` para re-render após erro; constante `HX_REFRESH_TREE`; helper `errMsg(e, fallback)`
-- **Guard de fragmentos** (`admin/index.ts`): GET não-HTMX com ≥2 segmentos é tratado como fragmento e redirecionado pra `/admin`. Página **completa** (renderizada com `layout: main`) sob caminho profundo (ex.: `/lancamentos/novo`) precisa entrar no Set `PAGINAS_COMPLETAS_PROFUNDAS`, senão o `<a href>` cai no dashboard. Exceção blanket: tudo sob `funcionando/*`.
+- Feedback ao admin via `HX-Trigger: {"mostrarInfo": {titulo, texto}}` — modal informativo em `main.ejs`
+- **Guard de fragmentos** (`admin/index.ts`): GET não-HTMX com ≥2 segmentos vira fragmento → redirect p/ `/admin`. Página completa sob caminho profundo precisa entrar no Set `PAGINAS_COMPLETAS_PROFUNDAS` (exceção blanket: `funcionando/*`)
+- **Coordenação entre sessões**: working tree compartilhada; antes de `git checkout -b` rodar `git branch --show-current`. PR empilhada cujo branch-base é deletado no merge é FECHADA pelo GitHub → rebasear no master e abrir PR nova ([[merge-stack-squash-x-ours]], [[reabrir-pr-para-redisparar-ci]], [[coordenacao-sessoes]])
 
 **Why:** Stack escolhida para programador COBOL veterano — tipagem forte, schema declarativo.
-**How to apply:** Continuar padrões service/route. Admin splitpane para hierarquias, modal para entidades simples. Para confirmações destrutivas use `data-confirm-*`. Ao criar/editar service crítico, criar `X.test.ts` correspondente e manter 100% de cobertura.
+**How to apply:** Continuar padrões service/route. Admin splitpane para hierarquias, modal para entidades simples. Confirmações destrutivas via `data-confirm-*`. Ao criar/editar service crítico, criar `X.test.ts` e manter 100% de cobertura. Atualizar `src/services/escopo.ts` no mesmo PR de cada feature.
