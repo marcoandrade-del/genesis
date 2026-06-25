@@ -121,6 +121,11 @@ export const ESCOPO: readonly AreaEscopo[] = [
         status: 'PRONTO',
         ref: '#32/#33',
       },
+      {
+        titulo: 'Solicitação de acesso a entidades (operador)',
+        descricao: 'Usuário sem acesso entra e solicita acesso a uma entidade (nível desejado + justificativa); fila de aprovação no admin decide o nível concedido. Autoconcessão pelo admin da entidade vem na fase 2.',
+        status: 'EM_ANDAMENTO',
+      },
     ],
   },
   {
