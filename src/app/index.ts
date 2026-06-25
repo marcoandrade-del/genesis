@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
-import { AcessosEntidadeService } from '../services/acessos-entidade.js'
 import { appAuthRoutes } from './auth.js'
 import { appContextoRoutes, parseContextoCookie } from './contexto.js'
 import { appDashboardRoutes } from './dashboard.js'
@@ -89,7 +88,6 @@ export async function appContextoMiddleware(req: FastifyRequest, reply: FastifyR
   const cookie = parseContextoCookie(req.cookies['genesis_exercicio'])
   if (!cookie) return reply.redirect('/app/contexto')
 
-  const acessos = new AcessosEntidadeService(req.server.prisma)
   const acesso = await req.server.prisma.acessoEntidade.findUnique({
     where: { usuarioId_entidadeId: { usuarioId: req.user.sub, entidadeId: cookie.entidadeId } },
     include: { entidade: { select: { ativo: true } } },
@@ -98,7 +96,6 @@ export async function appContextoMiddleware(req: FastifyRequest, reply: FastifyR
   if (!acesso || !acesso.ativo || !acesso.entidade.ativo) {
     return reply.clearCookie('genesis_exercicio', { path: '/' }).redirect('/app/contexto')
   }
-  void acessos
   req.contexto = { entidadeId: cookie.entidadeId, ano: cookie.ano, nivel: acesso.nivel }
 }
 
