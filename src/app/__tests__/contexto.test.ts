@@ -83,7 +83,8 @@ describe('appContextoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/contexto' })
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Escolha o contexto')
-      expect(res.body).toContain('não tem nenhum acesso ativo')
+      expect(res.body).toContain('ainda não tem acesso a nenhuma entidade')
+      expect(res.body).toContain('/app/solicitar-acesso')
     })
 
     it('agrupa entidades por município', async () => {

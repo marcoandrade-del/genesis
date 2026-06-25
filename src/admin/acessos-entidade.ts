@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import type { NivelAcessoEntidade } from '@prisma/client'
 import { AcessosEntidadeService } from '../services/acessos-entidade.js'
+import { SolicitacoesAcessoService } from '../services/solicitacoes-acesso.js'
 
 const NIVEIS_VALIDOS: ReadonlyArray<NivelAcessoEntidade> = ['LEITURA', 'ESCRITA', 'ADMIN']
 
@@ -12,6 +13,54 @@ const NIVEIS_VALIDOS: ReadonlyArray<NivelAcessoEntidade> = ['LEITURA', 'ESCRITA'
  */
 export async function adminAcessosEntidadeRoutes(app: FastifyInstance) {
   const acessos = new AcessosEntidadeService(app.prisma)
+  const solicitacoesSvc = new SolicitacoesAcessoService(app.prisma)
+
+  // ── Fila de solicitações de acesso pendentes (admin do sistema) ─────────────
+  app.get('/solicitacoes', async (req, reply) => {
+    const pendentes = await solicitacoesSvc.listarPendentes()
+    return reply.view(
+      'acessos-entidade/solicitacoes',
+      {
+        title: 'Solicitações de acesso — Gênesis Admin',
+        active: 'solicitacoes-acesso',
+        userEmail: req.user.email,
+        pendentes,
+        niveis: NIVEIS_VALIDOS,
+      },
+      { layout: 'layouts/main' },
+    )
+  })
+
+  // ── APROVAR (POST) — cria/ativa o acesso no nível decidido ───────────────────
+  app.post<{ Params: { id: string }; Body: { nivelConcedido?: string; observacao?: string } }>(
+    '/solicitacoes/:id/aprovar',
+    async (req, reply) => {
+      try {
+        await solicitacoesSvc.aprovar(
+          req.params.id,
+          req.user.sub,
+          (req.body.nivelConcedido ?? '') as NivelAcessoEntidade,
+          req.body.observacao,
+        )
+        return reply.header('HX-Redirect', '/admin/acessos-entidade/solicitacoes').status(204).send()
+      } catch (e: unknown) {
+        return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao aprovar solicitação.')
+      }
+    },
+  )
+
+  // ── REJEITAR (POST) ─────────────────────────────────────────────────────────
+  app.post<{ Params: { id: string }; Body: { observacao?: string } }>(
+    '/solicitacoes/:id/rejeitar',
+    async (req, reply) => {
+      try {
+        await solicitacoesSvc.rejeitar(req.params.id, req.user.sub, req.body.observacao)
+        return reply.header('HX-Redirect', '/admin/acessos-entidade/solicitacoes').status(204).send()
+      } catch (e: unknown) {
+        return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao rejeitar solicitação.')
+      }
+    },
+  )
 
   // ── Página principal: acessos de um usuário ─────────────────────────────────
   app.get<{

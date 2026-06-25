@@ -56,6 +56,7 @@ const PAGINAS_COMPLETAS_PROFUNDAS: ReadonlyArray<string | RegExp> = [
   /^programas\/[^/]+\/acoes$/,
   /^orcamentos\/[^/]+$/,
   /^acessos-entidade\/usuario\/[^/]+$/,
+  'acessos-entidade/solicitacoes',
 ]
 
 function ePaginaCompletaProfunda(path: string): boolean {

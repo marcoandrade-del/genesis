@@ -131,23 +131,9 @@ describe('appAuthRoutes', () => {
       expect(res.body).toContain('pendente de ativação')
     })
 
-    it('rejeita usuário sem nenhum AcessoEntidade ativo', async () => {
-      prisma.usuario.findFirst.mockResolvedValue(USUARIO_OK)
-      ;(argon2.verify as ReturnType<typeof vi.fn>).mockResolvedValue(true)
-      prisma.acessoEntidade.findFirst.mockResolvedValue(null)
-      const res = await app.inject({
-        method: 'POST',
-        url: '/login',
-        ...form({ email: USUARIO_OK.emailPrincipal, senha: 'x' }),
-      })
-      expect(res.statusCode).toBe(200)
-      expect(res.body).toContain('não tem acesso a nenhuma entidade')
-    })
-
     it('login feliz: seta cookie e redireciona para /app/contexto', async () => {
       prisma.usuario.findFirst.mockResolvedValue(USUARIO_OK)
       ;(argon2.verify as ReturnType<typeof vi.fn>).mockResolvedValue(true)
-      prisma.acessoEntidade.findFirst.mockResolvedValue({ id: 'a1' })
       const res = await app.inject({
         method: 'POST',
         url: '/login',

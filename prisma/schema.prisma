@@ -82,21 +82,21 @@ model ItemFuncionalidade {
 }
 
 model Usuario {
-  id                       String                   @id @default(uuid())
-  cpf                      String?                  @unique
-  idEstrangeiro            String?                  @unique
+  id                       String                      @id @default(uuid())
+  cpf                      String?                     @unique
+  idEstrangeiro            String?                     @unique
   nomeCompleto             String
   nomeSocial               String
-  dataNascimento           DateTime                 @db.Date
-  emailPrincipal           String                   @unique
+  dataNascimento           DateTime                    @db.Date
+  emailPrincipal           String                      @unique
   emailAlternativo         String?
   telefonePrincipal        String
   telefoneAlternativo      String?
-  emailValidado            Boolean                  @default(false)
-  celularValidado          Boolean                  @default(false)
-  ativo                    Boolean                  @default(false)
-  criadoEm                 DateTime                 @default(now())
-  atualizadoEm             DateTime                 @updatedAt
+  emailValidado            Boolean                     @default(false)
+  celularValidado          Boolean                     @default(false)
+  ativo                    Boolean                     @default(false)
+  criadoEm                 DateTime                    @default(now())
+  atualizadoEm             DateTime                    @updatedAt
   senhaHash                String?
   adminModulos             AdminModulo[]
   adminSistemas            AdminSistema[]
@@ -112,6 +112,8 @@ model Usuario {
   cabecalhosRelatorio      CabecalhoRelatorio[]
   rodapesRelatorio         RodapeRelatorio[]
   transicoesOrcamento      TransicaoStatusOrcamento[]
+  solicitacoesAcesso       SolicitacaoAcessoEntidade[] @relation("SolicitacaoAcessoUsuario")
+  decisoesAcesso           SolicitacaoAcessoEntidade[] @relation("SolicitacaoAcessoDecisor")
 
   @@map("usuarios")
 }
@@ -353,6 +355,14 @@ enum NivelAcessoEntidade {
   ADMIN
 }
 
+// Estado de um pedido de acesso a uma Entidade (SolicitacaoAcessoEntidade).
+enum StatusSolicitacaoAcesso {
+  PENDENTE
+  APROVADA
+  REJEITADA
+  CANCELADA
+}
+
 // ─────────────────────────────────────────────────────────────
 // Módulo Contábil
 // Estado/Município → ModeloContabil → PlanoDeContas (1/ano) → Conta (árvore 6 níveis)
@@ -422,24 +432,24 @@ model PlanoDeContas {
 }
 
 model Conta {
-  id              String        @id @default(uuid())
-  codigo          String
-  descricao       String
-  nivel           Int // 1..9 (PCASP Estendido TCE-PR)
-  admiteMovimento Boolean       @default(false)
+  id                  String               @id @default(uuid())
+  codigo              String
+  descricao           String
+  nivel               Int // 1..9 (PCASP Estendido TCE-PR)
+  admiteMovimento     Boolean              @default(false)
   // Atributos PCASP (origem: planilha TCE-PR; nullable pois contas criadas à mão
   // ou planos não-importados podem não tê-los). Só no plano-modelo contábil.
   naturezaInformacao  NaturezaInformacao?
   naturezaSaldo       NaturezaSaldo?
   superavitFinanceiro SuperavitFinanceiro?
-  funcao              String?       @db.Text
-  planoId         String
-  parentId        String?
-  criadoEm        DateTime      @default(now())
-  atualizadoEm    DateTime      @updatedAt
-  plano           PlanoDeContas @relation(fields: [planoId], references: [id])
-  parent          Conta?        @relation("Subcontas", fields: [parentId], references: [id])
-  filhos          Conta[]       @relation("Subcontas")
+  funcao              String?              @db.Text
+  planoId             String
+  parentId            String?
+  criadoEm            DateTime             @default(now())
+  atualizadoEm        DateTime             @updatedAt
+  plano               PlanoDeContas        @relation(fields: [planoId], references: [id])
+  parent              Conta?               @relation("Subcontas", fields: [parentId], references: [id])
+  filhos              Conta[]              @relation("Subcontas")
 
   @@unique([planoId, codigo])
   @@index([planoId, parentId])
@@ -494,20 +504,20 @@ model Lancamento {
 }
 
 model LancamentoItem {
-  id           String                @id @default(uuid())
-  lancamentoId String
-  contaId      String // FK em ContaContabilEntidade (cópia da entidade)
-  tipo         TipoLancamento
-  valor        Decimal               @db.Decimal(18, 2)
+  id                    String                @id @default(uuid())
+  lancamentoId          String
+  contaId               String // FK em ContaContabilEntidade (cópia da entidade)
+  tipo                  TipoLancamento
+  valor                 Decimal               @db.Decimal(18, 2)
   // Conta-corrente (sub-razão): a conta resolve p/ a folha fixa do PCASP e a
   // natureza da receita / fonte viajam como DIMENSÃO (não como código mais fundo).
   naturezaReceitaCodigo String? // ex.: "1.3.1.1.01.1.1" (cc da classe 6, VPA)
   fonteCodigo           String? // ex.: "1500" (cc da classe 8 / disponibilidade)
   // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
   dotacaoDespesaId      String?
-  lancamento   Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
-  conta        ContaContabilEntidade @relation(fields: [contaId], references: [id])
-  dotacaoDespesa DotacaoDespesa?     @relation(fields: [dotacaoDespesaId], references: [id])
+  lancamento            Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
+  conta                 ContaContabilEntidade @relation(fields: [contaId], references: [id])
+  dotacaoDespesa        DotacaoDespesa?       @relation(fields: [dotacaoDespesaId], references: [id])
 
   @@index([contaId])
   @@index([dotacaoDespesaId])
@@ -604,14 +614,14 @@ enum IndicadorReconhecimento {
 // NR → conta de contrapartida patrimonial + indicador de mutação. Esparsa: só as
 // naturezas configuradas. Vive no modelo (por estado), como o plano de contas.
 model ParametroReceita {
-  id                       String      @id @default(uuid())
+  id                       String                  @id @default(uuid())
   modeloContabilId         String
   naturezaCodigo           String // ex.: "1.3.1.1.01.1.1"
   tipoMutacao              TipoMutacao
   // Conta de contrapartida patrimonial a creditar no lançamento da arrecadação:
   // VPA classe 4 (efetiva, E300), passivo classe 2 (op. crédito, E400) ou baixa de
   // ativo classe 1 (alienação, E500). Mapeada à coluna legada "contaVpaCodigo".
-  contaContrapartidaCodigo String         @map("contaVpaCodigo")
+  contaContrapartidaCodigo String                  @map("contaVpaCodigo")
   // Tributária (COMPETENCIA): reconhece o crédito no lançamento. `contaAtivoCodigo`
   // é a conta de "créditos a receber" (classe 1.1.2.x) debitada no lançamento e
   // baixada na arrecadação (E560). CAIXA = não tributária (E300/E400/E500).
@@ -620,9 +630,9 @@ model ParametroReceita {
   // Dívida ativa (classe 1.2.1.x): destino da inscrição (E570) — D dívida ativa /
   // C baixa do crédito a receber circulante (contaAtivoCodigo).
   contaDividaAtivaCodigo   String?
-  criadoEm                 DateTime       @default(now())
-  atualizadoEm             DateTime       @updatedAt
-  modeloContabil           ModeloContabil @relation(fields: [modeloContabilId], references: [id])
+  criadoEm                 DateTime                @default(now())
+  atualizadoEm             DateTime                @updatedAt
+  modeloContabil           ModeloContabil          @relation(fields: [modeloContabilId], references: [id])
 
   @@unique([modeloContabilId, naturezaCodigo])
   @@index([modeloContabilId])
@@ -797,6 +807,7 @@ model Entidade {
   relatoriosPersonalizados RelatorioPersonalizado[]
   pastasFavorito           PastaFavorito[]
   contasBancarias          ContaBancaria[]
+  solicitacoesAcesso       SolicitacaoAcessoEntidade[]
   configuracaoDashboard    ConfiguracaoDashboard?
 
   @@unique([municipioId, nome])
@@ -875,24 +886,24 @@ model ContaBancaria {
 // As contas de entidade são cópias por exercício (ano). `modeloContaId` é uma
 // referência fraca (sem FK) à conta-fonte do modelo, para rastreio/sincronização.
 model ContaContabilEntidade {
-  id              String                  @id @default(uuid())
-  entidadeId      String
-  ano             Int
-  codigo          String
-  descricao       String
-  nivel           Int
-  admiteMovimento Boolean                 @default(false)
-  origem          OrigemConta             @default(MODELO)
-  modeloContaId   String?
-  parentId        String?
-  criadoEm        DateTime                @default(now())
-  atualizadoEm    DateTime                @updatedAt
-  entidade        Entidade                @relation(fields: [entidadeId], references: [id])
-  parent          ContaContabilEntidade?  @relation("SubContabilEnt", fields: [parentId], references: [id])
-  filhos          ContaContabilEntidade[] @relation("SubContabilEnt")
-  lancamentoItens LancamentoItem[]
-  resumos         ResumoMensalConta[]
-  saldosIniciais  SaldoInicialAno[]
+  id                String                  @id @default(uuid())
+  entidadeId        String
+  ano               Int
+  codigo            String
+  descricao         String
+  nivel             Int
+  admiteMovimento   Boolean                 @default(false)
+  origem            OrigemConta             @default(MODELO)
+  modeloContaId     String?
+  parentId          String?
+  criadoEm          DateTime                @default(now())
+  atualizadoEm      DateTime                @updatedAt
+  entidade          Entidade                @relation(fields: [entidadeId], references: [id])
+  parent            ContaContabilEntidade?  @relation("SubContabilEnt", fields: [parentId], references: [id])
+  filhos            ContaContabilEntidade[] @relation("SubContabilEnt")
+  lancamentoItens   LancamentoItem[]
+  resumos           ResumoMensalConta[]
+  saldosIniciais    SaldoInicialAno[]
   movimentosDiarios MovimentoDiarioConta[]
 
   @@unique([entidadeId, ano, codigo])
@@ -924,23 +935,23 @@ model ContaReceitaEntidade {
 }
 
 model ContaDespesaEntidade {
-  id              String                 @id @default(uuid())
-  entidadeId      String
-  ano             Int
-  codigo          String
-  descricao       String
-  nivel           Int
-  admiteMovimento Boolean                @default(false)
-  origem          OrigemConta            @default(MODELO)
-  modeloContaId   String?
-  parentId        String?
-  criadoEm        DateTime               @default(now())
-  atualizadoEm    DateTime               @updatedAt
-  entidade        Entidade               @relation(fields: [entidadeId], references: [id])
-  parent          ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
-  filhos          ContaDespesaEntidade[] @relation("SubDespesaEnt")
-  dotacoes        DotacaoDespesa[]
-  empenhosSubElemento Empenho[]          @relation("EmpenhoSubElemento")
+  id                  String                 @id @default(uuid())
+  entidadeId          String
+  ano                 Int
+  codigo              String
+  descricao           String
+  nivel               Int
+  admiteMovimento     Boolean                @default(false)
+  origem              OrigemConta            @default(MODELO)
+  modeloContaId       String?
+  parentId            String?
+  criadoEm            DateTime               @default(now())
+  atualizadoEm        DateTime               @updatedAt
+  entidade            Entidade               @relation(fields: [entidadeId], references: [id])
+  parent              ContaDespesaEntidade?  @relation("SubDespesaEnt", fields: [parentId], references: [id])
+  filhos              ContaDespesaEntidade[] @relation("SubDespesaEnt")
+  dotacoes            DotacaoDespesa[]
+  empenhosSubElemento Empenho[]              @relation("EmpenhoSubElemento")
 
   @@unique([entidadeId, ano, codigo])
   @@index([entidadeId, ano, parentId])
@@ -1160,17 +1171,17 @@ enum StatusOrcamento {
 }
 
 model Orcamento {
-  id             String            @id @default(uuid())
+  id             String                     @id @default(uuid())
   entidadeId     String
   ano            Int
-  status         StatusOrcamento   @default(RASCUNHO)
+  status         StatusOrcamento            @default(RASCUNHO)
   leiNumero      String?
   dataAprovacao  DateTime?
   dataPublicacao DateTime?
   observacoes    String?
-  criadoEm       DateTime          @default(now())
-  atualizadoEm   DateTime          @updatedAt
-  entidade       Entidade          @relation(fields: [entidadeId], references: [id])
+  criadoEm       DateTime                   @default(now())
+  atualizadoEm   DateTime                   @updatedAt
+  entidade       Entidade                   @relation(fields: [entidadeId], references: [id])
   dotacoes       DotacaoDespesa[]
   previsoes      PrevisaoReceita[]
   creditos       CreditoAdicional[]
@@ -1209,7 +1220,7 @@ enum EsferaOrcamentaria {
 }
 
 model DotacaoDespesa {
-  id                     String               @id @default(uuid())
+  id                     String                 @id @default(uuid())
   orcamentoId            String
   unidadeOrcamentariaId  String
   funcaoId               String
@@ -1218,24 +1229,24 @@ model DotacaoDespesa {
   acaoId                 String
   contaDespesaEntidadeId String
   fonteRecursoEntidadeId String
-  esfera                 EsferaOrcamentaria   @default(FISCAL) // qual orçamento financia (Fiscal/Seguridade/Investimento)
+  esfera                 EsferaOrcamentaria     @default(FISCAL) // qual orçamento financia (Fiscal/Seguridade/Investimento)
   vinculoVariavelCodigo  String? // detalhamento variável da fonte (ex.: "01.312.0212")
   vinculoVariavelNome    String? // ex.: "EDUCAÇÃO - CRECHE - COVID-19"
-  valorAutorizado        Decimal              @db.Decimal(18, 2)
+  valorAutorizado        Decimal                @db.Decimal(18, 2)
   // Saldo materializado da execução: disponível = autorizado − reservado − empenhado.
   // Atualizado transacionalmente por reservas (pré-empenho) e empenhos.
-  valorReservado         Decimal              @default(0) @db.Decimal(18, 2)
-  valorEmpenhado         Decimal              @default(0) @db.Decimal(18, 2)
-  criadoEm               DateTime             @default(now())
-  atualizadoEm           DateTime             @updatedAt
-  orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-  unidadeOrcamentaria    UnidadeOrcamentaria  @relation(fields: [unidadeOrcamentariaId], references: [id])
-  funcao                 Funcao               @relation(fields: [funcaoId], references: [id])
-  subfuncao              Subfuncao            @relation(fields: [subfuncaoId], references: [id])
-  programa               Programa             @relation(fields: [programaId], references: [id])
-  acao                   Acao                 @relation(fields: [acaoId], references: [id])
-  contaDespesa           ContaDespesaEntidade @relation(fields: [contaDespesaEntidadeId], references: [id])
-  fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+  valorReservado         Decimal                @default(0) @db.Decimal(18, 2)
+  valorEmpenhado         Decimal                @default(0) @db.Decimal(18, 2)
+  criadoEm               DateTime               @default(now())
+  atualizadoEm           DateTime               @updatedAt
+  orcamento              Orcamento              @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  unidadeOrcamentaria    UnidadeOrcamentaria    @relation(fields: [unidadeOrcamentariaId], references: [id])
+  funcao                 Funcao                 @relation(fields: [funcaoId], references: [id])
+  subfuncao              Subfuncao              @relation(fields: [subfuncaoId], references: [id])
+  programa               Programa               @relation(fields: [programaId], references: [id])
+  acao                   Acao                   @relation(fields: [acaoId], references: [id])
+  contaDespesa           ContaDespesaEntidade   @relation(fields: [contaDespesaEntidadeId], references: [id])
+  fonteRecurso           FonteRecursoEntidade   @relation(fields: [fonteRecursoEntidadeId], references: [id])
   reservas               ReservaDotacao[]
   empenhos               Empenho[]
   creditosItens          CreditoAdicionalItem[]
@@ -1249,18 +1260,18 @@ model DotacaoDespesa {
 // Previsão de receita: linha LOA por (ContaReceita × Fonte). Granularidade
 // padrão da maioria dos municípios; sem dimensão extra (UO/Programa).
 model PrevisaoReceita {
-  id                     String               @id @default(uuid())
+  id                     String                 @id @default(uuid())
   orcamentoId            String
   contaReceitaEntidadeId String
   fonteRecursoEntidadeId String
-  valorPrevisto          Decimal              @db.Decimal(18, 2)
+  valorPrevisto          Decimal                @db.Decimal(18, 2)
   /// Materializado: soma das arrecadações − estornos (atualizado na mesma transação do movimento).
-  valorArrecadado        Decimal              @default(0) @db.Decimal(18, 2)
-  criadoEm               DateTime             @default(now())
-  atualizadoEm           DateTime             @updatedAt
-  orcamento              Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
-  contaReceita           ContaReceitaEntidade @relation(fields: [contaReceitaEntidadeId], references: [id])
-  fonteRecurso           FonteRecursoEntidade @relation(fields: [fonteRecursoEntidadeId], references: [id])
+  valorArrecadado        Decimal                @default(0) @db.Decimal(18, 2)
+  criadoEm               DateTime               @default(now())
+  atualizadoEm           DateTime               @updatedAt
+  orcamento              Orcamento              @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  contaReceita           ContaReceitaEntidade   @relation(fields: [contaReceitaEntidadeId], references: [id])
+  fonteRecurso           FonteRecursoEntidade   @relation(fields: [fonteRecursoEntidadeId], references: [id])
   arrecadacoes           Arrecadacao[]
   lancamentosTributarios LancamentoTributario[]
 
@@ -1274,19 +1285,19 @@ model PrevisaoReceita {
 /// (evento E550). A arrecadação posterior só baixa o ativo (E560). Imutável —
 /// correção por estorno.
 model LancamentoTributario {
-  id               String          @id @default(uuid())
+  id               String                   @id @default(uuid())
   previsaoId       String
   tipo             TipoLancamentoTributario @default(LANCAMENTO)
-  data             DateTime        @db.Date // data do lançamento / fato gerador
-  valor            Decimal         @db.Decimal(18, 2)
-  vencimento       DateTime?       @db.Date
+  data             DateTime                 @db.Date // data do lançamento / fato gerador
+  valor            Decimal                  @db.Decimal(18, 2)
+  vencimento       DateTime?                @db.Date
   devedorNome      String?
   devedorDocumento String?
   documento        String? //                 nº do auto/notificação/carnê
   historico        String?
-  criadoEm         DateTime        @default(now())
+  criadoEm         DateTime                 @default(now())
   criadoPorId      String
-  previsao         PrevisaoReceita @relation(fields: [previsaoId], references: [id])
+  previsao         PrevisaoReceita          @relation(fields: [previsaoId], references: [id])
 
   @@index([previsaoId])
   @@map("lancamentos_tributarios")
@@ -1296,16 +1307,16 @@ model LancamentoTributario {
 /// previsão (conta analítica × fonte) do orçamento APROVADO. ESTORNO reverte
 /// arrecadação já registrada. Imutável após criado — correção é por estorno.
 model Arrecadacao {
-  id              String          @id @default(uuid())
-  previsaoId      String
-  tipo            ArrecadacaoTipo
-  data            DateTime        @db.Date
-  valor           Decimal         @db.Decimal(18, 2)
-  historico       String?
-  contaBancariaId String? // conta bancária por onde a receita entrou (deriva a folha de caixa do E300)
-  criadoEm        DateTime        @default(now())
-  previsao        PrevisaoReceita @relation(fields: [previsaoId], references: [id])
-  contaBancaria   ContaBancaria?  @relation(fields: [contaBancariaId], references: [id])
+  id                String             @id @default(uuid())
+  previsaoId        String
+  tipo              ArrecadacaoTipo
+  data              DateTime           @db.Date
+  valor             Decimal            @db.Decimal(18, 2)
+  historico         String?
+  contaBancariaId   String? // conta bancária por onde a receita entrou (deriva a folha de caixa do E300)
+  criadoEm          DateTime           @default(now())
+  previsao          PrevisaoReceita    @relation(fields: [previsaoId], references: [id])
+  contaBancaria     ContaBancaria?     @relation(fields: [contaBancariaId], references: [id])
   // Conciliação bancária: o crédito do extrato que casa com esta arrecadação (1:1).
   movimentoBancario MovimentoBancario?
 
@@ -1352,17 +1363,17 @@ model MovimentoBancario {
 /// execução. Aplicado de imediato na criação — cada item reforça (+) a dotação
 /// alvo ou anula (−) saldo de uma dotação-fonte. valorTotal = soma dos reforços.
 model CreditoAdicional {
-  id            String               @id @default(uuid())
+  id            String                 @id @default(uuid())
   orcamentoId   String
   tipo          CreditoAdicionalTipo
   numero        String
-  data          DateTime             @db.Date
+  data          DateTime               @db.Date
   atoLegal      String // lei/decreto que autorizou
   justificativa String?
-  valorTotal    Decimal              @db.Decimal(18, 2)
-  criadoEm      DateTime             @default(now())
-  atualizadoEm  DateTime             @updatedAt
-  orcamento     Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  valorTotal    Decimal                @db.Decimal(18, 2)
+  criadoEm      DateTime               @default(now())
+  atualizadoEm  DateTime               @updatedAt
+  orcamento     Orcamento              @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   itens         CreditoAdicionalItem[]
 
   @@unique([orcamentoId, numero])
@@ -1416,6 +1427,33 @@ model AcessoEntidade {
   @@index([usuarioId])
   @@index([entidadeId])
   @@map("acessos_entidade")
+}
+
+// Pedido de acesso de um usuário a uma Entidade, com aprovação. O usuário
+// SUGERE um nível; o aprovador (admin da entidade ou do sistema) decide o
+// nível concedido ao aprovar, criando/ativando o AcessoEntidade na mesma
+// transação. A regra "no máximo 1 PENDENTE por (usuário, entidade)" é
+// garantida no service (Prisma não modela unique parcial por status).
+model SolicitacaoAcessoEntidade {
+  id                String                  @id @default(uuid())
+  usuarioId         String
+  entidadeId        String
+  nivelSolicitado   NivelAcessoEntidade
+  justificativa     String?
+  status            StatusSolicitacaoAcesso @default(PENDENTE)
+  nivelConcedido    NivelAcessoEntidade?
+  decididoPorId     String?
+  decididoEm        DateTime?
+  observacaoDecisao String?
+  criadoEm          DateTime                @default(now())
+  atualizadoEm      DateTime                @updatedAt
+  usuario           Usuario                 @relation("SolicitacaoAcessoUsuario", fields: [usuarioId], references: [id])
+  entidade          Entidade                @relation(fields: [entidadeId], references: [id])
+  decididoPor       Usuario?                @relation("SolicitacaoAcessoDecisor", fields: [decididoPorId], references: [id])
+
+  @@index([usuarioId])
+  @@index([entidadeId, status])
+  @@map("solicitacoes_acesso_entidade")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1856,7 +1894,7 @@ enum StatusEmpenho {
 }
 
 model Empenho {
-  id                 String            @id @default(uuid())
+  id                 String                @id @default(uuid())
   entidadeId         String
   dotacaoDespesaId   String
   fornecedorId       String
@@ -1866,19 +1904,19 @@ model Empenho {
   subElementoContaId String? // sub-elemento da natureza (folha sob o elemento da dotação) — Specs 22-06-2026 §8
   numero             String
   tipo               TipoEmpenho
-  data               DateTime          @default(now())
-  valor              Decimal           @db.Decimal(18, 2)
-  valorLiquidado     Decimal           @default(0) @db.Decimal(18, 2)
+  data               DateTime              @default(now())
+  valor              Decimal               @db.Decimal(18, 2)
+  valorLiquidado     Decimal               @default(0) @db.Decimal(18, 2)
   historico          String?
-  status             StatusEmpenho     @default(ATIVO)
-  criadoEm           DateTime          @default(now())
-  atualizadoEm       DateTime          @updatedAt
-  entidade           Entidade          @relation(fields: [entidadeId], references: [id])
-  dotacaoDespesa     DotacaoDespesa    @relation(fields: [dotacaoDespesaId], references: [id])
-  fornecedor         Fornecedor        @relation(fields: [fornecedorId], references: [id])
-  reservaDotacao     ReservaDotacao?   @relation(fields: [reservaDotacaoId], references: [id])
-  contrato           Contrato?         @relation(fields: [contratoId], references: [id])
-  ataRegistroPreco   AtaRegistroPreco? @relation(fields: [ataRegistroPrecoId], references: [id])
+  status             StatusEmpenho         @default(ATIVO)
+  criadoEm           DateTime              @default(now())
+  atualizadoEm       DateTime              @updatedAt
+  entidade           Entidade              @relation(fields: [entidadeId], references: [id])
+  dotacaoDespesa     DotacaoDespesa        @relation(fields: [dotacaoDespesaId], references: [id])
+  fornecedor         Fornecedor            @relation(fields: [fornecedorId], references: [id])
+  reservaDotacao     ReservaDotacao?       @relation(fields: [reservaDotacaoId], references: [id])
+  contrato           Contrato?             @relation(fields: [contratoId], references: [id])
+  ataRegistroPreco   AtaRegistroPreco?     @relation(fields: [ataRegistroPrecoId], references: [id])
   subElementoConta   ContaDespesaEntidade? @relation("EmpenhoSubElemento", fields: [subElementoContaId], references: [id])
   liquidacoes        Liquidacao[]
   movimentos         MovimentoEmpenho[]
@@ -1897,20 +1935,20 @@ enum StatusLiquidacao {
 }
 
 model Liquidacao {
-  id                String           @id @default(uuid())
+  id                String             @id @default(uuid())
   entidadeId        String
   empenhoId         String
   numero            String
-  data              DateTime         @default(now())
-  valor             Decimal          @db.Decimal(18, 2)
-  valorPago         Decimal          @default(0) @db.Decimal(18, 2)
+  data              DateTime           @default(now())
+  valor             Decimal            @db.Decimal(18, 2)
+  valorPago         Decimal            @default(0) @db.Decimal(18, 2)
   notaFiscal        String?
   atesteResponsavel String?
-  status            StatusLiquidacao @default(ATIVA)
-  criadoEm          DateTime         @default(now())
-  atualizadoEm      DateTime         @updatedAt
-  entidade          Entidade         @relation(fields: [entidadeId], references: [id])
-  empenho           Empenho          @relation(fields: [empenhoId], references: [id])
+  status            StatusLiquidacao   @default(ATIVA)
+  criadoEm          DateTime           @default(now())
+  atualizadoEm      DateTime           @updatedAt
+  entidade          Entidade           @relation(fields: [entidadeId], references: [id])
+  empenho           Empenho            @relation(fields: [empenhoId], references: [id])
   ordensPagamento   OrdemPagamento[]
   movimentos        MovimentoEmpenho[]
 
@@ -1928,22 +1966,22 @@ enum StatusOrdemPagamento {
 }
 
 model OrdemPagamento {
-  id              String               @id @default(uuid())
-  entidadeId      String
-  liquidacaoId    String
-  numero          String
-  data            DateTime             @default(now())
-  valor           Decimal              @db.Decimal(18, 2)
-  contaBancaria   String // rótulo da conta p/ exibição (OPs antigas: texto livre)
-  contaBancariaId String? // FK ao cadastro Febraban (nulo só em OPs legadas)
-  comprovante     String?
-  status          StatusOrdemPagamento @default(EMITIDA)
-  criadoEm        DateTime             @default(now())
-  atualizadoEm    DateTime             @updatedAt
-  entidade        Entidade             @relation(fields: [entidadeId], references: [id])
-  liquidacao      Liquidacao           @relation(fields: [liquidacaoId], references: [id])
-  contaBancariaRef ContaBancaria?      @relation(fields: [contaBancariaId], references: [id])
-  movimentos      MovimentoEmpenho[]
+  id               String               @id @default(uuid())
+  entidadeId       String
+  liquidacaoId     String
+  numero           String
+  data             DateTime             @default(now())
+  valor            Decimal              @db.Decimal(18, 2)
+  contaBancaria    String // rótulo da conta p/ exibição (OPs antigas: texto livre)
+  contaBancariaId  String? // FK ao cadastro Febraban (nulo só em OPs legadas)
+  comprovante      String?
+  status           StatusOrdemPagamento @default(EMITIDA)
+  criadoEm         DateTime             @default(now())
+  atualizadoEm     DateTime             @updatedAt
+  entidade         Entidade             @relation(fields: [entidadeId], references: [id])
+  liquidacao       Liquidacao           @relation(fields: [liquidacaoId], references: [id])
+  contaBancariaRef ContaBancaria?       @relation(fields: [contaBancariaId], references: [id])
+  movimentos       MovimentoEmpenho[]
 
   @@unique([entidadeId, numero])
   @@index([liquidacaoId])
