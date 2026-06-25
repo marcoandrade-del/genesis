@@ -65,6 +65,25 @@ describe('desdobrar', () => {
     expect(prisma.contaDespesaEntidade.update).toHaveBeenCalledWith({ where: { id: 'p1' }, data: { admiteMovimento: false } })
   })
 
+  it('reaponta as dotações (sem execução) da mãe para a filha', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(PAI)
+    prisma.contaDespesaEntidade.create.mockResolvedValue({ id: 'f1', entidadeId: 'e1', ano: 2026 })
+    await service.desdobrar('p1', { codigo: '3.1.90.11.01', descricao: 'Salários' })
+    expect(prisma.dotacaoDespesa.updateMany).toHaveBeenCalledWith({
+      where: { contaDespesaEntidadeId: 'p1' },
+      data: { contaDespesaEntidadeId: 'f1' },
+    })
+  })
+
+  it('lança CONFLITO quando a dotação já tem execução (reserva/empenho)', async () => {
+    prisma.contaDespesaEntidade.findUnique.mockResolvedValue(PAI)
+    prisma.dotacaoDespesa.count.mockResolvedValue(1)
+    await expect(service.desdobrar('p1', { codigo: '3.1.90.11.01', descricao: 'Salários' }))
+      .rejects.toMatchObject({ code: 'CONFLITO' })
+    expect(prisma.contaDespesaEntidade.create).not.toHaveBeenCalled()
+    expect(prisma.dotacaoDespesa.updateMany).not.toHaveBeenCalled()
+  })
+
   it('lança RECURSO_NAO_ENCONTRADO quando conta não existe', async () => {
     prisma.contaDespesaEntidade.findUnique.mockResolvedValue(null)
     await expect(service.desdobrar('xx', { codigo: '1', descricao: 'X' }))
