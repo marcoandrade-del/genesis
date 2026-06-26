@@ -31,6 +31,7 @@ export type DadosCriarLancamento = {
 export type FiltrosListagem = {
   dataInicio?: string
   dataFim?: string
+  contaIds?: string[]
 }
 
 const LIMITE_LISTAGEM = 500
@@ -58,6 +59,8 @@ export class LancamentosService {
       if (filtros.dataInicio) where.data.gte = new Date(filtros.dataInicio)
       if (filtros.dataFim) where.data.lte = new Date(filtros.dataFim)
     }
+    // Lançamentos que tocam ao menos uma das contas selecionadas (débito ou crédito).
+    if (filtros.contaIds?.length) where.itens = { some: { contaId: { in: filtros.contaIds } } }
     return this.prisma.lancamento.findMany({
       where,
       orderBy: [{ data: 'desc' }, { criadoEm: 'desc' }],

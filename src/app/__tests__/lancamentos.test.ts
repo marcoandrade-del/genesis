@@ -44,9 +44,19 @@ describe('appLancamentosRoutes', () => {
     ])
     const res = await app.inject({ method: 'GET', url: '/lancamentos' })
     expect(res.statusCode).toBe(200)
-    expect(listarMock).toHaveBeenCalledWith('ent1', { dataInicio: '2026-01-01', dataFim: '2026-12-31' })
+    expect(listarMock).toHaveBeenCalledWith('ent1', { dataInicio: '2026-01-01', dataFim: '2026-12-31', contaIds: [] })
     expect(res.body).toContain('Empenho material')
     expect(res.body).toContain('200,00') // total 150+50 formatado pt-BR
+  })
+
+  it('aplica filtro de período e contas da query', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([{ id: 'k1', codigo: '1.1.1', descricao: 'Caixa' }])
+    listarMock.mockResolvedValue([])
+    const res = await app.inject({ method: 'GET', url: '/lancamentos?de=2026-05-01&ate=2026-05-31&contas=k1' })
+    expect(res.statusCode).toBe(200)
+    expect(listarMock).toHaveBeenCalledWith('ent1', { dataInicio: '2026-05-01', dataFim: '2026-05-31', contaIds: ['k1'] })
+    expect(res.body).toContain('Caixa') // opção no seletor de contas
   })
 
   it('estado vazio quando não há lançamentos', async () => {
@@ -62,7 +72,7 @@ describe('appLancamentosRoutes', () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     listarMock.mockResolvedValue([])
     await app.inject({ method: 'GET', url: '/lancamentos' })
-    expect(listarMock).toHaveBeenCalledWith('ent9', { dataInicio: '2023-01-01', dataFim: '2023-12-31' })
+    expect(listarMock).toHaveBeenCalledWith('ent9', { dataInicio: '2023-01-01', dataFim: '2023-12-31', contaIds: [] })
   })
 
   it('redireciona para /app/contexto se a entidade sumiu', async () => {
