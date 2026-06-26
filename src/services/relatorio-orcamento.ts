@@ -103,8 +103,9 @@ function linhasHtml(linhas: LinhaArrecadacao[], total: number): string {
 
 const ESTILO = `<style>
   .dem { font-family: 'Inter', Arial, sans-serif; color: #0e0f0c; }
-  .dem-cab { display: flex; align-items: center; gap: 16px; border-bottom: 2px solid #0e0f0c; padding-bottom: 10px; margin-bottom: 16px; }
-  .dem-cab img { height: 56px; width: auto; }
+  .dem-cab { border-bottom: 2px solid #0e0f0c; padding-bottom: 10px; margin-bottom: 16px; }
+  .dem-cab-marca { display: flex; align-items: center; gap: 16px; }
+  .dem-cab-marca img { height: 56px; width: auto; }
   .dem-ent { font-weight: 800; font-size: 1.05rem; }
   .dem-sub { color: #555; font-size: .8rem; }
   .dem-titulo { font-size: 1rem; margin: 4px 0 0; }
@@ -142,13 +143,13 @@ function cabecalhoHtml(c: CabecalhoDemonstrativo, titulo: string): string {
     c.emissaoLocal === 'CABECALHO' && c.emissao ? `<div class="dem-emissao">Emitido em ${esc(c.emissao)}</div>` : ''
   return (
     marca +
-    `<header class="dem-cab">${brasao}<div>` +
-    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
+    `<header class="dem-cab">` +
+    `<div class="dem-cab-marca">${brasao}<div class="dem-ent">${esc(c.entidadeNome)}</div></div>` +
     `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
     legenda +
-    `<h1 class="dem-titulo">${esc(titulo)}</h1>` +
     emissaoCab +
-    `</div></header>`
+    `<h1 class="dem-titulo">${esc(titulo)}</h1>` +
+    `</header>`
   )
 }
 
