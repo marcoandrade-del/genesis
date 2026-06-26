@@ -21,6 +21,9 @@ export type SerieDespesaDiaria = {
   dias: DiaDespesa[]
 }
 
+/** Recorte da série: intervalo de datas (dentro do exercício) e/ou contas de despesa. */
+export type FiltroSerieDespesa = { de?: Date; ate?: Date; contaIds?: string[] }
+
 // Cada movimento cai numa fase (emp/liq/pag) e soma ou subtrai (estorno) o líquido do dia.
 const SINAL: Record<TipoMovimentoEmpenho, { campo: 'emp' | 'liq' | 'pag'; sinal: 1 | -1 }> = {
   EMPENHO: { campo: 'emp', sinal: 1 },
@@ -43,7 +46,7 @@ const SINAL: Record<TipoMovimentoEmpenho, { campo: 'emp' | 'liq' | 'pag'; sinal:
 export class DespesaDiariaService {
   constructor(private prisma: PrismaClient) {}
 
-  async serie(entidadeId: string, ano: number): Promise<SerieDespesaDiaria> {
+  async serie(entidadeId: string, ano: number, filtro: FiltroSerieDespesa = {}): Promise<SerieDespesaDiaria> {
     const orcamento = await this.prisma.orcamento.findUnique({
       where: { entidadeId_ano: { entidadeId, ano } },
       select: { id: true },
@@ -52,15 +55,21 @@ export class DespesaDiariaService {
       return { temOrcamento: false, fixadoTotal: D0(), empenhadoTotal: D0(), liquidadoTotal: D0(), pagoTotal: D0(), dias: [] }
     }
 
+    const contaWhere = filtro.contaIds?.length ? { contaDespesaEntidadeId: { in: filtro.contaIds } } : {}
+    const dataWhere =
+      filtro.de || filtro.ate
+        ? { data: { ...(filtro.de ? { gte: filtro.de } : {}), ...(filtro.ate ? { lte: filtro.ate } : {}) } }
+        : {}
+
     const fix = await this.prisma.dotacaoDespesa.aggregate({
-      where: { orcamentoId: orcamento.id },
+      where: { orcamentoId: orcamento.id, ...contaWhere },
       _sum: { valorAutorizado: true },
     })
     const fixadoTotal = fix._sum.valorAutorizado ?? D0()
 
     const movs = await this.prisma.movimentoEmpenho.groupBy({
       by: ['data', 'tipo'],
-      where: { empenho: { dotacaoDespesa: { orcamentoId: orcamento.id } } },
+      where: { empenho: { dotacaoDespesa: { orcamentoId: orcamento.id, ...contaWhere } }, ...dataWhere },
       _sum: { valor: true },
     })
 

@@ -51,4 +51,42 @@ describe('ArrecadacaoDiariaService.serie', () => {
     expect(args.where).toEqual({ previsao: { orcamentoId: 'orc1' } })
     expect(args.by).toEqual(['data', 'tipo'])
   })
+
+  it('aplica filtro de período (de/até) e de contas', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1' })
+    prisma.previsaoReceita.aggregate.mockResolvedValue({ _sum: { valorPrevisto: dec(0) } })
+    prisma.arrecadacao.groupBy.mockResolvedValue([])
+    await service.serie('ent1', 2026, { de: dia(1), ate: dia(31), contaIds: ['c1', 'c2'] })
+    expect(prisma.arrecadacao.groupBy.mock.calls[0]![0].where).toEqual({
+      previsao: { orcamentoId: 'orc1', contaReceitaEntidadeId: { in: ['c1', 'c2'] } },
+      data: { gte: dia(1), lte: dia(31) },
+    })
+    expect(prisma.previsaoReceita.aggregate.mock.calls[0]![0].where).toEqual({
+      orcamentoId: 'orc1',
+      contaReceitaEntidadeId: { in: ['c1', 'c2'] },
+    })
+  })
+
+  it('aceita só a data final (até)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1' })
+    prisma.previsaoReceita.aggregate.mockResolvedValue({ _sum: { valorPrevisto: dec(0) } })
+    prisma.arrecadacao.groupBy.mockResolvedValue([])
+    await service.serie('ent1', 2026, { ate: dia(31), contaIds: [] })
+    expect(prisma.arrecadacao.groupBy.mock.calls[0]![0].where).toEqual({
+      previsao: { orcamentoId: 'orc1' },
+      data: { lte: dia(31) },
+    })
+  })
+
+  it('aceita só a data inicial (de) e trata soma nula como zero', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1' })
+    prisma.previsaoReceita.aggregate.mockResolvedValue({ _sum: { valorPrevisto: dec(0) } })
+    prisma.arrecadacao.groupBy.mockResolvedValue([{ data: dia(3), tipo: 'ARRECADACAO', _sum: { valor: null } }])
+    const s = await service.serie('ent1', 2026, { de: dia(1) })
+    expect(prisma.arrecadacao.groupBy.mock.calls[0]![0].where).toEqual({
+      previsao: { orcamentoId: 'orc1' },
+      data: { gte: dia(1) },
+    })
+    expect(s.dias[0]!.arrecadadoDia.toString()).toBe('0')
+  })
 })

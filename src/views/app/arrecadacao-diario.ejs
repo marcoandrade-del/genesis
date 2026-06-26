@@ -37,6 +37,8 @@
     <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Não há orçamento (LOA) cadastrado para este exercício.</div>
   <% } else { %>
 
+    <%- include('_filtro-consulta', { acao: '/app/orcamento/arrecadacao/diario', ano, filtro, contasOpcoes, comPeriodo: true }) %>
+
     <div class="row g-3 mb-3">
       <div class="col-md-4"><div class="card border-0 shadow-sm h-100"><div class="card-body py-3">
         <div class="small text-muted">Previsto</div><div class="h5 fw-bold font-monospace mb-0"><%= brl(previstoTotal) %></div>

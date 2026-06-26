@@ -4,6 +4,7 @@ import { ArrecadacaoDiariaService } from '../services/arrecadacao-diaria.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { ContasBancariasService } from '../services/contas-bancarias.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
+import { parseFiltroConsulta, type FiltroConsultaQuery } from './filtro-consulta.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
@@ -90,16 +91,26 @@ export async function appArrecadacaoRoutes(app: FastifyInstance) {
   })
 
   // ── Acumulado diário da receita: evolução do arrecadado dia a dia vs previsto ─
-  app.get('/orcamento/arrecadacao/diario', async (req, reply) => {
+  app.get<{ Querystring: FiltroConsultaQuery }>('/orcamento/arrecadacao/diario', async (req, reply) => {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     const { entidadeId, ano } = req.contexto
-    const serie = await diariaSvc.serie(entidadeId, ano)
+    const filtro = parseFiltroConsulta(req.query, ano)
+    const [serie, contasOpcoes] = await Promise.all([
+      diariaSvc.serie(entidadeId, ano, { ...(filtro.de ? { de: filtro.de } : {}), ...(filtro.ate ? { ate: filtro.ate } : {}), contaIds: filtro.contaIds }),
+      app.prisma.contaReceitaEntidade.findMany({
+        where: { entidadeId, ano, admiteMovimento: true },
+        orderBy: { codigo: 'asc' },
+        select: { id: true, codigo: true, descricao: true },
+      }),
+    ])
     const n = (d: { toNumber(): number }) => d.toNumber()
     const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
     return reply.view('app/arrecadacao-diario', {
       entidade,
       ano,
+      filtro,
+      contasOpcoes,
       temOrcamento: serie.temOrcamento,
       previstoTotal: n(serie.previstoTotal),
       arrecadadoTotal: n(serie.arrecadadoTotal),

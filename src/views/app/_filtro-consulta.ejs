@@ -1,0 +1,30 @@
+<%# Filtro de consulta reutilizável: período (de/até dentro do exercício) + multisseleção de contas.
+    Espera: acao, ano, filtro {deStr, ateStr, contaIds}, contasOpcoes [{id,codigo,descricao}], comPeriodo (bool). %>
+<form method="get" action="<%= acao %>" class="card border-0 shadow-sm mb-3"><div class="card-body py-2">
+  <div class="row g-2 align-items-end">
+    <% if (typeof comPeriodo === 'undefined' || comPeriodo) { %>
+      <div class="col-auto">
+        <label class="form-label small mb-0 text-muted">De</label>
+        <input type="date" name="de" value="<%= filtro.deStr %>"
+          min="<%= ano %>-01-01" max="<%= ano %>-12-31" class="form-control form-control-sm">
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0 text-muted">Até</label>
+        <input type="date" name="ate" value="<%= filtro.ateStr %>"
+          min="<%= ano %>-01-01" max="<%= ano %>-12-31" class="form-control form-control-sm">
+      </div>
+    <% } %>
+    <div class="col" style="min-width:240px">
+      <label class="form-label small mb-0 text-muted">Contas <span class="text-muted">(Ctrl/Cmd p/ várias; vazio = todas)</span></label>
+      <select name="contas" multiple size="4" class="form-select form-select-sm">
+        <% contasOpcoes.forEach(function(c){ %>
+          <option value="<%= c.id %>" <%= filtro.contaIds.indexOf(c.id) >= 0 ? 'selected' : '' %>><%= c.codigo %> — <%= c.descricao %></option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-funnel me-1"></i>Filtrar</button>
+      <a class="btn btn-sm btn-outline-secondary" href="<%= acao %>">Limpar</a>
+    </div>
+  </div>
+</div></form>

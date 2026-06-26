@@ -4,6 +4,7 @@ import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { DespesaDiariaService } from '../services/despesa-diaria.js'
+import { parseFiltroConsulta, type FiltroConsultaQuery } from './filtro-consulta.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
 import { AberturaContabilService } from '../services/abertura-contabil.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
@@ -126,16 +127,26 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
 
   // Acumulado diário da despesa: evolução do empenhado/liquidado/pago dia a dia
   // vs o fixado, lida do ledger MovimentoEmpenho. Read-only. Espelha a receita (#113).
-  app.get('/orcamento/despesa/diario', async (req, reply) => {
+  app.get<{ Querystring: FiltroConsultaQuery }>('/orcamento/despesa/diario', async (req, reply) => {
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
     const { entidadeId, ano } = req.contexto
-    const serie = await despesaDiariaSvc.serie(entidadeId, ano)
+    const filtro = parseFiltroConsulta(req.query, ano)
+    const [serie, contasOpcoes] = await Promise.all([
+      despesaDiariaSvc.serie(entidadeId, ano, { ...(filtro.de ? { de: filtro.de } : {}), ...(filtro.ate ? { ate: filtro.ate } : {}), contaIds: filtro.contaIds }),
+      app.prisma.contaDespesaEntidade.findMany({
+        where: { entidadeId, ano, admiteMovimento: true },
+        orderBy: { codigo: 'asc' },
+        select: { id: true, codigo: true, descricao: true },
+      }),
+    ])
     const n = (d: { toNumber(): number }) => d.toNumber()
     const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
     return reply.view('app/despesa-diario', {
       entidade,
       ano,
+      filtro,
+      contasOpcoes,
       temOrcamento: serie.temOrcamento,
       fixadoTotal: n(serie.fixadoTotal),
       empenhadoTotal: n(serie.empenhadoTotal),
