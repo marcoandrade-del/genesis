@@ -20,6 +20,7 @@ vi.mock('../../services/saldo-orcamentario.js', () => ({
 vi.mock('../../services/programa-trabalho.js', () => ({
   ProgramaTrabalhoService: class {
     calcular = ptMock
+    calcularPor = ptMock
   },
 }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
@@ -322,6 +323,44 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/sumario.pdf' })
       expect(res.statusCode).toBe(302)
       expect(res.headers.location).toBe('/app/orcamento/relatorios/sumario')
+    })
+  })
+
+  describe('Anexos funcional-programáticos extras', () => {
+    const PT_OK = { temOrcamento: true, total: 100, linhas: [{ codigo: '04', rotulo: 'Administração', nivel: 1, valor: 100 }] }
+
+    it('Programa de Trabalho de Governo (Anexo 7) — sem UO no título', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      ptMock.mockResolvedValue(PT_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/programa-governo' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Anexo 7, da Lei nº 4.320/64 — Programa de Trabalho de Governo')
+      expect(res.body).toContain('Administração')
+    })
+
+    it('Despesa por Funções, Programas e Subprogramas', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      ptMock.mockResolvedValue(PT_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-funcoes-programas' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Despesa por Funções, Programas e Subprogramas')
+    })
+
+    it('gera o PDF do Anexo 7', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      ptMock.mockResolvedValue(PT_OK)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF fake'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/programa-governo.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+    })
+
+    it('redireciona quando não há orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      ptMock.mockResolvedValue({ temOrcamento: false, total: 0, linhas: [] })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-funcoes-programas.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/despesa-funcoes-programas')
     })
   })
 })

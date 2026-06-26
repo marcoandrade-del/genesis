@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
-import { ProgramaTrabalhoService } from '../services/programa-trabalho.js'
+import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -196,45 +196,96 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
       .send(pdf)
   })
 
-  // ── Programa de Trabalho (Anexo 6 / QDD) ────────────────────────────────────
-  async function programa(req: FastifyRequest) {
+  // ── Anexos funcional-programáticos (Anexo 6, Anexo 7, Despesa por F/P/S) ─────
+  // Cada um é a despesa fixada cruzada por uma ordem diferente de dimensões.
+  type AnexoFP = {
+    path: string
+    tituloPagina: string
+    breadcrumb: string
+    filePrefix: string
+    dims: DimensaoPrograma[]
+    titulo: string
+    descricao: string
+  }
+
+  async function corpoAnexoFP(req: FastifyRequest, a: AnexoFP) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, legenda }, pt] = await Promise.all([entidadeCtx(entidadeId, ano), ptSvc.calcular(entidadeId, ano)])
+    const [{ e, legenda }, pt] = await Promise.all([
+      entidadeCtx(entidadeId, ano),
+      ptSvc.calcularPor(entidadeId, ano, a.dims),
+    ])
     const corpo = pt.temOrcamento
-      ? montarProgramaTrabalho({ cabecalho: cab(e, ano, legenda), linhas: pt.linhas, total: pt.total })
+      ? montarProgramaTrabalho({
+          cabecalho: cab(e, ano, legenda),
+          linhas: pt.linhas,
+          total: pt.total,
+          titulo: a.titulo,
+          descricao: a.descricao,
+        })
       : ''
     return { e, ano, temOrcamento: pt.temOrcamento, corpo }
   }
 
-  app.get('/orcamento/relatorios/programa-trabalho', async (req, reply) => {
-    const { e, ano, temOrcamento, corpo } = await programa(req)
-    return reply.view('app/relatorio-demonstrativo', {
-      tituloPagina: 'Programa de Trabalho',
-      breadcrumb: 'Programa de trabalho (LOA)',
-      pdfUrl: '/app/orcamento/relatorios/programa-trabalho.pdf',
-      entidade: e,
-      ano,
-      nivel: req.contexto.nivel,
-      temOrcamento,
-      corpo,
-      layout: null,
+  function registrarAnexoFP(a: AnexoFP) {
+    app.get(`/orcamento/relatorios/${a.path}`, async (req, reply) => {
+      const { e, ano, temOrcamento, corpo } = await corpoAnexoFP(req, a)
+      return reply.view('app/relatorio-demonstrativo', {
+        tituloPagina: a.tituloPagina,
+        breadcrumb: a.breadcrumb,
+        pdfUrl: `/app/orcamento/relatorios/${a.path}.pdf`,
+        entidade: e,
+        ano,
+        nivel: req.contexto.nivel,
+        temOrcamento,
+        corpo,
+        layout: null,
+      })
     })
+    app.get(`/orcamento/relatorios/${a.path}.pdf`, async (req, reply) => {
+      const { ano, temOrcamento, corpo } = await corpoAnexoFP(req, a)
+      if (!temOrcamento) return reply.redirect(`/app/orcamento/relatorios/${a.path}`)
+      const pdf = await gerarPdf({
+        corpoHtml: documentoPdf(`${a.tituloPagina} ${ano}`, corpo),
+        header: '<span></span>',
+        footer: footer(a.tituloPagina),
+        margemTopoMm: 12,
+        margemRodapeMm: 16,
+      })
+      return reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="${a.filePrefix}-${ano}.pdf"`)
+        .send(pdf)
+    })
+  }
+
+  registrarAnexoFP({
+    path: 'programa-trabalho',
+    tituloPagina: 'Programa de Trabalho',
+    breadcrumb: 'Programa de trabalho (LOA)',
+    filePrefix: 'programa-trabalho',
+    dims: ['uo', 'funcao', 'subfuncao', 'programa', 'acao'],
+    titulo: 'Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho',
+    descricao: 'Despesa fixada por unidade orçamentária → função → subfunção → programa → ação.',
   })
 
-  app.get('/orcamento/relatorios/programa-trabalho.pdf', async (req, reply) => {
-    const { ano, temOrcamento, corpo } = await programa(req)
-    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/programa-trabalho')
-    const pdf = await gerarPdf({
-      corpoHtml: documentoPdf(`Programa de Trabalho ${ano}`, corpo),
-      header: '<span></span>',
-      footer: footer('Programa de Trabalho'),
-      margemTopoMm: 12,
-      margemRodapeMm: 16,
-    })
-    return reply
-      .header('Content-Type', 'application/pdf')
-      .header('Content-Disposition', `inline; filename="programa-trabalho-${ano}.pdf"`)
-      .send(pdf)
+  registrarAnexoFP({
+    path: 'programa-governo',
+    tituloPagina: 'Programa de Trabalho de Governo',
+    breadcrumb: 'Programa de trabalho de governo (LOA)',
+    filePrefix: 'programa-governo',
+    dims: ['funcao', 'subfuncao', 'programa', 'acao'],
+    titulo: 'Anexo 7, da Lei nº 4.320/64 — Programa de Trabalho de Governo',
+    descricao: 'Despesa fixada por função → subfunção → programa → ação (consolidado, todo o governo).',
+  })
+
+  registrarAnexoFP({
+    path: 'despesa-funcoes-programas',
+    tituloPagina: 'Despesa por Funções, Programas e Subprogramas',
+    breadcrumb: 'Despesa por funções, programas e subprogramas (LOA)',
+    filePrefix: 'despesa-funcoes-programas',
+    dims: ['funcao', 'programa', 'subfuncao'],
+    titulo: 'Demonstrativo da Despesa por Funções, Programas e Subprogramas',
+    descricao: 'Despesa fixada por função → programa → subfunção.',
   })
 
   // ── Sumário Geral (Receita por Fontes × Despesa por Funções) ────────────────
