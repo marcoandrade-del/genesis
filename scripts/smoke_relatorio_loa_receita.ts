@@ -18,6 +18,7 @@ import {
   montarReceitaPrevista,
   montarDespesaFixada,
   montarProgramaTrabalho,
+  montarSumarioGeral,
   documentoPdf,
   formatarReais,
 } from '../src/services/relatorio-orcamento.js'
@@ -104,6 +105,21 @@ async function main() {
   if (htmlPrograma) {
     writeFileSync(htmlPrograma, documentoPdf('Programa de Trabalho 2026', corpoP))
     log(`✔ HTML programa gravado: ${htmlPrograma}`)
+  }
+
+  // ── Sumário geral (receita por fonte × despesa por função) ──────────────────
+  const corpoS = montarSumarioGeral({
+    cabecalho: { entidadeNome: ent.nome, municipio: ent.municipio.nome, estado: ent.municipio.estado.sigla, ano: 2026, brasao: ent.brasao, legenda: 'Projeto de Lei Orçamentária Anual' },
+    receitaPorFonte: resumo.porFonte,
+    despesaPorFuncao: saldo.porFuncao,
+    totalReceita: resumo.resumo.previsto,
+    totalDespesa: saldo.resumo.autorizado,
+  })
+  log(`\n✔ HTML sumário: ${corpoS.length} chars (receita ${formatarReais(resumo.resumo.previsto)} × despesa ${formatarReais(saldo.resumo.autorizado)})`)
+  const htmlSumario = arg('--html-sumario')
+  if (htmlSumario) {
+    writeFileSync(htmlSumario, documentoPdf('Sumário Geral 2026', corpoS))
+    log(`✔ HTML sumário gravado: ${htmlSumario}`)
   }
 
   if (pdfPath) {

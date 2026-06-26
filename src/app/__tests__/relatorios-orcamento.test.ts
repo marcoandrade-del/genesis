@@ -273,4 +273,41 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.headers.location).toBe('/app/orcamento/relatorios/programa-trabalho')
     })
   })
+
+  describe('Sumário geral', () => {
+    const REC = { temOrcamento: true, resumo: { previsto: 1000, arrecadado: 0, saldo: 1000 }, porConta: [], porFonte: [{ id: 'f', codigo: '000', rotulo: 'Ordinários', nivel: 1, previsto: 1000, arrecadado: 0, saldo: 1000 }] }
+    const DESP = { temOrcamento: true, resumo: { autorizado: 900, reservado: 0, empenhado: 0, disponivel: 900 }, porUnidade: [], porFuncao: [{ id: 'fn', codigo: '04', rotulo: 'Administração', nivel: 1, autorizado: 900, reservado: 0, empenhado: 0, disponivel: 900 }], porConta: [], porFonte: [] }
+    const VAZIO_REC = { temOrcamento: false, resumo: { previsto: 0, arrecadado: 0, saldo: 0 }, porConta: [], porFonte: [] }
+    const VAZIO_DESP = { temOrcamento: false, resumo: { autorizado: 0, reservado: 0, empenhado: 0, disponivel: 0 }, porUnidade: [], porFuncao: [], porConta: [], porFonte: [] }
+
+    it('renderiza receita por fonte + despesa por função', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      resumoMock.mockResolvedValue(REC)
+      calcularMock.mockResolvedValue(DESP)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/sumario' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Sumário Geral da Receita por Fontes')
+      expect(res.body).toContain('Ordinários')
+      expect(res.body).toContain('Administração')
+    })
+
+    it('gera o PDF', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      resumoMock.mockResolvedValue(REC)
+      calcularMock.mockResolvedValue(DESP)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF fake'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/sumario.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+    })
+
+    it('redireciona quando não há orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      resumoMock.mockResolvedValue(VAZIO_REC)
+      calcularMock.mockResolvedValue(VAZIO_DESP)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/sumario.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/sumario')
+    })
+  })
 })

@@ -231,6 +231,47 @@ export function montarProgramaTrabalho(dados: DadosProgramaTrabalho): string {
   )
 }
 
+export interface DadosSumarioGeral {
+  cabecalho: CabecalhoDemonstrativo
+  receitaPorFonte: LinhaArrecadacao[]
+  despesaPorFuncao: LinhaSaldo[]
+  totalReceita: number
+  totalDespesa: number
+}
+
+function tabelaSumario(col2: string, rows: RowDem[], total: number, valorHead: string): string {
+  return (
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Código</th><th>${esc(col2)}</th><th class="num">${esc(valorHead)}</th><th class="num">% do total</th></tr></thead>` +
+    `<tbody>${linhasGen(rows, total)}</tbody>` +
+    `<tfoot><tr><th colspan="2">TOTAL</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
+    `</table>`
+  )
+}
+
+/** Sumário Geral da Receita por Fontes e da Despesa por Funções do Governo. */
+export function montarSumarioGeral(dados: DadosSumarioGeral): string {
+  const { cabecalho: c, receitaPorFonte, despesaPorFuncao, totalReceita, totalDespesa } = dados
+  const rec = receitaPorFonte.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, nivel: l.nivel, valor: l.previsto }))
+  const desp = despesaPorFuncao.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, nivel: l.nivel, valor: l.autorizado }))
+  const saldo = Math.round((totalReceita - totalDespesa) * 100) / 100
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Sumário Geral da Receita por Fontes e da Despesa por Funções do Governo') +
+    `<h2 class="dem-sec">Receita por Fontes de Recurso</h2>` +
+    tabelaSumario('Fonte de recurso', rec, totalReceita, 'Previsto (R$)') +
+    `<h2 class="dem-sec">Despesa por Funções do Governo</h2>` +
+    tabelaSumario('Função de governo', desp, totalDespesa, 'Fixado (R$)') +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th colspan="2">TOTAL DA RECEITA</th><th class="num">${formatarReais(totalReceita)}</th></tr>` +
+    `<tr><th colspan="2">TOTAL DA DESPESA</th><th class="num">${formatarReais(totalDespesa)}</th></tr>` +
+    `<tr><th colspan="2">SUPERÁVIT / (DÉFICIT)</th><th class="num">${formatarReais(saldo)}</th></tr>` +
+    `</tfoot></table>` +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

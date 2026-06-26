@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, documentoPdf, formatarReais, formatarCodigoConta } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, documentoPdf, formatarReais, formatarCodigoConta } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -183,6 +183,23 @@ describe('montarProgramaTrabalho', () => {
       total: 10,
     })
     expect(html).toContain('<img src="data:image/png;base64,QQ"')
+  })
+})
+
+describe('montarSumarioGeral', () => {
+  it('renderiza receita por fonte, despesa por função e o saldo', () => {
+    const html = montarSumarioGeral({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      receitaPorFonte: [linha({ codigo: '000', rotulo: 'Ordinários', nivel: 1, previsto: 1000 })],
+      despesaPorFuncao: [ls({ codigo: '04', rotulo: 'Administração', nivel: 1, autorizado: 900 })],
+      totalReceita: 1000,
+      totalDespesa: 900,
+    })
+    expect(html).toContain('Sumário Geral da Receita por Fontes e da Despesa por Funções do Governo')
+    expect(html).toContain('Ordinários')
+    expect(html).toContain('Administração')
+    expect(html).toContain('SUPERÁVIT / (DÉFICIT)')
+    expect(html).toContain('100,00') // 1000 − 900
   })
 })
 
