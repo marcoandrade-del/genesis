@@ -6,6 +6,7 @@ import {
   montarReceitaPrevista,
   montarDespesaFixada,
   montarProgramaTrabalho,
+  montarSumarioGeral,
   documentoPdf,
   type FormatoCodigo,
 } from '../services/relatorio-orcamento.js'
@@ -231,6 +232,58 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="programa-trabalho-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Sumário Geral (Receita por Fontes × Despesa por Funções) ────────────────
+  async function sumario(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, legenda }, resumo, saldo] = await Promise.all([
+      entidadeCtx(entidadeId, ano),
+      arrecadacoes.resumo(entidadeId, ano),
+      saldoSvc.calcular(entidadeId, ano),
+    ])
+    const temOrcamento = resumo.temOrcamento || saldo.temOrcamento
+    const corpo = temOrcamento
+      ? montarSumarioGeral({
+          cabecalho: cab(e, ano, legenda),
+          receitaPorFonte: resumo.porFonte,
+          despesaPorFuncao: saldo.porFuncao,
+          totalReceita: resumo.resumo.previsto,
+          totalDespesa: saldo.resumo.autorizado,
+        })
+      : ''
+    return { e, ano, temOrcamento, corpo }
+  }
+
+  app.get('/orcamento/relatorios/sumario', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await sumario(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Sumário Geral',
+      breadcrumb: 'Sumário geral (LOA)',
+      pdfUrl: '/app/orcamento/relatorios/sumario.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/sumario.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo } = await sumario(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/sumario')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Sumário Geral ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Sumário Geral'),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="sumario-geral-${ano}.pdf"`)
       .send(pdf)
   })
 }
