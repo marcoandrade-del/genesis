@@ -47,6 +47,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
           municipio: {
             select: {
               nome: true,
+              brasao: true,
               loaCodigoModo: true,
               loaCodigoNivel: true,
               estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true } },
@@ -67,7 +68,8 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     const legenda =
       aprovado && orc?.leiNumero ? `Lei Orçamentária Anual nº ${orc.leiNumero}` : 'Projeto de Lei Orçamentária Anual'
     return {
-      e: { nome: row!.nome, brasao: row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
+      // Brasão do município tem prioridade; cai no da entidade se o município não tiver.
+      e: { nome: row!.nome, brasao: m.brasao ?? row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
       padrao: { modo, nivelMax },
       legenda,
     }

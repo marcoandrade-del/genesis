@@ -419,6 +419,7 @@ model Municipio {
   modeloContabilId String?
   loaCodigoModo    FormatoCodigoConta? // null = herda do estado
   loaCodigoNivel   Int?
+  brasao           String?             @db.Text // brasão do município (data URL), usado nos anexos da LOA
   criadoEm         DateTime            @default(now())
   atualizadoEm     DateTime            @updatedAt
   estado           Estado              @relation(fields: [estadoId], references: [id])
@@ -778,18 +779,26 @@ enum OrigemConta {
   DESDOBRAMENTO
 }
 
+// Como a entidade assina os documentos oficiais (anexos da LOA etc.).
+// O render da assinatura eletrônica fica para depois; por ora só a escolha.
+enum ModoAssinatura {
+  MANUAL
+  ELETRONICA
+}
+
 model Entidade {
-  id           String       @id @default(uuid())
-  nome         String
-  tipo         TipoEntidade
-  cnpj         String?      @unique
-  endereco     String?
-  brasao       String?      @db.Text // imagem do brasão como data URL (base64)
-  municipioId  String
-  ativo        Boolean      @default(true)
-  criadoEm     DateTime     @default(now())
-  atualizadoEm DateTime     @updatedAt
-  municipio    Municipio    @relation(fields: [municipioId], references: [id])
+  id             String         @id @default(uuid())
+  nome           String
+  tipo           TipoEntidade
+  cnpj           String?        @unique
+  endereco       String?
+  brasao         String?        @db.Text // imagem do brasão como data URL (base64)
+  assinaturaModo ModoAssinatura @default(MANUAL)
+  municipioId    String
+  ativo          Boolean        @default(true)
+  criadoEm       DateTime       @default(now())
+  atualizadoEm   DateTime       @updatedAt
+  municipio      Municipio      @relation(fields: [municipioId], references: [id])
 
   contasContabil           ContaContabilEntidade[]
   contasReceita            ContaReceitaEntidade[]

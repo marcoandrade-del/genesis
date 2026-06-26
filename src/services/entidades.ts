@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PrismaClient, Prisma, type TipoEntidade } from '@prisma/client'
+import { PrismaClient, Prisma, type TipoEntidade, type ModoAssinatura } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
 export type DadosCriarEntidade = {
@@ -19,6 +19,8 @@ export type DadosAtualizarEntidade = {
   ativo?: boolean
   /** Brasão/logotipo como data URL base64; `null` remove o atual. */
   brasao?: string | null
+  /** Como a entidade assina os documentos oficiais (manual/eletrônica). */
+  assinaturaModo?: ModoAssinatura
 }
 
 type ContaModelo = {

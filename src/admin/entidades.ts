@@ -3,30 +3,10 @@ import type { TipoEntidade } from '@prisma/client'
 import { EntidadeService, type DadosAtualizarEntidade } from '../services/entidades.js'
 import { AberturaExercicioService } from '../services/abertura-exercicio.js'
 import { ErroNegocio } from '../errors.js'
+import { validarBrasao, BODY_BRASAO } from './brasao.js'
 
 const TIPOS: TipoEntidade[] = ['PREFEITURA', 'CAMARA', 'ADM_INDIRETA']
 const ehTipo = (v: string): v is TipoEntidade => (TIPOS as string[]).includes(v)
-
-// O brasão chega como data URL base64 vinda do FileReader no formulário. O
-// cliente já limita o arquivo a 1 MB (~1,4 MB em base64); estes limites são a
-// rede de segurança do servidor. BODY_BRASAO (corpo total) folga acima do
-// MAX_BRASAO (comprimento do data URL) para o 413 nunca disparar antes da
-// validação amigável.
-const MAX_BRASAO = 1.5 * 1024 * 1024
-const BODY_BRASAO = 2 * 1024 * 1024
-const RE_BRASAO = /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=]+$/
-
-/**
- * Valida o brasão recebido do formulário. `''` significa "sem brasão / remover"
- * (→ null); um data URL de imagem raster é aceito; qualquer outra coisa é erro.
- */
-function validarBrasao(v: string): { ok: true; valor: string | null } | { ok: false; erro: string } {
-  const s = v.trim()
-  if (s === '') return { ok: true, valor: null }
-  if (s.length > MAX_BRASAO) return { ok: false, erro: 'Imagem muito grande (máx. 1 MB). Use um arquivo menor.' }
-  if (!RE_BRASAO.test(s)) return { ok: false, erro: 'Brasão inválido — envie uma imagem PNG, JPG, GIF ou WEBP.' }
-  return { ok: true, valor: s }
-}
 
 export async function adminEntidadesRoutes(app: FastifyInstance) {
   const service = new EntidadeService(app.prisma)
@@ -147,7 +127,10 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
   )
 
   // ── UPDATE ──────────────────────────────────────────────────────────────────
-  app.put<{ Params: { id: string }; Body: { nome: string; tipo: string; cnpj: string; ativo?: string; brasao?: string } }>(
+  app.put<{
+    Params: { id: string }
+    Body: { nome: string; tipo: string; cnpj: string; ativo?: string; brasao?: string; assinaturaModo?: string }
+  }>(
     '/:id',
     { bodyLimit: BODY_BRASAO },
     async (req, reply) => {
@@ -166,6 +149,7 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
         tipo,
         cnpj: cnpj?.trim() ? cnpj.trim() : null,
         ativo: ativo === 'true',
+        assinaturaModo: req.body.assinaturaModo === 'ELETRONICA' ? 'ELETRONICA' : 'MANUAL',
       }
       if (req.body.brasao !== undefined) {
         const r = validarBrasao(req.body.brasao)

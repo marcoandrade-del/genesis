@@ -225,6 +225,29 @@ describe('adminMunicipiosRoutes', () => {
       })
     })
 
+    it('salva o brasão do município', async () => {
+      atualizarMock.mockResolvedValue(MUNICIPIO)
+      prisma.municipio.findUnique.mockResolvedValue({ estadoId: 'e1' })
+      await app.inject({
+        method: 'PUT', url: '/mun1',
+        ...form({ nome: 'BH', brasao: 'data:image/png;base64,AAAA' }),
+      })
+      expect(prisma.municipio.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ brasao: 'data:image/png;base64,AAAA' }) }),
+      )
+    })
+
+    it('rejeita brasão inválido', async () => {
+      prisma.municipio.findUnique.mockResolvedValue(MUNICIPIO)
+      prisma.modeloContabil.findMany.mockResolvedValue([])
+      const res = await app.inject({
+        method: 'PUT', url: '/mun1',
+        ...form({ nome: 'BH', brasao: 'não-é-imagem' }),
+      })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Brasão inválido')
+    })
+
     it('string vazia em modeloContabilId → null (restaurar herança)', async () => {
       atualizarMock.mockResolvedValue(MUNICIPIO)
       prisma.municipio.findUnique.mockResolvedValue({ estadoId: 'e1' })

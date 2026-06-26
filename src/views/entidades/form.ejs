@@ -96,6 +96,15 @@
     </div>
 
     <% if (entidade) { %>
+      <div class="mb-3">
+        <label class="form-label small fw-semibold">Assinatura dos documentos oficiais</label>
+        <select name="assinaturaModo" class="form-select form-select-sm">
+          <option value="MANUAL" <%= entidade.assinaturaModo === 'ELETRONICA' ? '' : 'selected' %>>Manual (assinatura física)</option>
+          <option value="ELETRONICA" <%= entidade.assinaturaModo === 'ELETRONICA' ? 'selected' : '' %>>Eletrônica</option>
+        </select>
+        <div class="form-text">A assinatura eletrônica será habilitada futuramente; por ora os anexos saem para assinatura manual.</div>
+      </div>
+
       <div class="form-check">
         <input type="hidden" name="ativo" value="<%= entidade.ativo ? 'true' : 'false' %>" id="ent-ativo-val">
         <input type="checkbox" class="form-check-input" id="ent-chk-ativo"

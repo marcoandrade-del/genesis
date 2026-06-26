@@ -34,6 +34,7 @@ const ENTIDADE = {
   brasao: null,
   municipio: {
     nome: 'Maringá',
+    brasao: null, // sem brasão no município → cai no da entidade
     loaCodigoModo: null, // herda do estado
     loaCodigoNivel: null,
     estado: { sigla: 'PR', loaCodigoModo: 'CURTO', loaCodigoNivel: 4 },
@@ -85,6 +86,19 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Não há orçamento')
       expect(res.body).not.toContain('Baixar PDF')
+    })
+
+    it('usa o brasão do município no cabeçalho dos anexos', async () => {
+      const entBrasaoMun = {
+        ...ENTIDADE,
+        brasao: 'data:image/png;base64,ENT',
+        municipio: { ...ENTIDADE.municipio, brasao: 'data:image/png;base64,MUN' },
+      }
+      prisma.entidade.findUnique.mockResolvedValue(entBrasaoMun)
+      resumoMock.mockResolvedValue(RESUMO_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('data:image/png;base64,MUN') // brasão do município tem prioridade
+      expect(res.body).not.toContain('data:image/png;base64,ENT')
     })
 
     it('legenda mostra a lei quando o orçamento está publicado', async () => {
