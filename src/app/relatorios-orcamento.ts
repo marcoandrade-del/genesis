@@ -119,6 +119,13 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
 
   const qsCodigo = (f: FormatoCodigo) => `?cod=${f.modo}${f.modo === 'nivel' ? `&nivelMax=${f.nivelMax}` : ''}`
 
+  // ── Índice dos Anexos da LOA (landing do menu próprio) ──────────────────────
+  app.get('/orcamento/relatorios', async (req, reply) => {
+    const { entidadeId, ano } = req.contexto
+    const { e } = await entidadeCtx(entidadeId, ano)
+    return reply.view('app/relatorios-loa', { entidade: e, ano, nivel: req.contexto.nivel, layout: null })
+  })
+
   // ── Receita Orçada ──────────────────────────────────────────────────────────
   async function receita(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto

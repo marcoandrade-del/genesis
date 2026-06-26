@@ -367,6 +367,17 @@ describe('appRelatoriosOrcamentoRoutes', () => {
     })
   })
 
+  describe('Índice dos Anexos da LOA', () => {
+    it('renderiza a landing com os cards dos anexos', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Anexos da LOA')
+      expect(res.body).toContain('/app/orcamento/relatorios/receita-prevista')
+      expect(res.body).toContain('Sumário geral')
+    })
+  })
+
   describe('Marca d\'água e carimbo de emissão', () => {
     const REC = { temOrcamento: true, resumo: { previsto: 1, arrecadado: 0, saldo: 1 }, porConta: [], porFonte: [] }
 
