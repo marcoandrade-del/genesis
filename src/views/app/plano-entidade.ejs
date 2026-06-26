@@ -43,6 +43,15 @@
         </button>
       <% } %>
       <%- include('_seletor-granularidade') %>
+      <div class="btn-group btn-group-sm" role="group" aria-label="Nível de detalhe das contas">
+        <button type="button" id="nivel-menos" class="btn btn-outline-secondary" title="Recolher um nível">
+          <i class="bi bi-dash-lg"></i>
+        </button>
+        <span class="btn btn-outline-secondary disabled" style="pointer-events:none">Nível <span id="nivel-atual">–</span></span>
+        <button type="button" id="nivel-mais" class="btn btn-outline-secondary" title="Expandir um nível">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
       <span class="badge bg-light text-dark"><%= contas.length %> conta(s)</span>
     </div>
   </div>
@@ -126,7 +135,7 @@
           <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano não copiado para o exercício <%= ano %>.</td></tr>
         <% } %>
         <% contas.forEach(function(c) { %>
-          <tr>
+          <tr data-nivel="<%= c.nivel %>">
             <td class="ps-3">
               <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
                 <span class="font-monospace small text-muted"><%= c.codigo %></span>
@@ -180,5 +189,28 @@
     <p class="small text-muted mt-2">Contas do modelo padrão não podem ser excluídas — só desdobradas. Desdobramentos que você criou podem ser removidos enquanto não tiverem filhos nem movimento.</p>
   <% } %>
 </div>
+
+<script>
+// Colapsar/expandir a árvore por nível: mostra as contas até a profundidade
+// escolhida (− recolhe um nível, + expande um nível). Puramente visual.
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#tbl tbody tr[data-nivel]'))
+  var menos = document.getElementById('nivel-menos')
+  var mais = document.getElementById('nivel-mais')
+  var label = document.getElementById('nivel-atual')
+  if (!rows.length || !menos || !mais || !label) return
+  var maxN = rows.reduce(function (m, r) { return Math.max(m, +r.getAttribute('data-nivel')) }, 1)
+  var cur = maxN
+  function aplicar() {
+    rows.forEach(function (r) { r.style.display = +r.getAttribute('data-nivel') > cur ? 'none' : '' })
+    label.textContent = cur
+    menos.disabled = cur <= 1
+    mais.disabled = cur >= maxN
+  }
+  menos.addEventListener('click', function () { if (cur > 1) { cur--; aplicar() } })
+  mais.addEventListener('click', function () { if (cur < maxN) { cur++; aplicar() } })
+  aplicar()
+})()
+</script>
 </body>
 </html>

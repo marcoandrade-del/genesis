@@ -35,6 +35,10 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('ATIVO')
     expect(res.body).toContain('Caixa')
     expect(res.body).toContain('Analítica')
+    // controle de colapsar/expandir por nível
+    expect(res.body).toContain('id="nivel-menos"')
+    expect(res.body).toContain('id="nivel-mais"')
+    expect(res.body).toContain('data-nivel="3"')
   })
 
   it('estado vazio quando o plano não foi copiado para o ano', async () => {
