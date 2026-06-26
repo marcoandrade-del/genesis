@@ -211,6 +211,20 @@ describe('adminMunicipiosRoutes', () => {
       expect(atualizarMock).toHaveBeenCalledWith('mun1', { nome: 'BH', modeloContabilId: 'm9' })
     })
 
+    it('salva o override de formato de código (não-herdado)', async () => {
+      atualizarMock.mockResolvedValue(MUNICIPIO)
+      prisma.municipio.findUnique.mockResolvedValue({ estadoId: 'e1' })
+      await app.inject({
+        method: 'PUT',
+        url: '/mun1',
+        ...form({ nome: 'BH', loaCodigoModo: 'COMPLETO' }),
+      })
+      expect(prisma.municipio.update).toHaveBeenCalledWith({
+        where: { id: 'mun1' },
+        data: { loaCodigoModo: 'COMPLETO', loaCodigoNivel: 4 },
+      })
+    })
+
     it('string vazia em modeloContabilId → null (restaurar herança)', async () => {
       atualizarMock.mockResolvedValue(MUNICIPIO)
       prisma.municipio.findUnique.mockResolvedValue({ estadoId: 'e1' })

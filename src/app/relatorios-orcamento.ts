@@ -7,6 +7,7 @@ import {
   montarDespesaFixada,
   montarProgramaTrabalho,
   documentoPdf,
+  type FormatoCodigo,
 } from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
 
@@ -30,11 +31,31 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
   const ptSvc = new ProgramaTrabalhoService(app.prisma)
 
-  async function entidadeCab(entidadeId: string): Promise<EntidadeCab> {
-    return (await app.prisma.entidade.findUnique({
+  // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado).
+  async function entidadeCtx(entidadeId: string): Promise<{ e: EntidadeCab; padrao: FormatoCodigo }> {
+    const row = await app.prisma.entidade.findUnique({
       where: { id: entidadeId },
-      select: { nome: true, brasao: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
-    })) as EntidadeCab
+      select: {
+        nome: true,
+        brasao: true,
+        municipio: {
+          select: {
+            nome: true,
+            loaCodigoModo: true,
+            loaCodigoNivel: true,
+            estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true } },
+          },
+        },
+      },
+    })
+    const m = row!.municipio
+    const enumModo = m.loaCodigoModo ?? m.estado.loaCodigoModo
+    const modo = enumModo === 'COMPLETO' ? 'completo' : enumModo === 'NIVEL' ? 'nivel' : 'curto'
+    const nivelMax = m.loaCodigoNivel ?? m.estado.loaCodigoNivel
+    return {
+      e: { nome: row!.nome, brasao: row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
+      padrao: { modo, nivelMax },
+    }
   }
 
   const cab = (e: EntidadeCab, ano: number) => ({
@@ -45,27 +66,41 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     brasao: e.brasao,
   })
 
+  // Query da tela (override pontual) tem prioridade sobre o padrão herdado.
+  function fmtCodigo(req: FastifyRequest, padrao: FormatoCodigo): FormatoCodigo {
+    const q = req.query as { cod?: string; nivelMax?: string }
+    if (q.cod !== 'completo' && q.cod !== 'curto' && q.cod !== 'nivel') return padrao
+    const nivelMax = Math.min(12, Math.max(1, parseInt(q.nivelMax ?? '', 10) || padrao.nivelMax))
+    return { modo: q.cod, nivelMax }
+  }
+
+  const qsCodigo = (f: FormatoCodigo) => `?cod=${f.modo}${f.modo === 'nivel' ? `&nivelMax=${f.nivelMax}` : ''}`
+
   // ── Receita Orçada ──────────────────────────────────────────────────────────
   async function receita(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [e, resumo] = await Promise.all([entidadeCab(entidadeId), arrecadacoes.resumo(entidadeId, ano)])
+    const [{ e, padrao }, resumo] = await Promise.all([entidadeCtx(entidadeId), arrecadacoes.resumo(entidadeId, ano)])
+    const fmt = fmtCodigo(req, padrao)
     const corpo = resumo.temOrcamento
       ? montarReceitaPrevista({
           cabecalho: cab(e, ano),
           porConta: resumo.porConta,
           porFonte: resumo.porFonte,
           total: resumo.resumo.previsto,
+          codigoConta: fmt,
         })
       : ''
-    return { e, ano, temOrcamento: resumo.temOrcamento, corpo }
+    return { e, ano, temOrcamento: resumo.temOrcamento, corpo, fmt }
   }
 
   app.get('/orcamento/relatorios/receita-prevista', async (req, reply) => {
-    const { e, ano, temOrcamento, corpo } = await receita(req)
+    const { e, ano, temOrcamento, corpo, fmt } = await receita(req)
     return reply.view('app/relatorio-demonstrativo', {
       tituloPagina: 'Receita Orçada',
       breadcrumb: 'Receita orçada (LOA)',
-      pdfUrl: '/app/orcamento/relatorios/receita-prevista.pdf',
+      pdfUrl: '/app/orcamento/relatorios/receita-prevista.pdf' + qsCodigo(fmt),
+      seletorCodigo: fmt,
+      seletorCodigoAcao: '/app/orcamento/relatorios/receita-prevista',
       entidade: e,
       ano,
       nivel: req.contexto.nivel,
@@ -94,7 +129,8 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Despesa Fixada ──────────────────────────────────────────────────────────
   async function despesa(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [e, saldo] = await Promise.all([entidadeCab(entidadeId), saldoSvc.calcular(entidadeId, ano)])
+    const [{ e, padrao }, saldo] = await Promise.all([entidadeCtx(entidadeId), saldoSvc.calcular(entidadeId, ano)])
+    const fmt = fmtCodigo(req, padrao)
     const corpo = saldo.temOrcamento
       ? montarDespesaFixada({
           cabecalho: cab(e, ano),
@@ -103,17 +139,20 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
           porConta: saldo.porConta,
           porFonte: saldo.porFonte,
           total: saldo.resumo.autorizado,
+          codigoConta: fmt,
         })
       : ''
-    return { e, ano, temOrcamento: saldo.temOrcamento, corpo }
+    return { e, ano, temOrcamento: saldo.temOrcamento, corpo, fmt }
   }
 
   app.get('/orcamento/relatorios/despesa-fixada', async (req, reply) => {
-    const { e, ano, temOrcamento, corpo } = await despesa(req)
+    const { e, ano, temOrcamento, corpo, fmt } = await despesa(req)
     return reply.view('app/relatorio-demonstrativo', {
       tituloPagina: 'Despesa Fixada',
       breadcrumb: 'Despesa fixada (LOA)',
-      pdfUrl: '/app/orcamento/relatorios/despesa-fixada.pdf',
+      pdfUrl: '/app/orcamento/relatorios/despesa-fixada.pdf' + qsCodigo(fmt),
+      seletorCodigo: fmt,
+      seletorCodigoAcao: '/app/orcamento/relatorios/despesa-fixada',
       entidade: e,
       ano,
       nivel: req.contexto.nivel,
@@ -142,7 +181,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Programa de Trabalho (Anexo 6 / QDD) ────────────────────────────────────
   async function programa(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [e, pt] = await Promise.all([entidadeCab(entidadeId), ptSvc.calcular(entidadeId, ano)])
+    const [{ e }, pt] = await Promise.all([entidadeCtx(entidadeId), ptSvc.calcular(entidadeId, ano)])
     const corpo = pt.temOrcamento
       ? montarProgramaTrabalho({ cabecalho: cab(e, ano), linhas: pt.linhas, total: pt.total })
       : ''

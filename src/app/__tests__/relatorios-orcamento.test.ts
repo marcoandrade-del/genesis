@@ -29,7 +29,16 @@ import { appRelatoriosOrcamentoRoutes } from '../relatorios-orcamento.js'
 import type { FastifyInstance } from 'fastify'
 import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
 
-const ENTIDADE = { nome: 'Prefeitura de Maringá', brasao: null, municipio: { nome: 'Maringá', estado: { sigla: 'PR' } } }
+const ENTIDADE = {
+  nome: 'Prefeitura de Maringá',
+  brasao: null,
+  municipio: {
+    nome: 'Maringá',
+    loaCodigoModo: null, // herda do estado
+    loaCodigoNivel: null,
+    estado: { sigla: 'PR', loaCodigoModo: 'CURTO', loaCodigoNivel: 4 },
+  },
+}
 
 const RESUMO_OK = {
   temOrcamento: true,
@@ -76,6 +85,69 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Não há orçamento')
       expect(res.body).not.toContain('Baixar PDF')
+    })
+
+    it('o seletor de código e o parâmetro ?cod controlam o formato', async () => {
+      const comZeros = {
+        temOrcamento: true,
+        resumo: { previsto: 10, arrecadado: 0, saldo: 10 },
+        porConta: [{ id: 'c', codigo: '1.0.0.0.00', rotulo: 'Correntes', nivel: 1, previsto: 10, arrecadado: 0, saldo: 10 }],
+        porFonte: [],
+      }
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      resumoMock.mockResolvedValue(comZeros)
+      const curto = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(curto.body).toContain('Sem zeros à direita') // seletor presente
+      expect(curto.body).not.toContain('1.0.0.0.00') // default = trimado
+
+      resumoMock.mockResolvedValue(comZeros)
+      const completo = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista?cod=completo' })
+      expect(completo.body).toContain('1.0.0.0.00')
+
+      resumoMock.mockResolvedValue(comZeros)
+      const nivel = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista?cod=nivel&nivelMax=2' })
+      expect(nivel.body).toContain('>1.0<') // cortado em 2 segmentos
+      expect(nivel.body).not.toContain('1.0.0.0.00')
+      expect(nivel.body).toContain('nivelMax=2') // o link do PDF carrega o formato
+    })
+
+    it('herança: município sobrescreve o padrão do estado (sem query)', async () => {
+      const entOverride = {
+        ...ENTIDADE,
+        municipio: { ...ENTIDADE.municipio, loaCodigoModo: 'COMPLETO', loaCodigoNivel: 12 },
+      }
+      const comZeros = {
+        temOrcamento: true,
+        resumo: { previsto: 10, arrecadado: 0, saldo: 10 },
+        porConta: [{ id: 'c', codigo: '1.0.0.0.00', rotulo: 'Correntes', nivel: 1, previsto: 10, arrecadado: 0, saldo: 10 }],
+        porFonte: [],
+      }
+      prisma.entidade.findUnique.mockResolvedValue(entOverride)
+      resumoMock.mockResolvedValue(comZeros)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('1.0.0.0.00') // município forçou COMPLETO mesmo sem ?cod
+    })
+
+    it('config do estado em NIVEL corta o código sem query', async () => {
+      const entNivel = {
+        ...ENTIDADE,
+        municipio: {
+          ...ENTIDADE.municipio,
+          loaCodigoModo: null,
+          loaCodigoNivel: null,
+          estado: { sigla: 'PR', loaCodigoModo: 'NIVEL', loaCodigoNivel: 3 },
+        },
+      }
+      const comZeros = {
+        temOrcamento: true,
+        resumo: { previsto: 10, arrecadado: 0, saldo: 10 },
+        porConta: [{ id: 'c', codigo: '1.0.0.0.00', rotulo: 'X', nivel: 1, previsto: 10, arrecadado: 0, saldo: 0 }],
+        porFonte: [],
+      }
+      prisma.entidade.findUnique.mockResolvedValue(entNivel)
+      resumoMock.mockResolvedValue(comZeros)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('>1.0.0<') // cortado em 3 segmentos pela config do estado
     })
   })
 

@@ -50,12 +50,22 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
     return reply.view('estados/form', { estado, modelos, erro: null })
   })
 
-  app.put<{ Params: { id: string }; Body: { modeloContabilId?: string } }>(
+  app.put<{
+    Params: { id: string }
+    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string }
+  }>(
     '/:id',
     async (req, reply) => {
       // String vazia = limpar; senão usa o valor recebido.
       const novoId = req.body.modeloContabilId?.trim() ? req.body.modeloContabilId : null
+      const modo: 'COMPLETO' | 'CURTO' | 'NIVEL' =
+        req.body.loaCodigoModo === 'COMPLETO' || req.body.loaCodigoModo === 'NIVEL' ? req.body.loaCodigoModo : 'CURTO'
+      const nivel = Math.min(12, Math.max(1, parseInt(req.body.loaCodigoNivel ?? '', 10) || 4))
       try {
+        await app.prisma.estado.update({
+          where: { id: req.params.id },
+          data: { loaCodigoModo: modo, loaCodigoNivel: nivel },
+        })
         const r = await service.definirModelo(req.params.id, novoId)
         // Sinaliza ao admin quantos municípios foram tocados pela propagação.
         return reply

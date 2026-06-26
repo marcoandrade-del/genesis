@@ -21,6 +21,7 @@ export interface DadosReceitaPrevista {
   porConta: LinhaArrecadacao[]
   porFonte: LinhaArrecadacao[]
   total: number
+  codigoConta?: FormatoCodigo
 }
 
 /** Escapa texto para HTML (nomes de conta/fonte podem, em tese, ter `<`/`&`). */
@@ -35,6 +36,30 @@ function esc(s: string): string {
 /** Formata número em reais no padrão pt-BR (1.234.567,89). */
 export function formatarReais(n: number): string {
   return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+export interface FormatoCodigo {
+  modo: 'completo' | 'curto' | 'nivel'
+  nivelMax: number
+}
+
+export const FORMATO_CODIGO_PADRAO: FormatoCodigo = { modo: 'curto', nivelMax: 4 }
+
+/**
+ * Formata o código PCASP (segmentos separados por ponto) das contas de
+ * receita/despesa conforme o desejo do usuário:
+ *  - `completo`: como está (`1.0.0.0.00...`)
+ *  - `curto`: remove os zeros à direita (`1.0.0.0.00...` → `1`)
+ *  - `nivel`: corta no nível escolhido (primeiros N segmentos)
+ */
+export function formatarCodigoConta(codigo: string, fmt: FormatoCodigo): string {
+  const cod = String(codigo ?? '')
+  const segs = cod.split('.')
+  if (fmt.modo === 'completo') return cod
+  if (fmt.modo === 'nivel') return segs.slice(0, Math.max(1, fmt.nivelMax)).join('.')
+  let fim = segs.length
+  while (fim > 1 && /^0+$/.test(segs[fim - 1]!)) fim--
+  return segs.slice(0, fim).join('.')
 }
 
 function pct(valor: number, total: number): string {
@@ -81,7 +106,9 @@ const ESTILO = `<style>
 
 /** Monta o corpo HTML do Demonstrativo da Receita Orçada (LOA). */
 export function montarReceitaPrevista(dados: DadosReceitaPrevista): string {
-  const { cabecalho: c, porConta, porFonte, total } = dados
+  const { cabecalho: c, porFonte, total } = dados
+  const fmt = dados.codigoConta ?? FORMATO_CODIGO_PADRAO
+  const porConta = dados.porConta.map((l) => ({ ...l, codigo: formatarCodigoConta(l.codigo, fmt) }))
   const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   return (
     ESTILO +
@@ -147,11 +174,14 @@ export interface DadosDespesaFixada {
   porConta: LinhaSaldo[]
   porFonte: LinhaSaldo[]
   total: number
+  codigoConta?: FormatoCodigo
 }
 
 /** Monta o corpo HTML do Demonstrativo da Despesa Fixada (LOA), em 4 cortes. */
 export function montarDespesaFixada(dados: DadosDespesaFixada): string {
-  const { cabecalho: c, porUnidade, porFuncao, porConta, porFonte, total } = dados
+  const { cabecalho: c, porUnidade, porFuncao, porFonte, total } = dados
+  const fmt = dados.codigoConta ?? FORMATO_CODIGO_PADRAO
+  const porConta = dados.porConta.map((l) => ({ ...l, codigo: formatarCodigoConta(l.codigo, fmt) }))
   const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   return (
     ESTILO +

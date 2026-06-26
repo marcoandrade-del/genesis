@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, documentoPdf, formatarReais } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, documentoPdf, formatarReais, formatarCodigoConta } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -18,6 +18,46 @@ describe('formatarReais', () => {
   it('formata no padrão pt-BR', () => {
     expect(formatarReais(1234567.8)).toBe('1.234.567,80')
     expect(formatarReais(0)).toBe('0,00')
+  })
+})
+
+describe('formatarCodigoConta', () => {
+  const cod = '1.0.0.0.00.0.0.00.00.00.00.00'
+  it('completo devolve o código como está', () => {
+    expect(formatarCodigoConta(cod, { modo: 'completo', nivelMax: 4 })).toBe(cod)
+  })
+  it('curto remove os zeros à direita', () => {
+    expect(formatarCodigoConta(cod, { modo: 'curto', nivelMax: 4 })).toBe('1')
+    expect(formatarCodigoConta('1.1.2.0.00', { modo: 'curto', nivelMax: 4 })).toBe('1.1.2')
+  })
+  it('curto preserva zeros internos (só corta os do fim)', () => {
+    expect(formatarCodigoConta('1.0.5.0.0', { modo: 'curto', nivelMax: 4 })).toBe('1.0.5')
+  })
+  it('nivel corta nos N primeiros segmentos', () => {
+    expect(formatarCodigoConta(cod, { modo: 'nivel', nivelMax: 3 })).toBe('1.0.0')
+    expect(formatarCodigoConta(cod, { modo: 'nivel', nivelMax: 0 })).toBe('1') // mínimo 1
+  })
+  it('código todo-zero mantém ao menos o 1º segmento', () => {
+    expect(formatarCodigoConta('0.0.0', { modo: 'curto', nivelMax: 4 })).toBe('0')
+  })
+})
+
+describe('montarReceitaPrevista aplica o formato de código', () => {
+  const base = (codigoConta: { modo: 'completo' | 'curto' | 'nivel'; nivelMax: number }) => ({
+    cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+    porConta: [linha({ codigo: '1.0.0.0.00', rotulo: 'Correntes', nivel: 1, previsto: 10 })],
+    porFonte: [],
+    total: 10,
+    codigoConta,
+  })
+  it('curto trima na tabela de natureza', () => {
+    const html = montarReceitaPrevista(base({ modo: 'curto', nivelMax: 4 }))
+    expect(html).toContain('>1<') // código trimado
+    expect(html).not.toContain('1.0.0.0.00')
+  })
+  it('completo mantém o código cheio', () => {
+    const html = montarReceitaPrevista(base({ modo: 'completo', nivelMax: 4 }))
+    expect(html).toContain('1.0.0.0.00')
   })
 })
 
@@ -57,12 +97,12 @@ describe('montarReceitaPrevista', () => {
     expect(html).toContain('0,0%')
   })
 
-  it('tolera campo nulo sem quebrar (defensivo)', () => {
+  it('tolera campos nulos sem quebrar (defensivo)', () => {
     const html = montarReceitaPrevista({
       ...base,
-      porConta: [linha({ codigo: null as never, rotulo: 'Sem código', nivel: 1, previsto: 10 })],
+      porConta: [linha({ codigo: null as never, rotulo: null as never, nivel: 1, previsto: 10 })],
     })
-    expect(html).toContain('Sem código')
+    expect(html).toContain('10,00')
   })
 
   it('escapa caracteres especiais nos nomes', () => {

@@ -107,10 +107,19 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
     },
   )
 
-  app.put<{ Params: { id: string }; Body: { nome: string; modeloContabilId?: string } }>(
+  app.put<{
+    Params: { id: string }
+    Body: { nome: string; modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string }
+  }>(
     '/:id',
     async (req, reply) => {
       const { nome, modeloContabilId } = req.body
+      // Override do formato de código do município: vazio = herdar do estado (null).
+      const loaModo =
+        req.body.loaCodigoModo === 'COMPLETO' || req.body.loaCodigoModo === 'CURTO' || req.body.loaCodigoModo === 'NIVEL'
+          ? req.body.loaCodigoModo
+          : null
+      const loaNivel = loaModo ? Math.min(12, Math.max(1, parseInt(req.body.loaCodigoNivel ?? '', 10) || 4)) : null
       // Convenção: string vazia = restaurar herança do estado (modeloContabilId=null).
       const novoModelo = modeloContabilId !== undefined
         ? modeloContabilId.trim() ? modeloContabilId : null
@@ -135,6 +144,10 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
         await service.atualizar(req.params.id, {
           nome: nome.trim(),
           ...(novoModelo !== undefined ? { modeloContabilId: novoModelo } : {}),
+        })
+        await app.prisma.municipio.update({
+          where: { id: req.params.id },
+          data: { loaCodigoModo: loaModo, loaCodigoNivel: loaNivel },
         })
         return reply.header('HX-Redirect', `/admin/municipios?estadoId=${municipio.estadoId}`).status(204).send()
       } catch (e: unknown) {
