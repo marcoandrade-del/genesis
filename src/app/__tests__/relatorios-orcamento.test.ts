@@ -73,7 +73,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       resumoMock.mockResolvedValue(RESUMO_OK)
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
       expect(res.statusCode).toBe(200)
-      expect(res.body).toContain('Demonstrativo da Receita Orçada — LOA 2026')
+      expect(res.body).toContain('Resumo Geral da Receita')
       expect(res.body).toContain('RECEITAS CORRENTES')
       expect(res.body).toContain('Baixar PDF')
     })
@@ -85,6 +85,14 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Não há orçamento')
       expect(res.body).not.toContain('Baixar PDF')
+    })
+
+    it('legenda mostra a lei quando o orçamento está publicado', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      prisma.orcamento.findUnique.mockResolvedValue({ status: 'PUBLICADO', leiNumero: '1695/2025' })
+      resumoMock.mockResolvedValue(RESUMO_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('Lei Orçamentária Anual nº 1695/2025')
     })
 
     it('o seletor de código e o parâmetro ?cod controlam o formato', async () => {
@@ -161,7 +169,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.headers['content-type']).toContain('application/pdf')
       expect(gerarPdfMock).toHaveBeenCalledOnce()
       const corpo = gerarPdfMock.mock.calls[0][0].corpoHtml
-      expect(corpo).toContain('Demonstrativo da Receita Orçada')
+      expect(corpo).toContain('Resumo Geral da Receita')
     })
 
     it('redireciona para a tela quando não há orçamento', async () => {
@@ -189,7 +197,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       calcularMock.mockResolvedValue(SALDO_OK)
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada' })
       expect(res.statusCode).toBe(200)
-      expect(res.body).toContain('Demonstrativo da Despesa Fixada — LOA 2026')
+      expect(res.body).toContain('Demonstrativos da Despesa Fixada')
       expect(res.body).toContain('GABINETE')
       expect(res.body).toContain('Baixar PDF')
     })
@@ -208,7 +216,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada.pdf' })
       expect(res.statusCode).toBe(200)
       expect(res.headers['content-type']).toContain('application/pdf')
-      expect(gerarPdfMock.mock.calls[0][0].corpoHtml).toContain('Demonstrativo da Despesa Fixada')
+      expect(gerarPdfMock.mock.calls[0][0].corpoHtml).toContain('Demonstrativos da Despesa Fixada')
     })
 
     it('redireciona quando não há orçamento (.pdf)', async () => {
@@ -235,7 +243,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       ptMock.mockResolvedValue(PT_OK)
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/programa-trabalho' })
       expect(res.statusCode).toBe(200)
-      expect(res.body).toContain('Demonstrativo do Programa de Trabalho — LOA 2026')
+      expect(res.body).toContain('Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho')
       expect(res.body).toContain('Gabinete')
       expect(res.body).toContain('Baixar PDF')
     })
@@ -254,7 +262,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/programa-trabalho.pdf' })
       expect(res.statusCode).toBe(200)
       expect(res.headers['content-type']).toContain('application/pdf')
-      expect(gerarPdfMock.mock.calls[0][0].corpoHtml).toContain('Demonstrativo do Programa de Trabalho')
+      expect(gerarPdfMock.mock.calls[0][0].corpoHtml).toContain('Programa de Trabalho')
     })
 
     it('redireciona quando não há orçamento (.pdf)', async () => {

@@ -31,39 +31,54 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
   const ptSvc = new ProgramaTrabalhoService(app.prisma)
 
-  // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado).
-  async function entidadeCtx(entidadeId: string): Promise<{ e: EntidadeCab; padrao: FormatoCodigo }> {
-    const row = await app.prisma.entidade.findUnique({
-      where: { id: entidadeId },
-      select: {
-        nome: true,
-        brasao: true,
-        municipio: {
-          select: {
-            nome: true,
-            loaCodigoModo: true,
-            loaCodigoNivel: true,
-            estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true } },
+  // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
+  // + a legenda legal (status/lei do orçamento).
+  async function entidadeCtx(
+    entidadeId: string,
+    ano: number,
+  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; legenda: string }> {
+    const [row, orc] = await Promise.all([
+      app.prisma.entidade.findUnique({
+        where: { id: entidadeId },
+        select: {
+          nome: true,
+          brasao: true,
+          municipio: {
+            select: {
+              nome: true,
+              loaCodigoModo: true,
+              loaCodigoNivel: true,
+              estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true } },
+            },
           },
         },
-      },
-    })
+      }),
+      app.prisma.orcamento.findUnique({
+        where: { entidadeId_ano: { entidadeId, ano } },
+        select: { status: true, leiNumero: true },
+      }),
+    ])
     const m = row!.municipio
     const enumModo = m.loaCodigoModo ?? m.estado.loaCodigoModo
     const modo = enumModo === 'COMPLETO' ? 'completo' : enumModo === 'NIVEL' ? 'nivel' : 'curto'
     const nivelMax = m.loaCodigoNivel ?? m.estado.loaCodigoNivel
+    const aprovado = ['APROVADO', 'PUBLICADO', 'EM_EXECUCAO'].includes(orc?.status ?? '')
+    const legenda =
+      aprovado && orc?.leiNumero ? `Lei Orçamentária Anual nº ${orc.leiNumero}` : 'Projeto de Lei Orçamentária Anual'
     return {
       e: { nome: row!.nome, brasao: row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
       padrao: { modo, nivelMax },
+      legenda,
     }
   }
 
-  const cab = (e: EntidadeCab, ano: number) => ({
+  const cab = (e: EntidadeCab, ano: number, legenda: string) => ({
     entidadeNome: e.nome,
     municipio: e.municipio.nome,
     estado: e.municipio.estado.sigla,
     ano,
     brasao: e.brasao,
+    legenda,
   })
 
   // Query da tela (override pontual) tem prioridade sobre o padrão herdado.
@@ -79,11 +94,11 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Receita Orçada ──────────────────────────────────────────────────────────
   async function receita(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, padrao }, resumo] = await Promise.all([entidadeCtx(entidadeId), arrecadacoes.resumo(entidadeId, ano)])
+    const [{ e, padrao, legenda }, resumo] = await Promise.all([entidadeCtx(entidadeId, ano), arrecadacoes.resumo(entidadeId, ano)])
     const fmt = fmtCodigo(req, padrao)
     const corpo = resumo.temOrcamento
       ? montarReceitaPrevista({
-          cabecalho: cab(e, ano),
+          cabecalho: cab(e, ano, legenda),
           porConta: resumo.porConta,
           porFonte: resumo.porFonte,
           total: resumo.resumo.previsto,
@@ -129,11 +144,11 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Despesa Fixada ──────────────────────────────────────────────────────────
   async function despesa(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, padrao }, saldo] = await Promise.all([entidadeCtx(entidadeId), saldoSvc.calcular(entidadeId, ano)])
+    const [{ e, padrao, legenda }, saldo] = await Promise.all([entidadeCtx(entidadeId, ano), saldoSvc.calcular(entidadeId, ano)])
     const fmt = fmtCodigo(req, padrao)
     const corpo = saldo.temOrcamento
       ? montarDespesaFixada({
-          cabecalho: cab(e, ano),
+          cabecalho: cab(e, ano, legenda),
           porUnidade: saldo.porUnidade,
           porFuncao: saldo.porFuncao,
           porConta: saldo.porConta,
@@ -181,9 +196,9 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Programa de Trabalho (Anexo 6 / QDD) ────────────────────────────────────
   async function programa(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e }, pt] = await Promise.all([entidadeCtx(entidadeId), ptSvc.calcular(entidadeId, ano)])
+    const [{ e, legenda }, pt] = await Promise.all([entidadeCtx(entidadeId, ano), ptSvc.calcular(entidadeId, ano)])
     const corpo = pt.temOrcamento
-      ? montarProgramaTrabalho({ cabecalho: cab(e, ano), linhas: pt.linhas, total: pt.total })
+      ? montarProgramaTrabalho({ cabecalho: cab(e, ano, legenda), linhas: pt.linhas, total: pt.total })
       : ''
     return { e, ano, temOrcamento: pt.temOrcamento, corpo }
   }
