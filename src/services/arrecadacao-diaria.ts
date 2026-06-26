@@ -15,6 +15,9 @@ export type SerieReceitaDiaria = {
   dias: DiaReceita[]
 }
 
+/** Recorte da série: intervalo de datas (dentro do exercício) e/ou contas selecionadas. */
+export type FiltroSerie = { de?: Date; ate?: Date; contaIds?: string[] }
+
 /**
  * Acumulado diário da RECEITA: a evolução do arrecadado dia a dia (vs. o previsto),
  * lida direto das `Arrecadacao` — que já são o ledger datado da execução da receita
@@ -23,22 +26,30 @@ export type SerieReceitaDiaria = {
 export class ArrecadacaoDiariaService {
   constructor(private prisma: PrismaClient) {}
 
-  async serie(entidadeId: string, ano: number): Promise<SerieReceitaDiaria> {
+  async serie(entidadeId: string, ano: number, filtro: FiltroSerie = {}): Promise<SerieReceitaDiaria> {
     const orcamento = await this.prisma.orcamento.findUnique({
       where: { entidadeId_ano: { entidadeId, ano } },
       select: { id: true },
     })
     if (!orcamento) return { temOrcamento: false, previstoTotal: D0(), arrecadadoTotal: D0(), dias: [] }
 
+    // Filtro de contas (receita) aplicado à previsão e à arrecadação.
+    const contaWhere = filtro.contaIds?.length ? { contaReceitaEntidadeId: { in: filtro.contaIds } } : {}
+    // Intervalo de datas dentro do exercício.
+    const dataWhere =
+      filtro.de || filtro.ate
+        ? { data: { ...(filtro.de ? { gte: filtro.de } : {}), ...(filtro.ate ? { lte: filtro.ate } : {}) } }
+        : {}
+
     const prev = await this.prisma.previsaoReceita.aggregate({
-      where: { orcamentoId: orcamento.id },
+      where: { orcamentoId: orcamento.id, ...contaWhere },
       _sum: { valorPrevisto: true },
     })
     const previstoTotal = prev._sum.valorPrevisto ?? D0()
 
     const movs = await this.prisma.arrecadacao.groupBy({
       by: ['data', 'tipo'],
-      where: { previsao: { orcamentoId: orcamento.id } },
+      where: { previsao: { orcamentoId: orcamento.id, ...contaWhere }, ...dataWhere },
       _sum: { valor: true },
     })
 

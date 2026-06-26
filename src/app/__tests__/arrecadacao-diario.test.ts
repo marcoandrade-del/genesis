@@ -31,14 +31,30 @@ describe('GET /orcamento/arrecadacao/diario', () => {
     })
     ;({ app, prisma } = await montar())
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaReceitaEntidade.findMany.mockResolvedValue([])
   })
 
   it('renderiza o acumulado diário da receita', async () => {
     const res = await app.inject({ method: 'GET', url: '/orcamento/arrecadacao/diario' })
     expect(res.statusCode).toBe(200)
-    expect(m.serie).toHaveBeenCalledWith('ent1', 2026)
+    expect(m.serie).toHaveBeenCalledWith('ent1', 2026, expect.objectContaining({ contaIds: [] }))
     expect(res.body).toContain('acumulado diário')
     expect(res.body).toContain('450')
+  })
+
+  it('aplica os filtros de período e conta da query', async () => {
+    prisma.contaReceitaEntidade.findMany.mockResolvedValue([{ id: 'c1', codigo: '1.1.0', descricao: 'IPTU' }])
+    const res = await app.inject({
+      method: 'GET',
+      url: '/orcamento/arrecadacao/diario?de=2026-03-01&ate=2026-03-31&contas=c1',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(m.serie).toHaveBeenCalledWith(
+      'ent1',
+      2026,
+      expect.objectContaining({ de: expect.any(Date), ate: expect.any(Date), contaIds: ['c1'] }),
+    )
+    expect(res.body).toContain('IPTU') // opção da conta no seletor
   })
 
   it('mostra aviso quando não há orçamento', async () => {

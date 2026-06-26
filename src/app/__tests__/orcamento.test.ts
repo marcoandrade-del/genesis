@@ -109,6 +109,23 @@ describe('appOrcamentoRoutes', () => {
     expect(res.body).toContain('1.450,00')
   })
 
+  it('GET /orcamento/despesa/diario aplica filtros de período e conta', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.aggregate.mockResolvedValue({ _sum: { valorAutorizado: null } })
+    prisma.movimentoEmpenho.groupBy.mockResolvedValue([])
+    prisma.contaDespesaEntidade.findMany.mockResolvedValue([{ id: 'd1', codigo: '3.1.90', descricao: 'Pessoal' }])
+    const res = await app.inject({
+      method: 'GET',
+      url: '/orcamento/despesa/diario?de=2026-02-01&ate=2026-02-28&contas=d1',
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Pessoal') // opção da conta no seletor
+    const where = prisma.movimentoEmpenho.groupBy.mock.calls[0]![0].where
+    expect(where.empenho.dotacaoDespesa.contaDespesaEntidadeId).toEqual({ in: ['d1'] })
+    expect(where.data).toEqual({ gte: expect.any(Date), lte: expect.any(Date) })
+  })
+
   it('GET /orcamento/saldo redireciona se a entidade sumiu', async () => {
     prisma.entidade.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/orcamento/saldo' })
