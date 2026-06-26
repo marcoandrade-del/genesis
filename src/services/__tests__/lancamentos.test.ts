@@ -99,6 +99,13 @@ describe('LancamentosService.listar', () => {
     expect(args.where.data.gte).toBeUndefined()
     expect(args.where.data.lte).toBeInstanceOf(Date)
   })
+
+  it('filtra por contas (lançamentos que tocam alguma das contas)', async () => {
+    prisma.lancamento.findMany.mockResolvedValue([])
+    await service.listar('ent1', { contaIds: ['c1', 'c2'] })
+    const args = prisma.lancamento.findMany.mock.calls[0][0]
+    expect(args.where.itens).toEqual({ some: { contaId: { in: ['c1', 'c2'] } } })
+  })
 })
 
 describe('LancamentosService.buscarPorId', () => {

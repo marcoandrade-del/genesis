@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { LancamentosService } from '../services/lancamentos.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
+import { parseFiltroConsulta, type FiltroConsultaQuery } from './filtro-consulta.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 const ERRO_LEITURA =
@@ -33,12 +34,17 @@ export async function appLancamentosRoutes(app: FastifyInstance) {
 
   async function render(req: FastifyRequest, reply: FastifyReply, entidade: unknown, opts: RenderOpts = {}) {
     const { entidadeId, ano, nivel } = req.contexto
+    const filtro = parseFiltroConsulta(req.query as FiltroConsultaQuery, ano)
     const [lista, contas] = await Promise.all([
-      lancamentos.listar(entidadeId, { dataInicio: `${ano}-01-01`, dataFim: `${ano}-12-31` }),
-      // Catálogo das analíticas para o picker (datalist). Só folhas admitem movimento.
+      lancamentos.listar(entidadeId, {
+        dataInicio: filtro.de ? filtro.deStr : `${ano}-01-01`,
+        dataFim: filtro.ate ? filtro.ateStr : `${ano}-12-31`,
+        contaIds: filtro.contaIds,
+      }),
+      // Catálogo das analíticas para o picker (datalist + filtro). Só folhas admitem movimento.
       app.prisma.contaContabilEntidade.findMany({
         where: { entidadeId, ano, admiteMovimento: true },
-        select: { codigo: true, descricao: true },
+        select: { id: true, codigo: true, descricao: true },
         orderBy: { codigo: 'asc' },
       }),
     ])
@@ -51,6 +57,8 @@ export async function appLancamentosRoutes(app: FastifyInstance) {
       lancamentos: lista,
       total,
       contas,
+      contasOpcoes: contas,
+      filtro,
       podeEscrever: podeEscrever(nivel),
       anoMin: `${ano}-01-01`,
       anoMax: `${ano}-12-31`,
