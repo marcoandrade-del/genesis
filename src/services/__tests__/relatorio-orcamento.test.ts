@@ -76,7 +76,7 @@ describe('montarReceitaPrevista', () => {
     const html = montarReceitaPrevista(base)
     expect(html).toContain('Prefeitura de Maringá')
     expect(html).toContain('Maringá · PR — Exercício 2026')
-    expect(html).toContain('Demonstrativo da Receita Orçada — LOA 2026')
+    expect(html).toContain('Anexo 2, da Lei nº 4.320/64 — Resumo Geral da Receita')
     expect(html).toContain('RECEITAS CORRENTES')
     expect(html).toContain('800,00')
     expect(html).toContain('Receita prevista por fonte de recurso')
@@ -142,10 +142,10 @@ describe('montarDespesaFixada', () => {
 
   it('renderiza os 4 cortes com título e total', () => {
     const html = montarDespesaFixada(base)
-    expect(html).toContain('Demonstrativo da Despesa Fixada — LOA 2026')
-    expect(html).toContain('Despesa fixada por unidade orçamentária')
-    expect(html).toContain('Despesa fixada por função de governo')
-    expect(html).toContain('Despesa fixada por natureza')
+    expect(html).toContain('Demonstrativos da Despesa Fixada')
+    expect(html).toContain('Demonstração da Despesa por Unidades Orçamentárias')
+    expect(html).toContain('Demonstrativo da Despesa por Funções')
+    expect(html).toContain('Natureza da Despesa Segundo as Categorias Econômicas')
     expect(html).toContain('Despesa fixada por fonte de recurso')
     expect(html).toContain('GABINETE')
     expect(html).toContain('DESPESAS CORRENTES')
@@ -170,7 +170,7 @@ describe('montarProgramaTrabalho', () => {
       ],
       total: 600,
     })
-    expect(html).toContain('Demonstrativo do Programa de Trabalho — LOA 2026')
+    expect(html).toContain('Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho')
     expect(html).toContain('Gabinete')
     expect(html).toContain('TOTAL DA DESPESA FIXADA')
     expect(html).toContain('100,0%')

@@ -14,6 +14,7 @@ export interface CabecalhoDemonstrativo {
   estado: string
   ano: number
   brasao?: string | null
+  legenda?: string // base legal (ex.: "Lei nº 1695/2025" ou "Projeto de Lei Orçamentária Anual")
 }
 
 export interface DadosReceitaPrevista {
@@ -105,19 +106,28 @@ const ESTILO = `<style>
 </style>`
 
 /** Monta o corpo HTML do Demonstrativo da Receita Orçada (LOA). */
+/** Cabeçalho oficial: brasão + entidade + município/exercício + base legal + título do anexo. */
+function cabecalhoHtml(c: CabecalhoDemonstrativo, titulo: string): string {
+  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
+  const legenda = c.legenda ? `<div class="dem-sub">${esc(c.legenda)}</div>` : ''
+  return (
+    `<header class="dem-cab">${brasao}<div>` +
+    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
+    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
+    legenda +
+    `<h1 class="dem-titulo">${esc(titulo)}</h1>` +
+    `</div></header>`
+  )
+}
+
 export function montarReceitaPrevista(dados: DadosReceitaPrevista): string {
   const { cabecalho: c, porFonte, total } = dados
   const fmt = dados.codigoConta ?? FORMATO_CODIGO_PADRAO
   const porConta = dados.porConta.map((l) => ({ ...l, codigo: formatarCodigoConta(l.codigo, fmt) }))
-  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   return (
     ESTILO +
     `<div class="dem">` +
-    `<header class="dem-cab">${brasao}<div>` +
-    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
-    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
-    `<h1 class="dem-titulo">Demonstrativo da Receita Orçada — LOA ${c.ano}</h1>` +
-    `</div></header>` +
+    cabecalhoHtml(c, 'Anexo 2, da Lei nº 4.320/64 — Resumo Geral da Receita') +
     `<table class="dem-tab">` +
     `<thead><tr><th>Código</th><th>Especificação da receita</th><th class="num">Previsto (R$)</th><th class="num">% do total</th></tr></thead>` +
     `<tbody>${linhasHtml(porConta, total)}</tbody>` +
@@ -182,20 +192,15 @@ export function montarDespesaFixada(dados: DadosDespesaFixada): string {
   const { cabecalho: c, porUnidade, porFuncao, porFonte, total } = dados
   const fmt = dados.codigoConta ?? FORMATO_CODIGO_PADRAO
   const porConta = dados.porConta.map((l) => ({ ...l, codigo: formatarCodigoConta(l.codigo, fmt) }))
-  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   return (
     ESTILO +
     `<div class="dem">` +
-    `<header class="dem-cab">${brasao}<div>` +
-    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
-    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
-    `<h1 class="dem-titulo">Demonstrativo da Despesa Fixada — LOA ${c.ano}</h1>` +
-    `</div></header>` +
-    `<h2 class="dem-sec">Despesa fixada por unidade orçamentária</h2>` +
+    cabecalhoHtml(c, 'Demonstrativos da Despesa Fixada') +
+    `<h2 class="dem-sec">Anexo 2, da Lei nº 4.320/64 — Demonstração da Despesa por Unidades Orçamentárias</h2>` +
     tabelaDespesa('Unidade orçamentária', porUnidade, total, 'TOTAL') +
-    `<h2 class="dem-sec">Despesa fixada por função de governo</h2>` +
+    `<h2 class="dem-sec">Anexo 9, da Lei nº 4.320/64 — Demonstrativo da Despesa por Funções</h2>` +
     tabelaDespesa('Função', porFuncao, total, 'TOTAL') +
-    `<h2 class="dem-sec">Despesa fixada por natureza (categoria econômica)</h2>` +
+    `<h2 class="dem-sec">Anexo 2, da Lei nº 4.320/64 — Natureza da Despesa Segundo as Categorias Econômicas</h2>` +
     tabelaDespesa('Natureza da despesa', porConta, total, 'TOTAL DA DESPESA FIXADA') +
     `<h2 class="dem-sec">Despesa fixada por fonte de recurso</h2>` +
     tabelaDespesa('Fonte de recurso', porFonte, total, 'TOTAL') +
@@ -212,15 +217,10 @@ export interface DadosProgramaTrabalho {
 /** Monta o corpo HTML do Programa de Trabalho (Anexo 6 / QDD) — árvore única. */
 export function montarProgramaTrabalho(dados: DadosProgramaTrabalho): string {
   const { cabecalho: c, linhas, total } = dados
-  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   return (
     ESTILO +
     `<div class="dem">` +
-    `<header class="dem-cab">${brasao}<div>` +
-    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
-    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
-    `<h1 class="dem-titulo">Demonstrativo do Programa de Trabalho — LOA ${c.ano}</h1>` +
-    `</div></header>` +
+    cabecalhoHtml(c, 'Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho') +
     `<p class="dem-sub">Despesa fixada por unidade orçamentária → função → subfunção → programa → ação.</p>` +
     `<table class="dem-tab">` +
     `<thead><tr><th>Código</th><th>Programa de trabalho</th><th class="num">Fixado (R$)</th><th class="num">% do total</th></tr></thead>` +
