@@ -61,6 +61,27 @@
       </select>
       <div class="form-text">Sem modelo próprio, o município herda o do estado (incluindo mudanças futuras).</div>
     </div>
+
+    <% if (municipio) { %>
+    <hr class="my-2">
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Código nos relatórios da LOA</label>
+      <select name="loaCodigoModo" class="form-select form-select-sm"
+        onchange="this.closest('form').querySelector('.mun-nivel').style.display = this.value==='NIVEL' ? '' : 'none'">
+        <option value="" <%= !municipio.loaCodigoModo ? 'selected' : '' %>>— Herdar do estado —</option>
+        <option value="CURTO" <%= municipio.loaCodigoModo === 'CURTO' ? 'selected' : '' %>>Sem zeros à direita</option>
+        <option value="COMPLETO" <%= municipio.loaCodigoModo === 'COMPLETO' ? 'selected' : '' %>>Completo</option>
+        <option value="NIVEL" <%= municipio.loaCodigoModo === 'NIVEL' ? 'selected' : '' %>>Até nível</option>
+      </select>
+      <div class="form-text">Vazio = herda o padrão do estado.</div>
+    </div>
+    <div class="mb-3 mun-nivel" style="<%= municipio.loaCodigoModo === 'NIVEL' ? '' : 'display:none' %>">
+      <label class="form-label small">Nível (qtd. de segmentos)</label>
+      <input type="number" name="loaCodigoNivel" min="1" max="12"
+        value="<%= municipio.loaCodigoNivel || (estado && estado.loaCodigoNivel) || 4 %>"
+        class="form-control form-control-sm" style="width:90px">
+    </div>
+    <% } %>
   </div>
 
   <div class="modal-footer">

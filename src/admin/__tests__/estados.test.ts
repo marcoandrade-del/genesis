@@ -113,6 +113,19 @@ describe('adminEstadosRoutes', () => {
       expect(res.headers['hx-trigger']).toContain('853')
     })
 
+    it('salva o formato de código da LOA do estado', async () => {
+      definirModeloMock.mockResolvedValue({ estado: ESTADO, municipiosAtualizados: 0 })
+      await app.inject({
+        method: 'PUT',
+        url: '/e1',
+        ...form({ modeloContabilId: '', loaCodigoModo: 'NIVEL', loaCodigoNivel: '3' }),
+      })
+      expect(prisma.estado.update).toHaveBeenCalledWith({
+        where: { id: 'e1' },
+        data: { loaCodigoModo: 'NIVEL', loaCodigoNivel: 3 },
+      })
+    })
+
     it('passa null quando modeloContabilId é string vazia', async () => {
       definirModeloMock.mockResolvedValue({ estado: ESTADO, municipiosAtualizados: 10 })
       await app.inject({ method: 'PUT', url: '/e1', ...form({ modeloContabilId: '' }) })

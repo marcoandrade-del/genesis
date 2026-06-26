@@ -26,7 +26,20 @@
       </ol>
     </nav>
     <% if (temOrcamento) { %>
-      <div class="d-flex gap-2">
+      <div class="d-flex gap-2 align-items-center flex-wrap">
+        <% if (typeof seletorCodigo !== 'undefined' && seletorCodigo) { %>
+          <form method="GET" action="<%= seletorCodigoAcao %>" class="d-flex align-items-center gap-1">
+            <label class="small text-muted mb-0 me-1">Código:</label>
+            <select name="cod" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+              <option value="curto" <%= seletorCodigo.modo === 'curto' ? 'selected' : '' %>>Sem zeros à direita</option>
+              <option value="completo" <%= seletorCodigo.modo === 'completo' ? 'selected' : '' %>>Completo</option>
+              <option value="nivel" <%= seletorCodigo.modo === 'nivel' ? 'selected' : '' %>>Até nível</option>
+            </select>
+            <input type="number" name="nivelMax" min="1" max="12" value="<%= seletorCodigo.nivelMax %>"
+              class="form-control form-control-sm" style="width:64px" title="Nível (use com 'Até nível')">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">OK</button>
+          </form>
+        <% } %>
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">
           <i class="bi bi-printer me-1"></i>Imprimir
         </button>

@@ -389,28 +389,40 @@ model ModeloContabil {
   @@map("modelos_contabeis")
 }
 
+// Formato do código das contas (receita/despesa) nos demonstrativos da LOA.
+// COMPLETO = código cheio; CURTO = sem zeros à direita; NIVEL = corta em N segmentos.
+enum FormatoCodigoConta {
+  COMPLETO
+  CURTO
+  NIVEL
+}
+
 model Estado {
-  id               String          @id @default(uuid())
-  nome             String          @unique
-  sigla            String          @unique @db.Char(2)
+  id               String             @id @default(uuid())
+  nome             String             @unique
+  sigla            String             @unique @db.Char(2)
   modeloContabilId String?
-  criadoEm         DateTime        @default(now())
-  atualizadoEm     DateTime        @updatedAt
-  modeloContabil   ModeloContabil? @relation(fields: [modeloContabilId], references: [id])
+  loaCodigoModo    FormatoCodigoConta @default(CURTO) // padrão do estado p/ os relatórios da LOA
+  loaCodigoNivel   Int                @default(4)
+  criadoEm         DateTime           @default(now())
+  atualizadoEm     DateTime           @updatedAt
+  modeloContabil   ModeloContabil?    @relation(fields: [modeloContabilId], references: [id])
   municipios       Municipio[]
 
   @@map("estados")
 }
 
 model Municipio {
-  id               String          @id @default(uuid())
+  id               String              @id @default(uuid())
   nome             String
   estadoId         String
   modeloContabilId String?
-  criadoEm         DateTime        @default(now())
-  atualizadoEm     DateTime        @updatedAt
-  estado           Estado          @relation(fields: [estadoId], references: [id])
-  modeloContabil   ModeloContabil? @relation(fields: [modeloContabilId], references: [id])
+  loaCodigoModo    FormatoCodigoConta? // null = herda do estado
+  loaCodigoNivel   Int?
+  criadoEm         DateTime            @default(now())
+  atualizadoEm     DateTime            @updatedAt
+  estado           Estado              @relation(fields: [estadoId], references: [id])
+  modeloContabil   ModeloContabil?     @relation(fields: [modeloContabilId], references: [id])
   entidades        Entidade[]
 
   @@unique([nome, estadoId])

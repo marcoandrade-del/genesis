@@ -40,6 +40,23 @@
         </div>
       <% } %>
     </div>
+
+    <hr class="my-3">
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Código nos relatórios da LOA — padrão do estado</label>
+      <select name="loaCodigoModo" class="form-select form-select-sm"
+        onchange="this.closest('form').querySelector('.est-nivel').style.display = this.value==='NIVEL' ? '' : 'none'">
+        <option value="CURTO" <%= estado.loaCodigoModo === 'CURTO' ? 'selected' : '' %>>Sem zeros à direita</option>
+        <option value="COMPLETO" <%= estado.loaCodigoModo === 'COMPLETO' ? 'selected' : '' %>>Completo</option>
+        <option value="NIVEL" <%= estado.loaCodigoModo === 'NIVEL' ? 'selected' : '' %>>Até nível</option>
+      </select>
+      <div class="form-text">Cada município herda este padrão (pode sobrescrever no cadastro do município).</div>
+    </div>
+    <div class="mb-3 est-nivel" style="<%= estado.loaCodigoModo === 'NIVEL' ? '' : 'display:none' %>">
+      <label class="form-label small">Nível (qtd. de segmentos)</label>
+      <input type="number" name="loaCodigoNivel" min="1" max="12" value="<%= estado.loaCodigoNivel %>"
+        class="form-control form-control-sm" style="width:90px">
+    </div>
   </div>
 
   <div class="modal-footer">

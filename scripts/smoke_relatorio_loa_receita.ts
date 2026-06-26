@@ -49,6 +49,8 @@ async function main() {
   log('top categorias (nível 1):')
   resumo.porConta.filter((l) => l.nivel === 1).forEach((l) => log(`  ${l.codigo}  ${l.rotulo}: R$ ${formatarReais(l.previsto)}`))
 
+  const modoArg = (arg('--modo') as 'completo' | 'curto' | 'nivel') || 'curto'
+  const nmArg = parseInt(arg('--nm') ?? '4', 10) || 4
   const corpo = montarReceitaPrevista({
     cabecalho: {
       entidadeNome: ent.nome,
@@ -60,6 +62,7 @@ async function main() {
     porConta: resumo.porConta,
     porFonte: resumo.porFonte,
     total: resumo.resumo.previsto,
+    codigoConta: { modo: modoArg, nivelMax: nmArg },
   })
   log(`\n✔ HTML do demonstrativo: ${corpo.length} chars; contém título: ${corpo.includes('Demonstrativo da Receita Orçada')}`)
 
