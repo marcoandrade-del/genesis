@@ -8,6 +8,7 @@ import {
   montarProgramaTrabalho,
   montarSumarioGeral,
   documentoPdf,
+  formatarEmissao,
   type FormatoCodigo,
 } from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
@@ -18,9 +19,10 @@ type EntidadeCab = {
   municipio: { nome: string; estado: { sigla: string } }
 }
 
-const footer = (titulo: string) =>
+const footer = (titulo: string, emissao = '') =>
   `<div style="font-size:8px;width:100%;text-align:center;color:#888;padding:0 12mm">` +
-  `Gênesis · ${titulo} — página <span class="pageNumber"></span>/<span class="totalPages"></span></div>`
+  `Gênesis · ${titulo}${emissao ? ` — Relatório gerado em ${emissao}` : ''} — ` +
+  `página <span class="pageNumber"></span>/<span class="totalPages"></span></div>`
 
 /**
  * Relatórios imprimíveis do orçamento (LOA): demonstrativo da Receita Orçada e
@@ -34,16 +36,29 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
+  type CabMeta = {
+    legenda: string
+    emissao: string
+    emissaoLocal: 'CABECALHO' | 'RODAPE' | 'NENHUM'
+    marcaDagua?: string
+  }
+
+  // Marca d'água por status (só quando NÃO é a versão final aprovada).
+  const MARCA_POR_STATUS: Record<string, string> = { RASCUNHO: 'RASCUNHO', ENVIADO_AO_LEGISLATIVO: 'PROJETO DE LEI' }
+
   async function entidadeCtx(
     entidadeId: string,
     ano: number,
-  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; legenda: string }> {
+  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; meta: CabMeta }> {
     const [row, orc] = await Promise.all([
       app.prisma.entidade.findUnique({
         where: { id: entidadeId },
         select: {
           nome: true,
           brasao: true,
+          emissaoLocal: true,
+          emitirData: true,
+          emitirHora: true,
           municipio: {
             select: {
               nome: true,
@@ -67,22 +82,32 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     const aprovado = ['APROVADO', 'PUBLICADO', 'EM_EXECUCAO'].includes(orc?.status ?? '')
     const legenda =
       aprovado && orc?.leiNumero ? `Lei Orçamentária Anual nº ${orc.leiNumero}` : 'Projeto de Lei Orçamentária Anual'
+    const marcaDagua = aprovado ? undefined : MARCA_POR_STATUS[orc?.status ?? ''] ?? 'VERSÃO TRANSITÓRIA'
+    const meta: CabMeta = {
+      legenda,
+      emissao: formatarEmissao(new Date(), row!.emitirData, row!.emitirHora),
+      emissaoLocal: row!.emissaoLocal,
+      ...(marcaDagua ? { marcaDagua } : {}),
+    }
     return {
       // Brasão do município tem prioridade; cai no da entidade se o município não tiver.
       e: { nome: row!.nome, brasao: m.brasao ?? row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
       padrao: { modo, nivelMax },
-      legenda,
+      meta,
     }
   }
 
-  const cab = (e: EntidadeCab, ano: number, legenda: string) => ({
+  const cab = (e: EntidadeCab, ano: number, meta: CabMeta) => ({
     entidadeNome: e.nome,
     municipio: e.municipio.nome,
     estado: e.municipio.estado.sigla,
     ano,
     brasao: e.brasao,
-    legenda,
+    ...meta,
   })
+
+  // Carimbo p/ o rodapé por página do PDF (Playwright), só quando a entidade pede rodapé.
+  const emissaoRodape = (meta: CabMeta) => (meta.emissaoLocal === 'RODAPE' ? meta.emissao : '')
 
   // Query da tela (override pontual) tem prioridade sobre o padrão herdado.
   function fmtCodigo(req: FastifyRequest, padrao: FormatoCodigo): FormatoCodigo {
@@ -97,18 +122,18 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Receita Orçada ──────────────────────────────────────────────────────────
   async function receita(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, padrao, legenda }, resumo] = await Promise.all([entidadeCtx(entidadeId, ano), arrecadacoes.resumo(entidadeId, ano)])
+    const [{ e, padrao, meta },resumo] = await Promise.all([entidadeCtx(entidadeId, ano), arrecadacoes.resumo(entidadeId, ano)])
     const fmt = fmtCodigo(req, padrao)
     const corpo = resumo.temOrcamento
       ? montarReceitaPrevista({
-          cabecalho: cab(e, ano, legenda),
+          cabecalho: cab(e, ano, meta),
           porConta: resumo.porConta,
           porFonte: resumo.porFonte,
           total: resumo.resumo.previsto,
           codigoConta: fmt,
         })
       : ''
-    return { e, ano, temOrcamento: resumo.temOrcamento, corpo, fmt }
+    return { e, ano, temOrcamento: resumo.temOrcamento, corpo, fmt, meta }
   }
 
   app.get('/orcamento/relatorios/receita-prevista', async (req, reply) => {
@@ -129,12 +154,12 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   })
 
   app.get('/orcamento/relatorios/receita-prevista.pdf', async (req, reply) => {
-    const { ano, temOrcamento, corpo } = await receita(req)
+    const { ano, temOrcamento, corpo, meta } = await receita(req)
     if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/receita-prevista')
     const pdf = await gerarPdf({
       corpoHtml: documentoPdf(`Receita Orçada ${ano}`, corpo),
       header: '<span></span>',
-      footer: footer('Receita Orçada'),
+      footer: footer('Receita Orçada', emissaoRodape(meta)),
       margemTopoMm: 12,
       margemRodapeMm: 16,
     })
@@ -147,11 +172,11 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Despesa Fixada ──────────────────────────────────────────────────────────
   async function despesa(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, padrao, legenda }, saldo] = await Promise.all([entidadeCtx(entidadeId, ano), saldoSvc.calcular(entidadeId, ano)])
+    const [{ e, padrao, meta },saldo] = await Promise.all([entidadeCtx(entidadeId, ano), saldoSvc.calcular(entidadeId, ano)])
     const fmt = fmtCodigo(req, padrao)
     const corpo = saldo.temOrcamento
       ? montarDespesaFixada({
-          cabecalho: cab(e, ano, legenda),
+          cabecalho: cab(e, ano, meta),
           porUnidade: saldo.porUnidade,
           porFuncao: saldo.porFuncao,
           porConta: saldo.porConta,
@@ -160,7 +185,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
           codigoConta: fmt,
         })
       : ''
-    return { e, ano, temOrcamento: saldo.temOrcamento, corpo, fmt }
+    return { e, ano, temOrcamento: saldo.temOrcamento, corpo, fmt, meta }
   }
 
   app.get('/orcamento/relatorios/despesa-fixada', async (req, reply) => {
@@ -181,12 +206,12 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   })
 
   app.get('/orcamento/relatorios/despesa-fixada.pdf', async (req, reply) => {
-    const { ano, temOrcamento, corpo } = await despesa(req)
+    const { ano, temOrcamento, corpo, meta } = await despesa(req)
     if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/despesa-fixada')
     const pdf = await gerarPdf({
       corpoHtml: documentoPdf(`Despesa Fixada ${ano}`, corpo),
       header: '<span></span>',
-      footer: footer('Despesa Fixada'),
+      footer: footer('Despesa Fixada', emissaoRodape(meta)),
       margemTopoMm: 12,
       margemRodapeMm: 16,
     })
@@ -210,20 +235,20 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
 
   async function corpoAnexoFP(req: FastifyRequest, a: AnexoFP) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, legenda }, pt] = await Promise.all([
+    const [{ e, meta },pt] = await Promise.all([
       entidadeCtx(entidadeId, ano),
       ptSvc.calcularPor(entidadeId, ano, a.dims),
     ])
     const corpo = pt.temOrcamento
       ? montarProgramaTrabalho({
-          cabecalho: cab(e, ano, legenda),
+          cabecalho: cab(e, ano, meta),
           linhas: pt.linhas,
           total: pt.total,
           titulo: a.titulo,
           descricao: a.descricao,
         })
       : ''
-    return { e, ano, temOrcamento: pt.temOrcamento, corpo }
+    return { e, ano, temOrcamento: pt.temOrcamento, corpo, meta }
   }
 
   function registrarAnexoFP(a: AnexoFP) {
@@ -242,12 +267,12 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
       })
     })
     app.get(`/orcamento/relatorios/${a.path}.pdf`, async (req, reply) => {
-      const { ano, temOrcamento, corpo } = await corpoAnexoFP(req, a)
+      const { ano, temOrcamento, corpo, meta } = await corpoAnexoFP(req, a)
       if (!temOrcamento) return reply.redirect(`/app/orcamento/relatorios/${a.path}`)
       const pdf = await gerarPdf({
         corpoHtml: documentoPdf(`${a.tituloPagina} ${ano}`, corpo),
         header: '<span></span>',
-        footer: footer(a.tituloPagina),
+        footer: footer(a.tituloPagina, emissaoRodape(meta)),
         margemTopoMm: 12,
         margemRodapeMm: 16,
       })
@@ -291,7 +316,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── Sumário Geral (Receita por Fontes × Despesa por Funções) ────────────────
   async function sumario(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, legenda }, resumo, saldo] = await Promise.all([
+    const [{ e, meta },resumo, saldo] = await Promise.all([
       entidadeCtx(entidadeId, ano),
       arrecadacoes.resumo(entidadeId, ano),
       saldoSvc.calcular(entidadeId, ano),
@@ -299,14 +324,14 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     const temOrcamento = resumo.temOrcamento || saldo.temOrcamento
     const corpo = temOrcamento
       ? montarSumarioGeral({
-          cabecalho: cab(e, ano, legenda),
+          cabecalho: cab(e, ano, meta),
           receitaPorFonte: resumo.porFonte,
           despesaPorFuncao: saldo.porFuncao,
           totalReceita: resumo.resumo.previsto,
           totalDespesa: saldo.resumo.autorizado,
         })
       : ''
-    return { e, ano, temOrcamento, corpo }
+    return { e, ano, temOrcamento, corpo, meta }
   }
 
   app.get('/orcamento/relatorios/sumario', async (req, reply) => {
@@ -325,12 +350,12 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   })
 
   app.get('/orcamento/relatorios/sumario.pdf', async (req, reply) => {
-    const { ano, temOrcamento, corpo } = await sumario(req)
+    const { ano, temOrcamento, corpo, meta } = await sumario(req)
     if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/sumario')
     const pdf = await gerarPdf({
       corpoHtml: documentoPdf(`Sumário Geral ${ano}`, corpo),
       header: '<span></span>',
-      footer: footer('Sumário Geral'),
+      footer: footer('Sumário Geral', emissaoRodape(meta)),
       margemTopoMm: 12,
       margemRodapeMm: 16,
     })

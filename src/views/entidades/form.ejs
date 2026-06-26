@@ -105,6 +105,27 @@
         <div class="form-text">A assinatura eletrônica será habilitada futuramente; por ora os anexos saem para assinatura manual.</div>
       </div>
 
+      <div class="mb-2">
+        <label class="form-label small fw-semibold">Carimbo de emissão (data/hora) nos anexos</label>
+        <select name="emissaoLocal" class="form-select form-select-sm">
+          <option value="RODAPE" <%= entidade.emissaoLocal === 'RODAPE' ? 'selected' : '' %>>No rodapé ("Relatório gerado em…")</option>
+          <option value="CABECALHO" <%= entidade.emissaoLocal === 'CABECALHO' ? 'selected' : '' %>>No cabeçalho</option>
+          <option value="NENHUM" <%= entidade.emissaoLocal === 'NENHUM' ? 'selected' : '' %>>Não imprimir</option>
+        </select>
+        <div class="d-flex gap-3 mt-2">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="ent-emite-data" name="emitirData" value="true"
+              <%= entidade.emitirData ? 'checked' : '' %>>
+            <label for="ent-emite-data" class="form-check-label small">Incluir data</label>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="ent-emite-hora" name="emitirHora" value="true"
+              <%= entidade.emitirHora ? 'checked' : '' %>>
+            <label for="ent-emite-hora" class="form-check-label small">Incluir hora</label>
+          </div>
+        </div>
+      </div>
+
       <div class="form-check">
         <input type="hidden" name="ativo" value="<%= entidade.ativo ? 'true' : 'false' %>" id="ent-ativo-val">
         <input type="checkbox" class="form-check-input" id="ent-chk-ativo"

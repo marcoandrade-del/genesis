@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, documentoPdf, formatarReais, formatarCodigoConta } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -184,6 +184,14 @@ describe('montarProgramaTrabalho', () => {
     })
     expect(html).toContain('<img src="data:image/png;base64,QQ"')
   })
+})
+
+describe('formatarEmissao', () => {
+  const d = new Date(2026, 5, 26, 9, 5) // 26/06/2026 09:05 (mês 0-based)
+  it('data + hora', () => expect(formatarEmissao(d, true, true)).toBe('26/06/2026 às 09:05'))
+  it('só data', () => expect(formatarEmissao(d, true, false)).toBe('26/06/2026'))
+  it('só hora', () => expect(formatarEmissao(d, false, true)).toBe('09:05'))
+  it('nenhum → vazio', () => expect(formatarEmissao(d, false, false)).toBe(''))
 })
 
 describe('montarSumarioGeral', () => {
