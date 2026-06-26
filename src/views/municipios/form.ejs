@@ -81,6 +81,26 @@
         value="<%= municipio.loaCodigoNivel || (estado && estado.loaCodigoNivel) || 4 %>"
         class="form-control form-control-sm" style="width:90px">
     </div>
+
+    <div class="mb-1">
+      <label class="form-label small fw-semibold">Brasão do município</label>
+      <input type="hidden" name="brasao" id="mun-bras-val" value="<%= municipio.brasao || '' %>">
+      <div class="d-flex align-items-center gap-3">
+        <img id="mun-bras-preview" alt="Brasão"
+          <% if (municipio.brasao) { %>src="<%= municipio.brasao %>"<% } %>
+          class="border rounded bg-light p-1 <%= municipio.brasao ? '' : 'd-none' %>"
+          style="height:56px;max-width:120px;object-fit:contain">
+        <div class="flex-grow-1">
+          <input type="file" id="mun-bras-file" class="form-control form-control-sm"
+            accept="image/png,image/jpeg,image/gif,image/webp" onchange="munBrasaoSelecionar(this)">
+          <button type="button" id="mun-bras-remover"
+            class="btn btn-sm btn-link text-danger p-0 mt-1 <%= municipio.brasao ? '' : 'd-none' %>"
+            onclick="munBrasaoRemover()"><i class="bi bi-x-lg me-1"></i>Remover</button>
+        </div>
+      </div>
+      <div class="form-text">PNG/JPG/GIF/WEBP até 1 MB. Aparece nos anexos da LOA das entidades deste município.</div>
+      <div id="mun-bras-erro" class="small text-danger mt-1 d-none"></div>
+    </div>
     <% } %>
   </div>
 
@@ -92,3 +112,37 @@
     </button>
   </div>
 </form>
+
+<script>
+// Lê o arquivo como data URL base64 e guarda no hidden `brasao` (mesmo formato
+// que o gerador de anexos consome). Espelha o brasão da entidade.
+function munBrasaoErro(msg) {
+  var el = document.getElementById('mun-bras-erro')
+  if (!el) return
+  el.textContent = msg || ''
+  el.classList.toggle('d-none', !msg)
+}
+function munBrasaoDefinir(dataUrl) {
+  document.getElementById('mun-bras-val').value = dataUrl || ''
+  var img = document.getElementById('mun-bras-preview')
+  var btn = document.getElementById('mun-bras-remover')
+  if (dataUrl) { img.src = dataUrl; img.classList.remove('d-none'); btn.classList.remove('d-none') }
+  else { img.removeAttribute('src'); img.classList.add('d-none'); btn.classList.add('d-none') }
+}
+function munBrasaoSelecionar(input) {
+  munBrasaoErro('')
+  var file = input.files && input.files[0]
+  if (!file) return
+  if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) { munBrasaoErro('Formato não suportado. Use PNG, JPG, GIF ou WEBP.'); input.value = ''; return }
+  if (file.size > 1024 * 1024) { munBrasaoErro('Imagem muito grande (' + (file.size / 1024 / 1024).toFixed(1) + ' MB). Máximo 1 MB.'); input.value = ''; return }
+  var reader = new FileReader()
+  reader.onload = function () { munBrasaoDefinir(reader.result) }
+  reader.onerror = function () { munBrasaoErro('Falha ao ler o arquivo.') }
+  reader.readAsDataURL(file)
+}
+function munBrasaoRemover() {
+  document.getElementById('mun-bras-file').value = ''
+  munBrasaoErro('')
+  munBrasaoDefinir('')
+}
+</script>

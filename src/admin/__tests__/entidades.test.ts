@@ -227,7 +227,7 @@ describe('adminEntidadesRoutes', () => {
       })
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/entidades')
-      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'Novo nome', tipo: 'CAMARA', cnpj: null, ativo: true })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'Novo nome', tipo: 'CAMARA', cnpj: null, ativo: true, assinaturaModo: 'MANUAL' })
     })
 
     it('atualiza com cnpj preenchido', async () => {
@@ -235,7 +235,7 @@ describe('adminEntidadesRoutes', () => {
       await app.inject({
         method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11' }),
       })
-      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11', ativo: false })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11', ativo: false, assinaturaModo: 'MANUAL' })
     })
 
     it('atualiza definindo o brasao (logotipo)', async () => {
@@ -253,6 +253,15 @@ describe('adminEntidadesRoutes', () => {
         method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', brasao: '' }),
       })
       expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ brasao: null }))
+    })
+
+    it('grava o modo de assinatura eletrônica', async () => {
+      atualizarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'PUT', url: '/ent1',
+        ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', assinaturaModo: 'ELETRONICA' }),
+      })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ assinaturaModo: 'ELETRONICA' }))
     })
 
     it('rejeita brasao inválido no update', async () => {

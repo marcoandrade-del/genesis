@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { MunicipiosService } from '../services/municipios.js'
 import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
+import { validarBrasao, BODY_BRASAO } from './brasao.js'
 
 export async function adminMunicipiosRoutes(app: FastifyInstance) {
   const service = new MunicipiosService(app.prisma)
@@ -109,9 +110,10 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string }
-    Body: { nome: string; modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string }
+    Body: { nome: string; modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; brasao?: string }
   }>(
     '/:id',
+    { bodyLimit: BODY_BRASAO },
     async (req, reply) => {
       const { nome, modeloContabilId } = req.body
       // Override do formato de código do município: vazio = herdar do estado (null).
@@ -138,6 +140,13 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
 
       if (!nome?.trim()) return reRenderErro('O nome é obrigatório.')
 
+      let brasao: string | null | undefined
+      if (req.body.brasao !== undefined) {
+        const v = validarBrasao(req.body.brasao)
+        if (!v.ok) return reRenderErro(v.erro)
+        brasao = v.valor
+      }
+
       try {
         const municipio = await app.prisma.municipio.findUnique({ where: { id: req.params.id }, select: { estadoId: true } })
         if (!municipio) return reply.status(404).send('Município não encontrado.')
@@ -147,7 +156,7 @@ export async function adminMunicipiosRoutes(app: FastifyInstance) {
         })
         await app.prisma.municipio.update({
           where: { id: req.params.id },
-          data: { loaCodigoModo: loaModo, loaCodigoNivel: loaNivel },
+          data: { loaCodigoModo: loaModo, loaCodigoNivel: loaNivel, ...(brasao !== undefined ? { brasao } : {}) },
         })
         return reply.header('HX-Redirect', `/admin/municipios?estadoId=${municipio.estadoId}`).status(204).send()
       } catch (e: unknown) {
