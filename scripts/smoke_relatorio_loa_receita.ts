@@ -13,7 +13,14 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import { ArrecadacoesService } from '../src/services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../src/services/saldo-orcamentario.js'
-import { montarReceitaPrevista, montarDespesaFixada, documentoPdf, formatarReais } from '../src/services/relatorio-orcamento.js'
+import { ProgramaTrabalhoService } from '../src/services/programa-trabalho.js'
+import {
+  montarReceitaPrevista,
+  montarDespesaFixada,
+  montarProgramaTrabalho,
+  documentoPdf,
+  formatarReais,
+} from '../src/services/relatorio-orcamento.js'
 
 const arg = (flag: string) => {
   const i = process.argv.indexOf(flag)
@@ -78,6 +85,22 @@ async function main() {
   if (htmlDespesa) {
     writeFileSync(htmlDespesa, documentoPdf('Despesa Fixada 2026', corpoD))
     log(`✔ HTML despesa gravado: ${htmlDespesa}`)
+  }
+
+  // ── Programa de trabalho (QDD) ──────────────────────────────────────────────
+  const pt = await new ProgramaTrabalhoService(prisma).calcular(ent.id, 2026)
+  log(`\nTOTAL programa de trabalho: R$ ${formatarReais(pt.total)} (deve bater com a despesa)`)
+  log(`linhas (UO→função→subfunção→programa→ação): ${pt.linhas.length}`)
+  const corpoP = montarProgramaTrabalho({
+    cabecalho: { entidadeNome: ent.nome, municipio: ent.municipio.nome, estado: ent.municipio.estado.sigla, ano: 2026, brasao: ent.brasao },
+    linhas: pt.linhas,
+    total: pt.total,
+  })
+  log(`✔ HTML programa: ${corpoP.length} chars; contém título: ${corpoP.includes('Programa de Trabalho')}`)
+  const htmlPrograma = arg('--html-programa')
+  if (htmlPrograma) {
+    writeFileSync(htmlPrograma, documentoPdf('Programa de Trabalho 2026', corpoP))
+    log(`✔ HTML programa gravado: ${htmlPrograma}`)
   }
 
   if (pdfPath) {

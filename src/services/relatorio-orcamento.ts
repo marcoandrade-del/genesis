@@ -1,5 +1,6 @@
 import type { LinhaArrecadacao } from './arrecadacoes.js'
 import type { LinhaSaldo } from './saldo-orcamentario.js'
+import type { LinhaPrograma } from './programa-trabalho.js'
 
 /**
  * Geração do HTML dos demonstrativos imprimíveis do orçamento (LOA). Funções
@@ -168,6 +169,34 @@ export function montarDespesaFixada(dados: DadosDespesaFixada): string {
     tabelaDespesa('Natureza da despesa', porConta, total, 'TOTAL DA DESPESA FIXADA') +
     `<h2 class="dem-sec">Despesa fixada por fonte de recurso</h2>` +
     tabelaDespesa('Fonte de recurso', porFonte, total, 'TOTAL') +
+    `</div>`
+  )
+}
+
+export interface DadosProgramaTrabalho {
+  cabecalho: CabecalhoDemonstrativo
+  linhas: LinhaPrograma[]
+  total: number
+}
+
+/** Monta o corpo HTML do Programa de Trabalho (Anexo 6 / QDD) — árvore única. */
+export function montarProgramaTrabalho(dados: DadosProgramaTrabalho): string {
+  const { cabecalho: c, linhas, total } = dados
+  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    `<header class="dem-cab">${brasao}<div>` +
+    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
+    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
+    `<h1 class="dem-titulo">Demonstrativo do Programa de Trabalho — LOA ${c.ano}</h1>` +
+    `</div></header>` +
+    `<p class="dem-sub">Despesa fixada por unidade orçamentária → função → subfunção → programa → ação.</p>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Código</th><th>Programa de trabalho</th><th class="num">Fixado (R$)</th><th class="num">% do total</th></tr></thead>` +
+    `<tbody>${linhasGen(linhas, total)}</tbody>` +
+    `<tfoot><tr><th colspan="2">TOTAL DA DESPESA FIXADA</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
+    `</table>` +
     `</div>`
   )
 }

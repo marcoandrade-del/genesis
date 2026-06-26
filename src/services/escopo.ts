@@ -356,7 +356,7 @@ export const ESCOPO: readonly AreaEscopo[] = [
       },
       {
         titulo: 'Demonstrativos da LOA (imprimíveis)',
-        descricao: 'Relatórios oficiais do orçamento, hierárquicos com subtotais e PDF. Receita orçada (por natureza + fonte) e despesa fixada (por UO, função, natureza e fonte) prontas; programa de trabalho/QDD detalhado e anexos formais da Lei 4.320 a seguir.',
+        descricao: 'Relatórios oficiais do orçamento, hierárquicos com subtotais e PDF. Prontos: receita orçada (por natureza + fonte), despesa fixada (por UO, função, natureza e fonte) e programa de trabalho/QDD (UO→função→subfunção→programa→ação). Faltam os anexos em layout formal da Lei 4.320.',
         status: 'EM_ANDAMENTO',
       },
     ],
