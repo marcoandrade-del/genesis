@@ -3,6 +3,7 @@ import { appAuthRoutes } from './auth.js'
 import { appContextoRoutes, parseContextoCookie } from './contexto.js'
 import { appSolicitacaoAcessoRoutes } from './solicitacao-acesso.js'
 import { appEntidadeAcessosRoutes } from './entidade-acessos.js'
+import { appRelatoriosOrcamentoRoutes } from './relatorios-orcamento.js'
 import { appDashboardRoutes } from './dashboard.js'
 import { appOrcamentoRoutes } from './orcamento.js'
 import { appCreditosAdicionaisRoutes } from './creditos-adicionais.js'
@@ -140,6 +141,7 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appContextoRoutes)
     autenticado.register(appSolicitacaoAcessoRoutes)
     autenticado.register(appEntidadeAcessosRoutes)
+    autenticado.register(appRelatoriosOrcamentoRoutes)
     autenticado.register(appDashboardRoutes)
     autenticado.register(appOrcamentoRoutes)
     autenticado.register(appCreditosAdicionaisRoutes)
