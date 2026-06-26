@@ -1,7 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
-import { montarReceitaPrevista, montarDespesaFixada, documentoPdf } from '../services/relatorio-orcamento.js'
+import { ProgramaTrabalhoService } from '../services/programa-trabalho.js'
+import {
+  montarReceitaPrevista,
+  montarDespesaFixada,
+  montarProgramaTrabalho,
+  documentoPdf,
+} from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
 
 type EntidadeCab = {
@@ -22,6 +28,7 @@ const footer = (titulo: string) =>
 export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const arrecadacoes = new ArrecadacoesService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
+  const ptSvc = new ProgramaTrabalhoService(app.prisma)
 
   async function entidadeCab(entidadeId: string): Promise<EntidadeCab> {
     return (await app.prisma.entidade.findUnique({
@@ -129,6 +136,47 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="despesa-fixada-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Programa de Trabalho (Anexo 6 / QDD) ────────────────────────────────────
+  async function programa(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [e, pt] = await Promise.all([entidadeCab(entidadeId), ptSvc.calcular(entidadeId, ano)])
+    const corpo = pt.temOrcamento
+      ? montarProgramaTrabalho({ cabecalho: cab(e, ano), linhas: pt.linhas, total: pt.total })
+      : ''
+    return { e, ano, temOrcamento: pt.temOrcamento, corpo }
+  }
+
+  app.get('/orcamento/relatorios/programa-trabalho', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await programa(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Programa de Trabalho',
+      breadcrumb: 'Programa de trabalho (LOA)',
+      pdfUrl: '/app/orcamento/relatorios/programa-trabalho.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/programa-trabalho.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo } = await programa(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/programa-trabalho')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Programa de Trabalho ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Programa de Trabalho'),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="programa-trabalho-${ano}.pdf"`)
       .send(pdf)
   })
 }

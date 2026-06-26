@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, documentoPdf, formatarReais } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, documentoPdf, formatarReais } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -116,6 +116,33 @@ describe('montarDespesaFixada', () => {
   it('com brasão emite a imagem', () => {
     const html = montarDespesaFixada({ ...base, cabecalho: { ...base.cabecalho, brasao: 'data:image/png;base64,ZZ' } })
     expect(html).toContain('<img src="data:image/png;base64,ZZ"')
+  })
+})
+
+describe('montarProgramaTrabalho', () => {
+  it('renderiza a árvore funcional-programática com total', () => {
+    const html = montarProgramaTrabalho({
+      cabecalho: { entidadeNome: 'Prefeitura', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null },
+      linhas: [
+        { codigo: '02', rotulo: 'Gabinete', nivel: 1, valor: 600 },
+        { codigo: '04', rotulo: 'Administração', nivel: 2, valor: 600 },
+        { codigo: '2001', rotulo: 'Gestão', nivel: 5, valor: 600 },
+      ],
+      total: 600,
+    })
+    expect(html).toContain('Demonstrativo do Programa de Trabalho — LOA 2026')
+    expect(html).toContain('Gabinete')
+    expect(html).toContain('TOTAL DA DESPESA FIXADA')
+    expect(html).toContain('100,0%')
+  })
+
+  it('com brasão emite a imagem', () => {
+    const html = montarProgramaTrabalho({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: 'data:image/png;base64,QQ' },
+      linhas: [{ codigo: '02', rotulo: 'Gab', nivel: 1, valor: 10 }],
+      total: 10,
+    })
+    expect(html).toContain('<img src="data:image/png;base64,QQ"')
   })
 })
 
