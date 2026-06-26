@@ -12,7 +12,8 @@ import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import { ArrecadacoesService } from '../src/services/arrecadacoes.js'
-import { montarReceitaPrevista, documentoPdf, formatarReais } from '../src/services/relatorio-orcamento.js'
+import { SaldoOrcamentarioService } from '../src/services/saldo-orcamentario.js'
+import { montarReceitaPrevista, montarDespesaFixada, documentoPdf, formatarReais } from '../src/services/relatorio-orcamento.js'
 
 const arg = (flag: string) => {
   const i = process.argv.indexOf(flag)
@@ -57,7 +58,26 @@ async function main() {
 
   if (htmlPath) {
     writeFileSync(htmlPath, documentoPdf('Receita Orçada 2026', corpo))
-    log(`✔ HTML gravado: ${htmlPath}`)
+    log(`✔ HTML receita gravado: ${htmlPath}`)
+  }
+
+  // ── Despesa fixada ──────────────────────────────────────────────────────────
+  const saldo = await new SaldoOrcamentarioService(prisma).calcular(ent.id, 2026)
+  log(`\nTOTAL despesa fixada: R$ ${formatarReais(saldo.resumo.autorizado)}`)
+  log(`cortes: ${saldo.porUnidade.length} UO · ${saldo.porFuncao.length} funções · ${saldo.porConta.length} naturezas · ${saldo.porFonte.length} fontes`)
+  const corpoD = montarDespesaFixada({
+    cabecalho: { entidadeNome: ent.nome, municipio: ent.municipio.nome, estado: ent.municipio.estado.sigla, ano: 2026, brasao: ent.brasao },
+    porUnidade: saldo.porUnidade,
+    porFuncao: saldo.porFuncao,
+    porConta: saldo.porConta,
+    porFonte: saldo.porFonte,
+    total: saldo.resumo.autorizado,
+  })
+  log(`✔ HTML despesa: ${corpoD.length} chars; contém título: ${corpoD.includes('Demonstrativo da Despesa Fixada')}`)
+  const htmlDespesa = arg('--html-despesa')
+  if (htmlDespesa) {
+    writeFileSync(htmlDespesa, documentoPdf('Despesa Fixada 2026', corpoD))
+    log(`✔ HTML despesa gravado: ${htmlDespesa}`)
   }
 
   if (pdfPath) {

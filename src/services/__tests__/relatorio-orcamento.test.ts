@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, documentoPdf, formatarReais } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, documentoPdf, formatarReais } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
+import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
 const linha = (over: Partial<LinhaArrecadacao>): LinhaArrecadacao => ({
   id: 'x',
@@ -71,6 +72,50 @@ describe('montarReceitaPrevista', () => {
     })
     expect(html).toContain('A &amp; B &lt;x&gt;')
     expect(html).not.toContain('A & B <x>')
+  })
+})
+
+const ls = (over: Partial<LinhaSaldo>): LinhaSaldo => ({
+  id: 'x',
+  codigo: '1',
+  rotulo: 'X',
+  nivel: 1,
+  autorizado: 0,
+  reservado: 0,
+  empenhado: 0,
+  disponivel: 0,
+  ...over,
+})
+
+describe('montarDespesaFixada', () => {
+  const base = {
+    cabecalho: { entidadeNome: 'Prefeitura', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null },
+    porUnidade: [ls({ codigo: '02', rotulo: 'GABINETE', nivel: 1, autorizado: 600 })],
+    porFuncao: [ls({ codigo: '04', rotulo: 'Administração', nivel: 1, autorizado: 1000 })],
+    porConta: [
+      ls({ codigo: '3', rotulo: 'DESPESAS CORRENTES', nivel: 1, autorizado: 700 }),
+      ls({ codigo: '3.1', rotulo: 'Pessoal', nivel: 2, autorizado: 400 }),
+    ],
+    porFonte: [ls({ codigo: '000', rotulo: 'Ordinários', nivel: 1, autorizado: 1000 })],
+    total: 1000,
+  }
+
+  it('renderiza os 4 cortes com título e total', () => {
+    const html = montarDespesaFixada(base)
+    expect(html).toContain('Demonstrativo da Despesa Fixada — LOA 2026')
+    expect(html).toContain('Despesa fixada por unidade orçamentária')
+    expect(html).toContain('Despesa fixada por função de governo')
+    expect(html).toContain('Despesa fixada por natureza')
+    expect(html).toContain('Despesa fixada por fonte de recurso')
+    expect(html).toContain('GABINETE')
+    expect(html).toContain('DESPESAS CORRENTES')
+    expect(html).toContain('TOTAL DA DESPESA FIXADA')
+    expect(html).toContain('70,0%') // 700/1000 na natureza
+  })
+
+  it('com brasão emite a imagem', () => {
+    const html = montarDespesaFixada({ ...base, cabecalho: { ...base.cabecalho, brasao: 'data:image/png;base64,ZZ' } })
+    expect(html).toContain('<img src="data:image/png;base64,ZZ"')
   })
 })
 
