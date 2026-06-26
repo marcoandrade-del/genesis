@@ -23,6 +23,18 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/conciliacao', nome: 'Conciliação bancária', icone: 'bi-arrow-left-right', tipo: 'FUNCIONALIDADE' },
     ],
   },
+  {
+    rota: '/app/orcamento/relatorios', nome: 'Anexos da LOA', icone: 'bi-file-earmark-text', tipo: 'SUBMENU',
+    descricao: 'Demonstrativos legais do orçamento (Lei 4.320)',
+    filhos: [
+      { rota: '/app/orcamento/relatorios/receita-prevista', nome: 'Receita orçada', icone: 'bi-cash-coin', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 2 — Resumo Geral da Receita' },
+      { rota: '/app/orcamento/relatorios/despesa-fixada', nome: 'Despesa fixada', icone: 'bi-graph-down', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 2/9 — natureza, unidade e função' },
+      { rota: '/app/orcamento/relatorios/programa-trabalho', nome: 'Programa de trabalho', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 6 — UO → função → ação' },
+      { rota: '/app/orcamento/relatorios/programa-governo', nome: 'Programa de trabalho de governo', icone: 'bi-diagram-2', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 7 — consolidado por função' },
+      { rota: '/app/orcamento/relatorios/despesa-funcoes-programas', nome: 'Despesa por funções e programas', icone: 'bi-bar-chart-steps', tipo: 'FUNCIONALIDADE', descricao: 'Função → programa → subfunção' },
+      { rota: '/app/orcamento/relatorios/sumario', nome: 'Sumário geral', icone: 'bi-list-columns', tipo: 'FUNCIONALIDADE', descricao: 'Receita por fontes × despesa por funções' },
+    ],
+  },
   { rota: '/app/contas-bancarias', nome: 'Contas bancárias', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Cadastro Febraban por fonte de recurso' },
   { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício' },
   { rota: '/app/contas', nome: 'Plano de Contas', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Contas contábeis do exercício' },
