@@ -786,6 +786,13 @@ enum ModoAssinatura {
   ELETRONICA
 }
 
+// Onde imprimir o carimbo de emissão (data/hora) nos anexos.
+enum EmissaoLocal {
+  RODAPE
+  CABECALHO
+  NENHUM
+}
+
 model Entidade {
   id             String         @id @default(uuid())
   nome           String
@@ -794,6 +801,9 @@ model Entidade {
   endereco       String?
   brasao         String?        @db.Text // imagem do brasão como data URL (base64)
   assinaturaModo ModoAssinatura @default(MANUAL)
+  emissaoLocal   EmissaoLocal   @default(RODAPE) // onde imprimir o carimbo de emissão
+  emitirData     Boolean        @default(true) // inclui a data no carimbo de emissão
+  emitirHora     Boolean        @default(true) // inclui a hora no carimbo de emissão
   municipioId    String
   ativo          Boolean        @default(true)
   criadoEm       DateTime       @default(now())

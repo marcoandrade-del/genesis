@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { PrismaClient, Prisma, type TipoEntidade, type ModoAssinatura } from '@prisma/client'
+import { PrismaClient, Prisma, type TipoEntidade, type ModoAssinatura, type EmissaoLocal } from '@prisma/client'
 import { ErroNegocio } from '../errors.js'
 
 export type DadosCriarEntidade = {
@@ -21,6 +21,10 @@ export type DadosAtualizarEntidade = {
   brasao?: string | null
   /** Como a entidade assina os documentos oficiais (manual/eletrônica). */
   assinaturaModo?: ModoAssinatura
+  /** Carimbo de emissão nos anexos: onde imprimir e o que incluir. */
+  emissaoLocal?: EmissaoLocal
+  emitirData?: boolean
+  emitirHora?: boolean
 }
 
 type ContaModelo = {

@@ -227,7 +227,7 @@ describe('adminEntidadesRoutes', () => {
       })
       expect(res.statusCode).toBe(204)
       expect(res.headers['hx-redirect']).toBe('/admin/entidades')
-      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'Novo nome', tipo: 'CAMARA', cnpj: null, ativo: true, assinaturaModo: 'MANUAL' })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'Novo nome', tipo: 'CAMARA', cnpj: null, ativo: true, assinaturaModo: 'MANUAL', emissaoLocal: 'RODAPE', emitirData: false, emitirHora: false })
     })
 
     it('atualiza com cnpj preenchido', async () => {
@@ -235,7 +235,7 @@ describe('adminEntidadesRoutes', () => {
       await app.inject({
         method: 'PUT', url: '/ent1', ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11' }),
       })
-      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11', ativo: false, assinaturaModo: 'MANUAL' })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', { nome: 'X', tipo: 'PREFEITURA', cnpj: '11.111.111/0001-11', ativo: false, assinaturaModo: 'MANUAL', emissaoLocal: 'RODAPE', emitirData: false, emitirHora: false })
     })
 
     it('atualiza definindo o brasao (logotipo)', async () => {
@@ -262,6 +262,27 @@ describe('adminEntidadesRoutes', () => {
         ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', assinaturaModo: 'ELETRONICA' }),
       })
       expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ assinaturaModo: 'ELETRONICA' }))
+    })
+
+    it('grava emissão no cabeçalho com só data', async () => {
+      atualizarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'PUT', url: '/ent1',
+        ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', emissaoLocal: 'CABECALHO', emitirData: 'true' }),
+      })
+      expect(atualizarMock).toHaveBeenCalledWith(
+        'ent1',
+        expect.objectContaining({ emissaoLocal: 'CABECALHO', emitirData: true, emitirHora: false }),
+      )
+    })
+
+    it('grava emissão NENHUM', async () => {
+      atualizarMock.mockResolvedValue(ENTIDADE)
+      await app.inject({
+        method: 'PUT', url: '/ent1',
+        ...form({ nome: 'X', tipo: 'PREFEITURA', cnpj: '', emissaoLocal: 'NENHUM' }),
+      })
+      expect(atualizarMock).toHaveBeenCalledWith('ent1', expect.objectContaining({ emissaoLocal: 'NENHUM' }))
     })
 
     it('rejeita brasao inválido no update', async () => {

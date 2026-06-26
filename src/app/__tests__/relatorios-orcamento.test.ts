@@ -33,6 +33,9 @@ import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js
 const ENTIDADE = {
   nome: 'Prefeitura de Maringá',
   brasao: null,
+  emissaoLocal: 'RODAPE',
+  emitirData: true,
+  emitirHora: true,
   municipio: {
     nome: 'Maringá',
     brasao: null, // sem brasão no município → cai no da entidade
@@ -361,6 +364,56 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-funcoes-programas.pdf' })
       expect(res.statusCode).toBe(302)
       expect(res.headers.location).toBe('/app/orcamento/relatorios/despesa-funcoes-programas')
+    })
+  })
+
+  describe('Marca d\'água e carimbo de emissão', () => {
+    const REC = { temOrcamento: true, resumo: { previsto: 1, arrecadado: 0, saldo: 1 }, porConta: [], porFonte: [] }
+
+    it('marca d\'água "RASCUNHO" quando o orçamento não está aprovado', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      prisma.orcamento.findUnique.mockResolvedValue({ status: 'RASCUNHO', leiNumero: null })
+      resumoMock.mockResolvedValue(REC)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('<div class="dem-marca">RASCUNHO</div>')
+    })
+
+    it('sem marca d\'água quando publicado', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      prisma.orcamento.findUnique.mockResolvedValue({ status: 'PUBLICADO', leiNumero: '1' })
+      resumoMock.mockResolvedValue(REC)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).not.toContain('<div class="dem-marca">')
+    })
+
+    it('carimbo "Relatório gerado em" no rodapé (RODAPE)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE) // emissaoLocal RODAPE
+      resumoMock.mockResolvedValue(REC)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('Relatório gerado em')
+    })
+
+    it('carimbo "Emitido em" no cabeçalho (CABECALHO)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue({ ...ENTIDADE, emissaoLocal: 'CABECALHO' })
+      resumoMock.mockResolvedValue(REC)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista' })
+      expect(res.body).toContain('Emitido em')
+    })
+
+    it('o PDF leva o carimbo no rodapé por página', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      resumoMock.mockResolvedValue(REC)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
+      await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista.pdf' })
+      expect(gerarPdfMock.mock.calls[0]![0].footer).toContain('Relatório gerado em')
+    })
+
+    it('PDF sem carimbo no rodapé quando a emissão é no cabeçalho', async () => {
+      prisma.entidade.findUnique.mockResolvedValue({ ...ENTIDADE, emissaoLocal: 'CABECALHO' })
+      resumoMock.mockResolvedValue(REC)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
+      await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista.pdf' })
+      expect(gerarPdfMock.mock.calls[0]![0].footer).not.toContain('Relatório gerado em')
     })
   })
 })

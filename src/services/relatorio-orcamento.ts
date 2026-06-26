@@ -15,6 +15,20 @@ export interface CabecalhoDemonstrativo {
   ano: number
   brasao?: string | null
   legenda?: string // base legal (ex.: "Lei nº 1695/2025" ou "Projeto de Lei Orçamentária Anual")
+  emissao?: string // carimbo já formatado (ex.: "26/06/2026 às 14:30"); vazio = não imprime
+  emissaoLocal?: 'CABECALHO' | 'RODAPE' | 'NENHUM' // onde o carimbo aparece
+  marcaDagua?: string // texto da marca d'água (versão não-final); ausente = sem marca
+}
+
+/** Carimbo de emissão a partir dos toggles da entidade (função pura, testável). */
+export function formatarEmissao(d: Date, emitirData: boolean, emitirHora: boolean): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  const data = `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`
+  const hora = `${p(d.getHours())}:${p(d.getMinutes())}`
+  if (emitirData && emitirHora) return `${data} às ${hora}`
+  if (emitirData) return data
+  if (emitirHora) return hora
+  return ''
 }
 
 export interface DadosReceitaPrevista {
@@ -103,6 +117,19 @@ const ESTILO = `<style>
   .dem-n1 td { font-weight: 700; }
   .dem-n2 td { font-weight: 600; }
   .dem-sec { font-size: .9rem; margin: 0 0 6px; }
+  .dem-emissao { color: #555; font-size: .78rem; margin-top: 2px; }
+  .dem-rodape { margin-top: 18px; padding-top: 6px; border-top: 1px solid #e3e3e0; color: #555; font-size: .75rem; text-align: right; }
+  .dem-marca { position: fixed; top: 45%; left: 0; right: 0; text-align: center; transform: rotate(-30deg);
+    font-size: 84px; font-weight: 800; letter-spacing: 6px; text-transform: uppercase;
+    color: rgba(190, 20, 20, .10); pointer-events: none; z-index: 0; }
+  @media print {
+    thead { display: table-header-group; }   /* repete o cabeçalho da tabela em cada página */
+    tfoot { display: table-row-group; }
+    tr { break-inside: avoid; }
+    .dem-sec { break-after: avoid; }          /* título de seção não fica órfão no rodapé */
+    .dem-cab { break-after: avoid; }
+    .dem-rodape { display: none; }            /* no PDF o carimbo vai no rodapé por página (Playwright) */
+  }
 </style>`
 
 /** Monta o corpo HTML do Demonstrativo da Receita Orçada (LOA). */
@@ -110,14 +137,27 @@ const ESTILO = `<style>
 function cabecalhoHtml(c: CabecalhoDemonstrativo, titulo: string): string {
   const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
   const legenda = c.legenda ? `<div class="dem-sub">${esc(c.legenda)}</div>` : ''
+  const marca = c.marcaDagua ? `<div class="dem-marca">${esc(c.marcaDagua)}</div>` : ''
+  const emissaoCab =
+    c.emissaoLocal === 'CABECALHO' && c.emissao ? `<div class="dem-emissao">Emitido em ${esc(c.emissao)}</div>` : ''
   return (
+    marca +
     `<header class="dem-cab">${brasao}<div>` +
     `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
     `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
     legenda +
     `<h1 class="dem-titulo">${esc(titulo)}</h1>` +
+    emissaoCab +
     `</div></header>`
   )
+}
+
+/** Bloco de rodapé com o carimbo de emissão (oculto no PDF — lá vai no rodapé por
+ *  página do Playwright; visível na pré-visualização em tela). */
+function rodapeHtml(c: CabecalhoDemonstrativo): string {
+  return c.emissaoLocal === 'RODAPE' && c.emissao
+    ? `<div class="dem-rodape">Relatório gerado em ${esc(c.emissao)}</div>`
+    : ''
 }
 
 export function montarReceitaPrevista(dados: DadosReceitaPrevista): string {
@@ -139,6 +179,7 @@ export function montarReceitaPrevista(dados: DadosReceitaPrevista): string {
     `<tbody>${linhasHtml(porFonte, total)}</tbody>` +
     `<tfoot><tr><th colspan="2">TOTAL</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
     `</table>` +
+    rodapeHtml(c) +
     `</div>`
   )
 }
@@ -204,6 +245,7 @@ export function montarDespesaFixada(dados: DadosDespesaFixada): string {
     tabelaDespesa('Natureza da despesa', porConta, total, 'TOTAL DA DESPESA FIXADA') +
     `<h2 class="dem-sec">Despesa fixada por fonte de recurso</h2>` +
     tabelaDespesa('Fonte de recurso', porFonte, total, 'TOTAL') +
+    rodapeHtml(c) +
     `</div>`
   )
 }
@@ -233,6 +275,7 @@ export function montarProgramaTrabalho(dados: DadosProgramaTrabalho): string {
     `<tbody>${linhasGen(linhas, total)}</tbody>` +
     `<tfoot><tr><th colspan="2">TOTAL DA DESPESA FIXADA</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
     `</table>` +
+    rodapeHtml(c) +
     `</div>`
   )
 }
@@ -274,6 +317,7 @@ export function montarSumarioGeral(dados: DadosSumarioGeral): string {
     `<tr><th colspan="2">TOTAL DA DESPESA</th><th class="num">${formatarReais(totalDespesa)}</th></tr>` +
     `<tr><th colspan="2">SUPERÁVIT / (DÉFICIT)</th><th class="num">${formatarReais(saldo)}</th></tr>` +
     `</tfoot></table>` +
+    rodapeHtml(c) +
     `</div>`
   )
 }

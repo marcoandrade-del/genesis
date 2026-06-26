@@ -129,7 +129,17 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
   // ── UPDATE ──────────────────────────────────────────────────────────────────
   app.put<{
     Params: { id: string }
-    Body: { nome: string; tipo: string; cnpj: string; ativo?: string; brasao?: string; assinaturaModo?: string }
+    Body: {
+      nome: string
+      tipo: string
+      cnpj: string
+      ativo?: string
+      brasao?: string
+      assinaturaModo?: string
+      emissaoLocal?: string
+      emitirData?: string
+      emitirHora?: string
+    }
   }>(
     '/:id',
     { bodyLimit: BODY_BRASAO },
@@ -144,12 +154,16 @@ export async function adminEntidadesRoutes(app: FastifyInstance) {
       }
       if (!nome?.trim()) return reRenderErro('O nome é obrigatório.')
       if (!ehTipo(tipo)) return reRenderErro('Tipo inválido.')
+      const local = req.body.emissaoLocal
       const dados: DadosAtualizarEntidade = {
         nome: nome.trim(),
         tipo,
         cnpj: cnpj?.trim() ? cnpj.trim() : null,
         ativo: ativo === 'true',
         assinaturaModo: req.body.assinaturaModo === 'ELETRONICA' ? 'ELETRONICA' : 'MANUAL',
+        emissaoLocal: local === 'CABECALHO' || local === 'NENHUM' ? local : 'RODAPE',
+        emitirData: req.body.emitirData === 'true',
+        emitirHora: req.body.emitirHora === 'true',
       }
       if (req.body.brasao !== undefined) {
         const r = validarBrasao(req.body.brasao)
