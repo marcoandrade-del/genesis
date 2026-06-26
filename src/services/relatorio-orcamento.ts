@@ -1,4 +1,5 @@
 import type { LinhaArrecadacao } from './arrecadacoes.js'
+import type { LinhaSaldo } from './saldo-orcamentario.js'
 
 /**
  * Geração do HTML dos demonstrativos imprimíveis do orçamento (LOA). Funções
@@ -100,6 +101,73 @@ export function montarReceitaPrevista(dados: DadosReceitaPrevista): string {
     `<tbody>${linhasHtml(porFonte, total)}</tbody>` +
     `<tfoot><tr><th colspan="2">TOTAL</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
     `</table>` +
+    `</div>`
+  )
+}
+
+interface RowDem {
+  codigo: string
+  rotulo: string
+  nivel: number
+  valor: number
+}
+
+function linhasGen(rows: RowDem[], total: number): string {
+  return rows
+    .map((l) => {
+      const recuo = Math.max(0, l.nivel - 1) * 16
+      return (
+        `<tr class="dem-n${l.nivel}">` +
+        `<td class="cod">${esc(l.codigo)}</td>` +
+        `<td style="padding-left:${recuo}px">${esc(l.rotulo)}</td>` +
+        `<td class="num">${formatarReais(l.valor)}</td>` +
+        `<td class="num">${pct(l.valor, total)}</td>` +
+        `</tr>`
+      )
+    })
+    .join('')
+}
+
+function tabelaDespesa(col2: string, linhas: LinhaSaldo[], total: number, footLabel: string): string {
+  const rows = linhas.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, nivel: l.nivel, valor: l.autorizado }))
+  return (
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Código</th><th>${esc(col2)}</th><th class="num">Fixado (R$)</th><th class="num">% do total</th></tr></thead>` +
+    `<tbody>${linhasGen(rows, total)}</tbody>` +
+    `<tfoot><tr><th colspan="2">${esc(footLabel)}</th><th class="num">${formatarReais(total)}</th><th class="num">100,0%</th></tr></tfoot>` +
+    `</table>`
+  )
+}
+
+export interface DadosDespesaFixada {
+  cabecalho: CabecalhoDemonstrativo
+  porUnidade: LinhaSaldo[]
+  porFuncao: LinhaSaldo[]
+  porConta: LinhaSaldo[]
+  porFonte: LinhaSaldo[]
+  total: number
+}
+
+/** Monta o corpo HTML do Demonstrativo da Despesa Fixada (LOA), em 4 cortes. */
+export function montarDespesaFixada(dados: DadosDespesaFixada): string {
+  const { cabecalho: c, porUnidade, porFuncao, porConta, porFonte, total } = dados
+  const brasao = c.brasao ? `<img src="${esc(c.brasao)}" alt="brasão">` : ''
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    `<header class="dem-cab">${brasao}<div>` +
+    `<div class="dem-ent">${esc(c.entidadeNome)}</div>` +
+    `<div class="dem-sub">${esc(c.municipio)} · ${esc(c.estado)} — Exercício ${c.ano}</div>` +
+    `<h1 class="dem-titulo">Demonstrativo da Despesa Fixada — LOA ${c.ano}</h1>` +
+    `</div></header>` +
+    `<h2 class="dem-sec">Despesa fixada por unidade orçamentária</h2>` +
+    tabelaDespesa('Unidade orçamentária', porUnidade, total, 'TOTAL') +
+    `<h2 class="dem-sec">Despesa fixada por função de governo</h2>` +
+    tabelaDespesa('Função', porFuncao, total, 'TOTAL') +
+    `<h2 class="dem-sec">Despesa fixada por natureza (categoria econômica)</h2>` +
+    tabelaDespesa('Natureza da despesa', porConta, total, 'TOTAL DA DESPESA FIXADA') +
+    `<h2 class="dem-sec">Despesa fixada por fonte de recurso</h2>` +
+    tabelaDespesa('Fonte de recurso', porFonte, total, 'TOTAL') +
     `</div>`
   )
 }

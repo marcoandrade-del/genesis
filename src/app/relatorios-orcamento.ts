@@ -1,11 +1,8 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
-import { montarReceitaPrevista, documentoPdf } from '../services/relatorio-orcamento.js'
+import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
+import { montarReceitaPrevista, montarDespesaFixada, documentoPdf } from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
-
-const FOOTER =
-  '<div style="font-size:8px;width:100%;text-align:center;color:#888;padding:0 12mm">' +
-  'Gênesis · Demonstrativo da Receita Orçada — página <span class="pageNumber"></span>/<span class="totalPages"></span></div>'
 
 type EntidadeCab = {
   nome: string
@@ -13,67 +10,125 @@ type EntidadeCab = {
   municipio: { nome: string; estado: { sigla: string } }
 }
 
+const footer = (titulo: string) =>
+  `<div style="font-size:8px;width:100%;text-align:center;color:#888;padding:0 12mm">` +
+  `Gênesis · ${titulo} — página <span class="pageNumber"></span>/<span class="totalPages"></span></div>`
+
 /**
- * Relatórios imprimíveis do orçamento (LOA). Começa pelo Demonstrativo da
- * Receita Orçada (por natureza, com roll-up, + por fonte) reusando o roll-up
- * já existente do `ArrecadacoesService`. Saída em tela (imprimível) e PDF.
+ * Relatórios imprimíveis do orçamento (LOA): demonstrativo da Receita Orçada e
+ * da Despesa Fixada (hierárquicos, com roll-up reusado dos services de
+ * arrecadação/saldo). Saída em tela imprimível + PDF (Playwright).
  */
 export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const arrecadacoes = new ArrecadacoesService(app.prisma)
+  const saldoSvc = new SaldoOrcamentarioService(app.prisma)
 
-  async function dados(req: FastifyRequest) {
-    const { entidadeId, ano } = req.contexto
-    const [entidade, resumo] = await Promise.all([
-      app.prisma.entidade.findUnique({
-        where: { id: entidadeId },
-        select: { nome: true, brasao: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
-      }),
-      arrecadacoes.resumo(entidadeId, ano),
-    ])
-    return { entidade: entidade as EntidadeCab, ano, resumo }
+  async function entidadeCab(entidadeId: string): Promise<EntidadeCab> {
+    return (await app.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { nome: true, brasao: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
+    })) as EntidadeCab
   }
 
-  const corpoReceita = (entidade: EntidadeCab, ano: number, resumo: Awaited<ReturnType<typeof arrecadacoes.resumo>>) =>
-    montarReceitaPrevista({
-      cabecalho: {
-        entidadeNome: entidade.nome,
-        municipio: entidade.municipio.nome,
-        estado: entidade.municipio.estado.sigla,
-        ano,
-        brasao: entidade.brasao,
-      },
-      porConta: resumo.porConta,
-      porFonte: resumo.porFonte,
-      total: resumo.resumo.previsto,
-    })
+  const cab = (e: EntidadeCab, ano: number) => ({
+    entidadeNome: e.nome,
+    municipio: e.municipio.nome,
+    estado: e.municipio.estado.sigla,
+    ano,
+    brasao: e.brasao,
+  })
 
-  // ── Tela imprimível ─────────────────────────────────────────────────────────
+  // ── Receita Orçada ──────────────────────────────────────────────────────────
+  async function receita(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [e, resumo] = await Promise.all([entidadeCab(entidadeId), arrecadacoes.resumo(entidadeId, ano)])
+    const corpo = resumo.temOrcamento
+      ? montarReceitaPrevista({
+          cabecalho: cab(e, ano),
+          porConta: resumo.porConta,
+          porFonte: resumo.porFonte,
+          total: resumo.resumo.previsto,
+        })
+      : ''
+    return { e, ano, temOrcamento: resumo.temOrcamento, corpo }
+  }
+
   app.get('/orcamento/relatorios/receita-prevista', async (req, reply) => {
-    const { entidade, ano, resumo } = await dados(req)
-    return reply.view('app/relatorio-receita-prevista', {
-      entidade,
+    const { e, ano, temOrcamento, corpo } = await receita(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Receita Orçada',
+      breadcrumb: 'Receita orçada (LOA)',
+      pdfUrl: '/app/orcamento/relatorios/receita-prevista.pdf',
+      entidade: e,
       ano,
       nivel: req.contexto.nivel,
-      temOrcamento: resumo.temOrcamento,
-      corpo: resumo.temOrcamento ? corpoReceita(entidade, ano, resumo) : '',
+      temOrcamento,
+      corpo,
       layout: null,
     })
   })
 
-  // ── PDF (Playwright) ────────────────────────────────────────────────────────
   app.get('/orcamento/relatorios/receita-prevista.pdf', async (req, reply) => {
-    const { entidade, ano, resumo } = await dados(req)
-    if (!resumo.temOrcamento) return reply.redirect('/app/orcamento/relatorios/receita-prevista')
+    const { ano, temOrcamento, corpo } = await receita(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/receita-prevista')
     const pdf = await gerarPdf({
-      corpoHtml: documentoPdf(`Receita Orçada ${ano}`, corpoReceita(entidade, ano, resumo)),
+      corpoHtml: documentoPdf(`Receita Orçada ${ano}`, corpo),
       header: '<span></span>',
-      footer: FOOTER,
+      footer: footer('Receita Orçada'),
       margemTopoMm: 12,
       margemRodapeMm: 16,
     })
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="receita-orcada-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Despesa Fixada ──────────────────────────────────────────────────────────
+  async function despesa(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [e, saldo] = await Promise.all([entidadeCab(entidadeId), saldoSvc.calcular(entidadeId, ano)])
+    const corpo = saldo.temOrcamento
+      ? montarDespesaFixada({
+          cabecalho: cab(e, ano),
+          porUnidade: saldo.porUnidade,
+          porFuncao: saldo.porFuncao,
+          porConta: saldo.porConta,
+          porFonte: saldo.porFonte,
+          total: saldo.resumo.autorizado,
+        })
+      : ''
+    return { e, ano, temOrcamento: saldo.temOrcamento, corpo }
+  }
+
+  app.get('/orcamento/relatorios/despesa-fixada', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await despesa(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Despesa Fixada',
+      breadcrumb: 'Despesa fixada (LOA)',
+      pdfUrl: '/app/orcamento/relatorios/despesa-fixada.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/despesa-fixada.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo } = await despesa(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/despesa-fixada')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Despesa Fixada ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Despesa Fixada'),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="despesa-fixada-${ano}.pdf"`)
       .send(pdf)
   })
 }

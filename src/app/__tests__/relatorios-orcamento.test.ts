@@ -1,10 +1,19 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { resumoMock, gerarPdfMock } = vi.hoisted(() => ({ resumoMock: vi.fn(), gerarPdfMock: vi.fn() }))
+const { resumoMock, calcularMock, gerarPdfMock } = vi.hoisted(() => ({
+  resumoMock: vi.fn(),
+  calcularMock: vi.fn(),
+  gerarPdfMock: vi.fn(),
+}))
 
 vi.mock('../../services/arrecadacoes.js', () => ({
   ArrecadacoesService: class {
     resumo = resumoMock
+  },
+}))
+vi.mock('../../services/saldo-orcamentario.js', () => ({
+  SaldoOrcamentarioService: class {
+    calcular = calcularMock
   },
 }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
@@ -32,6 +41,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
 
   beforeEach(async () => {
     resumoMock.mockReset()
+    calcularMock.mockReset()
     gerarPdfMock.mockReset()
     ;({ app, prisma } = await criarApp({
       registrar: appRelatoriosOrcamentoRoutes,
@@ -82,6 +92,52 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       expect(res.statusCode).toBe(302)
       expect(res.headers.location).toBe('/app/orcamento/relatorios/receita-prevista')
       expect(gerarPdfMock).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('Despesa fixada', () => {
+    const SALDO_OK = {
+      temOrcamento: true,
+      resumo: { autorizado: 1000, reservado: 0, empenhado: 0, disponivel: 1000 },
+      porUnidade: [{ id: 'u', codigo: '02', rotulo: 'GABINETE', nivel: 1, autorizado: 1000, reservado: 0, empenhado: 0, disponivel: 1000 }],
+      porFuncao: [{ id: 'f', codigo: '04', rotulo: 'Administração', nivel: 1, autorizado: 1000, reservado: 0, empenhado: 0, disponivel: 1000 }],
+      porConta: [{ id: 'c', codigo: '3', rotulo: 'DESPESAS CORRENTES', nivel: 1, autorizado: 1000, reservado: 0, empenhado: 0, disponivel: 1000 }],
+      porFonte: [{ id: 's', codigo: '000', rotulo: 'Ordinários', nivel: 1, autorizado: 1000, reservado: 0, empenhado: 0, disponivel: 1000 }],
+    }
+
+    it('renderiza o demonstrativo quando há orçamento', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      calcularMock.mockResolvedValue(SALDO_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Demonstrativo da Despesa Fixada — LOA 2026')
+      expect(res.body).toContain('GABINETE')
+      expect(res.body).toContain('Baixar PDF')
+    })
+
+    it('mostra aviso quando não há orçamento', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      calcularMock.mockResolvedValue({ temOrcamento: false, resumo: { autorizado: 0, reservado: 0, empenhado: 0, disponivel: 0 }, porUnidade: [], porFuncao: [], porConta: [], porFonte: [] })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada' })
+      expect(res.body).toContain('Não há orçamento')
+    })
+
+    it('gera o PDF quando há orçamento', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      calcularMock.mockResolvedValue(SALDO_OK)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF fake'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+      expect(gerarPdfMock.mock.calls[0][0].corpoHtml).toContain('Demonstrativo da Despesa Fixada')
+    })
+
+    it('redireciona quando não há orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      calcularMock.mockResolvedValue({ temOrcamento: false, resumo: { autorizado: 0, reservado: 0, empenhado: 0, disponivel: 0 }, porUnidade: [], porFuncao: [], porConta: [], porFonte: [] })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/despesa-fixada.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/despesa-fixada')
     })
   })
 })
