@@ -70,4 +70,24 @@ describe('ProgramaTrabalhoService.calcular', () => {
     const somaUO = r.linhas.filter((l) => l.nivel === 1).reduce((s, l) => s + l.valor, 0)
     expect(Math.round(somaUO * 100) / 100).toBe(r.total)
   })
+
+  it('calcularPor com ordem custom (função → programa → subfunção) consolida sem UO', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    // Duas UOs diferentes na MESMA função 04 — devem consolidar (sem nível de UO).
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      dot('02', '04', '122', '0001', '2001', 100),
+      dot('07', '04', '122', '0001', '2099', 40),
+      dot('02', '04', '131', '0002', '2003', 30),
+    ])
+    const r = await service.calcularPor('ent1', 2026, ['funcao', 'programa', 'subfuncao'])
+    const resumo = r.linhas.map((l) => `${l.nivel}:${l.codigo}=${l.valor}`)
+    expect(resumo).toEqual([
+      '1:04=170', // função 04 consolidada das duas UOs
+      '2:0001=140', // programa 0001 = 100+40
+      '3:122=140', // subfunção 122 sob o programa
+      '2:0002=30',
+      '3:131=30',
+    ])
+    expect(r.total).toBe(170)
+  })
 })

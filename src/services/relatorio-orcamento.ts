@@ -212,16 +212,22 @@ export interface DadosProgramaTrabalho {
   cabecalho: CabecalhoDemonstrativo
   linhas: LinhaPrograma[]
   total: number
+  titulo?: string // default: Anexo 6
+  descricao?: string // legenda da hierarquia
 }
 
-/** Monta o corpo HTML do Programa de Trabalho (Anexo 6 / QDD) — árvore única. */
+/** Monta o corpo HTML de um demonstrativo funcional-programático em árvore única
+ *  (Anexo 6, Anexo 7, Despesa por Funções/Programas/Subprogramas — varia só o
+ *  título/descrição e a ordem das dimensões já vem pronta em `linhas`). */
 export function montarProgramaTrabalho(dados: DadosProgramaTrabalho): string {
   const { cabecalho: c, linhas, total } = dados
+  const titulo = dados.titulo ?? 'Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho'
+  const descricao = dados.descricao ?? 'Despesa fixada por unidade orçamentária → função → subfunção → programa → ação.'
   return (
     ESTILO +
     `<div class="dem">` +
-    cabecalhoHtml(c, 'Anexo 6, da Lei nº 4.320/64 — Programa de Trabalho') +
-    `<p class="dem-sub">Despesa fixada por unidade orçamentária → função → subfunção → programa → ação.</p>` +
+    cabecalhoHtml(c, titulo) +
+    `<p class="dem-sub">${esc(descricao)}</p>` +
     `<table class="dem-tab">` +
     `<thead><tr><th>Código</th><th>Programa de trabalho</th><th class="num">Fixado (R$)</th><th class="num">% do total</th></tr></thead>` +
     `<tbody>${linhasGen(linhas, total)}</tbody>` +
