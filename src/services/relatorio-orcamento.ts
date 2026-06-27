@@ -340,8 +340,8 @@ export function montarRcl(dados: DadosRcl): string {
   const linhaCorrente = (l: { codigo: string; rotulo: string; valor: number }) =>
     `<tr><td class="cod">${esc(l.codigo)}</td><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.valor)}</td></tr>`
   const avisoDeducoes =
-    deducoes.length === 0
-      ? `<div class="dem-sub" style="color:#b26a00;margin:6px 0">⚠ Sem deduções legais cadastradas — RCL provisória (deduções da RCL são definidas por Estado/TCE).</div>`
+    deducoesTotal === 0
+      ? `<div class="dem-sub" style="color:#b26a00;margin:6px 0">⚠ Deduções zeradas — RCL provisória. As naturezas de dedução são definidas por Estado/TCE (config) e dependem de dados que o orçamento ainda não traz.</div>`
       : ''
   return (
     ESTILO +
@@ -356,9 +356,9 @@ export function montarRcl(dados: DadosRcl): string {
     `<h2 class="dem-sec">Deduções da RCL (II)</h2>` +
     avisoDeducoes +
     `<table class="dem-tab">` +
-    `<thead><tr><th>Código</th><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
-    `<tbody>${deducoes.length ? deducoes.map(linhaCorrente).join('') : `<tr><td colspan="3" style="text-align:center;color:#888">— sem deduções cadastradas —</td></tr>`}</tbody>` +
-    `<tfoot><tr><th colspan="2">TOTAL DAS DEDUÇÕES (II)</th><th class="num">${formatarReais(deducoesTotal)}</th></tr></tfoot>` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${deducoes.map((l) => `<tr><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.valor)}</td></tr>`).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL DAS DEDUÇÕES (II)</th><th class="num">${formatarReais(deducoesTotal)}</th></tr></tfoot>` +
     `</table>` +
     `<table class="dem-tab"><tfoot>` +
     `<tr><th colspan="2">RECEITA CORRENTE LÍQUIDA (III) = (I − II)</th><th class="num">${formatarReais(rcl)}</th></tr>` +
