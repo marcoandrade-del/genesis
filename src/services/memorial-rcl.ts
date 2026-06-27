@@ -1,0 +1,96 @@
+import { PrismaClient } from '@prisma/client'
+import { RclService, resolverComposicao } from './rcl.js'
+import { RclConsolidadaService } from './rcl-consolidada.js'
+
+const n = (d: { toNumber(): number }) => d.toNumber()
+
+export interface LinhaMemorial {
+  codigo?: string
+  rotulo: string
+  valor: number
+}
+
+export interface MemorialRcl {
+  entidade: { id: string; nome: string; municipio: string; estado: string }
+  ano: number
+  metodologia: string
+  temOrcamento: boolean
+  correntes: LinhaMemorial[]
+  correntesTotal: number
+  deducoes: LinhaMemorial[]
+  deducoesTotal: number
+  rcl: number
+}
+
+export interface MemorialRclConsolidada {
+  municipio: string
+  estado: string
+  ano: number
+  metodologia: string
+  entidades: { nome: string; correntes: number; deducoes: number; rcl: number; temOrcamento: boolean }[]
+  correntesTotal: number
+  deducoesTotal: number
+  intra: number
+  rclTotal: number
+}
+
+/**
+ * Memorial da RCL no formato "pronto para exibir": inputs (receitas correntes),
+ * demonstrativo (deduções nomeadas) e o resultado. O cálculo é ÚNICO (RclService
+ * + composição do Estado) — o Gênesis calcula, o Oxy só exibe, garantindo
+ * consistência nos dois lados. Ver [[oxy-dashboards-integracao]].
+ */
+export class MemorialRclService {
+  constructor(private prisma: PrismaClient) {}
+
+  async rcl(entidadeId: string, ano: number): Promise<MemorialRcl | null> {
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: {
+        id: true,
+        nome: true,
+        municipio: { select: { nome: true, estado: { select: { sigla: true, rclComposicao: true } } } },
+      },
+    })
+    if (!ent) return null
+    const comp = resolverComposicao(ent.municipio.estado.sigla, ent.municipio.estado.rclComposicao)
+    const r = await new RclService(this.prisma).calcular(entidadeId, ano, comp)
+    return {
+      entidade: { id: ent.id, nome: ent.nome, municipio: ent.municipio.nome, estado: ent.municipio.estado.sigla },
+      ano,
+      metodologia: comp.nome,
+      temOrcamento: r.temOrcamento,
+      correntes: r.correntes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: n(l.valor) })),
+      correntesTotal: n(r.correntesTotal),
+      deducoes: r.deducoes.map((l) => ({ rotulo: l.rotulo, valor: n(l.valor) })),
+      deducoesTotal: n(r.deducoesTotal),
+      rcl: n(r.rcl),
+    }
+  }
+
+  async rclConsolidada(entidadeId: string, ano: number): Promise<MemorialRclConsolidada | null> {
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipioId: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
+    })
+    if (!ent) return null
+    const cons = await new RclConsolidadaService(this.prisma).calcular(ent.municipioId, ano)
+    return {
+      municipio: ent.municipio.nome,
+      estado: ent.municipio.estado.sigla,
+      ano,
+      metodologia: cons.metodologia,
+      entidades: cons.entidades.map((e) => ({
+        nome: e.nome,
+        correntes: n(e.correntes),
+        deducoes: n(e.deducoes),
+        rcl: n(e.rcl),
+        temOrcamento: e.temOrcamento,
+      })),
+      correntesTotal: n(cons.correntesTotal),
+      deducoesTotal: n(cons.deducoesTotal),
+      intra: n(cons.intra),
+      rclTotal: n(cons.rclTotal),
+    }
+  }
+}

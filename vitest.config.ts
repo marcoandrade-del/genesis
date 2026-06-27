@@ -7,7 +7,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],
-      include: ['src/services/**/*.ts', 'src/routes/**/*.ts', 'src/admin/**/*.ts', 'src/app/**/*.ts'],
+      include: ['src/services/**/*.ts', 'src/routes/**/*.ts', 'src/admin/**/*.ts', 'src/app/**/*.ts', 'src/api/**/*.ts'],
       exclude: ['**/__tests__/**'],
     },
   },

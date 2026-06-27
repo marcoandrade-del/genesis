@@ -8,6 +8,7 @@ import viewPlugin from './plugins/view.js'
 import { adminRoutes } from './admin/index.js'
 import { appRoutes } from './app/index.js'
 import { authRoutes } from './routes/auth.js'
+import { memoriaisApiRoutes } from './api/memoriais.js'
 import { usuariosRoutes } from './routes/usuarios.js'
 import { codigosRoutes } from './routes/codigos.js'
 import { sistemasRoutes } from './routes/sistemas.js'
@@ -44,6 +45,9 @@ app.register(appRoutes, { prefix: '/app' })
 
 // ── Rotas públicas (sem token) ────────────────────────────────────────────────
 app.register(authRoutes)   // /auth/registro, /auth/login, /auth/solicitar-validacao, /auth/validar
+
+// ── Data API read-only dos memoriais (LRF) p/ o Oxy — token de serviço ────────
+app.register(memoriaisApiRoutes, { prefix: '/api' })
 
 // ── Rotas protegidas (exigem Bearer token JWT) ────────────────────────────────
 app.register(async (api) => {
