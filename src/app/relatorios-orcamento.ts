@@ -3,12 +3,14 @@ import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
 import { RclService, composicaoDoEstado } from '../services/rcl.js'
+import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
   montarProgramaTrabalho,
   montarSumarioGeral,
   montarRcl,
+  montarRclConsolidada,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -36,6 +38,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
   const ptSvc = new ProgramaTrabalhoService(app.prisma)
   const rclSvc = new RclService(app.prisma)
+  const rclConsSvc = new RclConsolidadaService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -424,6 +427,61 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="rcl-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RCL Consolidada do município (soma as entidades) ────────────────────────
+  async function rclConsolidada(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, ent] = await Promise.all([
+      entidadeCtx(entidadeId, ano),
+      app.prisma.entidade.findUnique({ where: { id: entidadeId }, select: { municipioId: true } }),
+    ])
+    const cons = await rclConsSvc.calcular(ent!.municipioId, ano)
+    const num = (d: { toNumber(): number }) => d.toNumber()
+    const temOrcamento = cons.entidades.some((x) => x.temOrcamento)
+    const corpo = temOrcamento
+      ? montarRclConsolidada({
+          cabecalho: cab(e, ano, meta),
+          entidades: cons.entidades.map((x) => ({ nome: x.nome, correntes: num(x.correntes), deducoes: num(x.deducoes), rcl: num(x.rcl) })),
+          correntesTotal: num(cons.correntesTotal),
+          deducoesTotal: num(cons.deducoesTotal),
+          intra: num(cons.intra),
+          rclTotal: num(cons.rclTotal),
+          metodologia: cons.metodologia,
+        })
+      : ''
+    return { e, ano, temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/rcl-consolidada', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await rclConsolidada(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'RCL Consolidada do Município',
+      breadcrumb: 'RCL consolidada (LRF)',
+      pdfUrl: '/app/orcamento/relatorios/rcl-consolidada.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/rcl-consolidada.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await rclConsolidada(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/rcl-consolidada')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`RCL Consolidada ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('RCL Consolidada do Município', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="rcl-consolidada-${ano}.pdf"`)
       .send(pdf)
   })
 }

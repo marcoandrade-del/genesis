@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -239,6 +239,29 @@ describe('montarRcl', () => {
     expect(html).toContain('provisória')
     expect(html).toContain('Deduções zeradas')
     expect(html).toContain('Formação do FUNDEB') // linha de dedução nomeada aparece mesmo zerada
+  })
+})
+
+describe('montarRclConsolidada', () => {
+  it('renderiza a contribuição por entidade e o total do município', () => {
+    const html = montarRclConsolidada({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      entidades: [
+        { nome: 'Prefeitura', correntes: 1000, deducoes: 200, rcl: 800 },
+        { nome: 'Câmara', correntes: 0, deducoes: 0, rcl: 0 },
+      ],
+      correntesTotal: 1000,
+      deducoesTotal: 200,
+      intra: 0,
+      rclTotal: 800,
+      metodologia: 'TCE-PR',
+    })
+    expect(html).toContain('Consolidado')
+    expect(html).toContain('Prefeitura')
+    expect(html).toContain('Câmara')
+    expect(html).toContain('TOTAL DO MUNICÍPIO')
+    expect(html).toContain('RECEITA CORRENTE LÍQUIDA CONSOLIDADA')
+    expect(html).toContain('duplicidades')
   })
 })
 

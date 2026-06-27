@@ -370,6 +370,45 @@ export function montarRcl(dados: DadosRcl): string {
   )
 }
 
+export interface DadosRclConsolidada {
+  cabecalho: CabecalhoDemonstrativo
+  entidades: { nome: string; correntes: number; deducoes: number; rcl: number }[]
+  correntesTotal: number
+  deducoesTotal: number
+  intra: number
+  rclTotal: number
+  metodologia: string
+}
+
+/** RCL consolidada do município: contribuição (correntes/deduções/RCL) de cada
+ *  entidade + os totais do ente. A linha de duplicidades intragovernamentais
+ *  aparece (a apurar). */
+export function montarRclConsolidada(dados: DadosRclConsolidada): string {
+  const { cabecalho: c, entidades, correntesTotal, deducoesTotal, intra, rclTotal } = dados
+  const linha = (e: { nome: string; correntes: number; deducoes: number; rcl: number }) =>
+    `<tr><td>${esc(e.nome)}</td><td class="num">${formatarReais(e.correntes)}</td><td class="num">${formatarReais(e.deducoes)}</td><td class="num">${formatarReais(e.rcl)}</td></tr>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Demonstrativo Consolidado da Receita Corrente Líquida — Município') +
+    `<div class="dem-sub">Metodologia: ${esc(dados.metodologia)} · soma das entidades do município (o RPPS entra pela entidade de previdência)</div>` +
+    `<h2 class="dem-sec">Por entidade</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Entidade</th><th class="num">Receitas Correntes</th><th class="num">Deduções</th><th class="num">RCL</th></tr></thead>` +
+    `<tbody>${entidades.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL DO MUNICÍPIO</th><th class="num">${formatarReais(correntesTotal)}</th><th class="num">${formatarReais(deducoesTotal)}</th><th class="num">${formatarReais(rclTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th colspan="2">Receitas Correntes (I)</th><th class="num">${formatarReais(correntesTotal)}</th></tr>` +
+    `<tr><th colspan="2">(−) Deduções da RCL (II)</th><th class="num">${formatarReais(deducoesTotal)}</th></tr>` +
+    `<tr><th colspan="2">(−) Transferências intragovernamentais — duplicidades (a apurar)</th><th class="num">${formatarReais(intra)}</th></tr>` +
+    `<tr><th colspan="2">RECEITA CORRENTE LÍQUIDA CONSOLIDADA</th><th class="num">${formatarReais(rclTotal)}</th></tr>` +
+    `</tfoot></table>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (
