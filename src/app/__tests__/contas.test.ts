@@ -134,23 +134,38 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('apenas leitura')
   })
 
-  it('razão: renderiza movimentos e saldo corrente da conta no mês', async () => {
+  it('razão: renderiza movimentos e saldo corrente por intervalo de datas', async () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1', codigo: '1.1.1', descricao: 'Caixa', entidadeId: 'ent1', modeloContaId: 'm1' })
     prisma.conta.findUnique.mockResolvedValue({ naturezaSaldo: 'DEVEDORA' })
     prisma.saldoInicialAno.findUnique.mockResolvedValue({ valor: new Prisma.Decimal(500) })
-    prisma.lancamentoItem.groupBy.mockResolvedValue([]) // nada antes do mês
+    prisma.lancamentoItem.groupBy.mockResolvedValue([]) // nada antes do início
     prisma.resumoMensalConta.findMany.mockResolvedValue([{ mes: 3, totalDebito: new Prisma.Decimal(1000), totalCredito: new Prisma.Decimal(0) }])
     prisma.lancamentoItem.findMany.mockResolvedValue([
       { tipo: 'DEBITO', valor: new Prisma.Decimal(1000), lancamento: { data: new Date(Date.UTC(2026, 2, 15)), historico: 'Recebimento' } },
     ])
-    const res = await app.inject({ method: 'GET', url: '/contas/c1/razao?mes=3' })
+    const res = await app.inject({ method: 'GET', url: '/contas/c1/razao?de=2026-03-01&ate=2026-03-31' })
     expect(res.statusCode).toBe(200)
-    expect(res.body).toContain('Razão')
     expect(res.body).toContain('Caixa')
     expect(res.body).toContain('Recebimento')
+    expect(res.body).toContain('01/03/2026 a 31/03/2026') // rótulo do período
     // saldo anterior 500 + débito 1000 = 1.500 (DEVEDORA)
     expect(res.body).toMatch(/1\.500,00/)
+    // razaoDoPeriodo: itens buscados com gte/lte do intervalo
+    const argsItens = prisma.lancamentoItem.findMany.mock.calls.at(-1)![0]
+    expect(argsItens.where.lancamento.data).toEqual({ gte: expect.any(Date), lte: expect.any(Date) })
+  })
+
+  it('razão: sem filtro abrange o exercício inteiro', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findUnique.mockResolvedValue({ id: 'c1', codigo: '1.1.1', descricao: 'Caixa', entidadeId: 'ent1', modeloContaId: null })
+    prisma.saldoInicialAno.findUnique.mockResolvedValue(null)
+    prisma.lancamentoItem.groupBy.mockResolvedValue([])
+    prisma.resumoMensalConta.findMany.mockResolvedValue([])
+    prisma.lancamentoItem.findMany.mockResolvedValue([])
+    const res = await app.inject({ method: 'GET', url: '/contas/c1/razao' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('exercício 2026')
   })
 
   it('razão: conta de outra entidade → redireciona para /app/contas', async () => {

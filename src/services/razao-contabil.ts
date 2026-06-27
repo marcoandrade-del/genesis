@@ -75,10 +75,21 @@ export class RazaoContabilService {
     })
   }
 
-  /** Razão da conta num mês, com saldo anterior, saldo corrente e totais por dia. */
-  async razaoDoMes(entidadeId: string, contaId: string, ano: number, mes: number, natureza: Natureza | null): Promise<Razao> {
-    const mesInicio = new Date(Date.UTC(ano, mes - 1, 1))
-    const mesFim = new Date(Date.UTC(ano, mes, 1)) // exclusivo
+  /**
+   * Razão da conta num intervalo de datas (dentro do exercício), com saldo
+   * anterior ao início, saldo corrente e totais por dia. Sem `de`/`ate` cobre o
+   * exercício inteiro. `ate` é inclusivo.
+   */
+  async razaoDoPeriodo(
+    entidadeId: string,
+    contaId: string,
+    ano: number,
+    natureza: Natureza | null,
+    de?: Date,
+    ate?: Date,
+  ): Promise<Razao> {
+    const inicio = de ?? new Date(Date.UTC(ano, 0, 1))
+    const fim = ate ?? new Date(Date.UTC(ano, 11, 31)) // último dia do exercício (inclusivo)
 
     const inicialRow = await this.prisma.saldoInicialAno.findUnique({
       where: { entidadeId_contaId_ano: { entidadeId, contaId, ano } },
@@ -88,7 +99,7 @@ export class RazaoContabilService {
 
     const antes = await this.prisma.lancamentoItem.groupBy({
       by: ['tipo'],
-      where: { contaId, lancamento: { entidadeId, data: { lt: mesInicio } } },
+      where: { contaId, lancamento: { entidadeId, data: { lt: inicio } } },
       _sum: { valor: true },
     })
     let dAntes = D0()
@@ -100,7 +111,7 @@ export class RazaoContabilService {
     const saldoAnterior = saldoInicial.plus(delta(natureza, dAntes, cAntes))
 
     const itensDb = await this.prisma.lancamentoItem.findMany({
-      where: { contaId, lancamento: { entidadeId, data: { gte: mesInicio, lt: mesFim } } },
+      where: { contaId, lancamento: { entidadeId, data: { gte: inicio, lte: fim } } },
       select: {
         tipo: true,
         valor: true,
