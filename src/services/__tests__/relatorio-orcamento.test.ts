@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -208,6 +208,29 @@ describe('montarSumarioGeral', () => {
     expect(html).toContain('Administração')
     expect(html).toContain('SUPERÁVIT / (DÉFICIT)')
     expect(html).toContain('100,00') // 1000 − 900
+  })
+})
+
+describe('montarRcl', () => {
+  const cab = { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null }
+  it('renderiza correntes, deduções e a RCL', () => {
+    const html = montarRcl({
+      cabecalho: cab,
+      correntes: [{ codigo: '1.1', rotulo: 'Impostos', valor: 1000 }],
+      correntesTotal: 1000,
+      deducoes: [{ codigo: '1.2.1.8', rotulo: 'RPPS', valor: 200 }],
+      deducoesTotal: 200,
+      rcl: 800,
+    })
+    expect(html).toContain('RREO Anexo 3 — Demonstrativo da Receita Corrente Líquida')
+    expect(html).toContain('Impostos')
+    expect(html).toContain('RECEITA CORRENTE LÍQUIDA')
+    expect(html).not.toContain('provisória')
+  })
+  it('avisa RCL provisória quando não há deduções cadastradas', () => {
+    const html = montarRcl({ cabecalho: cab, correntes: [], correntesTotal: 0, deducoes: [], deducoesTotal: 0, rcl: 0 })
+    expect(html).toContain('provisória')
+    expect(html).toContain('sem deduções cadastradas')
   })
 })
 

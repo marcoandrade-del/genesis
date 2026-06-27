@@ -323,6 +323,51 @@ export function montarSumarioGeral(dados: DadosSumarioGeral): string {
   )
 }
 
+export interface DadosRcl {
+  cabecalho: CabecalhoDemonstrativo
+  correntes: { codigo: string; rotulo: string; valor: number }[]
+  correntesTotal: number
+  deducoes: { codigo: string; rotulo: string; valor: number }[]
+  deducoesTotal: number
+  rcl: number
+}
+
+/** Demonstrativo da Receita Corrente Líquida (RREO Anexo 3): receitas correntes
+ *  − deduções legais = RCL. Quando não há deduções cadastradas, avisa que o
+ *  valor é provisório (deduções a informar por Estado). */
+export function montarRcl(dados: DadosRcl): string {
+  const { cabecalho: c, correntes, correntesTotal, deducoes, deducoesTotal, rcl } = dados
+  const linhaCorrente = (l: { codigo: string; rotulo: string; valor: number }) =>
+    `<tr><td class="cod">${esc(l.codigo)}</td><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.valor)}</td></tr>`
+  const avisoDeducoes =
+    deducoes.length === 0
+      ? `<div class="dem-sub" style="color:#b26a00;margin:6px 0">⚠ Sem deduções legais cadastradas — RCL provisória (deduções da RCL são definidas por Estado/TCE).</div>`
+      : ''
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RREO Anexo 3 — Demonstrativo da Receita Corrente Líquida') +
+    `<h2 class="dem-sec">Receitas Correntes (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Código</th><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${correntes.map(linhaCorrente).join('')}</tbody>` +
+    `<tfoot><tr><th colspan="2">TOTAL DAS RECEITAS CORRENTES (I)</th><th class="num">${formatarReais(correntesTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<h2 class="dem-sec">Deduções da RCL (II)</h2>` +
+    avisoDeducoes +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Código</th><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${deducoes.length ? deducoes.map(linhaCorrente).join('') : `<tr><td colspan="3" style="text-align:center;color:#888">— sem deduções cadastradas —</td></tr>`}</tbody>` +
+    `<tfoot><tr><th colspan="2">TOTAL DAS DEDUÇÕES (II)</th><th class="num">${formatarReais(deducoesTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th colspan="2">RECEITA CORRENTE LÍQUIDA (III) = (I − II)</th><th class="num">${formatarReais(rcl)}</th></tr>` +
+    `</tfoot></table>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

@@ -2,11 +2,13 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
+import { RclService } from '../services/rcl.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
   montarProgramaTrabalho,
   montarSumarioGeral,
+  montarRcl,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -33,6 +35,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const arrecadacoes = new ArrecadacoesService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
   const ptSvc = new ProgramaTrabalhoService(app.prisma)
+  const rclSvc = new RclService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -369,6 +372,55 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="sumario-geral-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RCL (LRF / RREO Anexo 3) — receitas correntes − deduções ────────────────
+  async function rcl(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, r] = await Promise.all([entidadeCtx(entidadeId, ano), rclSvc.calcular(entidadeId, ano)])
+    const num = (d: { toNumber(): number }) => d.toNumber()
+    const corpo = r.temOrcamento
+      ? montarRcl({
+          cabecalho: cab(e, ano, meta),
+          correntes: r.correntes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: num(l.valor) })),
+          correntesTotal: num(r.correntesTotal),
+          deducoes: r.deducoes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: num(l.valor) })),
+          deducoesTotal: num(r.deducoesTotal),
+          rcl: num(r.rcl),
+        })
+      : ''
+    return { e, ano, temOrcamento: r.temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/rcl', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await rcl(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Receita Corrente Líquida',
+      breadcrumb: 'RCL (LRF)',
+      pdfUrl: '/app/orcamento/relatorios/rcl.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/rcl.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await rcl(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/rcl')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`RCL ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Receita Corrente Líquida', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="rcl-${ano}.pdf"`)
       .send(pdf)
   })
 }
