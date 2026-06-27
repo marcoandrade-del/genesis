@@ -120,10 +120,24 @@ describe('adminEstadosRoutes', () => {
         url: '/e1',
         ...form({ modeloContabilId: '', loaCodigoModo: 'NIVEL', loaCodigoNivel: '3' }),
       })
-      expect(prisma.estado.update).toHaveBeenCalledWith({
-        where: { id: 'e1' },
-        data: { loaCodigoModo: 'NIVEL', loaCodigoNivel: 3 },
-      })
+      expect(prisma.estado.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'e1' }, data: expect.objectContaining({ loaCodigoModo: 'NIVEL', loaCodigoNivel: 3 }) }),
+      )
+    })
+
+    it('salva a composição da RCL (JSON válido) e ignora JSON inválido', async () => {
+      definirModeloMock.mockResolvedValue({ estado: ESTADO, municipiosAtualizados: 0 })
+      const cfg = JSON.stringify({ nome: 'TCE-PR', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7.5.1.50'] }] })
+      await app.inject({ method: 'PUT', url: '/e1', ...form({ modeloContabilId: '', rclComposicao: cfg }) })
+      expect(prisma.estado.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ rclComposicao: { nome: 'TCE-PR', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7.5.1.50'] }] } }) }),
+      )
+
+      prisma.estado.update.mockClear()
+      await app.inject({ method: 'PUT', url: '/e1', ...form({ modeloContabilId: '', rclComposicao: 'isto não é json' }) })
+      // JSON inválido → limpa (DbNull), não persiste lixo
+      const data = prisma.estado.update.mock.calls[0]![0].data
+      expect(data.rclComposicao).not.toEqual({ nome: 'TCE-PR' })
     })
 
     it('passa null quando modeloContabilId é string vazia', async () => {

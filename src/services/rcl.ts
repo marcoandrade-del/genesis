@@ -55,6 +55,31 @@ export function composicaoDoEstado(sigla: string | null | undefined): Composicao
   return (sigla && COMPOSICAO_POR_ESTADO[sigla]) || COMPOSICAO_STN
 }
 
+/** Valida o JSON da composição editável (vindo do banco). Retorna null se inválido/ausente. */
+export function parseComposicao(json: unknown): ComposicaoRcl | null {
+  if (!json || typeof json !== 'object') return null
+  const o = json as { nome?: unknown; deducoes?: unknown }
+  if (!Array.isArray(o.deducoes)) return null
+  const deducoes: LinhaDeducaoConfig[] = []
+  for (const d of o.deducoes) {
+    if (!d || typeof d !== 'object') continue
+    const dd = d as { rotulo?: unknown; prefixos?: unknown }
+    if (typeof dd.rotulo !== 'string' || !dd.rotulo.trim()) continue
+    const prefixos = Array.isArray(dd.prefixos) ? dd.prefixos.filter((p): p is string => typeof p === 'string') : []
+    deducoes.push({ rotulo: dd.rotulo.trim(), prefixos })
+  }
+  if (deducoes.length === 0) return null
+  return { nome: typeof o.nome === 'string' && o.nome.trim() ? o.nome.trim() : 'Personalizada (Estado)', deducoes }
+}
+
+/**
+ * Composição efetiva: a config EDITÁVEL do Estado (JSON do banco) tem prioridade;
+ * sem ela, cai no default do código (delta do Estado ou STN).
+ */
+export function resolverComposicao(sigla: string | null | undefined, jsonConfig: unknown): ComposicaoRcl {
+  return parseComposicao(jsonConfig) ?? composicaoDoEstado(sigla)
+}
+
 /** Rótulos STN das subcategorias da Receita Corrente (categoria 1). */
 const SUBCATEGORIA: Record<string, string> = {
   '1.1': 'Impostos, Taxas e Contribuições de Melhoria',

@@ -404,6 +404,7 @@ model Estado {
   modeloContabilId String?
   loaCodigoModo    FormatoCodigoConta @default(CURTO) // padrão do estado p/ os relatórios da LOA
   loaCodigoNivel   Int                @default(4)
+  rclComposicao    Json? // composição editável da RCL ({nome, deducoes:[{rotulo,prefixos}]}); null = default do código
   criadoEm         DateTime           @default(now())
   atualizadoEm     DateTime           @updatedAt
   modeloContabil   ModeloContabil?    @relation(fields: [modeloContabilId], references: [id])

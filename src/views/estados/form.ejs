@@ -57,6 +57,17 @@
       <input type="number" name="loaCodigoNivel" min="1" max="12" value="<%= estado.loaCodigoNivel %>"
         class="form-control form-control-sm" style="width:90px">
     </div>
+
+    <hr class="my-3">
+    <div class="mb-1">
+      <label class="form-label small fw-semibold">Deduções da RCL (LRF) — por Estado</label>
+      <div class="form-text mb-2">Vazio = usa o padrão do sistema (STN/PR). Cada linha: rótulo + prefixos de natureza de receita (separados por vírgula).</div>
+      <input type="text" id="rcl-nome" class="form-control form-control-sm mb-2" placeholder="Nome da metodologia (ex.: TCE-PR)"
+        value="<%= estado.rclComposicao && estado.rclComposicao.nome ? estado.rclComposicao.nome : '' %>" oninput="rclSync()">
+      <div id="rcl-rows"></div>
+      <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="rclAddRow()"><i class="bi bi-plus-lg me-1"></i>Dedução</button>
+      <input type="hidden" name="rclComposicao" id="rcl-json">
+    </div>
   </div>
 
   <div class="modal-footer">
@@ -67,3 +78,32 @@
     </button>
   </div>
 </form>
+
+<script>
+// Editor das deduções da RCL: linhas (rótulo + prefixos) → JSON no hidden #rcl-json.
+var rclInit = <%- JSON.stringify((estado.rclComposicao && estado.rclComposicao.deducoes) || []) %>;
+function rclSync() {
+  var rows = document.querySelectorAll('#rcl-rows .rcl-row')
+  var deducoes = []
+  rows.forEach(function (r) {
+    var rot = r.querySelector('.rcl-rot').value.trim()
+    var pref = r.querySelector('.rcl-pref').value.split(',').map(function (s) { return s.trim() }).filter(Boolean)
+    if (rot) deducoes.push({ rotulo: rot, prefixos: pref })
+  })
+  var nome = document.getElementById('rcl-nome').value.trim()
+  document.getElementById('rcl-json').value = deducoes.length ? JSON.stringify({ nome: nome, deducoes: deducoes }) : ''
+}
+function rclAddRow(rotulo, prefixos) {
+  var div = document.createElement('div')
+  div.className = 'rcl-row input-group input-group-sm mb-1'
+  var rot = document.createElement('input'); rot.className = 'form-control rcl-rot'; rot.placeholder = 'rótulo da dedução'; rot.value = rotulo || ''
+  var pre = document.createElement('input'); pre.className = 'form-control rcl-pref'; pre.placeholder = 'prefixos (ex.: 1.7.5.1.50)'; pre.value = prefixos || ''
+  var del = document.createElement('button'); del.type = 'button'; del.className = 'btn btn-outline-danger'; del.textContent = '×'
+  del.onclick = function () { div.remove(); rclSync() }
+  rot.oninput = rclSync; pre.oninput = rclSync
+  div.appendChild(rot); div.appendChild(pre); div.appendChild(del)
+  document.getElementById('rcl-rows').appendChild(div)
+}
+rclInit.forEach(function (d) { rclAddRow(d.rotulo, (d.prefixos || []).join(', ')) })
+rclSync()
+</script>

@@ -1,6 +1,8 @@
 import type { FastifyInstance } from 'fastify'
+import { Prisma } from '@prisma/client'
 import { EstadosService } from '../services/estados.js'
 import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
+import { parseComposicao } from '../services/rcl.js'
 
 export async function adminEstadosRoutes(app: FastifyInstance) {
   const service = new EstadosService(app.prisma)
@@ -52,7 +54,7 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string }
-    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string }
+    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; rclComposicao?: string }
   }>(
     '/:id',
     async (req, reply) => {
@@ -61,10 +63,21 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
       const modo: 'COMPLETO' | 'CURTO' | 'NIVEL' =
         req.body.loaCodigoModo === 'COMPLETO' || req.body.loaCodigoModo === 'NIVEL' ? req.body.loaCodigoModo : 'CURTO'
       const nivel = Math.min(12, Math.max(1, parseInt(req.body.loaCodigoNivel ?? '', 10) || 4))
+      // Composição da RCL editável (JSON do form). Vazio/inválido = limpar (volta ao default).
+      let rclComposicao: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull
+      const rawRcl = req.body.rclComposicao
+      if (rawRcl && rawRcl.trim()) {
+        try {
+          const cfg = JSON.parse(rawRcl) as Prisma.InputJsonValue
+          if (parseComposicao(cfg)) rclComposicao = cfg
+        } catch {
+          /* JSON inválido → mantém DbNull (limpa) */
+        }
+      }
       try {
         await app.prisma.estado.update({
           where: { id: req.params.id },
-          data: { loaCodigoModo: modo, loaCodigoNivel: nivel },
+          data: { loaCodigoModo: modo, loaCodigoNivel: nivel, rclComposicao },
         })
         const r = await service.definirModelo(req.params.id, novoId)
         // Sinaliza ao admin quantos municípios foram tocados pela propagação.

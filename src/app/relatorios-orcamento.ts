@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
-import { RclService, composicaoDoEstado } from '../services/rcl.js'
+import { RclService, resolverComposicao } from '../services/rcl.js'
 import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import {
   montarReceitaPrevista,
@@ -55,7 +55,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   async function entidadeCtx(
     entidadeId: string,
     ano: number,
-  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; meta: CabMeta }> {
+  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; meta: CabMeta; estadoRclComposicao: unknown }> {
     const [row, orc] = await Promise.all([
       app.prisma.entidade.findUnique({
         where: { id: entidadeId },
@@ -71,7 +71,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
               brasao: true,
               loaCodigoModo: true,
               loaCodigoNivel: true,
-              estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true } },
+              estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true, rclComposicao: true } },
             },
           },
         },
@@ -100,6 +100,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
       e: { nome: row!.nome, brasao: m.brasao ?? row!.brasao, municipio: { nome: m.nome, estado: { sigla: m.estado.sigla } } },
       padrao: { modo, nivelMax },
       meta,
+      estadoRclComposicao: m.estado.rclComposicao,
     }
   }
 
@@ -381,8 +382,8 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── RCL (LRF / RREO Anexo 3) — receitas correntes − deduções ────────────────
   async function rcl(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const { e, meta } = await entidadeCtx(entidadeId, ano)
-    const comp = composicaoDoEstado(e.municipio.estado.sigla)
+    const { e, meta, estadoRclComposicao } = await entidadeCtx(entidadeId, ano)
+    const comp = resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao)
     const r = await rclSvc.calcular(entidadeId, ano, comp)
     const num = (d: { toNumber(): number }) => d.toNumber()
     const corpo = r.temOrcamento
