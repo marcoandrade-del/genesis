@@ -26,3 +26,11 @@ Memoriais de cálculo da LRF são definidos por lei (STN / Min. Planejamento), m
 
 ## Implicação p/ o roadmap do Gênesis
 O que mais habilita LRF/Oxy é **fechar a ponte execução→contabilidade** (o Motor de Eventos da Despesa, PR #114, em andamento) **+ a MSC**. Isso completa o lado "sistema de registro" e dá ao Oxy o dado completo e correto. Ver [[spec-realizacao-despesa-2026-06-22]], [[integracao-receita-eventos]].
+
+## Contrato concreto de memoriais (implementado 2026-06-27) — calculado no Gênesis, exibido no Oxy
+Decisão do Marco: **tudo calculado no Gênesis**, o Oxy **só exibe** (inputs + demonstrativo + total); cálculo ÚNICO → consistente nos dois lados; **com versionamento p/ não dar erro de versão**.
+- **Gênesis (produtor):** `src/api/memoriais.ts` (PR #141) — data API read-only `/api/memoriais/{rcl,rcl-consolidada,contrato}`, **token de serviço** `GENESIS_API_TOKEN` (503 se ausente, 401 se errado). `MemorialRclService` reusa o `RclService`. Envelope `{contrato:{nome:'memoriais-lrf',versao,recurso}, dados}`. Versão atual **1.0.0**.
+- **Oxy (consumidor):** `oxy-ia-backend/src/genesis.ts` — conector com `CONTRATO_MEMORIAIS_MAJOR` (=1). Compara o MAJOR do envelope; **MAJOR diferente ⇒ 409 "conector desatualizado"** (NÃO renderiza dado errado). `checarContratoMemoriais()` roda no boot (index.ts) e loga compatibilidade. Rotas `/api/memoriais/{rcl,rcl-consolidada}` (sessao) repassam o `dados` pronto.
+- **Regra de versão (os dois honram SemVer):** mudou cálculo/forma no Gênesis ⇒ bump da versão. Quebra (campo removido/renomeado/semântica) = **MAJOR** → Oxy detecta e pede atualização. Adição compatível = MINOR (Oxy segue). 
+- ⚠️ **oxy-ia-backend NÃO é repo git** (editei direto, typecheck limpo, e2e verificado). Falta: o **front (oxy-dashboards)** chamar `/api/memoriais/*` pra exibir; e por chaves no `.env` dos dois lados (`GENESIS_API_TOKEN` igual).
+- Verificado e2e (2026-06-27): compatível→RCL 2.604.051.913; MAJOR divergente→409; token errado→502.
