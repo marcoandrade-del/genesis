@@ -6,6 +6,7 @@ import { RazaoContabilService, type Razao } from '../services/razao-contabil.js'
 import { SaldoDiarioService } from '../services/saldo-diario.js'
 import { DesdobramentoDistribuicaoService, type FilhoNovo, type Distribuicao } from '../services/desdobramento-distribuicao.js'
 import type { Natureza } from '../services/saldo-contabil.js'
+import { parseFiltroConsulta, type FiltroConsultaQuery } from './filtro-consulta.js'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 import { registrarRotasPlano } from './plano-entidade.js'
 
@@ -38,7 +39,7 @@ export async function appContasRoutes(app: FastifyInstance) {
   // ── Razão da conta (drill-down): resumo mensal + total por dia + movimentos ──
   const razaoSvc = new RazaoContabilService(app.prisma)
 
-  app.get<{ Params: { id: string }; Querystring: { mes?: string } }>('/contas/:id/razao', async (req, reply) => {
+  app.get<{ Params: { id: string }; Querystring: FiltroConsultaQuery }>('/contas/:id/razao', async (req, reply) => {
     const { entidadeId, ano } = req.contexto
     const entidade = await app.prisma.entidade.findUnique({
       where: { id: entidadeId },
@@ -57,23 +58,28 @@ export async function appContasRoutes(app: FastifyInstance) {
       : null
     const natureza = (modelo?.naturezaSaldo as Natureza | null) ?? null
 
-    const mesNum = Number(req.query.mes)
-    const mes = Number.isInteger(mesNum) && mesNum >= 1 && mesNum <= 12 ? mesNum : new Date().getMonth() + 1
+    const filtro = parseFiltroConsulta(req.query, ano)
 
     const [resumo, razao] = await Promise.all([
       razaoSvc.resumoMensal(entidadeId, conta.id, ano),
-      razaoSvc.razaoDoMes(entidadeId, conta.id, ano, mes, natureza),
+      razaoSvc.razaoDoPeriodo(entidadeId, conta.id, ano, natureza, filtro.de, filtro.ate),
     ])
 
     const n = (d: { toNumber(): number }) => d.toNumber()
     const dia2 = (d: Date) => String(d.getUTCDate()).padStart(2, '0')
+    const fmtBR = (s: string) => s.split('-').reverse().join('/')
+    const periodoLabel =
+      filtro.deStr || filtro.ateStr
+        ? `${filtro.deStr ? fmtBR(filtro.deStr) : 'início'} a ${filtro.ateStr ? fmtBR(filtro.ateStr) : 'fim'}`
+        : `exercício ${ano}`
     const r: Razao = razao
     return reply.view('app/razao', {
       entidade,
       ano,
       conta,
       natureza,
-      mes,
+      filtro,
+      periodoLabel,
       meses: MESES,
       resumo: resumo.map((m) => ({ mes: m.mes, nome: MESES[m.mes - 1], debito: n(m.debito), credito: n(m.credito) })),
       saldoAnterior: n(r.saldoAnterior),

@@ -35,12 +35,8 @@
     <a href="/app/contas/<%= conta.id %>/diario" class="btn btn-sm btn-outline-primary"><i class="bi bi-graph-up me-1"></i>Acumulado diário</a>
   </div>
 
-  <%# Seletor de mês %>
-  <div class="btn-group btn-group-sm flex-wrap mb-3" role="group">
-    <% meses.forEach(function(nome, i) { %>
-      <a href="<%= base %>?mes=<%= i + 1 %>" class="btn <%= (i + 1) === mes ? 'btn-primary' : 'btn-outline-secondary' %>"><%= nome %></a>
-    <% }) %>
-  </div>
+  <%# Filtro por intervalo de datas (dentro do exercício) %>
+  <%- include('_filtro-consulta', { acao: base, ano, filtro, contasOpcoes: [], comPeriodo: true, comContas: false }) %>
 
   <div class="row g-3">
     <%# Resumo mensal + total por dia %>
@@ -51,8 +47,9 @@
           <thead class="table-light"><tr><th class="ps-3">Mês</th><th class="valor">Débito</th><th class="valor pe-3">Crédito</th></tr></thead>
           <tbody>
             <% resumo.forEach(function(m) { %>
-              <tr class="<%= m.mes === mes ? 'table-active' : '' %>">
-                <td class="ps-3"><a href="<%= base %>?mes=<%= m.mes %>" class="text-decoration-none"><%= m.nome %></a></td>
+              <% var mm = String(m.mes).padStart(2, '0'); var ld = String(new Date(ano, m.mes, 0).getDate()).padStart(2, '0'); %>
+              <tr class="<%= filtro.deStr === (ano + '-' + mm + '-01') ? 'table-active' : '' %>">
+                <td class="ps-3"><a href="<%= base %>?de=<%= ano %>-<%= mm %>-01&ate=<%= ano %>-<%= mm %>-<%= ld %>" class="text-decoration-none"><%= m.nome %></a></td>
                 <td class="valor small"><%= m.debito ? brl(m.debito) : '–' %></td>
                 <td class="valor small pe-3"><%= m.credito ? brl(m.credito) : '–' %></td>
               </tr>
@@ -62,7 +59,7 @@
       </div></div>
 
       <div class="card border-0 shadow-sm"><div class="card-body p-0">
-        <div class="px-3 py-2 small fw-semibold text-muted border-bottom">Total por dia — <%= meses[mes - 1] %></div>
+        <div class="px-3 py-2 small fw-semibold text-muted border-bottom">Total por dia — <%= periodoLabel %></div>
         <table class="table table-sm mb-0">
           <thead class="table-light"><tr><th class="ps-3">Dia</th><th class="valor">Débito</th><th class="valor pe-3">Crédito</th></tr></thead>
           <tbody>
@@ -81,7 +78,7 @@
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm"><div class="card-body p-0">
         <div class="px-3 py-2 small fw-semibold text-muted border-bottom d-flex justify-content-between">
-          <span>Razão — <%= meses[mes - 1] %>/<%= ano %></span>
+          <span>Razão — <%= periodoLabel %>/<%= ano %></span>
           <span>Saldo anterior: <strong class="<%= saldoAnterior < 0 ? 'text-danger' : '' %>"><%= brl(saldoAnterior) %></strong></span>
         </div>
         <table class="table table-sm table-hover mb-0">
