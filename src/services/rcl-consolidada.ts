@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
-import { RclService, composicaoDoEstado } from './rcl.js'
+import { RclService, resolverComposicao } from './rcl.js'
 
 const D0 = () => new Prisma.Decimal(0)
 
@@ -40,11 +40,11 @@ export class RclConsolidadaService {
     const municipio = await this.prisma.municipio.findUnique({
       where: { id: municipioId },
       select: {
-        estado: { select: { sigla: true } },
+        estado: { select: { sigla: true, rclComposicao: true } },
         entidades: { where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } },
       },
     })
-    const comp = composicaoDoEstado(municipio?.estado.sigla)
+    const comp = resolverComposicao(municipio?.estado.sigla, municipio?.estado.rclComposicao)
     const rclSvc = new RclService(this.prisma)
 
     const entidades: RclEntidade[] = []

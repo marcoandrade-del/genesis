@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
-import { RclService, composicaoDoEstado, COMPOSICAO_STN } from '../rcl.js'
+import { RclService, composicaoDoEstado, resolverComposicao, parseComposicao, COMPOSICAO_STN } from '../rcl.js'
 
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
@@ -101,5 +101,37 @@ describe('composicaoDoEstado', () => {
   it('Estado sem delta (ou nulo) cai na STN', () => {
     expect(composicaoDoEstado('SP')).toBe(COMPOSICAO_STN)
     expect(composicaoDoEstado(null)).toBe(COMPOSICAO_STN)
+  })
+})
+
+describe('parseComposicao', () => {
+  it('aceita JSON válido (nome + deduções)', () => {
+    const c = parseComposicao({ nome: 'TCE-PR', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7.5.1.50'] }] })
+    expect(c).toEqual({ nome: 'TCE-PR', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7.5.1.50'] }] })
+  })
+  it('nome genérico quando ausente; descarta inválidas; rótulo sem prefixos vira []; filtra prefixos não-string', () => {
+    const c = parseComposicao({ deducoes: [{ rotulo: '  ' }, 'lixo', { rotulo: 'Z' }, { rotulo: 'Y', prefixos: ['a', 5, 'b'] }] })
+    expect(c!.nome).toContain('Personalizada')
+    expect(c!.deducoes).toEqual([
+      { rotulo: 'Z', prefixos: [] },
+      { rotulo: 'Y', prefixos: ['a', 'b'] },
+    ])
+  })
+  it('retorna null para inválido/vazio', () => {
+    expect(parseComposicao(null)).toBeNull()
+    expect(parseComposicao('x')).toBeNull()
+    expect(parseComposicao({ deducoes: 'nope' })).toBeNull()
+    expect(parseComposicao({ deducoes: [{ rotulo: '' }] })).toBeNull()
+  })
+})
+
+describe('resolverComposicao', () => {
+  it('config do banco tem prioridade sobre o default', () => {
+    const c = resolverComposicao('PR', { deducoes: [{ rotulo: 'Custom', prefixos: [] }] })
+    expect(c.deducoes[0]!.rotulo).toBe('Custom')
+  })
+  it('sem config cai no default do Estado/STN', () => {
+    expect(resolverComposicao('PR', null).nome).toContain('TCE-PR')
+    expect(resolverComposicao('SP', null)).toBe(COMPOSICAO_STN)
   })
 })

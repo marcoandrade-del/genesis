@@ -29,7 +29,7 @@ vi.mock('../../services/rcl.js', () => ({
   RclService: class {
     calcular = rclMock
   },
-  composicaoDoEstado: (sigla: string) => ({ nome: sigla === 'PR' ? 'TCE-PR (aproximação por natureza)' : 'STN (padrão)', deducoes: [] }),
+  resolverComposicao: (sigla: string) => ({ nome: sigla === 'PR' ? 'TCE-PR (aproximação por natureza)' : 'STN (padrão)', deducoes: [] }),
 }))
 vi.mock('../../services/rcl-consolidada.js', () => ({ RclConsolidadaService: class { calcular = rclConsMock } }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
