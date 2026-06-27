@@ -107,6 +107,9 @@ describe('appOrcamentoRoutes', () => {
     expect(res.body).toContain('Por Unidade Orçamentária')
     expect(res.body).toContain('Vencimentos')
     expect(res.body).toContain('1.450,00')
+    // PR E: colapsar por nível + filtro de texto por conta na tabela de saldo
+    expect(res.body).toContain('filtrar conta')
+    expect(res.body).toContain('data-nivel="3"')
   })
 
   it('GET /orcamento/despesa/diario aplica filtros de período e conta', async () => {
