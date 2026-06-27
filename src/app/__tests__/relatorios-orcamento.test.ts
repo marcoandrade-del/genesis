@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { resumoMock, calcularMock, ptMock, rclMock, gerarPdfMock } = vi.hoisted(() => ({
+const { resumoMock, calcularMock, ptMock, rclMock, rclConsMock, gerarPdfMock } = vi.hoisted(() => ({
   resumoMock: vi.fn(),
   calcularMock: vi.fn(),
   ptMock: vi.fn(),
   rclMock: vi.fn(),
+  rclConsMock: vi.fn(),
   gerarPdfMock: vi.fn(),
 }))
 
@@ -30,6 +31,7 @@ vi.mock('../../services/rcl.js', () => ({
   },
   composicaoDoEstado: (sigla: string) => ({ nome: sigla === 'PR' ? 'TCE-PR (aproximação por natureza)' : 'STN (padrão)', deducoes: [] }),
 }))
+vi.mock('../../services/rcl-consolidada.js', () => ({ RclConsolidadaService: class { calcular = rclConsMock } }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
@@ -71,6 +73,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
     calcularMock.mockReset()
     ptMock.mockReset()
     rclMock.mockReset()
+    rclConsMock.mockReset()
     gerarPdfMock.mockReset()
     ;({ app, prisma } = await criarApp({
       registrar: appRelatoriosOrcamentoRoutes,
@@ -471,6 +474,57 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl.pdf' })
       expect(res.statusCode).toBe(302)
       expect(res.headers.location).toBe('/app/orcamento/relatorios/rcl')
+    })
+  })
+
+  describe('RCL Consolidada do Município', () => {
+    const d = (n: number) => ({ toNumber: () => n })
+
+    it('renderiza o consolidado por entidade + total do município', async () => {
+      prisma.entidade.findUnique.mockResolvedValue({ ...ENTIDADE, municipioId: 'mun1' })
+      rclConsMock.mockResolvedValue({
+        entidades: [{ nome: 'Prefeitura', correntes: d(1000), deducoes: d(200), rcl: d(800), temOrcamento: true }],
+        correntesTotal: d(1000),
+        deducoesTotal: d(200),
+        intra: d(0),
+        rclTotal: d(800),
+        metodologia: 'TCE-PR',
+      })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl-consolidada' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Consolidado')
+      expect(res.body).toContain('TOTAL DO MUNICÍPIO')
+    })
+
+    it('gera o PDF do consolidado', async () => {
+      prisma.entidade.findUnique.mockResolvedValue({ ...ENTIDADE, municipioId: 'mun1' })
+      rclConsMock.mockResolvedValue({
+        entidades: [{ nome: 'Prefeitura', correntes: d(1000), deducoes: d(0), rcl: d(1000), temOrcamento: true }],
+        correntesTotal: d(1000),
+        deducoesTotal: d(0),
+        intra: d(0),
+        rclTotal: d(1000),
+        metodologia: 'TCE-PR',
+      })
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl-consolidada.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+    })
+
+    it('redireciona quando nenhuma entidade tem orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue({ ...ENTIDADE, municipioId: 'mun1' })
+      rclConsMock.mockResolvedValue({
+        entidades: [{ nome: 'X', correntes: d(0), deducoes: d(0), rcl: d(0), temOrcamento: false }],
+        correntesTotal: d(0),
+        deducoesTotal: d(0),
+        intra: d(0),
+        rclTotal: d(0),
+        metodologia: 'STN (padrão)',
+      })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl-consolidada.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/rcl-consolidada')
     })
   })
 })
