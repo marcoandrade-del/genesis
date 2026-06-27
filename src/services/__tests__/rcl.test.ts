@@ -48,21 +48,35 @@ describe('RclService.calcular', () => {
     expect(r.correntes[0]!.rotulo).toBe('Receitas Correntes')
   })
 
-  it('aplica deduções de vários prefixos e agrega linhas do mesmo prefixo', async () => {
+  it('aplica deduções nomeadas (cada linha soma suas naturezas)', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
     prisma.previsaoReceita.findMany.mockResolvedValue([
       { valorPrevisto: dec(1000), contaReceita: { codigo: '1.1.1.0.00' } },
-      { valorPrevisto: dec(200), contaReceita: { codigo: '1.2.1.8.01' } }, // contribuição p/ RPPS
-      { valorPrevisto: dec(50), contaReceita: { codigo: '1.2.1.8.02' } }, // mesmo prefixo (agrega)
-      { valorPrevisto: dec(30), contaReceita: { codigo: '1.7.5.0.00' } }, // outro prefixo de dedução
+      { valorPrevisto: dec(200), contaReceita: { codigo: '1.2.1.8.01' } }, // RPPS
+      { valorPrevisto: dec(50), contaReceita: { codigo: '1.2.1.8.02' } }, // RPPS (agrega)
+      { valorPrevisto: dec(30), contaReceita: { codigo: '1.7.5.1.50' } }, // FUNDEB
     ])
-    const r = await svc.calcular('ent1', 2026, { deducoesPrefixos: ['1.2.1.8', '1.7.5'] })
+    const r = await svc.calcular('ent1', 2026, {
+      deducoes: [
+        { rotulo: 'Contribuição RPPS', prefixos: ['1.2.1.8'] },
+        { rotulo: 'FUNDEB', prefixos: ['1.7.5'] },
+      ],
+    })
     expect(r.correntesTotal.toString()).toBe('1280')
-    expect(r.deducoesTotal.toString()).toBe('280') // 200+50+30
-    expect(r.deducoes.map((l) => [l.codigo, l.valor.toString()])).toEqual([
-      ['1.2.1.8', '250'],
-      ['1.7.5', '30'],
+    expect(r.deducoes.map((l) => [l.rotulo, l.valor.toString()])).toEqual([
+      ['Contribuição RPPS', '250'],
+      ['FUNDEB', '30'],
     ])
+    expect(r.deducoesTotal.toString()).toBe('280')
     expect(r.rcl.toString()).toBe('1000')
+  })
+
+  it('composição STN default tem as 3 deduções nomeadas, zeradas sem dados', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.previsaoReceita.findMany.mockResolvedValue([{ valorPrevisto: dec(500), contaReceita: { codigo: '1.1.1.0.00' } }])
+    const r = await svc.calcular('ent1', 2026)
+    expect(r.deducoes).toHaveLength(3)
+    expect(r.deducoesTotal.toString()).toBe('0')
+    expect(r.rcl.toString()).toBe('500')
   })
 })

@@ -8,21 +8,29 @@ export type ResultadoRcl = {
   temOrcamento: boolean
   correntes: LinhaRcl[] // subcategorias da receita corrente (1.x)
   correntesTotal: Prisma.Decimal
-  deducoes: LinhaRcl[]
+  deducoes: LinhaRcl[] // linhas de dedução (nomeadas, conforme o Anexo 3)
   deducoesTotal: Prisma.Decimal
   rcl: Prisma.Decimal
 }
 
-/**
- * Composição da RCL — parametrizável por Estado (TCE). O default segue a STN; as
- * deduções entram por prefixo de código de natureza de receita. Estados que
- * diferem (ex.: PR) sobrescrevem esta composição (camada de config futura — UI
- * ou import de planilha via IA). Ver [[contabil-rcl-lrf-plano]].
- */
-export type ComposicaoRcl = { deducoesPrefixos: string[] }
+/** Uma linha de dedução da RCL: rótulo oficial + naturezas de receita (por prefixo de código). */
+export type LinhaDeducaoConfig = { rotulo: string; prefixos: string[] }
 
-/** Default STN: as deduções legais entram por configuração do Estado (vazio aqui). */
-export const COMPOSICAO_STN: ComposicaoRcl = { deducoesPrefixos: [] }
+/**
+ * Composição da RCL — parametrizável por Estado (TCE). O default segue a STN /
+ * RREO Anexo 3, com as 3 deduções legais nomeadas; os prefixos de natureza ficam
+ * vazios aqui (cada Estado/TCE informa os seus — camada de config futura: UI ou
+ * import da planilha de memória de cálculo via IA). Ver [[contabil-rcl-lrf-plano]].
+ */
+export type ComposicaoRcl = { deducoes: LinhaDeducaoConfig[] }
+
+export const COMPOSICAO_STN: ComposicaoRcl = {
+  deducoes: [
+    { rotulo: 'Contribuição do Servidor para o Plano de Previdência', prefixos: [] },
+    { rotulo: 'Compensação Financeira entre Regimes de Previdência', prefixos: [] },
+    { rotulo: 'Dedução de Receita para Formação do FUNDEB', prefixos: [] },
+  ],
+}
 
 /** Rótulos STN das subcategorias da Receita Corrente (categoria 1). */
 const SUBCATEGORIA: Record<string, string> = {
@@ -40,8 +48,8 @@ const SUBCATEGORIA: Record<string, string> = {
 /**
  * Receita Corrente Líquida (RCL) por entidade: Receitas Correntes (categoria 1)
  * − Deduções legais (LRF art. 2º). No LOA usa a previsão anual; a composição das
- * deduções vem da config do Estado. Per-entidade — a consolidação do município
- * (somar entidades) é uma camada seguinte. Ver [[contabil-rcl-lrf-plano]].
+ * deduções (quais naturezas e como) vem da config do Estado. Per-entidade — a
+ * consolidação do município é uma camada seguinte. Ver [[contabil-rcl-lrf-plano]].
  */
 export class RclService {
   constructor(private prisma: PrismaClient) {}
@@ -61,9 +69,8 @@ export class RclService {
     })
 
     const porSub = new Map<string, Prisma.Decimal>()
-    const porDeducao = new Map<string, Prisma.Decimal>()
+    const dedValor = comp.deducoes.map(() => D0())
     let correntesTotal = D0()
-    let deducoesTotal = D0()
 
     for (const p of previsoes) {
       const cod = p.contaReceita.codigo
@@ -73,21 +80,17 @@ export class RclService {
         const sub = cod.slice(0, 3)
         porSub.set(sub, (porSub.get(sub) ?? D0()).plus(v))
       }
-      // Deduções legais (por prefixo configurado do Estado). Subtraem da RCL.
-      const pref = comp.deducoesPrefixos.find((px) => cod.startsWith(px))
-      if (pref) {
-        deducoesTotal = deducoesTotal.plus(v)
-        porDeducao.set(pref, (porDeducao.get(pref) ?? D0()).plus(v))
-      }
+      comp.deducoes.forEach((d, i) => {
+        if (d.prefixos.some((px) => cod.startsWith(px))) dedValor[i] = dedValor[i]!.plus(v)
+      })
     }
 
     const correntes = [...porSub.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([codigo, valor]) => ({ codigo, rotulo: SUBCATEGORIA[codigo] ?? 'Receitas Correntes', valor }))
 
-    const deducoes = [...porDeducao.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([codigo, valor]) => ({ codigo, rotulo: `Dedução — ${codigo}`, valor }))
+    const deducoes = comp.deducoes.map((d, i) => ({ codigo: '', rotulo: d.rotulo, valor: dedValor[i]! }))
+    const deducoesTotal = dedValor.reduce((acc, v) => acc.plus(v), D0())
 
     return {
       temOrcamento: true,

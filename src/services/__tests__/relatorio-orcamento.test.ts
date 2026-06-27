@@ -227,10 +227,18 @@ describe('montarRcl', () => {
     expect(html).toContain('RECEITA CORRENTE LÍQUIDA')
     expect(html).not.toContain('provisória')
   })
-  it('avisa RCL provisória quando não há deduções cadastradas', () => {
-    const html = montarRcl({ cabecalho: cab, correntes: [], correntesTotal: 0, deducoes: [], deducoesTotal: 0, rcl: 0 })
+  it('avisa RCL provisória quando as deduções somam zero', () => {
+    const html = montarRcl({
+      cabecalho: cab,
+      correntes: [{ codigo: '1.1', rotulo: 'Impostos', valor: 500 }],
+      correntesTotal: 500,
+      deducoes: [{ codigo: '', rotulo: 'Formação do FUNDEB', valor: 0 }],
+      deducoesTotal: 0,
+      rcl: 500,
+    })
     expect(html).toContain('provisória')
-    expect(html).toContain('sem deduções cadastradas')
+    expect(html).toContain('Deduções zeradas')
+    expect(html).toContain('Formação do FUNDEB') // linha de dedução nomeada aparece mesmo zerada
   })
 })
 
