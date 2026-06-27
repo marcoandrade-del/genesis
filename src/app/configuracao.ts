@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { GranularidadePlano } from '@prisma/client'
 import { ConfiguracaoDashboardService } from '../services/configuracao-dashboard.js'
+import { IaPreferenciaService, IA_MOTORES } from '../services/ia-preferencia.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 const ERRO_LEITURA = 'Seu nível de acesso nesta entidade é apenas leitura — você não pode alterar a configuração.'
@@ -12,6 +13,7 @@ const ERRO_LEITURA = 'Seu nível de acesso nesta entidade é apenas leitura — 
  */
 export async function appConfiguracaoRoutes(app: FastifyInstance) {
   const svc = new ConfiguracaoDashboardService(app.prisma)
+  const svcIa = new IaPreferenciaService(app.prisma)
 
   async function carregarEntidade(req: FastifyRequest, reply: FastifyReply) {
     const entidade = await app.prisma.entidade.findUnique({
@@ -27,13 +29,15 @@ export async function appConfiguracaoRoutes(app: FastifyInstance) {
 
   async function render(req: FastifyRequest, reply: FastifyReply, entidade: unknown, opts: { erro?: string; aviso?: string; status?: number } = {}) {
     const { entidadeId, nivel } = req.contexto
-    const granularidade = await svc.granularidade(entidadeId)
+    const [granularidade, iaPref] = await Promise.all([svc.granularidade(entidadeId), svcIa.ler(req.user.sub)])
     if (opts.status) reply.code(opts.status)
     return reply.view('app/configuracao', {
       entidade,
       ano: req.contexto.ano,
       nivel,
       granularidade,
+      iaPref,
+      iaMotores: IA_MOTORES,
       podeEscrever: podeEscrever(nivel),
       erro: opts.erro ?? null,
       aviso: opts.aviso ?? null,
@@ -56,5 +60,16 @@ export async function appConfiguracaoRoutes(app: FastifyInstance) {
     const granularidade: GranularidadePlano = valor === 'PADRAO' ? 'PADRAO' : 'DESDOBRADO'
     await svc.definir(entidadeId, granularidade)
     return render(req, reply, entidade, { aviso: 'Configuração salva.' })
+  })
+
+  // Preferência de IA do USUÁRIO (rápida/profunda + motor) — salva em tempo real.
+  app.post<{ Body: { engine?: string; motor?: string } }>('/configuracao/ia', async (req, reply) => {
+    const pref = await svcIa.salvar(req.user.sub, { engine: req.body.engine, motor: req.body.motor })
+    const motorRotulo = IA_MOTORES.find((m) => m.id === pref.motor)?.rotulo ?? pref.motor
+    const texto = pref.engine === 'profunda' ? `IA: Pesquisa profunda · ${motorRotulo}` : 'IA: Pesquisa rápida'
+    return reply
+      .header('HX-Trigger', JSON.stringify({ mostrarInfo: { titulo: 'Preferência de IA salva', texto } }))
+      .status(204)
+      .send()
   })
 }

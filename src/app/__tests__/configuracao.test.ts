@@ -59,4 +59,41 @@ describe('appConfiguracaoRoutes', () => {
     expect(res.statusCode).toBe(403)
     expect(m.definir).not.toHaveBeenCalled()
   })
+
+  it('GET mostra a seção de IA (engines + motores)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/configuracao' })
+    expect(res.body).toContain('Inteligência Artificial')
+    expect(res.body).toContain('Pesquisa rápida')
+    expect(res.body).toContain('Pesquisa profunda')
+    expect(res.body).toContain('Gemini')
+    expect(res.body).toContain('Sabiá-3')
+  })
+
+  it('POST /configuracao/ia salva a preferência do usuário em tempo real', async () => {
+    prisma.usuario.update.mockResolvedValue({})
+    const res = await app.inject({
+      method: 'POST',
+      url: '/configuracao/ia',
+      payload: form({ engine: 'profunda', motor: 'sabia' }),
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    })
+    expect(res.statusCode).toBe(204)
+    expect(prisma.usuario.update).toHaveBeenCalledWith({
+      where: { id: 'u1' },
+      data: { iaEngine: 'profunda', iaMotor: 'sabia' },
+    })
+    expect(res.headers['hx-trigger']).toContain('Sabiá-3')
+  })
+
+  it('POST /configuracao/ia com rápida não cita motor', async () => {
+    prisma.usuario.update.mockResolvedValue({})
+    const res = await app.inject({
+      method: 'POST',
+      url: '/configuracao/ia',
+      payload: form({ engine: 'rapida', motor: 'gemini' }),
+      headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    })
+    expect(res.statusCode).toBe(204)
+    expect(res.headers['hx-trigger']).toContain('Pesquisa rápida')
+  })
 })

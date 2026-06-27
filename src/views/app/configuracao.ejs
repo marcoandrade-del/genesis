@@ -49,6 +49,47 @@
       <% } %>
     </form>
   </div></div>
+
+  <div class="card border-0 shadow-sm mt-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-1"><i class="bi bi-robot me-1 text-primary"></i>Inteligência Artificial</h6>
+    <p class="small text-muted mb-2">Escolha o motor de pesquisa. A preferência fica salva no seu usuário e pode ser trocada a qualquer momento.</p>
+    <div class="mb-2">
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" name="iaEngine" id="iaRapida" value="rapida" <%= iaPref.engine === 'rapida' ? 'checked' : '' %> onchange="iaSalvar()">
+        <label class="form-check-label" for="iaRapida">Pesquisa rápida <span class="text-muted small">(local, instantânea)</span></label>
+      </div>
+      <div class="form-check form-check-inline">
+        <input class="form-check-input" type="radio" name="iaEngine" id="iaProfunda" value="profunda" <%= iaPref.engine === 'profunda' ? 'checked' : '' %> onchange="iaSalvar()">
+        <label class="form-check-label" for="iaProfunda">Pesquisa profunda <span class="text-muted small">(IA)</span></label>
+      </div>
+    </div>
+    <div id="ia-motor-box" style="<%= iaPref.engine === 'profunda' ? '' : 'display:none' %>">
+      <label class="form-label small mb-1">Motor da pesquisa profunda</label>
+      <select id="iaMotor" class="form-select form-select-sm" style="max-width:340px" onchange="iaSalvar()">
+        <% iaMotores.forEach(function(m){ %>
+          <option value="<%= m.id %>" <%= iaPref.motor === m.id ? 'selected' : '' %>><%= m.especialista ? '★ ' : '' %><%= m.rotulo %></option>
+        <% }) %>
+      </select>
+      <div class="form-text">★ = especialista fiscal. A chamada à IA liga quando a chave do provedor estiver configurada.</div>
+    </div>
+    <div id="ia-salvo" class="small text-success mt-2" style="display:none"><i class="bi bi-check-circle me-1"></i>Preferência salva.</div>
+  </div></div>
 </div>
+
+<script>
+function iaSalvar() {
+  var engine = document.querySelector('input[name=iaEngine]:checked').value
+  var motor = document.getElementById('iaMotor').value
+  document.getElementById('ia-motor-box').style.display = engine === 'profunda' ? '' : 'none'
+  fetch('/app/configuracao/ia', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ engine: engine, motor: motor }),
+  }).then(function () {
+    var s = document.getElementById('ia-salvo'); s.style.display = ''
+    setTimeout(function () { s.style.display = 'none' }, 1800)
+  })
+}
+</script>
 </body>
 </html>
