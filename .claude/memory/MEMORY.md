@@ -6,6 +6,7 @@
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
 - [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas
 - [Spec Modelos Contábeis](project_contabil.md) — Próximo trabalho: sistema contábil (plano de contas, modelos, estados/municípios)
+- [RCL/LRF: plano](contabil-rcl-lrf-plano.md) — motor parametrizável por Estado (STN default + deltas; PR um pouco diferente); per-entidade primeiro; deduções fora do import (a informar); futuro: UI intuitiva ou IA importando xls
 - [Três planos de contas (setor público)](contabil-tres-planos-de-contas.md) — contábil/receita/despesa em tabelas separadas; layout das fontes TCE-PR
 - [Regras do orçamentário](contabil-regras-orcamentario.md) — modelo TCE imutável vs desdobramento da entidade; saldo por fonte com rollup; fonte→contas bancárias (Febraban)
 - [Revisão de regras 2026-06-01](spec-revisao-2026-06-01.md) — 7 gaps; pacote permissão+login+exercício COMPLETO (PR-A/B/C/D/D2 mergeados); Compras #35/36/38 abertos (outra sessão)
