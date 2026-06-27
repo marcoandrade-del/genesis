@@ -98,6 +98,8 @@ model Usuario {
   criadoEm                 DateTime                    @default(now())
   atualizadoEm             DateTime                    @updatedAt
   senhaHash                String?
+  iaEngine                 String                      @default("rapida") // "rapida" | "profunda" — memorizada, alterável em tempo real
+  iaMotor                  String                      @default("gemini") // motor da pesquisa profunda (gemini|claude|gpt|sabia)
   adminModulos             AdminModulo[]
   adminSistemas            AdminSistema[]
   acessosEntidade          AcessoEntidade[]
