@@ -330,6 +330,7 @@ export interface DadosRcl {
   deducoes: { codigo: string; rotulo: string; valor: number }[]
   deducoesTotal: number
   rcl: number
+  nota?: string // metodologia aplicada (ex.: "TCE-PR")
 }
 
 /** Demonstrativo da Receita Corrente Líquida (RREO Anexo 3): receitas correntes
@@ -347,6 +348,7 @@ export function montarRcl(dados: DadosRcl): string {
     ESTILO +
     `<div class="dem">` +
     cabecalhoHtml(c, 'RREO Anexo 3 — Demonstrativo da Receita Corrente Líquida') +
+    (dados.nota ? `<div class="dem-sub">Metodologia: ${esc(dados.nota)}</div>` : '') +
     `<h2 class="dem-sec">Receitas Correntes (I)</h2>` +
     `<table class="dem-tab">` +
     `<thead><tr><th>Código</th><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +

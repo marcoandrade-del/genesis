@@ -22,14 +22,37 @@ export type LinhaDeducaoConfig = { rotulo: string; prefixos: string[] }
  * vazios aqui (cada Estado/TCE informa os seus — camada de config futura: UI ou
  * import da planilha de memória de cálculo via IA). Ver [[contabil-rcl-lrf-plano]].
  */
-export type ComposicaoRcl = { deducoes: LinhaDeducaoConfig[] }
+export type ComposicaoRcl = { nome: string; deducoes: LinhaDeducaoConfig[] }
 
 export const COMPOSICAO_STN: ComposicaoRcl = {
+  nome: 'STN (padrão)',
   deducoes: [
     { rotulo: 'Contribuição do Servidor para o Plano de Previdência', prefixos: [] },
     { rotulo: 'Compensação Financeira entre Regimes de Previdência', prefixos: [] },
     { rotulo: 'Dedução de Receita para Formação do FUNDEB', prefixos: [] },
   ],
+}
+
+/**
+ * Composições por Estado (TCE). Deltas sobre a STN, com os prefixos de natureza
+ * que cada TCE usa. PR extraído do RREO Anexo 3 do TCE-PR (memória de cálculo) —
+ * aproximação por código de natureza (os marcadores internos do TCE e a receita
+ * realizada não estão disponíveis aqui). Ver [[contabil-rcl-lrf-plano]].
+ */
+export const COMPOSICAO_POR_ESTADO: Record<string, ComposicaoRcl> = {
+  PR: {
+    nome: 'TCE-PR (aproximação por natureza)',
+    deducoes: [
+      { rotulo: 'Contribuição do Servidor para o Plano de Previdência', prefixos: ['1.2.1.5'] },
+      { rotulo: 'Compensação Financeira entre Regimes de Previdência', prefixos: ['1.3.2.1.04'] },
+      { rotulo: 'Dedução de Receita para Formação do FUNDEB', prefixos: ['1.7.5.1.50', '1.7.1.1.50', '1.7.1.1.53'] },
+    ],
+  },
+}
+
+/** Resolve a composição da RCL pelo Estado (sigla); cai na STN se não houver delta. */
+export function composicaoDoEstado(sigla: string | null | undefined): ComposicaoRcl {
+  return (sigla && COMPOSICAO_POR_ESTADO[sigla]) || COMPOSICAO_STN
 }
 
 /** Rótulos STN das subcategorias da Receita Corrente (categoria 1). */

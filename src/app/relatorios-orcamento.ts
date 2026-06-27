@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { ArrecadacoesService } from '../services/arrecadacoes.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
-import { RclService } from '../services/rcl.js'
+import { RclService, composicaoDoEstado } from '../services/rcl.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -378,7 +378,9 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── RCL (LRF / RREO Anexo 3) — receitas correntes − deduções ────────────────
   async function rcl(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, meta }, r] = await Promise.all([entidadeCtx(entidadeId, ano), rclSvc.calcular(entidadeId, ano)])
+    const { e, meta } = await entidadeCtx(entidadeId, ano)
+    const comp = composicaoDoEstado(e.municipio.estado.sigla)
+    const r = await rclSvc.calcular(entidadeId, ano, comp)
     const num = (d: { toNumber(): number }) => d.toNumber()
     const corpo = r.temOrcamento
       ? montarRcl({
@@ -388,6 +390,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
           deducoes: r.deducoes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: num(l.valor) })),
           deducoesTotal: num(r.deducoesTotal),
           rcl: num(r.rcl),
+          nota: comp.nome,
         })
       : ''
     return { e, ano, temOrcamento: r.temOrcamento, corpo, meta }
