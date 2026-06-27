@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { resumoMock, calcularMock, ptMock, gerarPdfMock } = vi.hoisted(() => ({
+const { resumoMock, calcularMock, ptMock, rclMock, gerarPdfMock } = vi.hoisted(() => ({
   resumoMock: vi.fn(),
   calcularMock: vi.fn(),
   ptMock: vi.fn(),
+  rclMock: vi.fn(),
   gerarPdfMock: vi.fn(),
 }))
 
@@ -23,6 +24,7 @@ vi.mock('../../services/programa-trabalho.js', () => ({
     calcularPor = ptMock
   },
 }))
+vi.mock('../../services/rcl.js', () => ({ RclService: class { calcular = rclMock } }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
@@ -63,6 +65,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
     resumoMock.mockReset()
     calcularMock.mockReset()
     ptMock.mockReset()
+    rclMock.mockReset()
     gerarPdfMock.mockReset()
     ;({ app, prisma } = await criarApp({
       registrar: appRelatoriosOrcamentoRoutes,
@@ -425,6 +428,44 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
       await app.inject({ method: 'GET', url: '/orcamento/relatorios/receita-prevista.pdf' })
       expect(gerarPdfMock.mock.calls[0]![0].footer).not.toContain('Relatório gerado em')
+    })
+  })
+
+  describe('RCL (LRF)', () => {
+    const d = (n: number) => ({ toNumber: () => n })
+    const RCL_OK = {
+      temOrcamento: true,
+      correntes: [{ codigo: '1.1', rotulo: 'Impostos', valor: d(1000) }],
+      correntesTotal: d(1000),
+      deducoes: [],
+      deducoesTotal: d(0),
+      rcl: d(1000),
+    }
+
+    it('renderiza o demonstrativo da RCL', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      rclMock.mockResolvedValue(RCL_OK)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Receita Corrente Líquida')
+      expect(res.body).toContain('Impostos')
+    })
+
+    it('gera o PDF', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      rclMock.mockResolvedValue(RCL_OK)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+    })
+
+    it('redireciona quando não há orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      rclMock.mockResolvedValue({ temOrcamento: false, correntes: [], correntesTotal: d(0), deducoes: [], deducoesTotal: d(0), rcl: d(0) })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/rcl')
     })
   })
 })

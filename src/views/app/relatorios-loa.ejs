@@ -66,6 +66,11 @@
   <% cards([
     { rota: '/app/orcamento/relatorios/sumario', icone: 'bi-list-columns', nome: 'Sumário geral', desc: 'Receita por fontes × despesa por funções' },
   ]) %>
+
+  <div class="loa-grupo mb-2">LRF — Lei de Responsabilidade Fiscal</div>
+  <% cards([
+    { rota: '/app/orcamento/relatorios/rcl', icone: 'bi-percent', nome: 'Receita Corrente Líquida', desc: 'RREO Anexo 3 — base dos limites da LRF' },
+  ]) %>
 </div>
 </body>
 </html>
