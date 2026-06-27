@@ -24,7 +24,12 @@ vi.mock('../../services/programa-trabalho.js', () => ({
     calcularPor = ptMock
   },
 }))
-vi.mock('../../services/rcl.js', () => ({ RclService: class { calcular = rclMock } }))
+vi.mock('../../services/rcl.js', () => ({
+  RclService: class {
+    calcular = rclMock
+  },
+  composicaoDoEstado: (sigla: string) => ({ nome: sigla === 'PR' ? 'TCE-PR (aproximação por natureza)' : 'STN (padrão)', deducoes: [] }),
+}))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'

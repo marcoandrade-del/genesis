@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
-import { RclService } from '../rcl.js'
+import { RclService, composicaoDoEstado, COMPOSICAO_STN } from '../rcl.js'
 
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
@@ -78,5 +78,28 @@ describe('RclService.calcular', () => {
     expect(r.deducoes).toHaveLength(3)
     expect(r.deducoesTotal.toString()).toBe('0')
     expect(r.rcl.toString()).toBe('500')
+  })
+
+  it('composição do PR deduz o FUNDEB recebido (1.7.5.1.50)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.previsaoReceita.findMany.mockResolvedValue([
+      { valorPrevisto: dec(1000), contaReceita: { codigo: '1.1.1.0.00' } },
+      { valorPrevisto: dec(277), contaReceita: { codigo: '1.7.5.1.50.0.1.01' } }, // FUNDEB recebido
+    ])
+    const r = await svc.calcular('ent1', 2026, composicaoDoEstado('PR'))
+    const fundeb = r.deducoes.find((l) => l.rotulo.includes('FUNDEB'))!
+    expect(fundeb.valor.toString()).toBe('277')
+    expect(r.deducoesTotal.toString()).toBe('277')
+    expect(r.rcl.toString()).toBe('1000') // correntes 1277 − FUNDEB 277
+  })
+})
+
+describe('composicaoDoEstado', () => {
+  it('PR retorna a composição do TCE-PR', () => {
+    expect(composicaoDoEstado('PR').nome).toContain('TCE-PR')
+  })
+  it('Estado sem delta (ou nulo) cai na STN', () => {
+    expect(composicaoDoEstado('SP')).toBe(COMPOSICAO_STN)
+    expect(composicaoDoEstado(null)).toBe(COMPOSICAO_STN)
   })
 })
