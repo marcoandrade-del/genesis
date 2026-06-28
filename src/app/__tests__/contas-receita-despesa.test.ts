@@ -21,11 +21,28 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.body).toContain('Previsto') // colunas de saldo da receita
     expect(res.body).toContain('A arrecadar')
     expect(res.body).toContain('Posição em') // seletor de data
+    expect(res.body).toContain('Bimestral') // seletor de desdobramento por período
+    expect(res.body).toContain('Quadrimestral')
     expect(prisma.contaReceitaEntidade.findMany).toHaveBeenCalledWith({
       where: { entidadeId: 'ent1', ano: 2026 },
       orderBy: { codigo: 'asc' },
       select: { id: true, codigo: true, descricao: true, nivel: true, admiteMovimento: true, origem: true, parentId: true },
     })
+  })
+
+  it('receita: ▸ desdobramento mensal por conta quando há arrecadação', async () => {
+    const { app, prisma } = await criarApp({ registrar: appContasReceitaRoutes, comView: true, simularUsuario: { sub: 'u1', email: 'u@x.com' }, simularContexto: CTX })
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaReceitaEntidade.findMany.mockResolvedValue([
+      { id: 'r1', codigo: '1', descricao: 'RECEITAS CORRENTES', nivel: 1, admiteMovimento: false, origem: 'MODELO', parentId: null },
+    ])
+    prisma.arrecadacao.findMany.mockResolvedValue([
+      { contaReceitaEntidadeId: 'r1', data: new Date(Date.UTC(2026, 0, 10)), valor: 123 },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/contas-receita' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('data-mensal=') // os 12 valores embutidos na linha
+    expect(res.body).toContain('mensal-toggle') // o botão ▸
   })
 
   it('despesa: lista do contexto e consulta o model de despesa', async () => {

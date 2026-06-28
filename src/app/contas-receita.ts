@@ -29,5 +29,8 @@ export async function appContasReceitaRoutes(app: FastifyInstance) {
       { chave: 'saldo', rotulo: 'A arrecadar' },
     ],
     saldoMapa: (entidadeId, ano, dataRef) => saldoReceita.porConta(entidadeId, ano, dataRef),
+    // Desdobramento mensal por conta (arrecadado/mês) — visão geral + conferência.
+    mensalMapa: (entidadeId, ano) => saldoReceita.arrecadadoMensal(entidadeId, ano),
+    mensalRotulo: 'Arrecadado/mês',
   })
 }

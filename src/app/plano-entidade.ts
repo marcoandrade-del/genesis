@@ -42,6 +42,11 @@ export type ConfigPlano = {
    *  na posição da data de referência. Renderiza colunas simples (sem natureza). */
   saldoColunas?: { chave: string; rotulo: string }[]
   saldoMapa?: (entidadeId: string, ano: number, dataRef: Date) => Promise<Map<string, Record<string, number>>>
+  /** Desdobramento mensal por conta: 12 valores (jan→dez) já com roll-up na árvore.
+   *  A tela mostra um "▸" por conta que abre as células por período (mensal/bimestral/
+   *  quadrimestral, reagrupadas no cliente). `mensalRotulo` rotula a métrica. */
+  mensalMapa?: (entidadeId: string, ano: number) => Promise<Map<string, number[]>>
+  mensalRotulo?: string
 }
 
 type RenderOpts = {
@@ -117,12 +122,14 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     const dataRef = dataRefDe(req)
     const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
     const saldoGenMap = cfg.saldoMapa ? await cfg.saldoMapa(entidadeId, ano, dataRef) : null
+    const mensalMap = cfg.mensalMapa ? await cfg.mensalMapa(entidadeId, ano) : null
 
     const linhas = contasVisiveis.map((c) => {
       const s = saldos?.get(c.id)
       return {
         ...c,
         saldoGen: saldoGenMap?.get(c.id) ?? null,
+        mensal: mensalMap?.get(c.id) ?? null,
         temFilhos: idsPais.has(c.id),
         // Redutora/retificadora do PCASP: marcada com "(-)" no título (subtrai do grupo).
         redutora: c.descricao.trim().startsWith('(-)'),
@@ -158,6 +165,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       podeEscrever: podeEscrever(nivel),
       comSaldos: !!cfg.saldos,
       saldoColunas: cfg.saldoColunas ?? null,
+      mensalRotulo: cfg.mensalRotulo ?? null,
       dataRef: isoData(dataRef),
       desdobrar: opts.desdobrar ?? null,
       sugestao: opts.sugestao ?? '',
