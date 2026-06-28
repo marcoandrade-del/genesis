@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { definirModeloMock } = vi.hoisted(() => ({
+const { definirModeloMock, proporMock, lerXlsxMock } = vi.hoisted(() => ({
   definirModeloMock: vi.fn(),
+  proporMock: vi.fn(),
+  lerXlsxMock: vi.fn(),
 }))
 
 vi.mock('../../services/estados.js', () => ({
@@ -9,9 +11,12 @@ vi.mock('../../services/estados.js', () => ({
     definirModelo = definirModeloMock
   },
 }))
+vi.mock('../../services/rcl-import-ia.js', () => ({ RclImportIaService: class { proporComposicao = proporMock } }))
+vi.mock('../../services/rcl-xlsx.js', () => ({ lerXlsxBase64: lerXlsxMock }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
 import { adminEstadosRoutes } from '../estados.js'
+import { ErroNegocio } from '../../errors.js'
 import type { FastifyInstance } from 'fastify'
 import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
 
@@ -172,6 +177,41 @@ describe('adminEstadosRoutes', () => {
       })
       expect(res.statusCode).toBe(200)
       expect(res.body).toContain('Erro ao atualizar')
+    })
+  })
+
+  describe('POST /:id/rcl-import (IA)', () => {
+    beforeEach(() => {
+      proporMock.mockReset()
+      lerXlsxMock.mockReset().mockResolvedValue('grade de texto da planilha')
+    })
+
+    it('re-renderiza o form com a composição proposta pela IA (revisão)', async () => {
+      prisma.estado.findUnique.mockResolvedValue(ESTADO)
+      prisma.modeloContabil.findMany.mockResolvedValue([])
+      proporMock.mockResolvedValue({ nome: 'TCE-PR', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7.5.1.50'] }] })
+      const res = await app.inject({ method: 'POST', url: '/e1/rcl-import', ...form({ planilhaBase64: 'QQ==' }) })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Proposta da IA')
+      expect(res.body).toContain('TCE-PR')
+      expect(res.body).toContain('FUNDEB')
+      expect(lerXlsxMock).toHaveBeenCalled()
+      expect(proporMock).toHaveBeenCalledWith('admin1', 'grade de texto da planilha')
+    })
+
+    it('motor sem chave → form com aviso (não quebra)', async () => {
+      prisma.estado.findUnique.mockResolvedValue(ESTADO)
+      prisma.modeloContabil.findMany.mockResolvedValue([])
+      proporMock.mockRejectedValue(new ErroNegocio('IA_NAO_CONFIGURADA', 'IA por Google · Gemini 2.5 Pro não configurada — defina GEMINI_API_KEY no .env.'))
+      const res = await app.inject({ method: 'POST', url: '/e1/rcl-import', ...form({ planilhaBase64: 'QQ==' }) })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('não configurada')
+    })
+
+    it('estado inexistente → 404', async () => {
+      prisma.estado.findUnique.mockResolvedValue(null)
+      const res = await app.inject({ method: 'POST', url: '/e9/rcl-import', ...form({ planilhaBase64: 'QQ==' }) })
+      expect(res.statusCode).toBe(404)
     })
   })
 })

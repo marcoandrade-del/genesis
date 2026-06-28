@@ -59,15 +59,18 @@
     </div>
 
     <hr class="my-3">
-    <div class="mb-1">
-      <label class="form-label small fw-semibold">Deduções da RCL (LRF) — por Estado</label>
-      <div class="form-text mb-2">Vazio = usa o padrão do sistema (STN/PR). Cada linha: rótulo + prefixos de natureza de receita (separados por vírgula).</div>
-      <input type="text" id="rcl-nome" class="form-control form-control-sm mb-2" placeholder="Nome da metodologia (ex.: TCE-PR)"
-        value="<%= estado.rclComposicao && estado.rclComposicao.nome ? estado.rclComposicao.nome : '' %>" oninput="rclSync()">
-      <div id="rcl-rows"></div>
-      <button type="button" class="btn btn-sm btn-outline-secondary mt-1" onclick="rclAddRow()"><i class="bi bi-plus-lg me-1"></i>Dedução</button>
-      <input type="hidden" name="rclComposicao" id="rcl-json">
+    <% if (typeof avisoIa !== 'undefined' && avisoIa) { %>
+      <div class="alert alert-info py-2 small"><i class="bi bi-robot me-1"></i><%= avisoIa %> Confira as deduções e clique em <strong>Aplicar</strong> para salvar.</div>
+    <% } %>
+    <div class="mb-2">
+      <input type="file" id="rcl-xlsx-file" accept=".xlsx" class="d-none" onchange="rclImportarIa(this)">
+      <button type="button" class="btn btn-sm btn-outline-primary" onclick="document.getElementById('rcl-xlsx-file').click()">
+        <i class="bi bi-robot me-1"></i>Importar por IA (planilha do TCE)
+      </button>
+      <span id="rcl-import-status" class="small text-muted ms-2"></span>
     </div>
+    <% const rclInicial = (typeof propostaRcl !== 'undefined' && propostaRcl) ? propostaRcl : estado.rclComposicao %>
+    <%- include('_rcl-editor', { rclInicial }) %>
   </div>
 
   <div class="modal-footer">
@@ -80,30 +83,17 @@
 </form>
 
 <script>
-// Editor das deduções da RCL: linhas (rótulo + prefixos) → JSON no hidden #rcl-json.
-var rclInit = <%- JSON.stringify((estado.rclComposicao && estado.rclComposicao.deducoes) || []) %>;
-function rclSync() {
-  var rows = document.querySelectorAll('#rcl-rows .rcl-row')
-  var deducoes = []
-  rows.forEach(function (r) {
-    var rot = r.querySelector('.rcl-rot').value.trim()
-    var pref = r.querySelector('.rcl-pref').value.split(',').map(function (s) { return s.trim() }).filter(Boolean)
-    if (rot) deducoes.push({ rotulo: rot, prefixos: pref })
-  })
-  var nome = document.getElementById('rcl-nome').value.trim()
-  document.getElementById('rcl-json').value = deducoes.length ? JSON.stringify({ nome: nome, deducoes: deducoes }) : ''
+// Importar por IA: lê o xlsx no browser (FileReader → base64) e pede a proposta;
+// o backend re-renderiza ESTE form com a composição proposta no editor (revisão).
+function rclImportarIa(input) {
+  var f = input.files[0]; if (!f) return
+  var st = document.getElementById('rcl-import-status'); if (st) st.textContent = 'Lendo planilha e consultando a IA…'
+  var reader = new FileReader()
+  reader.onload = function () {
+    var b64 = String(reader.result).split(',')[1] || ''
+    htmx.ajax('POST', '/admin/estados/<%= estado.id %>/rcl-import', { target: '#modal-body', swap: 'innerHTML', values: { planilhaBase64: b64 } })
+  }
+  reader.readAsDataURL(f)
+  input.value = ''
 }
-function rclAddRow(rotulo, prefixos) {
-  var div = document.createElement('div')
-  div.className = 'rcl-row input-group input-group-sm mb-1'
-  var rot = document.createElement('input'); rot.className = 'form-control rcl-rot'; rot.placeholder = 'rótulo da dedução'; rot.value = rotulo || ''
-  var pre = document.createElement('input'); pre.className = 'form-control rcl-pref'; pre.placeholder = 'prefixos (ex.: 1.7.5.1.50)'; pre.value = prefixos || ''
-  var del = document.createElement('button'); del.type = 'button'; del.className = 'btn btn-outline-danger'; del.textContent = '×'
-  del.onclick = function () { div.remove(); rclSync() }
-  rot.oninput = rclSync; pre.oninput = rclSync
-  div.appendChild(rot); div.appendChild(pre); div.appendChild(del)
-  document.getElementById('rcl-rows').appendChild(div)
-}
-rclInit.forEach(function (d) { rclAddRow(d.rotulo, (d.prefixos || []).join(', ')) })
-rclSync()
 </script>
