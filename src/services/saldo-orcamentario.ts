@@ -197,4 +197,46 @@ export class SaldoOrcamentarioService {
       porConta,
     }
   }
+
+  /**
+   * Empenhado por conta e por MÊS (jan→dez = índices 0..11), com roll-up na árvore.
+   * Lê o ledger `MovimentoEmpenho` (EMPENHO − ESTORNO_EMPENHO) via
+   * empenho→dotação→conta. Read-only. Usado no desdobramento mensal da tela do
+   * plano de despesa (a soma dos 12 meses reconcilia com o empenhado da conta).
+   */
+  async empenhadoMensal(entidadeId: string, ano: number): Promise<Map<string, number[]>> {
+    const mapa = new Map<string, number[]>()
+    const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
+    if (!orcamento) return mapa
+
+    const [dotacoes, contas, movs] = await Promise.all([
+      this.prisma.dotacaoDespesa.findMany({ where: { orcamentoId: orcamento.id }, select: { id: true, contaDespesaEntidadeId: true } }),
+      this.prisma.contaDespesaEntidade.findMany({ where: { entidadeId, ano }, select: { id: true, parentId: true } }),
+      this.prisma.movimentoEmpenho.findMany({
+        where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: new Date(Date.UTC(ano, 11, 31)) }, tipo: { in: ['EMPENHO', 'ESTORNO_EMPENHO'] } },
+        select: { data: true, tipo: true, valor: true, empenho: { select: { dotacaoDespesaId: true } } },
+      }),
+    ])
+    const contaDeDotacao = new Map(dotacoes.map((d) => [d.id, d.contaDespesaEntidadeId]))
+    const parent = new Map(contas.map((c) => [c.id, c.parentId]))
+
+    const acumular = (contaId: string, mes: number, v: number) => {
+      let id: string | null = contaId
+      const visitados = new Set<string>()
+      while (id && !visitados.has(id)) {
+        visitados.add(id)
+        const meses = mapa.get(id) ?? new Array<number>(12).fill(0)
+        meses[mes] = (meses[mes] ?? 0) + v
+        mapa.set(id, meses)
+        id = parent.get(id) ?? null
+      }
+    }
+    for (const mv of movs) {
+      const contaId = mv.empenho.dotacaoDespesaId ? contaDeDotacao.get(mv.empenho.dotacaoDespesaId) : undefined
+      if (!contaId) continue
+      acumular(contaId, mv.data.getUTCMonth(), (mv.tipo === 'EMPENHO' ? 1 : -1) * Number(mv.valor))
+    }
+    for (const meses of mapa.values()) for (let i = 0; i < 12; i++) meses[i] = r2(meses[i] ?? 0)
+    return mapa
+  }
 }
