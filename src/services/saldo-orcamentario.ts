@@ -45,7 +45,13 @@ const ZERO = { autorizado: 0, reservado: 0, empenhado: 0 }
 export class SaldoOrcamentarioService {
   constructor(private prisma: PrismaClient) {}
 
-  async calcular(entidadeId: string, ano: number): Promise<SaldoOrcamentario> {
+  /**
+   * @param dataRef quando informado, o empenhado é a posição ATÉ a data (somado
+   *   do ledger `MovimentoEmpenho`, EMPENHO − ESTORNO_EMPENHO); senão usa o saldo
+   *   materializado (posição atual). Reservas (pré-empenho) não têm ledger datado
+   *   → em data passada o reservado é 0.
+   */
+  async calcular(entidadeId: string, ano: number, dataRef?: Date): Promise<SaldoOrcamentario> {
     const vazio: SaldoOrcamentario = {
       temOrcamento: false,
       resumo: { autorizado: 0, reservado: 0, empenhado: 0, disponivel: 0 },
@@ -62,6 +68,22 @@ export class SaldoOrcamentarioService {
       where: { orcamentoId: orcamento.id },
       include: { unidadeOrcamentaria: true, funcao: true, contaDespesa: true, fonteRecurso: true },
     })
+
+    // Posição "até a data": empenhado por dotação somado do ledger datado.
+    let empAteData: Map<string, number> | null = null
+    if (dataRef) {
+      const movs = await this.prisma.movimentoEmpenho.findMany({
+        where: { entidadeId, data: { lte: dataRef }, tipo: { in: ['EMPENHO', 'ESTORNO_EMPENHO'] } },
+        select: { valor: true, tipo: true, empenho: { select: { dotacaoDespesaId: true } } },
+      })
+      empAteData = new Map()
+      for (const mv of movs) {
+        const did = mv.empenho.dotacaoDespesaId
+        if (!did) continue
+        const sinal = mv.tipo === 'EMPENHO' ? 1 : -1
+        empAteData.set(did, (empAteData.get(did) ?? 0) + sinal * Number(mv.valor))
+      }
+    }
 
     // Resumo geral + agrupamentos planos.
     let aut = 0
@@ -97,8 +119,8 @@ export class SaldoOrcamentarioService {
 
     for (const d of dotacoes) {
       const a = Number(d.valorAutorizado)
-      const rr = Number(d.valorReservado)
-      const e = Number(d.valorEmpenhado)
+      const rr = empAteData ? 0 : Number(d.valorReservado)
+      const e = empAteData ? (empAteData.get(d.id) ?? 0) : Number(d.valorEmpenhado)
       aut += a
       res += rr
       emp += e

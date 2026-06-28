@@ -93,4 +93,21 @@ describe('SaldoOrcamentarioService.calcular', () => {
     expect(r.porConta.map((l) => l.codigo)).toEqual(['3', '3.1', '3.1.90', '3.3', '3.3.90'])
     expect(por('3.1.90').nivel).toBe(3)
   })
+
+  it('com dataRef: empenhado vem do ledger até a data; reservado 0', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      dot({ id: 'd1', contaDespesaEntidadeId: 'c3', valorAutorizado: '1000', valorReservado: '100', valorEmpenhado: '200' }),
+    ])
+    prisma.contaDespesaEntidade.findMany.mockResolvedValue(CONTAS)
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { valor: '120', tipo: 'EMPENHO', empenho: { dotacaoDespesaId: 'd1' } },
+      { valor: '20', tipo: 'ESTORNO_EMPENHO', empenho: { dotacaoDespesaId: 'd1' } },
+      { valor: '99', tipo: 'EMPENHO', empenho: { dotacaoDespesaId: null } }, // sem dotação → ignorado
+    ])
+    const r = await service.calcular('ent1', 2026, new Date('2026-03-31T00:00:00'))
+    // empenhado até a data = 120 − 20 = 100 (não os 200 materializados); reservado 0
+    expect(r.resumo).toEqual({ autorizado: 1000, reservado: 0, empenhado: 100, disponivel: 900 })
+    expect(prisma.movimentoEmpenho.findMany).toHaveBeenCalled()
+  })
 })

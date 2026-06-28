@@ -23,6 +23,7 @@
   <div class="d-flex justify-content-between align-items-center mb-1">
     <h2 class="h4 fw-bold mb-0">Saldo Orçamentário — Despesa <span class="font-monospace fs-6 text-muted"><%= ano %></span></h2>
     <div class="d-flex align-items-center gap-2">
+      <%- include('_seletor-posicao', { base: '/app/orcamento/saldo', dataRef, ano }) %>
       <a href="/app/orcamento/despesa/diario" class="btn btn-sm btn-outline-secondary"><i class="bi bi-graph-up-arrow me-1"></i>Acumulado diário</a>
       <%- include('_seletor-granularidade') %>
       <span class="badge bg-secondary bg-opacity-10 text-secondary"><i class="bi bi-eye me-1"></i>Somente leitura</span>
@@ -30,6 +31,7 @@
   </div>
   <p class="text-muted small mb-4">
     Disponível = Autorizado − Reservado − Empenhado · <strong><%= entidade.nome %></strong>, exercício <strong><%= ano %></strong>.
+    <% if (posicaoData) { %><span class="badge bg-info bg-opacity-10 text-info ms-1">posição em <%= dataRef.split('-').reverse().join('/') %></span> <span class="text-muted">(empenhado até a data; reservas não entram em data passada)</span><% } %>
   </p>
 
   <% if (!saldo.temOrcamento) { %>
