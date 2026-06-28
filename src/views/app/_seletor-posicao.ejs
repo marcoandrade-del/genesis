@@ -1,0 +1,17 @@
+<%# Seletor de posição: data (qualquer dia do exercício) + atalho de fim de mês.
+    Params: base (action GET), dataRef (YYYY-MM-DD), ano. Recalcula o saldo "até a data". %>
+<form method="get" action="<%= base %>" class="d-flex align-items-center gap-1">
+  <label class="form-label small mb-0 text-muted">Posição em</label>
+  <input type="date" id="pos-data" name="data" value="<%= dataRef %>" min="<%= ano %>-01-01" max="<%= ano %>-12-31"
+    class="form-control form-control-sm" style="width:auto" onchange="this.form.submit()">
+  <select class="form-select form-select-sm" style="width:auto" title="Ir para o fim de um mês"
+    onchange="if(this.value){var i=document.getElementById('pos-data');i.value=this.value;i.form.submit()}">
+    <option value="">fim de mês…</option>
+    <% const M = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+       for (let m = 1; m <= 12; m++) {
+         const ld = new Date(Date.UTC(ano, m, 0)).getUTCDate();
+         const val = ano + '-' + String(m).padStart(2, '0') + '-' + String(ld).padStart(2, '0'); %>
+      <option value="<%= val %>"><%= M[m - 1] %></option>
+    <% } %>
+  </select>
+</form>
