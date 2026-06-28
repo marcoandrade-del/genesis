@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { resumoMock, calcularMock, ptMock, rclMock, rclConsMock, gerarPdfMock } = vi.hoisted(() => ({
+const { resumoMock, calcularMock, ptMock, rclMock, rclConsMock, guardiaoMock, gerarPdfMock } = vi.hoisted(() => ({
   resumoMock: vi.fn(),
   calcularMock: vi.fn(),
   ptMock: vi.fn(),
   rclMock: vi.fn(),
   rclConsMock: vi.fn(),
+  guardiaoMock: vi.fn(),
   gerarPdfMock: vi.fn(),
 }))
 
@@ -32,6 +33,7 @@ vi.mock('../../services/rcl.js', () => ({
   resolverComposicao: (sigla: string) => ({ nome: sigla === 'PR' ? 'TCE-PR (aproximação por natureza)' : 'STN (padrão)', deducoes: [] }),
 }))
 vi.mock('../../services/rcl-consolidada.js', () => ({ RclConsolidadaService: class { calcular = rclConsMock } }))
+vi.mock('../../services/memorial-guardiao.js', () => ({ MemorialGuardiaoService: class { guardiao = guardiaoMock } }))
 vi.mock('../../services/relatorio-pdf.js', () => ({ gerarPdf: gerarPdfMock }))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
@@ -74,6 +76,7 @@ describe('appRelatoriosOrcamentoRoutes', () => {
     ptMock.mockReset()
     rclMock.mockReset()
     rclConsMock.mockReset()
+    guardiaoMock.mockReset()
     gerarPdfMock.mockReset()
     ;({ app, prisma } = await criarApp({
       registrar: appRelatoriosOrcamentoRoutes,
@@ -525,6 +528,42 @@ describe('appRelatoriosOrcamentoRoutes', () => {
       const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/rcl-consolidada.pdf' })
       expect(res.statusCode).toBe(302)
       expect(res.headers.location).toBe('/app/orcamento/relatorios/rcl-consolidada')
+    })
+  })
+
+  describe('Guardião LRF', () => {
+    const GUARDIAO = {
+      temOrcamento: true,
+      metodologia: 'TCE-PR (aproximação por natureza)',
+      indicadores: [
+        { indicador: 'Despesa com Pessoal', unidade: '% da RCL', valor: 1148, base: 2604, percentual: 44.1, limite: 54, nivel: 'ok', memorial: { descricao: 'pessoal ÷ rcl', baseLegal: 'LRF', linhas: [] } },
+      ],
+    }
+
+    it('renderiza o Guardião com os indicadores', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      guardiaoMock.mockResolvedValue(GUARDIAO)
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/guardiao' })
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toContain('Guardião LRF')
+      expect(res.body).toContain('Despesa com Pessoal')
+    })
+
+    it('gera o PDF do Guardião', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      guardiaoMock.mockResolvedValue(GUARDIAO)
+      gerarPdfMock.mockResolvedValue(Buffer.from('%PDF'))
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/guardiao.pdf' })
+      expect(res.statusCode).toBe(200)
+      expect(res.headers['content-type']).toContain('application/pdf')
+    })
+
+    it('redireciona quando não há orçamento (.pdf)', async () => {
+      prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+      guardiaoMock.mockResolvedValue({ temOrcamento: false, metodologia: '', indicadores: [] })
+      const res = await app.inject({ method: 'GET', url: '/orcamento/relatorios/guardiao.pdf' })
+      expect(res.statusCode).toBe(302)
+      expect(res.headers.location).toBe('/app/orcamento/relatorios/guardiao')
     })
   })
 })

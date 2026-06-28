@@ -370,6 +370,54 @@ export function montarRcl(dados: DadosRcl): string {
   )
 }
 
+export interface DadosGuardiao {
+  cabecalho: CabecalhoDemonstrativo
+  metodologia: string
+  indicadores: {
+    indicador: string
+    unidade: string
+    valor: number
+    base: number
+    percentual: number
+    limite: number | null
+    nivel: string
+    memorial: { descricao: string; baseLegal: string }
+  }[]
+}
+
+const NIVEL_TXT: Record<string, string> = {
+  ok: 'Dentro do limite',
+  alerta: 'Alerta do TCE',
+  prudencial: 'Limite prudencial',
+  estouro: 'Acima do limite',
+}
+
+/** Demonstrativo do Guardião LRF: os indicadores fiscais (RCL, Pessoal, aplicação
+ *  por função) calculados no Gênesis, com %, limite, situação e memória de cálculo. */
+export function montarGuardiao(dados: DadosGuardiao): string {
+  const { cabecalho: c, indicadores } = dados
+  const pct = (v: number) => v.toFixed(1).replace('.', ',') + '%'
+  const linha = (i: DadosGuardiao['indicadores'][number]) =>
+    `<tr><td>${esc(i.indicador)}</td><td class="num">${formatarReais(i.valor)}</td><td class="num">${formatarReais(i.base)}</td><td class="num">${pct(i.percentual)}</td><td class="num">${i.limite != null ? pct(i.limite) : '—'}</td><td>${i.limite != null ? (NIVEL_TXT[i.nivel] ?? i.nivel) : 'informativo'}</td></tr>`
+  const memoriais = indicadores
+    .map((i) => `<div class="dem-sub" style="margin:4px 0"><strong>${esc(i.indicador)}:</strong> ${esc(i.memorial.descricao)} <em>(${esc(i.memorial.baseLegal)})</em></div>`)
+    .join('')
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Guardião LRF — Indicadores Fiscais') +
+    `<div class="dem-sub">Metodologia: ${esc(dados.metodologia)} · cálculo único no Gênesis</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Indicador</th><th class="num">Valor (R$)</th><th class="num">Base (R$)</th><th class="num">%</th><th class="num">Limite</th><th>Situação</th></tr></thead>` +
+    `<tbody>${indicadores.map(linha).join('')}</tbody>` +
+    `</table>` +
+    `<h2 class="dem-sec">Memórias de cálculo</h2>` +
+    memoriais +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 export interface DadosRclConsolidada {
   cabecalho: CabecalhoDemonstrativo
   entidades: { nome: string; correntes: number; deducoes: number; rcl: number }[]

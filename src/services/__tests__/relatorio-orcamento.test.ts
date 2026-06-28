@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -262,6 +262,25 @@ describe('montarRclConsolidada', () => {
     expect(html).toContain('TOTAL DO MUNICÍPIO')
     expect(html).toContain('RECEITA CORRENTE LÍQUIDA CONSOLIDADA')
     expect(html).toContain('duplicidades')
+  })
+})
+
+describe('montarGuardiao', () => {
+  it('renderiza indicadores com situação, limite e memórias', () => {
+    const html = montarGuardiao({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      metodologia: 'TCE-PR',
+      indicadores: [
+        { indicador: 'Despesa com Pessoal', unidade: '% da RCL', valor: 1148, base: 2604, percentual: 44.1, limite: 54, nivel: 'ok', memorial: { descricao: 'pessoal ÷ rcl', baseLegal: 'LRF 19-20' } },
+        { indicador: 'Aplicação em Educação', unidade: '% da despesa', valor: 657, base: 2848, percentual: 23.1, limite: null, nivel: 'ok', memorial: { descricao: 'função 12', baseLegal: 'CF 212' } },
+      ],
+    })
+    expect(html).toContain('Guardião LRF')
+    expect(html).toContain('Despesa com Pessoal')
+    expect(html).toContain('Dentro do limite') // nível ok com limite
+    expect(html).toContain('informativo') // educação sem limite
+    expect(html).toContain('44,1%')
+    expect(html).toContain('Memórias de cálculo')
   })
 })
 
