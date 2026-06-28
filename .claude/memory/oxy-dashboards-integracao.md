@@ -34,3 +34,13 @@ Decisão do Marco: **tudo calculado no Gênesis**, o Oxy **só exibe** (inputs +
 - **Regra de versão (os dois honram SemVer):** mudou cálculo/forma no Gênesis ⇒ bump da versão. Quebra (campo removido/renomeado/semântica) = **MAJOR** → Oxy detecta e pede atualização. Adição compatível = MINOR (Oxy segue). 
 - ⚠️ **oxy-ia-backend NÃO é repo git** (editei direto, typecheck limpo, e2e verificado). Falta: o **front (oxy-dashboards)** chamar `/api/memoriais/*` pra exibir; e por chaves no `.env` dos dois lados (`GENESIS_API_TOKEN` igual).
 - Verificado e2e (2026-06-27): compatível→RCL 2.604.051.913; MAJOR divergente→409; token errado→502.
+
+## Topologia REAL dos repos Oxy (apurada 2026-06-27) + fatia 1 da integração
+**Canônico = `oxy-repo`** (git, branch `main`, origin marcoandrade-del/oxy-repo): monorepo com `backend/oxy-bi-jpa` (**Spring Boot 3, Java 17, :8080**, Flyway, OpenAPI-first, testes JUnit/AssertJ/Mockito) + `frontend/` (mockups HTML) + specs/docs. O pacote **`fiscal/`** já tinha o **Guardião LRF**: porta `MotorApuracaoFiscal` (resolvida via `ObjectProvider`), `ApuracaoIndicador` (com `MemorialCalculo` + `RegraVersao`), `SampleMotorApuracaoFiscal` (@Profile dev).
+- **`oxy-dashboards`** (git separado, React/Vite) = front; fala com :8080 (= oxy-bi-jpa).
+- **`oxy-ia-backend`** (Express/Node :4000, **não-git**) = **protótipo DEPRECADO**; o front não usa. Reverti as edições que fiz lá por engano.
+- **Build Java:** `export JAVA_HOME=$(ls -d ~/.sdkman/candidates/java/current); export PATH="$JAVA_HOME/bin:~/.sdkman/candidates/maven/current/bin:$PATH"`; `mvn -o test` (offline, deps em cache). Não há `mvn` no PATH por padrão.
+
+**Fatia 1 (PR #5 oxy-repo, mergeada):** `GenesisMotorApuracaoFiscal` (fiscal/) implementa a porta consumindo `/api/memoriais/rcl` do Gênesis (token), mapeia a RCL pronta → `ApuracaoIndicador` + `MemorialCalculo` + `RegraVersao`. **Segurança de versão**: confere MAJOR do `contrato.versao`; incompatível ⇒ recusa. `@Primary` + `@ConditionalOnProperty(genesis.api.token)` (liga com env `GENESIS_API_TOKEN`; senão Sample no dev). Config em application.yml (genesis.api.url/contrato-major, genesis.entidade-id). 3 testes verdes.
+- **Rodar a integração real:** subir o Gênesis com `GENESIS_API_TOKEN`; subir o oxy-bi-jpa com `GENESIS_API_TOKEN` (mesmo valor) + `GENESIS_ENTIDADE_ID` (UUID da entidade) → Guardião mostra a RCL calculada no Gênesis.
+- **Próximo:** indicadores Pessoal/MDE 25%/Saúde 15%/Fundeb exigem **novos memoriais no lado Gênesis** (hoje só RCL); depois o front (oxy-dashboards/mockup) exibir. A consistência é garantida porque o cálculo é único (Gênesis).
