@@ -34,10 +34,7 @@
     <h2 class="h4 fw-bold mb-0"><%= titulo %> — <span class="font-monospace"><%= ano %></span></h2>
     <div class="d-flex align-items-center gap-2">
       <% if (comSaldos) { %>
-        <form method="get" action="<%= base %>" class="d-flex align-items-center gap-1">
-          <label class="form-label small mb-0 text-muted">Saldo em</label>
-          <input type="date" name="data" value="<%= dataRef %>" class="form-control form-control-sm" style="width:auto" onchange="this.form.submit()">
-        </form>
+        <%- include('_seletor-posicao', { base, dataRef, ano }) %>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('tbl').classList.toggle('ocultar-detalhe')" title="Mostrar/ocultar detalhes">
           <i class="bi bi-arrows-collapse"></i>
         </button>

@@ -81,6 +81,24 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('Devedora')
     // DEVEDORA: 100 + (50 − 20) = 130
     expect(res.body).toMatch(/130,00/)
+    // Seletor de posição: data + atalho de fim de mês
+    expect(res.body).toContain('Posição em')
+    expect(res.body).toContain('fim de mês')
+  })
+
+  it('saldo respeita ?data= (posição numa data anterior)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', codigo: '1.1.1', descricao: 'Caixa', nivel: 3, admiteMovimento: true, origem: 'MODELO', parentId: null, modeloContaId: 'm1' },
+    ])
+    prisma.conta.findMany.mockResolvedValue([{ id: 'm1', naturezaSaldo: 'DEVEDORA' }])
+    prisma.saldoInicialAno.findMany.mockResolvedValue([])
+    prisma.lancamentoItem.groupBy.mockResolvedValue([])
+    await app.inject({ method: 'GET', url: '/contas?data=2026-03-15' })
+    // o filtro de data chega ao service: lançamentos até a data de referência (lte)
+    const arg = prisma.lancamentoItem.groupBy.mock.calls.at(-1)?.[0] as { where: { lancamento: { data: { lte: Date } } } }
+    expect(arg.where.lancamento.data.lte).toBeInstanceOf(Date)
+    expect(arg.where.lancamento.data.lte.toISOString()).toContain('2026-03')
   })
 
   it('GET ?desdobrar abre o form de uma conta analítica do escopo', async () => {
