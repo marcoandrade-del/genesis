@@ -4,6 +4,7 @@ import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/programa-trabalho.js'
 import { RclService, resolverComposicao } from '../services/rcl.js'
 import { RclConsolidadaService } from '../services/rcl-consolidada.js'
+import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -11,6 +12,7 @@ import {
   montarSumarioGeral,
   montarRcl,
   montarRclConsolidada,
+  montarGuardiao,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -39,6 +41,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const ptSvc = new ProgramaTrabalhoService(app.prisma)
   const rclSvc = new RclService(app.prisma)
   const rclConsSvc = new RclConsolidadaService(app.prisma)
+  const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -483,6 +486,61 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="rcl-consolidada-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Guardião LRF — indicadores fiscais (RCL, Pessoal, aplicação por função) ──
+  async function guardiao(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, g] = await Promise.all([entidadeCtx(entidadeId, ano), guardiaoSvc.guardiao(entidadeId, ano)])
+    const temOrcamento = !!g?.temOrcamento && g.indicadores.length > 0
+    const corpo = temOrcamento
+      ? montarGuardiao({
+          cabecalho: cab(e, ano, meta),
+          metodologia: g!.metodologia,
+          indicadores: g!.indicadores.map((i) => ({
+            indicador: i.indicador,
+            unidade: i.unidade,
+            valor: i.valor,
+            base: i.base,
+            percentual: i.percentual,
+            limite: i.limite,
+            nivel: i.nivel,
+            memorial: { descricao: i.memorial.descricao, baseLegal: i.memorial.baseLegal },
+          })),
+        })
+      : ''
+    return { e, ano, temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/guardiao', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await guardiao(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Guardião LRF',
+      breadcrumb: 'Guardião LRF',
+      pdfUrl: '/app/orcamento/relatorios/guardiao.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/guardiao.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await guardiao(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/guardiao')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Guardião LRF ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Guardião LRF', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="guardiao-lrf-${ano}.pdf"`)
       .send(pdf)
   })
 }
