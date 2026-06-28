@@ -7,7 +7,7 @@ const ENTIDADE = { id: 'ent1', nome: 'Prefeitura', municipio: { nome: 'Maringá'
 const CTX = { entidadeId: 'ent1', ano: 2026, nivel: 'ESCRITA' as const }
 
 describe('planos de receita e despesa no /app (factory compartilhada)', () => {
-  it('receita: lista do contexto (sem coluna de saldo)', async () => {
+  it('receita: lista do contexto com saldo (previsto × arrecadado) + seletor de data', async () => {
     const { app, prisma } = await criarApp({ registrar: appContasReceitaRoutes, comView: true, simularUsuario: { sub: 'u1', email: 'u@x.com' }, simularContexto: CTX })
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     prisma.contaReceitaEntidade.findMany.mockResolvedValue([
@@ -17,7 +17,10 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Plano de Receita')
     expect(res.body).toContain('RECEITAS CORRENTES')
-    expect(res.body).not.toContain('Saldo atual') // receita não tem saldos
+    expect(res.body).not.toContain('Saldo atual') // não é o saldo contábil (natureza)
+    expect(res.body).toContain('Previsto') // colunas de saldo da receita
+    expect(res.body).toContain('A arrecadar')
+    expect(res.body).toContain('Posição em') // seletor de data
     expect(prisma.contaReceitaEntidade.findMany).toHaveBeenCalledWith({
       where: { entidadeId: 'ent1', ano: 2026 },
       orderBy: { codigo: 'asc' },
@@ -35,6 +38,9 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Plano de Despesa')
     expect(res.body).toContain('DESPESAS CORRENTES')
+    expect(res.body).toContain('Autorizado') // colunas de saldo da despesa
+    expect(res.body).toContain('Disponível')
+    expect(res.body).toContain('Posição em') // seletor de data
     expect(prisma.contaDespesaEntidade.findMany).toHaveBeenCalledWith({
       where: { entidadeId: 'ent1', ano: 2026 },
       orderBy: { codigo: 'asc' },

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { ContasReceitaEntidadeService } from '../services/contas-receita-entidade.js'
+import { SaldoReceitaService } from '../services/saldo-receita.js'
 import { registrarRotasPlano } from './plano-entidade.js'
 
 /**
@@ -9,6 +10,7 @@ import { registrarRotasPlano } from './plano-entidade.js'
  */
 export async function appContasReceitaRoutes(app: FastifyInstance) {
   const servico = new ContasReceitaEntidadeService(app.prisma)
+  const saldoReceita = new SaldoReceitaService(app.prisma)
   registrarRotasPlano(app, {
     rota: '/contas-receita',
     titulo: 'Plano de Receita',
@@ -20,5 +22,12 @@ export async function appContasReceitaRoutes(app: FastifyInstance) {
         orderBy: { codigo: 'asc' },
         select: { id: true, codigo: true, descricao: true, nivel: true, admiteMovimento: true, origem: true, parentId: true },
       }),
+    // Saldo por conta: previsto × arrecadado até a data = a arrecadar.
+    saldoColunas: [
+      { chave: 'previsto', rotulo: 'Previsto' },
+      { chave: 'arrecadado', rotulo: 'Arrecadado' },
+      { chave: 'saldo', rotulo: 'A arrecadar' },
+    ],
+    saldoMapa: (entidadeId, ano, dataRef) => saldoReceita.porConta(entidadeId, ano, dataRef),
   })
 }

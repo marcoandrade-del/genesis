@@ -38,6 +38,10 @@ export type ConfigPlano = {
   /** Só o plano contábil tem saldos (lançamentos). Quando presente, a tela
    *  exibe saldo inicial/débito/crédito/saldo atual por conta. */
   saldos?: SaldoContabilService
+  /** Saldo GENÉRICO por conta (receita/despesa): colunas + valores por conta,
+   *  na posição da data de referência. Renderiza colunas simples (sem natureza). */
+  saldoColunas?: { chave: string; rotulo: string }[]
+  saldoMapa?: (entidadeId: string, ano: number, dataRef: Date) => Promise<Map<string, Record<string, number>>>
 }
 
 type RenderOpts = {
@@ -112,11 +116,13 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
 
     const dataRef = dataRefDe(req)
     const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
+    const saldoGenMap = cfg.saldoMapa ? await cfg.saldoMapa(entidadeId, ano, dataRef) : null
 
     const linhas = contasVisiveis.map((c) => {
       const s = saldos?.get(c.id)
       return {
         ...c,
+        saldoGen: saldoGenMap?.get(c.id) ?? null,
         temFilhos: idsPais.has(c.id),
         // Redutora/retificadora do PCASP: marcada com "(-)" no título (subtrai do grupo).
         redutora: c.descricao.trim().startsWith('(-)'),
@@ -151,6 +157,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       temDesdobramento,
       podeEscrever: podeEscrever(nivel),
       comSaldos: !!cfg.saldos,
+      saldoColunas: cfg.saldoColunas ?? null,
       dataRef: isoData(dataRef),
       desdobrar: opts.desdobrar ?? null,
       sugestao: opts.sugestao ?? '',

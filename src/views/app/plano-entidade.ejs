@@ -22,7 +22,7 @@
 <% /* saldo vem com sinal (+ devedor, − credor): exibe módulo + lado D/C */ %>
 <% const sal = (n) => { const v = Number(n) || 0; return v === 0 ? brl(0) : brl(Math.abs(v)) + (v < 0 ? ' C' : ' D') } %>
 
-<div class="container py-4" style="max-width:<%= comSaldos ? 1280 : 1000 %>px">
+<div class="container py-4" style="max-width:<%= (comSaldos || saldoColunas) ? 1280 : 1000 %>px">
   <nav aria-label="breadcrumb">
     <ol class="breadcrumb small">
       <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
@@ -33,7 +33,7 @@
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
     <h2 class="h4 fw-bold mb-0"><%= titulo %> — <span class="font-monospace"><%= ano %></span></h2>
     <div class="d-flex align-items-center gap-2">
-      <% if (comSaldos) { %>
+      <% if (comSaldos || saldoColunas) { %>
         <%- include('_seletor-posicao', { base, dataRef, ano }) %>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('tbl').classList.toggle('ocultar-detalhe')" title="Mostrar/ocultar detalhes">
           <i class="bi bi-arrows-collapse"></i>
@@ -124,6 +124,7 @@
           <th class="valor">Total crédito</th>
           <th class="valor">Saldo atual</th>
         <% } %>
+        <% if (saldoColunas) { saldoColunas.forEach(function(col){ %><th class="valor"><%= col.rotulo %></th><% }) } %>
         <th class="col-detalhe" style="width:110px">Tipo</th>
         <% if (podeEscrever) { %><th class="col-detalhe text-end pe-3" style="width:180px">Ações</th><% } %>
       </tr></thead>
@@ -153,6 +154,7 @@
               <td class="valor small"><%= brl(c.saldo && c.saldo.credito) %></td>
               <td class="valor small fw-semibold <%= c.saldo && c.saldo.atual < 0 ? 'text-secondary' : '' %>"><%= c.saldo ? sal(c.saldo.atual) : '—' %></td>
             <% } %>
+            <% if (saldoColunas) { saldoColunas.forEach(function(col){ %><td class="valor small <%= col.chave === 'saldo' ? 'fw-semibold' : '' %>"><%= c.saldoGen ? brl(c.saldoGen[col.chave]) : '—' %></td><% }) } %>
             <td class="col-detalhe">
               <% if (c.admiteMovimento) { %><span class="badge bg-primary bg-opacity-10 text-primary">Analítica</span>
               <% } else { %><span class="badge bg-secondary bg-opacity-10 text-secondary">Sintética</span><% } %>
