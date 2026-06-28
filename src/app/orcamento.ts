@@ -107,11 +107,18 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
 
   // Saldo orçamentário da despesa do exercício: resumo + agregações (UO, fonte,
   // função e conta com roll-up). Read-only.
-  app.get<{ Querystring: { g?: string } }>('/orcamento/saldo', async (req, reply) => {
+  app.get<{ Querystring: { g?: string; data?: string } }>('/orcamento/saldo', async (req, reply) => {
     const { entidadeId, ano, nivel } = req.contexto
     const entidade = await carregarEntidade(req, reply)
     if (!entidade) return
-    const saldo = await saldoSvc.calcular(entidadeId, ano)
+    // ?data=YYYY-MM-DD → posição até a data; sem ela, posição atual (saldo materializado).
+    const raw = req.query.data?.trim()
+    let dataRef: Date | undefined
+    if (raw) {
+      const d = new Date(`${raw}T00:00:00`)
+      if (!Number.isNaN(d.getTime())) dataRef = d
+    }
+    const saldo = await saldoSvc.calcular(entidadeId, ano, dataRef)
     const temDesdobramento = saldo.porConta.some((l) => l.origem === 'DESDOBRAMENTO')
     const g = req.query.g
     let granularidade: 'PADRAO' | 'DESDOBRADO'
@@ -122,7 +129,8 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
       granularidade = await cfgDash.granularidadeRelatorio(entidadeId, '/orcamento/saldo')
     }
     saldo.porConta = aplicarGranularidade(saldo.porConta, granularidade)
-    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, temDesdobramento, layout: null })
+    const dataRefIso = (dataRef ?? new Date()).toISOString().slice(0, 10)
+    return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, temDesdobramento, dataRef: dataRefIso, posicaoData: !!dataRef, layout: null })
   })
 
   // Acumulado diário da despesa: evolução do empenhado/liquidado/pago dia a dia

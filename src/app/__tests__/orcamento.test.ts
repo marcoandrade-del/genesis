@@ -102,14 +102,30 @@ describe('appOrcamentoRoutes', () => {
     })
     const res = await app.inject({ method: 'GET', url: '/orcamento/saldo' })
     expect(res.statusCode).toBe(200)
-    expect(saldoCalcularMock).toHaveBeenCalledWith('ent1', 2026)
+    expect(saldoCalcularMock).toHaveBeenCalledWith('ent1', 2026, undefined) // sem ?data= → posição atual
     expect(res.body).toContain('Saldo Orçamentário')
     expect(res.body).toContain('Por Unidade Orçamentária')
     expect(res.body).toContain('Vencimentos')
     expect(res.body).toContain('1.450,00')
+    expect(res.body).toContain('Posição em') // seletor de data presente
     // PR E: colapsar por nível + filtro de texto por conta na tabela de saldo
     expect(res.body).toContain('filtrar conta')
     expect(res.body).toContain('data-nivel="3"')
+  })
+
+  it('GET /orcamento/saldo?data= calcula a posição até a data', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    saldoCalcularMock.mockResolvedValue({
+      temOrcamento: true,
+      resumo: { autorizado: 1800, reservado: 0, empenhado: 250, disponivel: 1550 },
+      porUnidade: [], porFonte: [], porFuncao: [], porConta: [],
+    })
+    const res = await app.inject({ method: 'GET', url: '/orcamento/saldo?data=2026-03-15' })
+    expect(res.statusCode).toBe(200)
+    const arg = saldoCalcularMock.mock.calls.at(-1)
+    expect(arg?.[2]).toBeInstanceOf(Date)
+    expect((arg?.[2] as Date).toISOString()).toContain('2026-03')
+    expect(res.body).toContain('posição em') // badge da posição
   })
 
   it('GET /orcamento/despesa/diario aplica filtros de período e conta', async () => {
