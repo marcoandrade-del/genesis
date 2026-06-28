@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { Prisma } from '@prisma/client'
-import { rollupSaldos, type NoSaldo } from '../saldo-contabil.js'
+import { rollupSaldos, SaldoContabilService, type NoSaldo } from '../saldo-contabil.js'
+import { criarPrismaMock } from './helpers/prisma-mock.js'
 
 const D = (v: number) => new Prisma.Decimal(v)
 const no = (p: Partial<NoSaldo> & { id: string }): NoSaldo => ({
@@ -62,5 +63,23 @@ describe('rollupSaldos (balancete, saldo devedor com sinal)', () => {
     ])
     expect(m.get('meio')!.saldoAtual.toNumber()).toBe(70)
     expect(m.get('raiz')!.saldoAtual.toNumber()).toBe(70)
+  })
+})
+
+describe('SaldoContabilService.movimentoMensal', () => {
+  it('movimento (débito − crédito) por mês por conta, com roll-up no pai', async () => {
+    const prisma = criarPrismaMock()
+    const svc = new SaldoContabilService(prisma as never)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', parentId: null }, // raiz
+      { id: 'c11', parentId: 'c1' }, // folha
+    ])
+    prisma.resumoMensalConta.findMany.mockResolvedValue([
+      { contaId: 'c11', mes: 1, totalDebito: D(100), totalCredito: D(30) }, // jan: D−C = 70
+      { contaId: 'c11', mes: 3, totalDebito: D(20), totalCredito: D(50) }, // mar: D−C = −30
+    ])
+    const m = await svc.movimentoMensal('ent1', 2026)
+    expect(m.get('c11')).toEqual([70, 0, -30, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(m.get('c1')).toEqual([70, 0, -30, 0, 0, 0, 0, 0, 0, 0, 0, 0]) // roll-up
   })
 })
