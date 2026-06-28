@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { ContasDespesaEntidadeService } from '../services/contas-despesa-entidade.js'
+import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
 import { registrarRotasPlano } from './plano-entidade.js'
 
 /**
@@ -9,6 +10,7 @@ import { registrarRotasPlano } from './plano-entidade.js'
  */
 export async function appContasDespesaRoutes(app: FastifyInstance) {
   const servico = new ContasDespesaEntidadeService(app.prisma)
+  const saldoDespesa = new SaldoOrcamentarioService(app.prisma)
   registrarRotasPlano(app, {
     rota: '/contas-despesa',
     titulo: 'Plano de Despesa',
@@ -20,5 +22,17 @@ export async function appContasDespesaRoutes(app: FastifyInstance) {
         orderBy: { codigo: 'asc' },
         select: { id: true, codigo: true, descricao: true, nivel: true, admiteMovimento: true, origem: true, parentId: true },
       }),
+    // Saldo por conta: autorizado × empenhado até a data = disponível (reusa o saldo orçamentário).
+    saldoColunas: [
+      { chave: 'autorizado', rotulo: 'Autorizado' },
+      { chave: 'empenhado', rotulo: 'Empenhado' },
+      { chave: 'disponivel', rotulo: 'Disponível' },
+    ],
+    saldoMapa: async (entidadeId, ano, dataRef) => {
+      const s = await saldoDespesa.calcular(entidadeId, ano, dataRef)
+      const mapa = new Map<string, Record<string, number>>()
+      for (const l of s.porConta) mapa.set(l.id, { autorizado: l.autorizado, empenhado: l.empenhado, disponivel: l.disponivel })
+      return mapa
+    },
   })
 }
