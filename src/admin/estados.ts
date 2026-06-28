@@ -3,6 +3,9 @@ import { Prisma } from '@prisma/client'
 import { EstadosService } from '../services/estados.js'
 import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
 import { parseComposicao } from '../services/rcl.js'
+import { lerXlsxBase64 } from '../services/rcl-xlsx.js'
+import { RclImportIaService } from '../services/rcl-import-ia.js'
+import { ErroNegocio } from '../errors.js'
 
 export async function adminEstadosRoutes(app: FastifyInstance) {
   const service = new EstadosService(app.prisma)
@@ -100,6 +103,35 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
           select: { id: true, descricao: true },
         })
         const msg = e instanceof Error ? e.message : 'Erro ao atualizar modelo contábil do estado.'
+        return reply.view('estados/form', { estado, modelos, erro: msg })
+      }
+    },
+  )
+
+  // Importa por IA a composição da RCL a partir da planilha (xlsx) do TCE.
+  // A IA só PROPÕE: re-renderiza ESTE form com a composição proposta no editor
+  // (revisão), preservando os demais campos. O admin confere e clica em Aplicar
+  // (o PUT existente salva). Sem chave do provedor → mensagem clara, sem quebrar.
+  app.post<{ Params: { id: string }; Body: { planilhaBase64?: string } }>(
+    '/:id/rcl-import',
+    { bodyLimit: 12 * 1024 * 1024 },
+    async (req, reply) => {
+      const estado = await app.prisma.estado.findUnique({
+        where: { id: req.params.id },
+        include: { modeloContabil: { select: { id: true, descricao: true } }, _count: { select: { municipios: true } } },
+      })
+      if (!estado) return reply.status(404).send('Estado não encontrado.')
+      const modelos = await app.prisma.modeloContabil.findMany({
+        where: { ativo: true },
+        orderBy: { descricao: 'asc' },
+        select: { id: true, descricao: true },
+      })
+      try {
+        const texto = await lerXlsxBase64(req.body.planilhaBase64 ?? '')
+        const proposta = await new RclImportIaService(app.prisma).proporComposicao(req.user.sub, texto)
+        return reply.view('estados/form', { estado, modelos, erro: null, propostaRcl: proposta, avisoIa: `Proposta da IA: "${proposta.nome}".` })
+      } catch (e: unknown) {
+        const msg = e instanceof ErroNegocio || e instanceof Error ? e.message : 'Falha na importação por IA.'
         return reply.view('estados/form', { estado, modelos, erro: msg })
       }
     },
