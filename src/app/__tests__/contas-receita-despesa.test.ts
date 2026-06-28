@@ -44,6 +44,8 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('data-mensal=') // os 12 valores embutidos na linha
     expect(res.body).toContain('mensal-toggle') // o botão ▸
+    expect(res.body).toContain('Em colunas') // modo: períodos inline em todas as contas
+    expect(res.body).toContain('Por conta') // modo: expandir uma conta por vez
   })
 
   it('despesa: lista do contexto e consulta o model de despesa', async () => {

@@ -41,7 +41,11 @@
       <% } %>
       <%- include('_seletor-granularidade') %>
       <% if (mensalRotulo) { %>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Desdobramento por período" title="<%= mensalRotulo %> — expanda uma conta (▸)">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Modo do desdobramento" title="<%= mensalRotulo %>">
+          <button type="button" class="btn btn-outline-secondary active" data-modo="expandir" onclick="setModoMensal(this, 'expandir')" title="Expandir uma conta por vez (▸)"><i class="bi bi-arrows-expand"></i> Por conta</button>
+          <button type="button" class="btn btn-outline-secondary" data-modo="colunas" onclick="setModoMensal(this, 'colunas')" title="Mostrar os períodos em colunas, em todas as contas"><i class="bi bi-table"></i> Em colunas</button>
+        </div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Granularidade do período" title="<%= mensalRotulo %>">
           <button type="button" class="btn btn-outline-primary active" data-gran="12" onclick="setGranMensal(this, 12)">Mensal</button>
           <button type="button" class="btn btn-outline-primary" data-gran="6" onclick="setGranMensal(this, 6)">Bimestral</button>
           <button type="button" class="btn btn-outline-primary" data-gran="3" onclick="setGranMensal(this, 3)">Quadrimestral</button>
@@ -226,8 +230,11 @@
 
 // Desdobramento por período (mensal/bimestral/quadrimestral): os 12 valores/conta
 // vêm embutidos em data-mensal; o reagrupamento (12→6→3) é todo no cliente.
+// Dois modos: 'expandir' (▸ uma conta por vez) e 'colunas' (períodos inline em todas).
 var granMensal = 12
+var modoMensal = 'expandir'
 var MESES_LBL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+function _fmtMensal(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 function _gruposMensal(vals, g) {
   if (g === 6) { var b = []; for (var i = 0; i < 6; i++) b.push({ rot: i + 1 + 'º bim', val: (vals[i * 2] || 0) + (vals[i * 2 + 1] || 0) }); return b }
   if (g === 3) { var q = []; for (var j = 0; j < 3; j++) { var s = 0; for (var k = 0; k < 4; k++) s += vals[j * 4 + k] || 0; q.push({ rot: j + 1 + 'º quad', val: s }) } return q }
@@ -257,7 +264,34 @@ function toggleMensal(contaId) {
 function setGranMensal(btn, g) {
   granMensal = g
   Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
-  document.querySelectorAll('tr.mensal-detalhe:not([hidden])').forEach(function (sub) { _renderMensal(sub) })
+  if (modoMensal === 'colunas') _renderColunas()
+  else document.querySelectorAll('tr.mensal-detalhe:not([hidden])').forEach(function (sub) { _renderMensal(sub) })
+}
+// Modo "Em colunas": injeta os períodos como colunas em TODAS as contas de uma vez.
+function _limparColunas() { document.querySelectorAll('.mensal-col').forEach(function (el) { el.remove() }) }
+function _renderColunas() {
+  _limparColunas()
+  var emColunas = modoMensal === 'colunas'
+  // os ▸ só fazem sentido no modo "por conta"
+  document.querySelectorAll('.mensal-toggle').forEach(function (b) { b.style.display = emColunas ? 'none' : '' })
+  if (emColunas) document.querySelectorAll('tr.mensal-detalhe').forEach(function (s) { s.setAttribute('hidden', '') })
+  if (!emColunas) return
+  var labels = _gruposMensal([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], granMensal).map(function (p) { return p.rot })
+  var head = document.querySelector('#tbl thead tr')
+  if (head) labels.forEach(function (lbl) { var th = document.createElement('th'); th.className = 'mensal-col valor small'; th.textContent = lbl; head.appendChild(th) })
+  document.querySelectorAll('#tbl tbody tr[data-nivel]').forEach(function (row) {
+    var raw = row.getAttribute('data-mensal'); var vals = raw ? JSON.parse(raw) : null
+    _gruposMensal(vals || [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], granMensal).forEach(function (p) {
+      var td = document.createElement('td'); td.className = 'mensal-col valor small font-monospace'
+      if (!vals || p.val === 0) { td.textContent = '–'; td.className += ' text-muted' } else { td.textContent = _fmtMensal(p.val) }
+      row.appendChild(td)
+    })
+  })
+}
+function setModoMensal(btn, modo) {
+  modoMensal = modo
+  Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
+  _renderColunas()
 }
 </script>
 </body>
