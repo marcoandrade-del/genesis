@@ -22,18 +22,22 @@ const dec = (v: unknown) => new Prisma.Decimal(String(v ?? '0') || '0')
  */
 export async function appContasRoutes(app: FastifyInstance) {
   const servico = new ContasContabilEntidadeService(app.prisma)
+  const saldosContabil = new SaldoContabilService(app.prisma)
   registrarRotasPlano(app, {
     rota: '/contas',
     titulo: 'Plano de Contas (contábil)',
     descricao: 'Contas contábeis do exercício',
     servico,
-    saldos: new SaldoContabilService(app.prisma),
+    saldos: saldosContabil,
     listarFlat: (entidadeId, ano) =>
       app.prisma.contaContabilEntidade.findMany({
         where: { entidadeId, ano },
         orderBy: { codigo: 'asc' },
         select: { id: true, codigo: true, descricao: true, nivel: true, admiteMovimento: true, origem: true, parentId: true },
       }),
+    // Desdobramento mensal por conta (movimento D−C/mês, de ResumoMensalConta).
+    mensalMapa: (entidadeId, ano) => saldosContabil.movimentoMensal(entidadeId, ano),
+    mensalRotulo: 'Movimento/mês (D−C)',
   })
 
   // ── Razão da conta (drill-down): resumo mensal + total por dia + movimentos ──

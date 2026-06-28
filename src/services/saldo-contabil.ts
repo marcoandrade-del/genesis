@@ -143,4 +143,39 @@ export class SaldoContabilService {
     })
     return rollupSaldos(nos)
   }
+
+  /**
+   * Movimento por conta e por MÊS (jan→dez = índices 0..11): débito − crédito do
+   * mês, lido direto de `ResumoMensalConta` (que já é mensal), com roll-up linear
+   * na árvore (a soma das contas-filhas = a do pai). Read-only. Usado no
+   * desdobramento mensal da tela do plano contábil. (D−C: positivo = mês com mais
+   * débito; o lado/natureza fica na coluna de saldo.)
+   */
+  async movimentoMensal(entidadeId: string, ano: number): Promise<Map<string, number[]>> {
+    const mapa = new Map<string, number[]>()
+    const contas = await this.prisma.contaContabilEntidade.findMany({ where: { entidadeId, ano }, select: { id: true, parentId: true } })
+    const parent = new Map(contas.map((c) => [c.id, c.parentId]))
+    const resumos = await this.prisma.resumoMensalConta.findMany({
+      where: { entidadeId, ano },
+      select: { contaId: true, mes: true, totalDebito: true, totalCredito: true },
+    })
+    const acumular = (contaId: string, mes: number, v: number) => {
+      let id: string | null = contaId
+      const visitados = new Set<string>()
+      while (id && !visitados.has(id)) {
+        visitados.add(id)
+        const meses = mapa.get(id) ?? new Array<number>(12).fill(0)
+        meses[mes] = (meses[mes] ?? 0) + v
+        mapa.set(id, meses)
+        id = parent.get(id) ?? null
+      }
+    }
+    for (const r of resumos) {
+      const i = r.mes - 1
+      if (i < 0 || i > 11) continue
+      acumular(r.contaId, i, Number(r.totalDebito) - Number(r.totalCredito))
+    }
+    for (const meses of mapa.values()) for (let i = 0; i < 12; i++) meses[i] = Math.round((meses[i] ?? 0) * 100) / 100
+    return mapa
+  }
 }

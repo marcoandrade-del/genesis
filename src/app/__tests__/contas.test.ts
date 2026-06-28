@@ -75,6 +75,9 @@ describe('appContasRoutes', () => {
       { contaId: 'c1', tipo: 'DEBITO', _sum: { valor: new Prisma.Decimal(50) } },
       { contaId: 'c1', tipo: 'CREDITO', _sum: { valor: new Prisma.Decimal(20) } },
     ])
+    prisma.resumoMensalConta.findMany.mockResolvedValue([
+      { contaId: 'c1', mes: 1, totalDebito: new Prisma.Decimal(50), totalCredito: new Prisma.Decimal(20) },
+    ])
     const res = await app.inject({ method: 'GET', url: '/contas' })
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Saldo atual')
@@ -84,6 +87,10 @@ describe('appContasRoutes', () => {
     // Seletor de posição: data + atalho de fim de mês
     expect(res.body).toContain('Posição em')
     expect(res.body).toContain('fim de mês')
+    // Desdobramento mensal: seletor de período + ▸ por conta (de ResumoMensalConta)
+    expect(res.body).toContain('Bimestral')
+    expect(res.body).toContain('mensal-toggle')
+    expect(res.body).toContain('data-mensal=')
   })
 
   it('saldo respeita ?data= (posição numa data anterior)', async () => {
