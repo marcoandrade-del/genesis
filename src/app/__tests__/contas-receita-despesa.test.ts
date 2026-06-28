@@ -33,11 +33,12 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
   it('receita: ▸ desdobramento mensal por conta quando há arrecadação', async () => {
     const { app, prisma } = await criarApp({ registrar: appContasReceitaRoutes, comView: true, simularUsuario: { sub: 'u1', email: 'u@x.com' }, simularContexto: CTX })
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
     prisma.contaReceitaEntidade.findMany.mockResolvedValue([
       { id: 'r1', codigo: '1', descricao: 'RECEITAS CORRENTES', nivel: 1, admiteMovimento: false, origem: 'MODELO', parentId: null },
     ])
     prisma.arrecadacao.findMany.mockResolvedValue([
-      { contaReceitaEntidadeId: 'r1', data: new Date(Date.UTC(2026, 0, 10)), valor: 123 },
+      { valor: 123, tipo: 'ARRECADACAO', data: new Date(Date.UTC(2026, 0, 10)), previsao: { contaReceitaEntidadeId: 'r1' } },
     ])
     const res = await app.inject({ method: 'GET', url: '/contas-receita' })
     expect(res.statusCode).toBe(200)

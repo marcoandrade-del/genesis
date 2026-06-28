@@ -36,10 +36,11 @@ export class SaldoReceitaService {
       where: { orcamentoId: orcamento.id },
       _sum: { valorPrevisto: true },
     })
-    const arrecadado = await this.prisma.arrecadacao.groupBy({
-      by: ['contaReceitaEntidadeId'],
-      where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: dataRef } },
-      _sum: { valor: true },
+    // Arrecadação liga à conta via `previsao` (PrevisaoReceita.contaReceitaEntidadeId);
+    // Arrecadacao não tem entidadeId/contaReceitaEntidadeId diretos. Escopo por orçamento.
+    const arrecadacoes = await this.prisma.arrecadacao.findMany({
+      where: { previsao: { orcamentoId: orcamento.id }, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: dataRef } },
+      select: { valor: true, tipo: true, previsao: { select: { contaReceitaEntidadeId: true } } },
     })
 
     // Roll-up: a folha e todos os ancestrais recebem o valor.
@@ -55,7 +56,7 @@ export class SaldoReceitaService {
       }
     }
     for (const p of previsto) acumular(p.contaReceitaEntidadeId, 'previsto', Number(p._sum.valorPrevisto ?? 0))
-    for (const a of arrecadado) acumular(a.contaReceitaEntidadeId, 'arrecadado', Number(a._sum.valor ?? 0))
+    for (const a of arrecadacoes) acumular(a.previsao.contaReceitaEntidadeId, 'arrecadado', (a.tipo === 'ESTORNO' ? -1 : 1) * Number(a.valor))
 
     for (const row of mapa.values()) {
       row.previsto = r2(row.previsto)
@@ -73,14 +74,17 @@ export class SaldoReceitaService {
    */
   async arrecadadoMensal(entidadeId: string, ano: number): Promise<Map<string, number[]>> {
     const mapa = new Map<string, number[]>()
+    const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
+    if (!orcamento) return mapa
     const contas = await this.prisma.contaReceitaEntidade.findMany({
       where: { entidadeId, ano },
       select: { id: true, parentId: true },
     })
     const parent = new Map(contas.map((c) => [c.id, c.parentId]))
+    // Arrecadacao liga à conta via `previsao` (não tem entidadeId/contaReceitaEntidadeId diretos).
     const arrecadacoes = await this.prisma.arrecadacao.findMany({
-      where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: new Date(Date.UTC(ano, 11, 31)) } },
-      select: { contaReceitaEntidadeId: true, data: true, valor: true },
+      where: { previsao: { orcamentoId: orcamento.id }, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: new Date(Date.UTC(ano, 11, 31)) } },
+      select: { valor: true, tipo: true, data: true, previsao: { select: { contaReceitaEntidadeId: true } } },
     })
     const acumular = (contaId: string, mes: number, v: number) => {
       let id: string | null = contaId
@@ -93,7 +97,7 @@ export class SaldoReceitaService {
         id = parent.get(id) ?? null
       }
     }
-    for (const a of arrecadacoes) acumular(a.contaReceitaEntidadeId, a.data.getUTCMonth(), Number(a.valor))
+    for (const a of arrecadacoes) acumular(a.previsao.contaReceitaEntidadeId, a.data.getUTCMonth(), (a.tipo === 'ESTORNO' ? -1 : 1) * Number(a.valor))
     for (const meses of mapa.values()) for (let i = 0; i < 12; i++) meses[i] = r2(meses[i] ?? 0)
     return mapa
   }
