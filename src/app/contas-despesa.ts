@@ -34,5 +34,8 @@ export async function appContasDespesaRoutes(app: FastifyInstance) {
       for (const l of s.porConta) mapa.set(l.id, { autorizado: l.autorizado, empenhado: l.empenhado, disponivel: l.disponivel })
       return mapa
     },
+    // Desdobramento mensal por conta (empenhado/mês) — visão geral + conferência.
+    mensalMapa: (entidadeId, ano) => saldoDespesa.empenhadoMensal(entidadeId, ano),
+    mensalRotulo: 'Empenhado/mês',
   })
 }

@@ -111,3 +111,26 @@ describe('SaldoOrcamentarioService.calcular', () => {
     expect(prisma.movimentoEmpenho.findMany).toHaveBeenCalled()
   })
 })
+
+describe('SaldoOrcamentarioService.empenhadoMensal', () => {
+  it('empenhado por mês por conta (EMPENHO − ESTORNO), com roll-up no pai', async () => {
+    const prisma = criarPrismaMock()
+    const service = new SaldoOrcamentarioService(prisma as never)
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([{ id: 'd1', contaDespesaEntidadeId: 'c3' }])
+    prisma.contaDespesaEntidade.findMany.mockResolvedValue(CONTAS) // c3 → c2 → c1
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { data: new Date(Date.UTC(2026, 0, 15)), tipo: 'EMPENHO', valor: '200', empenho: { dotacaoDespesaId: 'd1' } }, // jan +200
+      { data: new Date(Date.UTC(2026, 2, 10)), tipo: 'ESTORNO_EMPENHO', valor: '50', empenho: { dotacaoDespesaId: 'd1' } }, // mar −50
+    ])
+    const m = await service.empenhadoMensal('ent1', 2026)
+    expect(m.get('c3')).toEqual([200, 0, -50, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    expect(m.get('c1')).toEqual([200, 0, -50, 0, 0, 0, 0, 0, 0, 0, 0, 0]) // roll-up até a raiz
+  })
+
+  it('sem orçamento → mapa vazio', async () => {
+    const prisma = criarPrismaMock()
+    prisma.orcamento.findUnique.mockResolvedValue(null)
+    expect((await new SaldoOrcamentarioService(prisma as never).empenhadoMensal('ent1', 2026)).size).toBe(0)
+  })
+})
