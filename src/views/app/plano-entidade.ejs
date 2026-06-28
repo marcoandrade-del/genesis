@@ -40,6 +40,13 @@
         </button>
       <% } %>
       <%- include('_seletor-granularidade') %>
+      <% if (mensalRotulo) { %>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Desdobramento por período" title="<%= mensalRotulo %> — expanda uma conta (▸)">
+          <button type="button" class="btn btn-outline-primary active" data-gran="12" onclick="setGranMensal(this, 12)">Mensal</button>
+          <button type="button" class="btn btn-outline-primary" data-gran="6" onclick="setGranMensal(this, 6)">Bimestral</button>
+          <button type="button" class="btn btn-outline-primary" data-gran="3" onclick="setGranMensal(this, 3)">Quadrimestral</button>
+        </div>
+      <% } %>
       <div class="btn-group btn-group-sm" role="group" aria-label="Nível de detalhe das contas">
         <button type="button" id="nivel-menos" class="btn btn-outline-secondary" title="Recolher um nível">
           <i class="bi bi-dash-lg"></i>
@@ -133,9 +140,10 @@
           <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano não copiado para o exercício <%= ano %>.</td></tr>
         <% } %>
         <% contas.forEach(function(c) { %>
-          <tr data-nivel="<%= c.nivel %>">
+          <tr data-nivel="<%= c.nivel %>"<% if (c.mensal) { %> data-conta="<%= c.id %>" data-mensal="<%- JSON.stringify(c.mensal) %>"<% } %>>
             <td class="ps-3">
               <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
+                <% if (c.mensal) { %><button type="button" class="btn btn-link btn-sm p-0 me-1 mensal-toggle align-baseline" onclick="toggleMensal('<%= c.id %>')" title="Desdobrar por período (<%= mensalRotulo %>)"><i class="bi bi-caret-right-fill"></i></button><% } %>
                 <span class="font-monospace small text-muted"><%= c.codigo %></span>
                 <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
                 <% if (c.redutora) { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-1" title="Conta redutora/retificadora (PCASP) — subtrai do saldo do grupo">redutora</span><% } %>
@@ -179,6 +187,11 @@
               </td>
             <% } %>
           </tr>
+          <% if (c.mensal) { %>
+            <tr class="mensal-detalhe" data-conta="<%= c.id %>" hidden>
+              <td colspan="12" class="bg-light px-3 py-2"><div class="mensal-cells small d-flex flex-wrap gap-2"></div></td>
+            </tr>
+          <% } %>
         <% }) %>
       </tbody>
     </table>
@@ -210,6 +223,42 @@
   mais.addEventListener('click', function () { if (cur < maxN) { cur++; aplicar() } })
   aplicar()
 })()
+
+// Desdobramento por período (mensal/bimestral/quadrimestral): os 12 valores/conta
+// vêm embutidos em data-mensal; o reagrupamento (12→6→3) é todo no cliente.
+var granMensal = 12
+var MESES_LBL = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+function _gruposMensal(vals, g) {
+  if (g === 6) { var b = []; for (var i = 0; i < 6; i++) b.push({ rot: i + 1 + 'º bim', val: (vals[i * 2] || 0) + (vals[i * 2 + 1] || 0) }); return b }
+  if (g === 3) { var q = []; for (var j = 0; j < 3; j++) { var s = 0; for (var k = 0; k < 4; k++) s += vals[j * 4 + k] || 0; q.push({ rot: j + 1 + 'º quad', val: s }) } return q }
+  return MESES_LBL.map(function (m, i) { return { rot: m, val: vals[i] || 0 } })
+}
+function _renderMensal(sub) {
+  var contaId = sub.getAttribute('data-conta')
+  var row = document.querySelector('tr[data-conta="' + contaId + '"][data-mensal]')
+  var cells = sub.querySelector('.mensal-cells')
+  if (!row || !cells) return
+  var vals = JSON.parse(row.getAttribute('data-mensal') || '[]')
+  cells.textContent = ''
+  _gruposMensal(vals, granMensal).forEach(function (p) {
+    var d = document.createElement('div'); d.className = 'border rounded px-2 py-1 bg-white text-center'; d.style.minWidth = '92px'
+    var r = document.createElement('div'); r.className = 'text-muted'; r.style.fontSize = '.65rem'; r.textContent = p.rot
+    var v = document.createElement('div'); v.className = 'font-monospace'; v.textContent = 'R$ ' + p.val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    d.appendChild(r); d.appendChild(v); cells.appendChild(d)
+  })
+}
+function toggleMensal(contaId) {
+  var sub = document.querySelector('tr.mensal-detalhe[data-conta="' + contaId + '"]')
+  var icon = document.querySelector('tr[data-conta="' + contaId + '"][data-mensal] .mensal-toggle i')
+  if (!sub) return
+  if (sub.hasAttribute('hidden')) { sub.removeAttribute('hidden'); _renderMensal(sub); if (icon) icon.className = 'bi bi-caret-down-fill' }
+  else { sub.setAttribute('hidden', ''); if (icon) icon.className = 'bi bi-caret-right-fill' }
+}
+function setGranMensal(btn, g) {
+  granMensal = g
+  Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
+  document.querySelectorAll('tr.mensal-detalhe:not([hidden])').forEach(function (sub) { _renderMensal(sub) })
+}
 </script>
 </body>
 </html>

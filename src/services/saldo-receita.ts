@@ -64,4 +64,37 @@ export class SaldoReceitaService {
     }
     return mapa
   }
+
+  /**
+   * Arrecadado por conta e por MÊS (jan→dez = índices 0..11), com roll-up na
+   * árvore. Agrega `Arrecadacao.valor` igual ao `porConta` (a soma dos 12 meses
+   * reconcilia com a coluna "Arrecadado"). Read-only. Usado no desdobramento
+   * mensal/bimestral/quadrimestral da tela do plano de receita.
+   */
+  async arrecadadoMensal(entidadeId: string, ano: number): Promise<Map<string, number[]>> {
+    const mapa = new Map<string, number[]>()
+    const contas = await this.prisma.contaReceitaEntidade.findMany({
+      where: { entidadeId, ano },
+      select: { id: true, parentId: true },
+    })
+    const parent = new Map(contas.map((c) => [c.id, c.parentId]))
+    const arrecadacoes = await this.prisma.arrecadacao.findMany({
+      where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: new Date(Date.UTC(ano, 11, 31)) } },
+      select: { contaReceitaEntidadeId: true, data: true, valor: true },
+    })
+    const acumular = (contaId: string, mes: number, v: number) => {
+      let id: string | null = contaId
+      const visitados = new Set<string>()
+      while (id && !visitados.has(id)) {
+        visitados.add(id)
+        const meses = mapa.get(id) ?? new Array<number>(12).fill(0)
+        meses[mes] = (meses[mes] ?? 0) + v
+        mapa.set(id, meses)
+        id = parent.get(id) ?? null
+      }
+    }
+    for (const a of arrecadacoes) acumular(a.contaReceitaEntidadeId, a.data.getUTCMonth(), Number(a.valor))
+    for (const meses of mapa.values()) for (let i = 0; i < 12; i++) meses[i] = r2(meses[i] ?? 0)
+    return mapa
+  }
 }
