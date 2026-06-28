@@ -42,3 +42,6 @@ pcasp_*.csv
 
 # Locks temporários do LibreOffice
 .~lock.*#
+
+# Dados capturados do portal (regeneráveis; consumidos pela outra sessão)
+scripts/dados/
