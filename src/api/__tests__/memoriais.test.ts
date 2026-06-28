@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn() }))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
     rclConsolidada = m.rclConsolidada
+  },
+}))
+vi.mock('../../services/memorial-guardiao.js', () => ({
+  MemorialGuardiaoService: class {
+    guardiao = m.guardiao
   },
 }))
 
@@ -22,6 +27,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   beforeEach(async () => {
     m.rcl.mockReset()
     m.rclConsolidada.mockReset()
+    m.guardiao.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
     ;({ app } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
@@ -84,6 +90,20 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   it('404 consolidada quando não existe', async () => {
     m.rclConsolidada.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/rcl-consolidada?entidadeId=x&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('200 Guardião (lista de indicadores) em envelope', async () => {
+    m.guardiao.mockResolvedValue({ indicadores: [{ indicador: 'Despesa com Pessoal' }] })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/guardiao?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().contrato.recurso).toBe('guardiao')
+    expect(res.json().dados.indicadores[0].indicador).toBe('Despesa com Pessoal')
+  })
+
+  it('404 Guardião quando a entidade não existe', async () => {
+    m.guardiao.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/guardiao?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
   })
 })
