@@ -3,6 +3,7 @@ import { OrcamentosService } from '../services/orcamentos.js'
 import { DotacoesDespesaService } from '../services/dotacoes-despesa.js'
 import { PrevisoesReceitaService } from '../services/previsoes-receita.js'
 import { SaldoOrcamentarioService } from '../services/saldo-orcamentario.js'
+import { ExecucaoDespesaService } from '../services/execucao-despesa.js'
 import { DespesaDiariaService } from '../services/despesa-diaria.js'
 import { parseFiltroConsulta, type FiltroConsultaQuery } from './filtro-consulta.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
@@ -21,6 +22,7 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
   const dotacoesSvc = new DotacoesDespesaService(app.prisma)
   const previsoesSvc = new PrevisoesReceitaService(app.prisma)
   const saldoSvc = new SaldoOrcamentarioService(app.prisma)
+  const execucaoSvc = new ExecucaoDespesaService(app.prisma)
   const despesaDiariaSvc = new DespesaDiariaService(app.prisma)
   const cfgDash = new ConfiguracaoDashboardService(app.prisma)
   const aberturaSvc = new AberturaContabilService(app.prisma)
@@ -131,6 +133,24 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
     saldo.porConta = aplicarGranularidade(saldo.porConta, granularidade)
     const dataRefIso = (dataRef ?? new Date()).toISOString().slice(0, 10)
     return reply.view('app/orcamento-saldo', { entidade, ano, nivel, saldo, granularidade, temDesdobramento, dataRef: dataRefIso, posicaoData: !!dataRef, layout: null })
+  })
+
+  // Execução da despesa pela codificação orçamentária completa (funcional-
+  // programática + natureza), por fonte e por função, com os estágios
+  // autorizado/empenhado/liquidado/pago. Read-only. Espelha /orcamento/saldo.
+  app.get<{ Querystring: { data?: string } }>('/orcamento/despesa/execucao', async (req, reply) => {
+    const { entidadeId, ano } = req.contexto
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const raw = req.query.data?.trim()
+    let dataRef: Date | undefined
+    if (raw) {
+      const d = new Date(`${raw}T00:00:00`)
+      if (!Number.isNaN(d.getTime())) dataRef = d
+    }
+    const execucao = await execucaoSvc.calcular(entidadeId, ano, dataRef)
+    const dataRefIso = (dataRef ?? new Date()).toISOString().slice(0, 10)
+    return reply.view('app/execucao-despesa', { entidade, ano, execucao, dataRef: dataRefIso, posicaoData: !!dataRef, layout: null })
   })
 
   // Acumulado diário da despesa: evolução do empenhado/liquidado/pago dia a dia

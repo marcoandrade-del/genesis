@@ -1,0 +1,85 @@
+<%# Tabela de execução da despesa. Params: titulo, icone, rotuloCol, linhas (LinhaExec[]),
+    arvore (bool — indenta rótulo por nível, habilita colapsar/expandir).
+    Colunas: Autorizado · Empenhado · A empenhar · Liquidado · A liquidar · Pago · A pagar. %>
+<% var tid = 'exe-' + String(titulo).toLowerCase().replace(/[^a-z0-9]+/g, '-') %>
+<% var brl = function (n) { return Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) } %>
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white border-bottom py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span class="fw-semibold small"><i class="bi bi-<%= icone %> me-2"></i><%= titulo %></span>
+    <div class="d-flex align-items-center gap-2">
+      <% if (arvore) { %>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Nível de detalhe">
+          <button type="button" id="<%= tid %>-menos" class="btn btn-outline-secondary py-0" title="Recolher um nível"><i class="bi bi-dash-lg"></i></button>
+          <span class="btn btn-outline-secondary py-0 disabled" style="pointer-events:none">Nível <span id="<%= tid %>-nivel">–</span></span>
+          <button type="button" id="<%= tid %>-mais" class="btn btn-outline-secondary py-0" title="Expandir um nível"><i class="bi bi-plus-lg"></i></button>
+        </div>
+      <% } %>
+      <input type="search" id="<%= tid %>-busca" class="form-control form-control-sm" style="width:170px"
+        placeholder="filtrar…" aria-label="Filtrar">
+    </div>
+  </div>
+  <div class="card-body p-0 table-responsive">
+    <table id="<%= tid %>" class="table table-hover table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3" style="width:150px">Código</th>
+          <th><%= rotuloCol %></th>
+          <th class="text-end">Autorizado</th>
+          <th class="text-end">Empenhado</th>
+          <th class="text-end">A empenhar</th>
+          <th class="text-end">Liquidado</th>
+          <th class="text-end">A liquidar</th>
+          <th class="text-end">Pago</th>
+          <th class="text-end pe-3">A pagar</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (linhas.length === 0) { %>
+          <tr><td colspan="9" class="text-center text-muted py-3">Sem dotações.</td></tr>
+        <% } %>
+        <% linhas.forEach(function(l) { %>
+          <tr data-nivel="<%= l.nivel %>" data-busca="<%= (l.codigo + ' ' + l.rotulo).toLowerCase() %>">
+            <td class="ps-3 font-monospace small"><%= l.codigo %></td>
+            <td class="small" <% if (arvore) { %>style="padding-left: calc(<%= (l.nivel - 1) * 1.1 %>rem + 0.5rem)"<% } %>><%= l.rotulo %></td>
+            <td class="text-end font-monospace small"><%= brl(l.autorizado) %></td>
+            <td class="text-end font-monospace small"><%= brl(l.empenhado) %></td>
+            <td class="text-end font-monospace small text-muted <%= l.aEmpenhar < 0 ? 'text-danger' : '' %>"><%= brl(l.aEmpenhar) %></td>
+            <td class="text-end font-monospace small"><%= brl(l.liquidado) %></td>
+            <td class="text-end font-monospace small text-muted <%= l.aLiquidar < 0 ? 'text-danger' : '' %>"><%= brl(l.aLiquidar) %></td>
+            <td class="text-end font-monospace small"><%= brl(l.pago) %></td>
+            <td class="text-end font-monospace small pe-3 fw-semibold <%= l.aPagar < 0 ? 'text-danger' : '' %>"><%= brl(l.aPagar) %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+// Colapsar/expandir por nível (se árvore) + filtro de texto, por tabela.
+(function () {
+  var rows = Array.prototype.slice.call(document.querySelectorAll('#<%= tid %> tbody tr[data-nivel]'))
+  if (!rows.length) return
+  var menos = document.getElementById('<%= tid %>-menos')
+  var mais = document.getElementById('<%= tid %>-mais')
+  var label = document.getElementById('<%= tid %>-nivel')
+  var busca = document.getElementById('<%= tid %>-busca')
+  var maxN = rows.reduce(function (m, r) { return Math.max(m, +r.getAttribute('data-nivel')) }, 1)
+  var cur = maxN
+  function aplicar() {
+    var q = (busca && busca.value || '').trim().toLowerCase()
+    rows.forEach(function (r) {
+      var okNivel = +r.getAttribute('data-nivel') <= cur
+      var okBusca = !q || r.getAttribute('data-busca').indexOf(q) >= 0
+      r.style.display = okNivel && okBusca ? '' : 'none'
+    })
+    if (label) label.textContent = cur
+    if (menos) menos.disabled = cur <= 1
+    if (mais) mais.disabled = cur >= maxN
+  }
+  if (menos) menos.addEventListener('click', function () { if (cur > 1) { cur--; aplicar() } })
+  if (mais) mais.addEventListener('click', function () { if (cur < maxN) { cur++; aplicar() } })
+  if (busca) busca.addEventListener('input', aplicar)
+  aplicar()
+})()
+</script>

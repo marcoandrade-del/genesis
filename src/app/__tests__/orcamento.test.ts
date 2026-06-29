@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock } = vi.hoisted(() => ({
+const { buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock } = vi.hoisted(() => ({
   buscarAnoMock: vi.fn(),
   dotListarMock: vi.fn(),
   prevListarMock: vi.fn(),
   saldoCalcularMock: vi.fn(),
+  execucaoCalcularMock: vi.fn(),
 }))
 
 vi.mock('../../services/orcamentos.js', () => ({
@@ -25,6 +26,11 @@ vi.mock('../../services/previsoes-receita.js', () => ({
 vi.mock('../../services/saldo-orcamentario.js', () => ({
   SaldoOrcamentarioService: class {
     calcular = saldoCalcularMock
+  },
+}))
+vi.mock('../../services/execucao-despesa.js', () => ({
+  ExecucaoDespesaService: class {
+    calcular = execucaoCalcularMock
   },
 }))
 
@@ -49,7 +55,7 @@ describe('appOrcamentoRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock].forEach((m) => m.mockReset())
+    ;[buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await montar())
   })
 
@@ -111,6 +117,36 @@ describe('appOrcamentoRoutes', () => {
     // PR E: colapsar por nível + filtro de texto por conta na tabela de saldo
     expect(res.body).toContain('filtrar conta')
     expect(res.body).toContain('data-nivel="3"')
+  })
+
+  it('GET /orcamento/despesa/execucao renderiza a execução por codificação completa', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    execucaoCalcularMock.mockResolvedValue({
+      temOrcamento: true,
+      resumo: { autorizado: 1000, empenhado: 500, liquidado: 400, pago: 300 },
+      porFP: [{ codigo: '02.001', rotulo: 'Chefia', nivel: 1, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
+      porFonte: [{ codigo: '100', rotulo: 'Tesouro', nivel: 1, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
+      porFuncao: [],
+      porNatureza: [{ codigo: '3.3.90.30', rotulo: 'Material', nivel: 3, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
+    })
+    const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao' })
+    expect(res.statusCode).toBe(200)
+    expect(execucaoCalcularMock).toHaveBeenCalledWith('ent1', 2026, undefined)
+    expect(res.body).toContain('Execução da Despesa')
+    expect(res.body).toContain('Por Funcional-programática + Natureza')
+    expect(res.body).toContain('A empenhar')
+    expect(res.body).toContain('A pagar')
+    expect(res.body).toContain('Material')
+    expect(res.body).toContain('Posição em') // seletor de data
+  })
+
+  it('GET /orcamento/despesa/execucao?data= calcula a posição até a data', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    execucaoCalcularMock.mockResolvedValue({ temOrcamento: true, resumo: { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }, porFP: [], porFonte: [], porFuncao: [], porNatureza: [] })
+    const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao?data=2026-03-15' })
+    expect(res.statusCode).toBe(200)
+    const arg = execucaoCalcularMock.mock.calls.at(-1)
+    expect((arg?.[2] as Date).toISOString()).toContain('2026-03')
   })
 
   it('GET /orcamento/saldo?data= calcula a posição até a data', async () => {
