@@ -1,0 +1,166 @@
+{
+  "contrato": {
+    "nome": "valores-mensais",
+    "versao": "1.0.0",
+    "recurso": "despesa"
+  },
+  "dados": {
+    "entidade": {
+      "id": "b186d24e-5f2a-4378-831f-c0092b626384",
+      "nome": "Prefeitura do Município",
+      "estado": "PR"
+    },
+    "ano": 2026,
+    "mesesRealizados": 6,
+    "itens": [
+      {
+        "grupo": "AMORTIZAÇÃO DA DÍVIDA",
+        "funcao": "ENCARGOS ESPECIAIS",
+        "orgao": "FUNDO MUNICIPAL DE DEFESA DO CONSUMIDOR - PROCON",
+        "fonte": "9999 - Fonte não discriminada (import Portal da Transparência)",
+        "empenhadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "liquidadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pagoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 10000
+      },
+      {
+        "grupo": "AMORTIZAÇÃO DA DÍVIDA",
+        "funcao": "ENCARGOS ESPECIAIS",
+        "orgao": "GABINETE DO PROCURADOR GERAL DO MUNICIPIO",
+        "fonte": "9999 - Fonte não discriminada (import Portal da Transparência)",
+        "empenhadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "liquidadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pagoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 31512819
+      },
+      {
+        "grupo": "AMORTIZAÇÃO DA DÍVIDA",
+        "funcao": "ENCARGOS ESPECIAIS",
+        "orgao": "GABINETE DO SECRETARIO DE FAZENDA",
+        "fonte": "9999 - Fonte não discriminada (import Portal da Transparência)",
+        "empenhadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "liquidadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "pagoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 72488350
+      }
+    ]
+  },
+  "_amostra": "Amostra enxuta (itens truncado para 3 de 215). Maringá/2026; shape exato do contrato valores-mensais v1.0.0."
+}

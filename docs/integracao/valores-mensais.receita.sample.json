@@ -1,0 +1,85 @@
+{
+  "contrato": {
+    "nome": "valores-mensais",
+    "versao": "1.0.0",
+    "recurso": "receita"
+  },
+  "dados": {
+    "entidade": {
+      "id": "b186d24e-5f2a-4378-831f-c0092b626384",
+      "nome": "Prefeitura do Município",
+      "estado": "PR"
+    },
+    "ano": 2026,
+    "mesesRealizados": 6,
+    "contas": [
+      {
+        "codigo": "1.1.1.2.50.0.1.00.00.00.00.00",
+        "descricao": "Imposto sobre a Propriedade Predial e Territorial Urbana - Principal",
+        "natureza": "Corrente",
+        "origem": "Impostos, Taxas e Contribuições de Melhoria",
+        "fonte": "1303 - Saúde Rec.Vinc.EC29/00 15% c/c 119.546-8",
+        "arrecadadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6000,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 52248375
+      },
+      {
+        "codigo": "1.1.1.2.50.0.1.00.00.00.00.00",
+        "descricao": "Imposto sobre a Propriedade Predial e Territorial Urbana - Principal",
+        "natureza": "Corrente",
+        "origem": "Impostos, Taxas e Contribuições de Melhoria",
+        "fonte": "1000 - Recursos Ordinários (Livres)",
+        "arrecadadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 208993500
+      },
+      {
+        "codigo": "1.1.1.2.50.0.1.00.00.00.00.00",
+        "descricao": "Imposto sobre a Propriedade Predial e Territorial Urbana - Principal",
+        "natureza": "Corrente",
+        "origem": "Impostos, Taxas e Contribuições de Melhoria",
+        "fonte": "1104 - Demais impostos vinculados à educação básica c/c 62-1",
+        "arrecadadoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "orcado": 87080625
+      }
+    ]
+  },
+  "_amostra": "Amostra enxuta (contas truncado para 3 de 403). Maringá/2026; shape exato do contrato valores-mensais v1.0.0."
+}
