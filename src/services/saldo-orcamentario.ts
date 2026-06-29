@@ -1,4 +1,11 @@
 import type { PrismaClient } from '@prisma/client'
+import {
+  resolverClassificacaoFonte,
+  classificarFonte,
+  ROTULO_FINALIDADE,
+  ORDEM_FINALIDADE,
+  type Finalidade,
+} from './fonte-classificacao.js'
 
 /**
  * Consulta read-only do saldo orçamentário da despesa de uma entidade × exercício.
@@ -24,6 +31,17 @@ export interface LinhaSaldo {
   empenhado: number
   disponivel: number
   origem?: string // só nas linhas por conta (MODELO|DESDOBRAMENTO) — p/ a granularidade do painel
+  finalidade?: string // só nas linhas por fonte — finalidade da fonte (MDE/ASPS/…)
+}
+
+/** Despesa agregada por FINALIDADE da fonte (MDE/ASPS/FUNDEB/livres/…). */
+export interface LinhaSaldoFinalidade {
+  finalidade: string
+  rotulo: string
+  autorizado: number
+  reservado: number
+  empenhado: number
+  disponivel: number
 }
 
 export interface SaldoOrcamentario {
@@ -33,6 +51,9 @@ export interface SaldoOrcamentario {
   porFonte: LinhaSaldo[]
   porFuncao: LinhaSaldo[]
   porConta: LinhaSaldo[]
+  // Por finalidade da fonte (eixo da prestação de contas).
+  porFinalidade: LinhaSaldoFinalidade[]
+  metodologiaFonte: string
 }
 
 /** Arredonda para centavos, evitando deriva de ponto flutuante na soma. */
@@ -52,6 +73,13 @@ export class SaldoOrcamentarioService {
    *   → em data passada o reservado é 0.
    */
   async calcular(entidadeId: string, ano: number, dataRef?: Date): Promise<SaldoOrcamentario> {
+    // Classificação de fonte→finalidade do Estado da entidade (default em código + override do banco).
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true } } } } },
+    })
+    const comp = resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao)
+
     const vazio: SaldoOrcamentario = {
       temOrcamento: false,
       resumo: { autorizado: 0, reservado: 0, empenhado: 0, disponivel: 0 },
@@ -59,6 +87,8 @@ export class SaldoOrcamentarioService {
       porFonte: [],
       porFuncao: [],
       porConta: [],
+      porFinalidade: [],
+      metodologiaFonte: comp.nome,
     }
 
     const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } } })
@@ -92,6 +122,8 @@ export class SaldoOrcamentarioService {
     const porUO = new Map<string, { codigo: string; rotulo: string; autorizado: number; reservado: number; empenhado: number }>()
     const porFonte = new Map<string, { codigo: string; rotulo: string; autorizado: number; reservado: number; empenhado: number }>()
     const porFuncao = new Map<string, { codigo: string; rotulo: string; autorizado: number; reservado: number; empenhado: number }>()
+    const porFin = new Map<Finalidade, { autorizado: number; reservado: number; empenhado: number }>()
+    const finDeFonte = new Map<string, Finalidade>() // fonteRecursoEntidadeId → finalidade
 
     const acumular = (
       mapa: Map<string, { codigo: string; rotulo: string; autorizado: number; reservado: number; empenhado: number }>,
@@ -128,6 +160,14 @@ export class SaldoOrcamentarioService {
       acumular(porUO, d.unidadeOrcamentariaId, d.unidadeOrcamentaria.codigo, d.unidadeOrcamentaria.nome, a, rr, e)
       acumular(porFonte, d.fonteRecursoEntidadeId, d.fonteRecurso.codigo, d.fonteRecurso.nomenclatura, a, rr, e)
       acumular(porFuncao, d.funcaoId, d.funcao.codigo, d.funcao.nome, a, rr, e)
+
+      const fin = classificarFonte(d.fonteRecurso.codigo, comp)
+      finDeFonte.set(d.fonteRecursoEntidadeId, fin)
+      const af = porFin.get(fin) ?? { ...ZERO }
+      af.autorizado += a
+      af.reservado += rr
+      af.empenhado += e
+      porFin.set(fin, af)
 
       // Roll-up na árvore de contas: a folha e todos os ancestrais recebem o valor.
       let id: string | null = d.contaDespesaEntidadeId
@@ -168,7 +208,7 @@ export class SaldoOrcamentarioService {
       .map(([id, v]) => linha(id, v.codigo, v.rotulo, 1, v))
       .sort(ordenarPorCodigo)
     const fontes = [...porFonte.entries()]
-      .map(([id, v]) => linha(id, v.codigo, v.rotulo, 1, v))
+      .map(([id, v]) => ({ ...linha(id, v.codigo, v.rotulo, 1, v), finalidade: finDeFonte.get(id) }))
       .sort(ordenarPorCodigo)
     const funcoes = [...porFuncao.entries()]
       .map(([id, v]) => linha(id, v.codigo, v.rotulo, 1, v))
@@ -195,6 +235,18 @@ export class SaldoOrcamentarioService {
       porFonte: fontes,
       porFuncao: funcoes,
       porConta,
+      porFinalidade: ORDEM_FINALIDADE.filter((fin) => porFin.has(fin)).map((fin) => {
+        const v = porFin.get(fin)!
+        return {
+          finalidade: fin,
+          rotulo: ROTULO_FINALIDADE[fin],
+          autorizado: r2(v.autorizado),
+          reservado: r2(v.reservado),
+          empenhado: r2(v.empenhado),
+          disponivel: r2(v.autorizado - v.reservado - v.empenhado),
+        }
+      }),
+      metodologiaFonte: comp.nome,
     }
   }
 

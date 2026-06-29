@@ -1,20 +1,27 @@
 import type { PrismaClient } from '@prisma/client'
 
 /**
- * Execução da despesa pela codificação orçamentária COMPLETA: a despesa cruzada
- * pela funcional-programática (UO → Função → Subfunção → Programa → Ação) +
- * natureza, e também por Fonte de Recurso e por Função, mostrando os estágios
- * Autorizado / Empenhado / Liquidado / Pago (e os saldos a executar). Read-only.
+ * Execução da despesa pela codificação orçamentária COMPLETA, como árvore de
+ * dotações desdobrável por linha:
+ *   Unidade Orçamentária → Função/Subfunção → Programa/Ação → dotação (Natureza + Fonte).
+ * Cada nó traz Autorizado / Empenhado / Liquidado / Pago (e os saldos a executar),
+ * com roll-up dos filhos. Read-only. `dataRef` = posição até a data.
  *
- * Autorizado vem de `DotacaoDespesa.valorAutorizado`; empenhado/liquidado/pago
- * vêm do ledger `MovimentoEmpenho` (sinal por tipo, igual ao despesa-diaria),
- * somados por dotação e com roll-up por dimensão. `dataRef` = posição até a data.
+ * Autorizado vem de `DotacaoDespesa.valorAutorizado`; empenhado/liquidado/pago do
+ * ledger `MovimentoEmpenho` (sinal por tipo, igual ao despesa-diaria).
  */
 
-export interface LinhaExec {
-  codigo: string
-  rotulo: string
-  nivel: number
+export interface LinhaDotacao {
+  path: string
+  parentPath: string | null
+  nivel: number // 1=UO · 2=Função/Subf · 3=Programa/Ação · 4=dotação (natureza+fonte)
+  uo: string
+  funcaoSubf: string
+  programaAcao: string
+  natureza: string
+  fonte: string
+  rotulo: string // descrição do nível (nome da UO/função/ação/natureza)
+  temFilhos: boolean
   autorizado: number
   empenhado: number
   aEmpenhar: number
@@ -22,24 +29,30 @@ export interface LinhaExec {
   aLiquidar: number
   pago: number
   aPagar: number
-  origem?: string // só em porNatureza (MODELO|DESDOBRAMENTO) — p/ granularidade
 }
 
 export interface ExecucaoDespesa {
   temOrcamento: boolean
   resumo: { autorizado: number; empenhado: number; liquidado: number; pago: number }
-  porFP: LinhaExec[]
-  porFonte: LinhaExec[]
-  porFuncao: LinhaExec[]
-  porNatureza: LinhaExec[]
+  dotacoes: LinhaDotacao[]
+  totalDotacoes: number // nº de dotações (folhas)
 }
 
 const r2 = (n: number) => Math.round(n * 100) / 100
-// Separador das chaves de caminho da FP: "-" ordena antes dos dígitos e não
-// aparece nos códigos (numéricos/pontuados) das dimensões — pai antes dos filhos.
-const SEP = '-'
+const SEP = '|' // separa segmentos do path; não aparece nos códigos (numéricos/pontuados)
 
-type Estagios = { autorizado: number; empenhado: number; liquidado: number; pago: number }
+type No = {
+  path: string
+  parentPath: string | null
+  nivel: number
+  cod: string // código do segmento (para a coluna do nível)
+  rotulo: string
+  temFilhos: boolean
+  autorizado: number
+  empenhado: number
+  liquidado: number
+  pago: number
+}
 
 export class ExecucaoDespesaService {
   constructor(private prisma: PrismaClient) {}
@@ -48,10 +61,8 @@ export class ExecucaoDespesaService {
     const vazio: ExecucaoDespesa = {
       temOrcamento: false,
       resumo: { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 },
-      porFP: [],
-      porFonte: [],
-      porFuncao: [],
-      porNatureza: [],
+      dotacoes: [],
+      totalDotacoes: 0,
     }
     const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
     if (!orcamento) return vazio
@@ -82,91 +93,78 @@ export class ExecucaoDespesaService {
       execDot.set(did, e)
     }
 
-    // Árvore de contas (natureza) para roll-up.
-    const contas = await this.prisma.contaDespesaEntidade.findMany({
-      where: { entidadeId, ano },
-      select: { id: true, codigo: true, descricao: true, nivel: true, parentId: true, origem: true },
-    })
-    const noConta = new Map(contas.map((c) => [c.id, c]))
+    const resumo = { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }
+    const nos = new Map<string, No>()
+    let totalDotacoes = 0
 
-    const novo = (codigo: string, rotulo: string, nivel: number): LinhaExec => ({
-      codigo, rotulo, nivel, autorizado: 0, empenhado: 0, aEmpenhar: 0, liquidado: 0, aLiquidar: 0, pago: 0, aPagar: 0,
-    })
-    const soma = (l: LinhaExec, e: Estagios) => {
-      l.autorizado += e.autorizado
-      l.empenhado += e.empenhado
-      l.liquidado += e.liquidado
-      l.pago += e.pago
+    const acumular = (path: string, parentPath: string | null, nivel: number, cod: string, rotulo: string, e: { autorizado: number; empenhado: number; liquidado: number; pago: number }) => {
+      const n = nos.get(path) ?? { path, parentPath, nivel, cod, rotulo, temFilhos: nivel < 4, autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }
+      n.autorizado += e.autorizado
+      n.empenhado += e.empenhado
+      n.liquidado += e.liquidado
+      n.pago += e.pago
+      nos.set(path, n)
     }
 
-    const resumo = { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }
-    const accFP = new Map<string, LinhaExec>()
-    const accFonte = new Map<string, LinhaExec>()
-    const accFuncao = new Map<string, LinhaExec>()
-    const accNat = new Map<string, LinhaExec>()
-
     for (const d of dotacoes) {
+      totalDotacoes++
       const ex = execDot.get(d.id) ?? { empenhado: 0, liquidado: 0, pago: 0 }
-      const e: Estagios = { autorizado: Number(d.valorAutorizado), empenhado: ex.empenhado, liquidado: ex.liquidado, pago: ex.pago }
+      const e = { autorizado: Number(d.valorAutorizado), empenhado: ex.empenhado, liquidado: ex.liquidado, pago: ex.pago }
       resumo.autorizado += e.autorizado
       resumo.empenhado += e.empenhado
       resumo.liquidado += e.liquidado
       resumo.pago += e.pago
 
-      // Funcional-programática + natureza, com roll-up por chave de caminho.
-      const segs = [
-        { cod: d.unidadeOrcamentaria.codigo, nome: d.unidadeOrcamentaria.nome },
-        { cod: d.funcao.codigo, nome: d.funcao.nome },
-        { cod: d.subfuncao.codigo, nome: d.subfuncao.nome },
-        { cod: d.programa.codigo, nome: d.programa.nome },
-        { cod: d.acao.codigo, nome: d.acao.nome },
-        { cod: d.contaDespesa.codigo, nome: d.contaDespesa.descricao },
-      ]
-      for (let k = 1; k <= segs.length; k++) {
-        const key = segs.slice(0, k).map((s) => s.cod).join(SEP)
-        const cur = accFP.get(key) ?? novo(segs[k - 1]!.cod, segs[k - 1]!.nome, k)
-        soma(cur, e)
-        accFP.set(key, cur)
-      }
-      // Fonte (plano) e Função (plano).
-      const cf = accFonte.get(d.fonteRecurso.codigo) ?? novo(d.fonteRecurso.codigo, d.fonteRecurso.nomenclatura, 1)
-      soma(cf, e); accFonte.set(d.fonteRecurso.codigo, cf)
-      const cfu = accFuncao.get(d.funcao.codigo) ?? novo(d.funcao.codigo, d.funcao.nome, 1)
-      soma(cfu, e); accFuncao.set(d.funcao.codigo, cfu)
-      // Natureza: roll-up na árvore (folha → ancestrais).
-      let id: string | null = d.contaDespesaEntidadeId
-      const vis = new Set<string>()
-      while (id && !vis.has(id)) {
-        vis.add(id)
-        const node = noConta.get(id)
-        if (!node) break
-        const cn = accNat.get(id) ?? novo(node.codigo, node.descricao, node.nivel)
-        if (!cn.origem) cn.origem = node.origem
-        soma(cn, e)
-        accNat.set(id, cn)
-        id = node.parentId
-      }
+      const uoCod = d.unidadeOrcamentaria.codigo
+      const fsCod = `${d.funcao.codigo}.${d.subfuncao.codigo}`
+      const paCod = `${d.programa.codigo}.${d.acao.codigo}`
+      const natCod = d.contaDespesa.codigo
+      const fonte = d.fonteRecurso.codigo
+
+      const p1 = uoCod
+      const p2 = `${p1}${SEP}${fsCod}`
+      const p3 = `${p2}${SEP}${paCod}`
+      const p4 = `${p3}${SEP}${natCod}#${fonte}`
+      acumular(p1, null, 1, uoCod, d.unidadeOrcamentaria.nome, e)
+      acumular(p2, p1, 2, fsCod, `${d.funcao.nome} / ${d.subfuncao.nome}`, e)
+      acumular(p3, p2, 3, paCod, d.acao.nome, e)
+      acumular(p4, p3, 4, natCod, d.contaDespesa.descricao, e)
+      // a folha (dotação) carrega natureza + fonte nas suas colunas próprias.
+      const folha = nos.get(p4)!
+      folha.temFilhos = false
+      ;(folha as No & { fonte?: string }).fonte = fonte
     }
 
-    const finalize = (l: LinhaExec): LinhaExec => ({
-      ...l,
-      autorizado: r2(l.autorizado),
-      empenhado: r2(l.empenhado),
-      liquidado: r2(l.liquidado),
-      pago: r2(l.pago),
-      aEmpenhar: r2(l.autorizado - l.empenhado),
-      aLiquidar: r2(l.empenhado - l.liquidado),
-      aPagar: r2(l.liquidado - l.pago),
+    // Pré-ordem (pai antes dos filhos) pela ordenação das chaves de caminho.
+    const ordenadas = [...nos.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    const linhas: LinhaDotacao[] = ordenadas.map((n) => {
+      const fonte = (n as No & { fonte?: string }).fonte ?? ''
+      return {
+        path: n.path,
+        parentPath: n.parentPath,
+        nivel: n.nivel,
+        uo: n.nivel === 1 ? n.cod : '',
+        funcaoSubf: n.nivel === 2 ? n.cod : '',
+        programaAcao: n.nivel === 3 ? n.cod : '',
+        natureza: n.nivel === 4 ? n.cod : '',
+        fonte: n.nivel === 4 ? fonte : '',
+        rotulo: n.rotulo,
+        temFilhos: n.temFilhos,
+        autorizado: r2(n.autorizado),
+        empenhado: r2(n.empenhado),
+        aEmpenhar: r2(n.autorizado - n.empenhado),
+        liquidado: r2(n.liquidado),
+        aLiquidar: r2(n.empenhado - n.liquidado),
+        pago: r2(n.pago),
+        aPagar: r2(n.liquidado - n.pago),
+      }
     })
-    const ordCod = (a: LinhaExec, b: LinhaExec) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true })
 
     return {
       temOrcamento: true,
       resumo: { autorizado: r2(resumo.autorizado), empenhado: r2(resumo.empenhado), liquidado: r2(resumo.liquidado), pago: r2(resumo.pago) },
-      porFP: [...accFP.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, l]) => finalize(l)),
-      porFonte: [...accFonte.values()].map(finalize).sort(ordCod),
-      porFuncao: [...accFuncao.values()].map(finalize).sort(ordCod),
-      porNatureza: [...accNat.values()].map(finalize).sort(ordCod),
+      dotacoes: linhas,
+      totalDotacoes,
     }
   }
 }

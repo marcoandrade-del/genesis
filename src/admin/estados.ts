@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { EstadosService } from '../services/estados.js'
 import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
 import { parseComposicao } from '../services/rcl.js'
+import { parseClassificacaoFonte } from '../services/fonte-classificacao.js'
 import { lerXlsxBase64 } from '../services/rcl-xlsx.js'
 import { RclImportIaService } from '../services/rcl-import-ia.js'
 import { ErroNegocio } from '../errors.js'
@@ -57,7 +58,7 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string }
-    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; rclComposicao?: string }
+    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; rclComposicao?: string; fonteClassificacao?: string }
   }>(
     '/:id',
     async (req, reply) => {
@@ -77,10 +78,21 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
           /* JSON inválido → mantém DbNull (limpa) */
         }
       }
+      // Classificação de fonte→finalidade editável (mesmo padrão do RCL): vazio/inválido = limpa (volta ao default).
+      let fonteClassificacao: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull
+      const rawFonte = req.body.fonteClassificacao
+      if (rawFonte && rawFonte.trim()) {
+        try {
+          const cfg = JSON.parse(rawFonte) as Prisma.InputJsonValue
+          if (parseClassificacaoFonte(cfg)) fonteClassificacao = cfg
+        } catch {
+          /* JSON inválido → mantém DbNull (limpa) */
+        }
+      }
       try {
         await app.prisma.estado.update({
           where: { id: req.params.id },
-          data: { loaCodigoModo: modo, loaCodigoNivel: nivel, rclComposicao },
+          data: { loaCodigoModo: modo, loaCodigoNivel: nivel, rclComposicao, fonteClassificacao },
         })
         const r = await service.definirModelo(req.params.id, novoId)
         // Sinaliza ao admin quantos municípios foram tocados pela propagação.

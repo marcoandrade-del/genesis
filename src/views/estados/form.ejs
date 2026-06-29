@@ -71,6 +71,14 @@
     </div>
     <% const rclInicial = (typeof propostaRcl !== 'undefined' && propostaRcl) ? propostaRcl : estado.rclComposicao %>
     <%- include('_rcl-editor', { rclInicial }) %>
+
+    <hr class="my-3">
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Classificação de fonte → finalidade (controle por fonte / LRF)</label>
+      <textarea name="fonteClassificacao" rows="6" class="form-control form-control-sm font-monospace" style="font-size:.75rem"
+        placeholder='{"nome":"TCE-PR","regras":[{"finalidade":"MDE","prefixos":["1104"]}]}'><%= estado.fonteClassificacao ? JSON.stringify(estado.fonteClassificacao, null, 2) : '' %></textarea>
+      <div class="form-text">Vazio = usa o padrão do código (STN, ou o delta do Estado). Finalidades: LIVRES, MDE, FUNDEB, ASPS, RPPS, DIVIDA, OUTRAS_VINCULADAS.</div>
+    </div>
   </div>
 
   <div class="modal-footer">

@@ -119,30 +119,32 @@ describe('appOrcamentoRoutes', () => {
     expect(res.body).toContain('data-nivel="3"')
   })
 
-  it('GET /orcamento/despesa/execucao renderiza a execução por codificação completa', async () => {
+  it('GET /orcamento/despesa/execucao renderiza a árvore de dotações (codificação completa)', async () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     execucaoCalcularMock.mockResolvedValue({
       temOrcamento: true,
       resumo: { autorizado: 1000, empenhado: 500, liquidado: 400, pago: 300 },
-      porFP: [{ codigo: '02.001', rotulo: 'Chefia', nivel: 1, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
-      porFonte: [{ codigo: '100', rotulo: 'Tesouro', nivel: 1, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
-      porFuncao: [],
-      porNatureza: [{ codigo: '3.3.90.30', rotulo: 'Material', nivel: 3, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 }],
+      totalDotacoes: 1,
+      dotacoes: [
+        { path: '02.001', parentPath: '', nivel: 1, uo: '02.001', funcaoSubf: '', programaAcao: '', natureza: '', fonte: '', rotulo: 'Chefia', temFilhos: true, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
+        { path: '02.001|04.122|0001.2001|3.3.90.30#100', parentPath: '02.001|04.122|0001.2001', nivel: 4, uo: '', funcaoSubf: '', programaAcao: '', natureza: '3.3.90.30', fonte: '100', rotulo: 'Material', temFilhos: false, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
+      ],
     })
     const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao' })
     expect(res.statusCode).toBe(200)
     expect(execucaoCalcularMock).toHaveBeenCalledWith('ent1', 2026, undefined)
     expect(res.body).toContain('Execução da Despesa')
-    expect(res.body).toContain('Por Funcional-programática + Natureza')
-    expect(res.body).toContain('A empenhar')
-    expect(res.body).toContain('A pagar')
-    expect(res.body).toContain('Material')
+    expect(res.body).toContain('Dotações de despesa')
+    expect(res.body).toContain('Unid. Orç.')
+    expect(res.body).toContain('a empenhar') // sub-rótulo das colunas (2 linhas)
+    expect(res.body).toContain('3.3.90.30') // natureza da folha
+    expect(res.body).toContain('toggleExecRow') // desdobrar por linha
     expect(res.body).toContain('Posição em') // seletor de data
   })
 
   it('GET /orcamento/despesa/execucao?data= calcula a posição até a data', async () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
-    execucaoCalcularMock.mockResolvedValue({ temOrcamento: true, resumo: { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }, porFP: [], porFonte: [], porFuncao: [], porNatureza: [] })
+    execucaoCalcularMock.mockResolvedValue({ temOrcamento: true, resumo: { autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }, dotacoes: [], totalDotacoes: 0 })
     const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao?data=2026-03-15' })
     expect(res.statusCode).toBe(200)
     const arg = execucaoCalcularMock.mock.calls.at(-1)

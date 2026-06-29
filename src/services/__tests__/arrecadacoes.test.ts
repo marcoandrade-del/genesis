@@ -290,4 +290,25 @@ describe('ArrecadacoesService.resumo', () => {
     expect(r.porConta).toEqual([])
     expect(r.porFonte).toHaveLength(1)
   })
+
+  it('agrega por finalidade da fonte usando a classificação do Estado (PR)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ municipio: { estado: { sigla: 'PR', fonteClassificacao: null } } })
+    prisma.orcamento.findUnique.mockResolvedValue(ORC)
+    prisma.contaReceitaEntidade.findMany.mockResolvedValue([])
+    prisma.previsaoReceita.findMany.mockResolvedValue([
+      { contaReceitaEntidadeId: 'x', fonteRecursoEntidadeId: 'a', valorPrevisto: '300', valorArrecadado: '0', fonteRecurso: { codigo: '1104', nomenclatura: 'Educação' } }, // MDE
+      { contaReceitaEntidadeId: 'x', fonteRecursoEntidadeId: 'b', valorPrevisto: '200', valorArrecadado: '50', fonteRecurso: { codigo: '1303', nomenclatura: 'Saúde 15%' } }, // ASPS
+      { contaReceitaEntidadeId: 'x', fonteRecursoEntidadeId: 'c', valorPrevisto: '500', valorArrecadado: '0', fonteRecurso: { codigo: '1000', nomenclatura: 'Livres' } }, // LIVRES
+      { contaReceitaEntidadeId: 'x', fonteRecursoEntidadeId: 'd', valorPrevisto: '10', valorArrecadado: '0', fonteRecurso: { codigo: '9999', nomenclatura: 'Não discriminada' } }, // NAO_CLASSIFICADA
+    ])
+    const r = await service.resumo('ent1', 2026)
+    expect(r.metodologiaFonte).toContain('TCE-PR')
+    // ordem estável: LIVRES, MDE, ASPS, …, NAO_CLASSIFICADA
+    expect(r.porFinalidade.map((l) => [l.finalidade, l.previsto, l.arrecadado])).toEqual([
+      ['LIVRES', 500, 0],
+      ['MDE', 300, 0],
+      ['ASPS', 200, 50],
+      ['NAO_CLASSIFICADA', 10, 0],
+    ])
+  })
 })
