@@ -42,10 +42,10 @@
       <%- include('_seletor-granularidade') %>
       <% if (mensalRotulo) { %>
         <div class="btn-group btn-group-sm" role="group" aria-label="Modo do desdobramento" title="<%= mensalRotulo %>">
-          <button type="button" class="btn btn-outline-secondary active" data-modo="expandir" onclick="setModoMensal(this, 'expandir')" title="Expandir uma conta por vez (▸)"><i class="bi bi-arrows-expand"></i> Por conta</button>
+          <button type="button" class="btn btn-outline-secondary active" data-modo="expandir" onclick="setModoMensal(this, 'expandir')" title="Uma conta por vez: clique no ▸ para abrir o desdobramento"><i class="bi bi-arrows-expand"></i> Por conta</button>
           <button type="button" class="btn btn-outline-secondary" data-modo="colunas" onclick="setModoMensal(this, 'colunas')" title="Mostrar os períodos em colunas, em todas as contas"><i class="bi bi-table"></i> Em colunas</button>
         </div>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Granularidade do período" title="<%= mensalRotulo %>">
+        <div id="grpGran" class="btn-group btn-group-sm" role="group" aria-label="Granularidade (modo Em colunas)" title="Granularidade do modo Em colunas" style="display:none">
           <button type="button" class="btn btn-outline-primary active" data-gran="12" onclick="setGranMensal(this, 12)">Mensal</button>
           <button type="button" class="btn btn-outline-primary" data-gran="6" onclick="setGranMensal(this, 6)">Bimestral</button>
           <button type="button" class="btn btn-outline-primary" data-gran="3" onclick="setGranMensal(this, 3)">Quadrimestral</button>
@@ -144,10 +144,10 @@
           <tr><td colspan="12" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Plano não copiado para o exercício <%= ano %>.</td></tr>
         <% } %>
         <% contas.forEach(function(c) { %>
-          <tr data-nivel="<%= c.nivel %>"<% if (c.mensal) { %> data-conta="<%= c.id %>" data-mensal="<%- JSON.stringify(c.mensal) %>"<% } %>>
+          <tr data-nivel="<%= c.nivel %>"<% if (c.mensal) { %> data-conta="<%= c.id %>" data-mensal="<%- JSON.stringify(c.mensal) %>" data-rotulo="<%= c.codigo %> · <%= c.descricao %>"<% } %>>
             <td class="ps-3">
               <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
-                <% if (c.mensal) { %><button type="button" class="btn btn-link btn-sm p-0 me-1 mensal-toggle align-baseline" onclick="toggleMensal('<%= c.id %>')" title="Desdobrar por período (<%= mensalRotulo %>)"><i class="bi bi-caret-right-fill"></i></button><% } %>
+                <% if (c.mensal) { %><button type="button" class="btn btn-link btn-sm p-0 me-1 mensal-toggle align-baseline" onclick="abrirModalMensal('<%= c.id %>')" title="Desdobrar por período (<%= mensalRotulo %>)"><i class="bi bi-bar-chart-steps"></i></button><% } %>
                 <span class="font-monospace small text-muted"><%= c.codigo %></span>
                 <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
                 <% if (c.redutora) { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-1" title="Conta redutora/retificadora (PCASP) — subtrai do saldo do grupo">redutora</span><% } %>
@@ -191,11 +191,6 @@
               </td>
             <% } %>
           </tr>
-          <% if (c.mensal) { %>
-            <tr class="mensal-detalhe" data-conta="<%= c.id %>" hidden>
-              <td colspan="12" class="bg-light px-3 py-2"><div class="mensal-cells small d-flex flex-wrap gap-2"></div></td>
-            </tr>
-          <% } %>
         <% }) %>
       </tbody>
     </table>
@@ -203,6 +198,36 @@
 
   <% if (!comSaldos) { %>
     <p class="small text-muted mt-2">Contas do modelo padrão não podem ser excluídas — só desdobradas. Desdobramentos que você criou podem ser removidos enquanto não tiverem filhos nem movimento.</p>
+  <% } %>
+
+  <% if (mensalRotulo) { %>
+    <!-- Modal de desdobramento de UMA conta (aberto pelo ▸); abas de período dentro -->
+    <div class="modal fade" id="modalMensal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header py-2">
+            <div>
+              <h6 class="modal-title fw-semibold mb-0" id="mmTitulo"></h6>
+              <small class="text-muted"><%= mensalRotulo %></small>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+          </div>
+          <div class="modal-body">
+            <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Período">
+              <button type="button" class="btn btn-outline-primary active" data-granm="12" onclick="setGranModal(this, 12)">Mensal</button>
+              <button type="button" class="btn btn-outline-primary" data-granm="6" onclick="setGranModal(this, 6)">Bimestral</button>
+              <button type="button" class="btn btn-outline-primary" data-granm="3" onclick="setGranModal(this, 3)">Quadrimestral</button>
+            </div>
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light"><tr><th>Período</th><th class="valor">Valor</th><th style="width:44px"></th></tr></thead>
+              <tbody id="mmCorpo"></tbody>
+              <tfoot><tr class="fw-semibold border-top"><td>Total</td><td class="valor font-monospace" id="mmTotal"></td><td></td></tr></tfoot>
+            </table>
+            <p class="small text-muted mt-2 mb-0"><i class="bi bi-diagram-3"></i> ver os lançamentos que formaram o valor — em breve.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   <% } %>
 </div>
 
@@ -240,32 +265,45 @@ function _gruposMensal(vals, g) {
   if (g === 3) { var q = []; for (var j = 0; j < 3; j++) { var s = 0; for (var k = 0; k < 4; k++) s += vals[j * 4 + k] || 0; q.push({ rot: j + 1 + 'º quad', val: s }) } return q }
   return MESES_LBL.map(function (m, i) { return { rot: m, val: vals[i] || 0 } })
 }
-function _renderMensal(sub) {
-  var contaId = sub.getAttribute('data-conta')
+// "Por conta": o ▸ abre o MODAL da conta com as abas de período (estado próprio).
+var granModal = 12
+var mmVals = null
+function abrirModalMensal(contaId) {
   var row = document.querySelector('tr[data-conta="' + contaId + '"][data-mensal]')
-  var cells = sub.querySelector('.mensal-cells')
-  if (!row || !cells) return
-  var vals = JSON.parse(row.getAttribute('data-mensal') || '[]')
-  cells.textContent = ''
-  _gruposMensal(vals, granMensal).forEach(function (p) {
-    var d = document.createElement('div'); d.className = 'border rounded px-2 py-1 bg-white text-center'; d.style.minWidth = '92px'
-    var r = document.createElement('div'); r.className = 'text-muted'; r.style.fontSize = '.65rem'; r.textContent = p.rot
-    var v = document.createElement('div'); v.className = 'font-monospace'; v.textContent = 'R$ ' + p.val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    d.appendChild(r); d.appendChild(v); cells.appendChild(d)
+  if (!row) return
+  mmVals = JSON.parse(row.getAttribute('data-mensal') || '[]')
+  var t = document.getElementById('mmTitulo'); if (t) t.textContent = row.getAttribute('data-rotulo') || ''
+  _renderModalBody()
+  if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(document.getElementById('modalMensal')).show()
+}
+function setGranModal(btn, g) {
+  granModal = g
+  Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
+  _renderModalBody()
+}
+function _renderModalBody() {
+  var corpo = document.getElementById('mmCorpo'); if (!corpo || !mmVals) return
+  corpo.textContent = ''
+  var total = 0
+  _gruposMensal(mmVals, granModal).forEach(function (p) {
+    total += p.val
+    var tr = document.createElement('tr')
+    var tdP = document.createElement('td'); tdP.textContent = p.rot
+    var tdV = document.createElement('td'); tdV.className = 'valor font-monospace'
+    if (p.val === 0) { tdV.textContent = '–'; tdV.className += ' text-muted' } else { tdV.textContent = 'R$ ' + _fmtMensal(p.val) }
+    var tdL = document.createElement('td'); tdL.className = 'text-end'
+    var lnk = document.createElement('span'); lnk.className = 'text-muted'; lnk.style.cursor = 'not-allowed'; lnk.title = 'Ver lançamentos — em breve'
+    var ic = document.createElement('i'); ic.className = 'bi bi-diagram-3'; lnk.appendChild(ic); tdL.appendChild(lnk)
+    tr.appendChild(tdP); tr.appendChild(tdV); tr.appendChild(tdL)
+    corpo.appendChild(tr)
   })
+  var tot = document.getElementById('mmTotal'); if (tot) tot.textContent = 'R$ ' + _fmtMensal(total)
 }
-function toggleMensal(contaId) {
-  var sub = document.querySelector('tr.mensal-detalhe[data-conta="' + contaId + '"]')
-  var icon = document.querySelector('tr[data-conta="' + contaId + '"][data-mensal] .mensal-toggle i')
-  if (!sub) return
-  if (sub.hasAttribute('hidden')) { sub.removeAttribute('hidden'); _renderMensal(sub); if (icon) icon.className = 'bi bi-caret-down-fill' }
-  else { sub.setAttribute('hidden', ''); if (icon) icon.className = 'bi bi-caret-right-fill' }
-}
+// Granularidade do modo "Em colunas" (matriz de todas as contas).
 function setGranMensal(btn, g) {
   granMensal = g
   Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
-  if (modoMensal === 'colunas') _renderColunas()
-  else document.querySelectorAll('tr.mensal-detalhe:not([hidden])').forEach(function (sub) { _renderMensal(sub) })
+  _renderColunas()
 }
 // Modo "Em colunas": injeta os períodos como colunas em TODAS as contas de uma vez.
 function _limparColunas() { document.querySelectorAll('.mensal-col').forEach(function (el) { el.remove() }) }
@@ -274,7 +312,6 @@ function _renderColunas() {
   var emColunas = modoMensal === 'colunas'
   // os ▸ só fazem sentido no modo "por conta"
   document.querySelectorAll('.mensal-toggle').forEach(function (b) { b.style.display = emColunas ? 'none' : '' })
-  if (emColunas) document.querySelectorAll('tr.mensal-detalhe').forEach(function (s) { s.setAttribute('hidden', '') })
   if (!emColunas) return
   var labels = _gruposMensal([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], granMensal).map(function (p) { return p.rot })
   var head = document.querySelector('#tbl thead tr')
@@ -291,6 +328,7 @@ function _renderColunas() {
 function setModoMensal(btn, modo) {
   modoMensal = modo
   Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
+  var grp = document.getElementById('grpGran'); if (grp) grp.style.display = modo === 'colunas' ? '' : 'none'
   _renderColunas()
 }
 </script>
