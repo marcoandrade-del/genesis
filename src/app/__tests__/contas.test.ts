@@ -87,10 +87,12 @@ describe('appContasRoutes', () => {
     // Seletor de posição: data + atalho de fim de mês
     expect(res.body).toContain('Posição em')
     expect(res.body).toContain('fim de mês')
-    // Desdobramento mensal: seletor de período + ▸ por conta (de ResumoMensalConta)
+    // Desdobramento mensal: ▸ por conta abre a modal (períodos de ResumoMensalConta)
     expect(res.body).toContain('Bimestral')
     expect(res.body).toContain('mensal-toggle')
     expect(res.body).toContain('data-mensal=')
+    expect(res.body).toContain('abrirModalMensal(')
+    expect(res.body).toContain('id="modalMensal"')
   })
 
   it('saldo respeita ?data= (posição numa data anterior)', async () => {
