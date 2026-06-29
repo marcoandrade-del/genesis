@@ -31,8 +31,12 @@
   </nav>
 
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-    <h2 class="h4 fw-bold mb-0"><%= titulo %> — <span class="font-monospace"><%= ano %></span></h2>
+    <div>
+      <h2 class="h4 fw-bold mb-0"><%= titulo %> — <span class="font-monospace"><%= ano %></span></h2>
+      <% if (subtitulo) { %><div class="small text-muted"><%= subtitulo %></div><% } %>
+    </div>
     <div class="d-flex align-items-center gap-2">
+      <% if (analiseLink) { %><a href="<%= analiseLink.href %>" class="btn btn-sm btn-outline-primary" title="Análise da execução pela codificação completa"><i class="bi bi-diagram-3 me-1"></i><%= analiseLink.rotulo %></a><% } %>
       <% if (comSaldos || saldoColunas) { %>
         <%- include('_seletor-posicao', { base, dataRef, ano }) %>
         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('tbl').classList.toggle('ocultar-detalhe')" title="Mostrar/ocultar detalhes">

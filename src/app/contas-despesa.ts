@@ -37,5 +37,9 @@ export async function appContasDespesaRoutes(app: FastifyInstance) {
     // Desdobramento mensal por conta (empenhado/mês) — visão geral + conferência.
     mensalMapa: (entidadeId, ano) => saldoDespesa.empenhadoMensal(entidadeId, ano),
     mensalRotulo: 'Empenhado/mês',
+    // Este plano é o cadastro/visão POR NATUREZA; a execução pela codificação
+    // completa (funcional-programática) vive na tela de Execução da Despesa.
+    subtitulo: 'Plano de contas por natureza (cadastro e consolidação por elemento)',
+    analiseLink: { href: '/app/orcamento/despesa/execucao', rotulo: 'Execução (funcional-programática)' },
   })
 }

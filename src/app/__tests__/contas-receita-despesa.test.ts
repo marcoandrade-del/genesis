@@ -64,6 +64,9 @@ describe('planos de receita e despesa no /app (factory compartilhada)', () => {
     expect(res.body).toContain('Disponível')
     expect(res.body).toContain('Posição em') // seletor de data
     expect(res.body).toContain('Bimestral') // seletor de desdobramento por período
+    // papel do plano explícito + link para a Execução (funcional-programática)
+    expect(res.body).toContain('por natureza')
+    expect(res.body).toContain('/app/orcamento/despesa/execucao')
     expect(prisma.contaDespesaEntidade.findMany).toHaveBeenCalledWith({
       where: { entidadeId: 'ent1', ano: 2026 },
       orderBy: { codigo: 'asc' },

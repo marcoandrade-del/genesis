@@ -47,6 +47,11 @@ export type ConfigPlano = {
    *  quadrimestral, reagrupadas no cliente). `mensalRotulo` rotula a métrica. */
   mensalMapa?: (entidadeId: string, ano: number) => Promise<Map<string, number[]>>
   mensalRotulo?: string
+  /** Link opcional para a tela de ANÁLISE correspondente (ex.: despesa → Execução
+   *  por funcional-programática), deixando claro que o plano é o cadastro/visão por
+   *  conta. `subtitulo` complementa o título explicando o recorte do plano. */
+  analiseLink?: { href: string; rotulo: string }
+  subtitulo?: string
 }
 
 type RenderOpts = {
@@ -166,6 +171,8 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       comSaldos: !!cfg.saldos,
       saldoColunas: cfg.saldoColunas ?? null,
       mensalRotulo: cfg.mensalRotulo ?? null,
+      analiseLink: cfg.analiseLink ?? null,
+      subtitulo: cfg.subtitulo ?? null,
       dataRef: isoData(dataRef),
       desdobrar: opts.desdobrar ?? null,
       sugestao: opts.sugestao ?? '',
