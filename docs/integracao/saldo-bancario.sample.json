@@ -1,0 +1,52 @@
+{
+  "contrato": {
+    "nome": "saldo-bancario",
+    "versao": "1.0.0",
+    "recurso": "saldo-bancario"
+  },
+  "dados": {
+    "entidade": {
+      "id": "b186d24e-5f2a-4378-831f-c0092b626384",
+      "nome": "Prefeitura do Município",
+      "estado": "PR"
+    },
+    "ano": 2026,
+    "mesesRealizados": 6,
+    "contas": [
+      {
+        "rotulo": "104 ag. 1234 c/c 7770001 — DEMO Conta IPTU",
+        "banco": "Caixa Econômica",
+        "fonte": "1303 - Saúde Rec.Vinc.EC29/00 15% c/c 119.546-8",
+        "saldoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6000,
+          6000,
+          6000,
+          6000,
+          6000,
+          6000,
+          6000
+        ],
+        "movimentacaoMensal": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          6000,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "_amostra": "Amostra (1 contas no total; truncado p/ 3). Maringá/2026; shape exato do contrato saldo-bancario v1.0.0."
+}

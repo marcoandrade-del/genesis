@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn() }))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
@@ -23,9 +23,14 @@ vi.mock('../../services/valores-mensais.js', () => ({
     despesa = m.valDesp
   },
 }))
+vi.mock('../../services/saldo-bancario-mensal.js', () => ({
+  SaldoBancarioMensalService: class {
+    consolidar = m.saldoBanc
+  },
+}))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
-import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS } from '../memoriais.js'
+import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO } from '../memoriais.js'
 import type { FastifyInstance } from 'fastify'
 
 const TOKEN = 'segredo-de-teste'
@@ -42,6 +47,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.saldoFonte.mockReset()
     m.valRec.mockReset()
     m.valDesp.mockReset()
+    m.saldoBanc.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
     ;({ app } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
@@ -165,6 +171,23 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   it('404 valores-mensais quando a entidade não existe', async () => {
     m.valRec.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/valores-mensais?entidadeId=x&ano=2026&tipo=receita', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('200 saldo-bancario — contrato próprio saldo-bancario', async () => {
+    m.saldoBanc.mockResolvedValue({ entidade: { id: 'e1', nome: 'Pref', estado: 'PR' }, ano: 2026, mesesRealizados: 6, contas: [{ rotulo: '001 ag. 1 c/c 2', saldoMensal: [100], movimentacaoMensal: [50] }] })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-bancario?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.nome).toBe(CONTRATO_SALDO_BANCARIO.nome)
+    expect(body.contrato.versao).toBe(CONTRATO_SALDO_BANCARIO.versao)
+    expect(body.dados.contas[0].rotulo).toBe('001 ag. 1 c/c 2')
+    expect(m.saldoBanc).toHaveBeenCalledWith('e1', 2026)
+  })
+
+  it('404 saldo-bancario quando a entidade não existe', async () => {
+    m.saldoBanc.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-bancario?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
   })
 })
