@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn() }))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
@@ -10,6 +10,11 @@ vi.mock('../../services/memorial-rcl.js', () => ({
 vi.mock('../../services/memorial-guardiao.js', () => ({
   MemorialGuardiaoService: class {
     guardiao = m.guardiao
+  },
+}))
+vi.mock('../../services/memorial-saldo-fonte.js', () => ({
+  MemorialSaldoFonteService: class {
+    saldoFonte = m.saldoFonte
   },
 }))
 
@@ -28,6 +33,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.rcl.mockReset()
     m.rclConsolidada.mockReset()
     m.guardiao.mockReset()
+    m.saldoFonte.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
     ;({ app } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
@@ -104,6 +110,21 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   it('404 Guardião quando a entidade não existe', async () => {
     m.guardiao.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/guardiao?entidadeId=x&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('200 saldo por fonte (receita+despesa por finalidade) em envelope', async () => {
+    m.saldoFonte.mockResolvedValue({ receita: { porFinalidade: [{ finalidade: 'MDE' }] }, despesa: { porFinalidade: [] } })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-fonte?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().contrato.recurso).toBe('saldo-fonte')
+    expect(res.json().dados.receita.porFinalidade[0].finalidade).toBe('MDE')
+    expect(m.saldoFonte).toHaveBeenCalledWith('e1', 2026)
+  })
+
+  it('404 saldo por fonte quando a entidade não existe', async () => {
+    m.saldoFonte.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-fonte?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
   })
 })

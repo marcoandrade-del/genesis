@@ -3,6 +3,13 @@ import { ErroNegocio } from '../errors.js'
 import { MotorEventosReceita } from './motor-eventos-receita.js'
 import { LancamentosService } from './lancamentos.js'
 import { orcamentoPodeExecutar } from './orcamentos.js'
+import {
+  resolverClassificacaoFonte,
+  classificarFonte,
+  ROTULO_FINALIDADE,
+  ORDEM_FINALIDADE,
+  type Finalidade,
+} from './fonte-classificacao.js'
 
 export interface DadosArrecadacao {
   previsaoId: string
@@ -25,11 +32,23 @@ export interface LinhaArrecadacao {
   origem?: string // só nas linhas por conta (MODELO|DESDOBRAMENTO) — p/ a granularidade do painel
 }
 
+/** Receita agregada por FINALIDADE da fonte (MDE/ASPS/FUNDEB/livres/…). */
+export interface LinhaFinalidade {
+  finalidade: string
+  rotulo: string
+  previsto: number
+  arrecadado: number
+  saldo: number
+}
+
 export interface ResumoArrecadacao {
   temOrcamento: boolean
   resumo: { previsto: number; arrecadado: number; saldo: number }
   porFonte: LinhaArrecadacao[]
   porConta: LinhaArrecadacao[]
+  // Por finalidade da fonte (eixo da prestação de contas). Metodologia da classificação em `metodologiaFonte`.
+  porFinalidade: LinhaFinalidade[]
+  metodologiaFonte: string
 }
 
 const TIPOS_VALIDOS = ['ARRECADACAO', 'ESTORNO']
@@ -238,11 +257,20 @@ export class ArrecadacoesService {
    * — espelha o SaldoOrcamentarioService da despesa.
    */
   async resumo(entidadeId: string, ano: number): Promise<ResumoArrecadacao> {
+    // Classificação de fonte→finalidade do Estado da entidade (default em código + override do banco).
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true } } } } },
+    })
+    const comp = resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao)
+
     const vazio: ResumoArrecadacao = {
       temOrcamento: false,
       resumo: { previsto: 0, arrecadado: 0, saldo: 0 },
       porFonte: [],
       porConta: [],
+      porFinalidade: [],
+      metodologiaFonte: comp.nome,
     }
     const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } } })
     if (!orcamento) return vazio
@@ -262,12 +290,19 @@ export class ArrecadacoesService {
     let arrTotal = 0
     const porFonte = new Map<string, { codigo: string; rotulo: string; previsto: number; arrecadado: number }>()
     const acumConta = new Map<string, { previsto: number; arrecadado: number }>()
+    const porFin = new Map<Finalidade, { previsto: number; arrecadado: number }>()
 
     for (const p of previsoes) {
       const prev = Number(p.valorPrevisto)
       const arr = Number(p.valorArrecadado)
       prevTotal += prev
       arrTotal += arr
+
+      const fin = classificarFonte(p.fonteRecurso.codigo, comp)
+      const af = porFin.get(fin) ?? { previsto: 0, arrecadado: 0 }
+      af.previsto += prev
+      af.arrecadado += arr
+      porFin.set(fin, af)
 
       const f = porFonte.get(p.fonteRecursoEntidadeId) ?? {
         codigo: p.fonteRecurso.codigo,
@@ -320,6 +355,17 @@ export class ArrecadacoesService {
         .filter((c) => acumConta.has(c.id))
         .sort((a, b) => a.codigo.localeCompare(b.codigo, undefined, { numeric: true }))
         .map((c) => ({ ...linha(c.id, c.codigo, c.descricao, c.nivel, acumConta.get(c.id)!), origem: c.origem })),
+      porFinalidade: ORDEM_FINALIDADE.filter((fin) => porFin.has(fin)).map((fin) => {
+        const v = porFin.get(fin)!
+        return {
+          finalidade: fin,
+          rotulo: ROTULO_FINALIDADE[fin],
+          previsto: r2(v.previsto),
+          arrecadado: r2(v.arrecadado),
+          saldo: r2(v.previsto - v.arrecadado),
+        }
+      }),
+      metodologiaFonte: comp.nome,
     }
   }
 }

@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { MemorialRclService } from '../services/memorial-rcl.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
+import { MemorialSaldoFonteService } from '../services/memorial-saldo-fonte.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -15,7 +16,7 @@ import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.1.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.2.0' } as const
 
 /** Descritor do contrato: o que o Oxy pode validar antes de consumir. */
 export function descreverContrato() {
@@ -25,6 +26,7 @@ export function descreverContrato() {
       { recurso: 'rcl', campos: ['entidade', 'ano', 'metodologia', 'temOrcamento', 'correntes', 'correntesTotal', 'deducoes', 'deducoesTotal', 'rcl'] },
       { recurso: 'rcl-consolidada', campos: ['municipio', 'estado', 'ano', 'metodologia', 'entidades', 'correntesTotal', 'deducoesTotal', 'intra', 'rclTotal'] },
       { recurso: 'guardiao', campos: ['entidade', 'ano', 'metodologia', 'temOrcamento', 'indicadores'] },
+      { recurso: 'saldo-fonte', campos: ['entidade', 'ano', 'metodologia', 'receita', 'despesa'] },
     ],
   }
 }
@@ -42,6 +44,7 @@ const envelope = (recurso: string, dados: unknown) => ({
 export async function memoriaisApiRoutes(app: FastifyInstance) {
   const svc = new MemorialRclService(app.prisma)
   const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
+  const saldoFonteSvc = new MemorialSaldoFonteService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -80,5 +83,13 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const r = await guardiaoSvc.guardiao(p.entidadeId, p.ano)
     if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     return reply.send(envelope('guardiao', r))
+  })
+
+  app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/saldo-fonte', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const r = await saldoFonteSvc.saldoFonte(p.entidadeId, p.ano)
+    if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    return reply.send(envelope('saldo-fonte', r))
   })
 }
