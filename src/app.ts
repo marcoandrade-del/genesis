@@ -37,6 +37,9 @@ app.register(rateLimitPlugin, { global: false })
 
 app.get('/health', async () => ({ status: 'ok', system: 'Gênesis' }))
 
+// Raiz → app do usuário (a URL "pelada" cai no login em vez de 404).
+app.get('/', async (_req, reply) => reply.redirect('/app'))
+
 // ── Painel Admin (HTML, autenticação via cookie) ──────────────────────────────
 app.register(adminRoutes, { prefix: '/admin' })
 
