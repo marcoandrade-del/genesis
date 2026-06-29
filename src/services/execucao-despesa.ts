@@ -29,6 +29,7 @@ export interface LinhaDotacao {
   aLiquidar: number
   pago: number
   aPagar: number
+  dotacaoId?: string // só na folha (nível 4): a dotação única (p/ drill de lançamentos)
 }
 
 export interface ExecucaoDespesa {
@@ -52,6 +53,8 @@ type No = {
   empenhado: number
   liquidado: number
   pago: number
+  fonte?: string // só na folha
+  dotacaoId?: string // só na folha
 }
 
 export class ExecucaoDespesaService {
@@ -132,13 +135,14 @@ export class ExecucaoDespesaService {
       // a folha (dotação) carrega natureza + fonte nas suas colunas próprias.
       const folha = nos.get(p4)!
       folha.temFilhos = false
-      ;(folha as No & { fonte?: string }).fonte = fonte
+      folha.fonte = fonte
+      folha.dotacaoId = d.id
     }
 
     // Pré-ordem (pai antes dos filhos) pela ordenação das chaves de caminho.
     const ordenadas = [...nos.values()].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
     const linhas: LinhaDotacao[] = ordenadas.map((n) => {
-      const fonte = (n as No & { fonte?: string }).fonte ?? ''
+      const fonte = n.fonte ?? ''
       return {
         path: n.path,
         parentPath: n.parentPath,
@@ -148,6 +152,7 @@ export class ExecucaoDespesaService {
         programaAcao: n.nivel === 3 ? n.cod : '',
         natureza: n.nivel === 4 ? n.cod : '',
         fonte: n.nivel === 4 ? fonte : '',
+        ...(n.dotacaoId ? { dotacaoId: n.dotacaoId } : {}),
         rotulo: n.rotulo,
         temFilhos: n.temFilhos,
         autorizado: r2(n.autorizado),
@@ -165,6 +170,74 @@ export class ExecucaoDespesaService {
       resumo: { autorizado: r2(resumo.autorizado), empenhado: r2(resumo.empenhado), liquidado: r2(resumo.liquidado), pago: r2(resumo.pago) },
       dotacoes: linhas,
       totalDotacoes,
+    }
+  }
+
+  /**
+   * Série MENSAL (empenhado/liquidado/pago por mês) de um NÓ da árvore (por `path`):
+   * agrega as dotações cujo caminho começa pelo path. Read-only. null = path inexistente.
+   */
+  async mensal(entidadeId: string, ano: number, path: string): Promise<{ empenhadoMensal: number[]; liquidadoMensal: number[]; pagoMensal: number[] } | null> {
+    const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
+    if (!orcamento) return null
+    const dotacoes = await this.prisma.dotacaoDespesa.findMany({
+      where: { orcamentoId: orcamento.id },
+      select: { id: true, unidadeOrcamentaria: { select: { codigo: true } }, funcao: { select: { codigo: true } }, subfuncao: { select: { codigo: true } }, programa: { select: { codigo: true } }, acao: { select: { codigo: true } }, contaDespesa: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } },
+    })
+    const ids = new Set<string>()
+    for (const d of dotacoes) {
+      const p4 = `${d.unidadeOrcamentaria.codigo}${SEP}${d.funcao.codigo}.${d.subfuncao.codigo}${SEP}${d.programa.codigo}.${d.acao.codigo}${SEP}${d.contaDespesa.codigo}#${d.fonteRecurso.codigo}`
+      if (p4 === path || p4.startsWith(path + SEP)) ids.add(d.id)
+    }
+    if (ids.size === 0) return null
+    const movs = await this.prisma.movimentoEmpenho.findMany({
+      where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: new Date(Date.UTC(ano, 11, 31)) }, empenho: { dotacaoDespesaId: { in: [...ids] } } },
+      select: { tipo: true, valor: true, data: true },
+    })
+    const emp = new Array<number>(12).fill(0)
+    const liq = new Array<number>(12).fill(0)
+    const pag = new Array<number>(12).fill(0)
+    for (const mv of movs) {
+      const m = mv.data.getUTCMonth()
+      const v = Number(mv.valor)
+      if (mv.tipo === 'EMPENHO') emp[m] = (emp[m] ?? 0) + v
+      else if (mv.tipo === 'ESTORNO_EMPENHO') emp[m] = (emp[m] ?? 0) - v
+      else if (mv.tipo === 'LIQUIDACAO') liq[m] = (liq[m] ?? 0) + v
+      else if (mv.tipo === 'ESTORNO_LIQUIDACAO') liq[m] = (liq[m] ?? 0) - v
+      else if (mv.tipo === 'PAGAMENTO') pag[m] = (pag[m] ?? 0) + v
+      else if (mv.tipo === 'ESTORNO_PAGAMENTO') pag[m] = (pag[m] ?? 0) - v
+    }
+    return { empenhadoMensal: emp.map(r2), liquidadoMensal: liq.map(r2), pagoMensal: pag.map(r2) }
+  }
+
+  /**
+   * Lançamentos (ledger MovimentoEmpenho) de UMA dotação, em ordem cronológica.
+   * Valida que a dotação é da entidade. null = não encontrada / de outra entidade.
+   */
+  async lancamentos(entidadeId: string, dotacaoId: string): Promise<{ dotacao: { codigo: string; natureza: string; orgao: string; fonte: string }; movimentos: { data: Date; tipo: string; valor: number; documento: string }[] } | null> {
+    const dot = await this.prisma.dotacaoDespesa.findUnique({
+      where: { id: dotacaoId },
+      select: { orcamento: { select: { entidadeId: true } }, unidadeOrcamentaria: { select: { codigo: true, nome: true } }, funcao: { select: { codigo: true } }, contaDespesa: { select: { codigo: true, descricao: true } }, fonteRecurso: { select: { codigo: true, nomenclatura: true } } },
+    })
+    if (!dot || dot.orcamento.entidadeId !== entidadeId) return null
+    const movs = await this.prisma.movimentoEmpenho.findMany({
+      where: { empenho: { dotacaoDespesaId: dotacaoId } },
+      orderBy: [{ data: 'asc' }, { criadoEm: 'asc' }],
+      select: { data: true, tipo: true, valor: true, documento: true, empenho: { select: { numero: true } }, liquidacao: { select: { numero: true } }, ordemPagamento: { select: { numero: true } } },
+    })
+    return {
+      dotacao: {
+        codigo: `${dot.unidadeOrcamentaria.codigo} · ${dot.funcao.codigo} · ${dot.contaDespesa.codigo}`,
+        natureza: dot.contaDespesa.descricao,
+        orgao: dot.unidadeOrcamentaria.nome,
+        fonte: `${dot.fonteRecurso.codigo} - ${dot.fonteRecurso.nomenclatura}`,
+      },
+      movimentos: movs.map((m) => ({
+        data: m.data,
+        tipo: m.tipo,
+        valor: Number(m.valor),
+        documento: m.documento ?? (m.ordemPagamento ? `OP ${m.ordemPagamento.numero}` : m.liquidacao ? `Liq ${m.liquidacao.numero}` : `Emp ${m.empenho.numero}`),
+      })),
     }
   }
 }

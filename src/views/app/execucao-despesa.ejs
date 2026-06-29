@@ -79,7 +79,8 @@
               <th class="text-end">Autorizado</th>
               <th class="text-end">Empenhado<br><span class="text-muted fw-normal exec-saldo">a empenhar</span></th>
               <th class="text-end">Liquidado<br><span class="text-muted fw-normal exec-saldo">a liquidar</span></th>
-              <th class="text-end pe-3">Pago<br><span class="text-muted fw-normal exec-saldo">a pagar</span></th>
+              <th class="text-end">Pago<br><span class="text-muted fw-normal exec-saldo">a pagar</span></th>
+              <th class="pe-3" style="width:64px"></th>
             </tr>
           </thead>
           <tbody>
@@ -89,7 +90,7 @@
                    <% if (cod) { %><% if (mostraChevron) { %><button type="button" class="exec-chevron" onclick="toggleExecRow(this)"><i class="bi bi-chevron-<%= l.nivel <= 2 ? 'up' : 'down' %>"></i></button><% } %><span class="font-monospace small" title="<%= l.rotulo %>"><%= cod %></span><% } %>
                  <% } %>
               %>
-              <tr data-path="<%= l.path %>" data-parent="<%= l.parentPath || '' %>" data-nivel="<%= l.nivel %>" data-busca="<%= busca %>" data-aberto="<%= l.nivel <= 2 ? '1' : '0' %>"<% if (l.nivel > 3) { %> style="display:none"<% } %>>
+              <tr data-path="<%= l.path %>" data-parent="<%= l.parentPath || '' %>" data-nivel="<%= l.nivel %>" data-busca="<%= busca %>" data-rotulo="<%= l.rotulo %>" data-aberto="<%= l.nivel <= 2 ? '1' : '0' %>"<% if (l.nivel > 3) { %> style="display:none"<% } %>>
                 <td class="ps-3"><% celCod(l.uo, l.nivel === 1 && l.temFilhos) %></td>
                 <td><% celCod(l.funcaoSubf, l.nivel === 2 && l.temFilhos) %></td>
                 <td><% celCod(l.programaAcao, l.nivel === 3 && l.temFilhos) %></td>
@@ -98,15 +99,45 @@
                 <td class="text-end font-monospace small"><%= brl(l.autorizado) %></td>
                 <td class="text-end font-monospace small"><%= brl(l.empenhado) %><br><span class="text-muted exec-saldo <%= l.aEmpenhar < 0 ? 'text-danger' : '' %>"><%= brl(l.aEmpenhar) %></span></td>
                 <td class="text-end font-monospace small"><%= brl(l.liquidado) %><br><span class="text-muted exec-saldo <%= l.aLiquidar < 0 ? 'text-danger' : '' %>"><%= brl(l.aLiquidar) %></span></td>
-                <td class="text-end font-monospace small pe-3"><%= brl(l.pago) %><br><span class="text-muted exec-saldo <%= l.aPagar < 0 ? 'text-danger' : '' %>"><%= brl(l.aPagar) %></span></td>
+                <td class="text-end font-monospace small"><%= brl(l.pago) %><br><span class="text-muted exec-saldo <%= l.aPagar < 0 ? 'text-danger' : '' %>"><%= brl(l.aPagar) %></span></td>
+                <td class="text-end pe-3 text-nowrap">
+                  <button type="button" class="btn btn-link btn-sm p-0 me-2 align-baseline" title="Ver por mês" onclick="abrirMensalExec(this)"><i class="bi bi-calendar3"></i></button>
+                  <% if (l.dotacaoId) { %><a href="/app/orcamento/despesa/execucao/<%= l.dotacaoId %>/lancamentos" class="align-baseline text-decoration-none" title="Ver lançamentos"><i class="bi bi-list-ul"></i></a><% } %>
+                </td>
               </tr>
             <% }) %>
-            <% if (execucao.dotacoes.length === 0) { %><tr><td colspan="9" class="text-center text-muted py-4">Sem dotações neste exercício.</td></tr><% } %>
+            <% if (execucao.dotacoes.length === 0) { %><tr><td colspan="10" class="text-center text-muted py-4">Sem dotações neste exercício.</td></tr><% } %>
           </tbody>
         </table>
       </div>
     </div>
   <% } %>
+  <!-- Modal ▸ mensal: empenhado/liquidado/pago por período do nó (buscado sob demanda) -->
+  <div class="modal fade" id="modalExecMensal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header py-2">
+          <div>
+            <h6 class="modal-title fw-semibold mb-0" id="emTitulo"></h6>
+            <small class="text-muted">Empenhado · Liquidado · Pago por período</small>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <div class="btn-group btn-group-sm mb-3" role="group" aria-label="Período">
+            <button type="button" class="btn btn-outline-primary active" onclick="setGranExec(this, 12)">Mensal</button>
+            <button type="button" class="btn btn-outline-primary" onclick="setGranExec(this, 6)">Bimestral</button>
+            <button type="button" class="btn btn-outline-primary" onclick="setGranExec(this, 3)">Quadrimestral</button>
+          </div>
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light"><tr><th>Período</th><th class="text-end">Empenhado</th><th class="text-end">Liquidado</th><th class="text-end">Pago</th></tr></thead>
+            <tbody id="emCorpo"></tbody>
+            <tfoot><tr class="fw-semibold border-top"><td>Total</td><td class="text-end font-monospace small" id="emTotEmp"></td><td class="text-end font-monospace small" id="emTotLiq"></td><td class="text-end font-monospace small" id="emTotPag"></td></tr></tfoot>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -162,6 +193,52 @@ function execBuscar(q) {
     r.style.display = on ? '' : 'none'
     if (on && r.getAttribute('data-nivel') !== '4') { r.setAttribute('data-aberto', '1'); _execChevron(r, true) }
   })
+}
+
+// ▸ mensal: busca empenhado/liquidado/pago por mês do nó (path) e abre o modal.
+var granExec = 12
+var emDados = null
+var MESES_EX = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+function _grpEx(vals, g) {
+  if (g === 6) { var b = []; for (var i = 0; i < 6; i++) b.push({ rot: i + 1 + 'º bim', val: (vals[i * 2] || 0) + (vals[i * 2 + 1] || 0) }); return b }
+  if (g === 3) { var q = []; for (var j = 0; j < 3; j++) { var s = 0; for (var k = 0; k < 4; k++) s += vals[j * 4 + k] || 0; q.push({ rot: j + 1 + 'º quad', val: s }) } return q }
+  return MESES_EX.map(function (m, i) { return { rot: m, val: vals[i] || 0 } })
+}
+function _fmtEx(n) { return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+function _renderEx() {
+  var corpo = document.getElementById('emCorpo'); if (!corpo || !emDados) return
+  corpo.textContent = ''
+  var ge = _grpEx(emDados.empenhadoMensal || [], granExec), gl = _grpEx(emDados.liquidadoMensal || [], granExec), gp = _grpEx(emDados.pagoMensal || [], granExec)
+  var te = 0, tl = 0, tp = 0
+  for (var i = 0; i < ge.length; i++) {
+    te += ge[i].val; tl += gl[i].val; tp += gp[i].val
+    var tr = document.createElement('tr')
+    var c0 = document.createElement('td'); c0.textContent = ge[i].rot
+    var c1 = document.createElement('td'); c1.className = 'text-end font-monospace small'; c1.textContent = _fmtEx(ge[i].val)
+    var c2 = document.createElement('td'); c2.className = 'text-end font-monospace small'; c2.textContent = _fmtEx(gl[i].val)
+    var c3 = document.createElement('td'); c3.className = 'text-end font-monospace small'; c3.textContent = _fmtEx(gp[i].val)
+    tr.appendChild(c0); tr.appendChild(c1); tr.appendChild(c2); tr.appendChild(c3); corpo.appendChild(tr)
+  }
+  document.getElementById('emTotEmp').textContent = _fmtEx(te)
+  document.getElementById('emTotLiq').textContent = _fmtEx(tl)
+  document.getElementById('emTotPag').textContent = _fmtEx(tp)
+}
+function setGranExec(btn, g) {
+  granExec = g
+  Array.prototype.forEach.call(btn.parentNode.children, function (b) { b.classList.toggle('active', b === btn) })
+  _renderEx()
+}
+function abrirMensalExec(btn) {
+  var tr = btn.closest('tr')
+  var path = tr.getAttribute('data-path')
+  document.getElementById('emTitulo').textContent = tr.getAttribute('data-rotulo') || ''
+  emDados = null
+  var corpo = document.getElementById('emCorpo'); if (corpo) corpo.textContent = ''
+  fetch('/app/orcamento/despesa/execucao/mensal?path=' + encodeURIComponent(path), { headers: { Accept: 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null })
+    .then(function (d) { emDados = d || { empenhadoMensal: [], liquidadoMensal: [], pagoMensal: [] }; _renderEx() })
+    .catch(function () { emDados = { empenhadoMensal: [], liquidadoMensal: [], pagoMensal: [] }; _renderEx() })
+  if (window.bootstrap) bootstrap.Modal.getOrCreateInstance(document.getElementById('modalExecMensal')).show()
 }
 </script>
 </body>
