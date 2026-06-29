@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { MemorialRclService } from '../services/memorial-rcl.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { MemorialSaldoFonteService } from '../services/memorial-saldo-fonte.js'
+import { ValoresMensaisService } from '../services/valores-mensais.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -17,6 +18,13 @@ import { MemorialSaldoFonteService } from '../services/memorial-saldo-fonte.js'
  * Ver [[oxy-dashboards-integracao]].
  */
 export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.2.0' } as const
+
+/**
+ * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
+ * Versão própria, independente do `memoriais-lrf`. O oxy-bi-jpa valida este
+ * `versao` na resposta antes de agregar. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
+ */
+export const CONTRATO_VALORES_MENSAIS = { nome: 'valores-mensais', versao: '1.0.0' } as const
 
 /** Descritor do contrato: o que o Oxy pode validar antes de consumir. */
 export function descreverContrato() {
@@ -45,6 +53,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const svc = new MemorialRclService(app.prisma)
   const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
   const saldoFonteSvc = new MemorialSaldoFonteService(app.prisma)
+  const valoresSvc = new ValoresMensaisService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -91,5 +100,16 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const r = await saldoFonteSvc.saldoFonte(p.entidadeId, p.ano)
     if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     return reply.send(envelope('saldo-fonte', r))
+  })
+
+  // Valores mensais granulares p/ o painel do Oxy (contrato próprio `valores-mensais`).
+  app.get<{ Querystring: { entidadeId?: string; ano?: string; tipo?: string } }>('/memoriais/valores-mensais', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const tipo = req.query.tipo
+    if (tipo !== 'receita' && tipo !== 'despesa') return reply.code(400).send({ erro: 'tipo deve ser receita ou despesa.' })
+    const dados = tipo === 'receita' ? await valoresSvc.receita(p.entidadeId, p.ano) : await valoresSvc.despesa(p.entidadeId, p.ano)
+    if (!dados) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    return reply.send({ contrato: { ...CONTRATO_VALORES_MENSAIS, recurso: tipo }, dados })
   })
 }
