@@ -80,3 +80,80 @@ describe('ExecucaoDespesaService.calcular', () => {
     expect(r.dotacoes.filter((l) => l.nivel === 4)).toHaveLength(2)
   })
 })
+
+describe('ExecucaoDespesaService.mensal', () => {
+  let prisma: PrismaMock
+  let svc: ExecucaoDespesaService
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    svc = new ExecucaoDespesaService(prisma as never)
+  })
+
+  const movs = [
+    { tipo: 'EMPENHO', valor: '600', data: new Date(Date.UTC(2026, 0, 10)) },
+    { tipo: 'ESTORNO_EMPENHO', valor: '100', data: new Date(Date.UTC(2026, 0, 20)) }, // jan empenhado = 500
+    { tipo: 'LIQUIDACAO', valor: '400', data: new Date(Date.UTC(2026, 1, 10)) }, // fev
+    { tipo: 'PAGAMENTO', valor: '300', data: new Date(Date.UTC(2026, 2, 10)) }, // mar
+  ]
+  // path da folha a partir dos defaults de dotacao(): uo|func.subf|prog.acao|conta#fonte
+  const LEAF = '02.001|04.122|0001.2001|3.3.90.30#100'
+
+  it('série mensal (emp/liq/pago) do nó-folha pelo path', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([dotacao({ id: 'd1' })])
+    prisma.movimentoEmpenho.findMany.mockResolvedValue(movs)
+    const r = await svc.mensal('ent1', 2026, LEAF)
+    expect(r?.empenhadoMensal[0]).toBe(500)
+    expect(r?.liquidadoMensal[1]).toBe(400)
+    expect(r?.pagoMensal[2]).toBe(300)
+  })
+
+  it('nó-pai (UO) agrega a dotação sob o caminho', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([dotacao({ id: 'd1' })])
+    prisma.movimentoEmpenho.findMany.mockResolvedValue(movs)
+    const r = await svc.mensal('ent1', 2026, '02.001')
+    expect(r?.empenhadoMensal[0]).toBe(500)
+  })
+
+  it('path inexistente → null', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([dotacao({ id: 'd1' })])
+    expect(await svc.mensal('ent1', 2026, '99.999')).toBeNull()
+  })
+})
+
+describe('ExecucaoDespesaService.lancamentos', () => {
+  let prisma: PrismaMock
+  let svc: ExecucaoDespesaService
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    svc = new ExecucaoDespesaService(prisma as never)
+  })
+
+  it('lista o ledger da dotação (cronológico) com rótulo do documento', async () => {
+    prisma.dotacaoDespesa.findUnique.mockResolvedValue({
+      orcamento: { entidadeId: 'ent1' },
+      unidadeOrcamentaria: { codigo: '02.001', nome: 'Chefia' },
+      funcao: { codigo: '04' },
+      contaDespesa: { codigo: '3.3.90.30', descricao: 'Material de Consumo' },
+      fonteRecurso: { codigo: '100', nomenclatura: 'Tesouro' },
+    })
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { data: new Date(Date.UTC(2026, 2, 10)), tipo: 'EMPENHO', valor: '600', documento: null, empenho: { numero: '123' }, liquidacao: null, ordemPagamento: null },
+      { data: new Date(Date.UTC(2026, 2, 20)), tipo: 'PAGAMENTO', valor: '300', documento: null, empenho: { numero: '123' }, liquidacao: null, ordemPagamento: { numero: '88' } },
+    ])
+    const r = await svc.lancamentos('ent1', 'd1')
+    expect(r?.dotacao).toMatchObject({ natureza: 'Material de Consumo', orgao: 'Chefia', fonte: '100 - Tesouro' })
+    expect(r?.movimentos[0]).toMatchObject({ tipo: 'EMPENHO', valor: 600, documento: 'Emp 123' })
+    expect(r?.movimentos[1]?.documento).toBe('OP 88')
+  })
+
+  it('null se a dotação é de outra entidade', async () => {
+    prisma.dotacaoDespesa.findUnique.mockResolvedValue({
+      orcamento: { entidadeId: 'OUTRA' },
+      unidadeOrcamentaria: { codigo: '', nome: '' }, funcao: { codigo: '' }, contaDespesa: { codigo: '', descricao: '' }, fonteRecurso: { codigo: '', nomenclatura: '' },
+    })
+    expect(await svc.lancamentos('ent1', 'd1')).toBeNull()
+  })
+})

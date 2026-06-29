@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const { buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock } = vi.hoisted(() => ({
+const { buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock, execMensalMock, execLancMock } = vi.hoisted(() => ({
   buscarAnoMock: vi.fn(),
   dotListarMock: vi.fn(),
   prevListarMock: vi.fn(),
   saldoCalcularMock: vi.fn(),
   execucaoCalcularMock: vi.fn(),
+  execMensalMock: vi.fn(),
+  execLancMock: vi.fn(),
 }))
 
 vi.mock('../../services/orcamentos.js', () => ({
@@ -31,6 +33,8 @@ vi.mock('../../services/saldo-orcamentario.js', () => ({
 vi.mock('../../services/execucao-despesa.js', () => ({
   ExecucaoDespesaService: class {
     calcular = execucaoCalcularMock
+    mensal = execMensalMock
+    lancamentos = execLancMock
   },
 }))
 
@@ -55,7 +59,7 @@ describe('appOrcamentoRoutes', () => {
   let prisma: PrismaMock
 
   beforeEach(async () => {
-    ;[buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock].forEach((m) => m.mockReset())
+    ;[buscarAnoMock, dotListarMock, prevListarMock, saldoCalcularMock, execucaoCalcularMock, execMensalMock, execLancMock].forEach((m) => m.mockReset())
     ;({ app, prisma } = await montar())
   })
 
@@ -149,6 +153,41 @@ describe('appOrcamentoRoutes', () => {
     expect(res.statusCode).toBe(200)
     const arg = execucaoCalcularMock.mock.calls.at(-1)
     expect((arg?.[2] as Date).toISOString()).toContain('2026-03')
+  })
+
+  it('GET /orcamento/despesa/execucao/mensal?path= devolve a série mensal do nó (JSON)', async () => {
+    execMensalMock.mockResolvedValue({ empenhadoMensal: [500], liquidadoMensal: [0], pagoMensal: [0] })
+    const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao/mensal?path=02.001' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().empenhadoMensal[0]).toBe(500)
+    expect(execMensalMock).toHaveBeenCalledWith('ent1', 2026, '02.001')
+  })
+
+  it('GET /orcamento/despesa/execucao/mensal sem path → 400; nó inexistente → 404', async () => {
+    expect((await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao/mensal' })).statusCode).toBe(400)
+    execMensalMock.mockResolvedValue(null)
+    expect((await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao/mensal?path=x' })).statusCode).toBe(404)
+  })
+
+  it('GET /orcamento/despesa/execucao/:dotacaoId/lancamentos renderiza o ledger', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    execLancMock.mockResolvedValue({
+      dotacao: { codigo: '02.001 · 04 · 3.3.90.30', natureza: 'Material', orgao: 'Chefia', fonte: '100 - Tesouro' },
+      movimentos: [{ data: new Date(Date.UTC(2026, 2, 10)), tipo: 'EMPENHO', valor: 600, documento: 'Emp 123' }],
+    })
+    const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao/d1/lancamentos' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Material')
+    expect(res.body).toContain('Empenho')
+    expect(res.body).toContain('Emp 123')
+    expect(execLancMock).toHaveBeenCalledWith('ent1', 'd1')
+  })
+
+  it('GET …/lancamentos 404 quando a dotação não é da entidade', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    execLancMock.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao/x/lancamentos' })
+    expect(res.statusCode).toBe(404)
   })
 
   it('GET /orcamento/saldo?data= calcula a posição até a data', async () => {

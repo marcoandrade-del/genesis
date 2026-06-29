@@ -153,6 +153,32 @@ export async function appOrcamentoRoutes(app: FastifyInstance) {
     return reply.view('app/execucao-despesa', { entidade, ano, execucao, dataRef: dataRefIso, posicaoData: !!dataRef, layout: null })
   })
 
+  // ▸ mensal de um nó da árvore de execução (JSON p/ o modal). Read-only.
+  app.get<{ Querystring: { path?: string } }>('/orcamento/despesa/execucao/mensal', async (req, reply) => {
+    const { entidadeId, ano } = req.contexto
+    const path = req.query.path
+    if (!path) return reply.code(400).send({ erro: 'path obrigatório' })
+    const r = await execucaoSvc.mensal(entidadeId, ano, path)
+    if (!r) return reply.code(404).send({ erro: 'nó não encontrado' })
+    return reply.send(r)
+  })
+
+  // 🔗 lançamentos (ledger MovimentoEmpenho) de uma dotação da execução.
+  app.get<{ Params: { dotacaoId: string } }>('/orcamento/despesa/execucao/:dotacaoId/lancamentos', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const r = await execucaoSvc.lancamentos(req.contexto.entidadeId, req.params.dotacaoId)
+    if (!r) return reply.code(404).view('404', { caminho: req.url })
+    const dataBR = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    return reply.view('app/execucao-lancamentos', {
+      entidade,
+      ano: req.contexto.ano,
+      dotacao: r.dotacao,
+      movimentos: r.movimentos.map((m) => ({ ...m, data: dataBR(m.data) })),
+      layout: null,
+    })
+  })
+
   // Acumulado diário da despesa: evolução do empenhado/liquidado/pago dia a dia
   // vs o fixado, lida do ledger MovimentoEmpenho. Read-only. Espelha a receita (#113).
   app.get<{ Querystring: FiltroConsultaQuery }>('/orcamento/despesa/diario', async (req, reply) => {
