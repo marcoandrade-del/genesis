@@ -2,6 +2,7 @@
 
 - [⚠️ Coordenação entre sessões](coordenacao-sessoes.md) — QUADRO VIVO: ler ao iniciar e atualizar ao assumir/concluir trabalho; quem está em qual branch/PR e zonas de colisão
 - [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
+- [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — mesmo .git/índice/working-tree: conferir `git show --stat` antes de pushar, branch única, reset --hard pro origin pra recuperar divergência
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
 - [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas
@@ -23,6 +24,7 @@
 - [Compras no /app (operador): plano](compras-no-app-plano.md) — trazer Compras p/ área do usuário escopada ao contexto; reusa services; aguarda #42 mergear
 - [Gerador de Relatórios: plano 3 PRs](relatorios-gerador-plano.md) — /app, escopo por entidade; R1 cabeçalho/rodapé+editor WYSIWYG em andamento
 - [Orçamento Maringá 2026 importado](orcamento-maringa-importado.md) — LOA real no banco dev (403 previsões + 2.325 dotações); fonte 9999 na despesa, receita bruta; script aguarda PR
+- [Arrecadação Maringá importada (por fonte)](arrecadacao-maringa-importada.md) — execução da receita realizada no dev, por fonte (96,72% cobertura, R$1,73bi jan-jun); PR #165; alimenta valores-mensais/OXY
 - [Import em massa não dispara sync](contabil-import-massa-bypassa-sync.md) — importar plano-MODELO via script fura o SincronizadorContas → entidades defasam; remediar com scripts/ressincronizar_entidades_modelo.ts (feito p/ Maringá 2026-06-09)
 - [Drift de migração no banco dev](prisma-migrate-drift-genesis.md) — NÃO `migrate reset`; aplicar migração via diff+db execute+resolve
 - [Bug do engine de migração Prisma 7.7](prisma-migrate-engine-bug-7.7.md) — `H.replace` crasha diff/db execute/resolve; aplicar migração via psql + INSERT à mão em _prisma_migrations
