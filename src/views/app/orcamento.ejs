@@ -19,6 +19,7 @@
       <li class="breadcrumb-item active" aria-current="page">Orçamento</li>
     </ol>
   </nav>
+  <%- include('_subnav-orcamento', { atual: 'loa' }) %>
 
   <% if (typeof erro !== 'undefined' && erro) { %>
     <div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div>
@@ -42,21 +43,7 @@
         %>
         <span class="badge bg-<%= sb[0] %> bg-opacity-10 text-<%= sb[0] %>"><%= sb[1] %></span>
       <% } %>
-      <a href="/app/orcamento/saldo" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-wallet2 me-1"></i>Ver saldos
-      </a>
-      <a href="/app/orcamento/despesa/execucao" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-diagram-3 me-1"></i>Execução da despesa
-      </a>
-      <a href="/app/orcamento/creditos" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-plus-slash-minus me-1"></i>Créditos adicionais
-      </a>
-      <a href="/app/orcamento/arrecadacao" class="btn btn-sm btn-outline-primary">
-        <i class="bi bi-cash-stack me-1"></i>Arrecadação
-      </a>
-      <a href="/app/orcamento/relatorios" class="btn btn-sm btn-primary">
-        <i class="bi bi-file-earmark-text me-1"></i>Anexos da LOA
-      </a>
+      <a href="/app/orcamento/relatorios" class="btn btn-sm btn-primary"><i class="bi bi-file-earmark-text me-1"></i>Anexos da LOA</a>
     </div>
   </div>
 
@@ -71,11 +58,14 @@
             <% } else if (abertura.status === 'EM_EXECUCAO') { %>
               Abertura contabilizada — orçamento <strong>em execução</strong><% if (abertura.temExecucao) { %>, com movimentos no exercício<% } %>.
             <% } else { %>
-              A LOA precisa estar <strong>Publicada</strong> antes de contabilizar a abertura.
+              A LOA precisa estar <strong>Publicada</strong> antes de contabilizar a abertura — <a href="/admin/orcamentos" class="text-decoration-none">abra o orçamento</a> para publicá-la.
             <% } %>
           </div>
         </div>
         <div>
+          <% if (abertura.status !== 'PUBLICADO' && abertura.status !== 'EM_EXECUCAO' && !abertura.contabilizada) { %>
+            <a href="/admin/orcamentos" class="btn btn-primary btn-sm"><i class="bi bi-box-arrow-up-right me-1"></i>Abrir orçamento</a>
+          <% } %>
           <% if (abertura.podeContabilizar && podeEscrever) { %>
             <form method="post" action="/app/orcamento/abertura/contabilizar" onsubmit="return confirm('Contabilizar a abertura do exercício? Os lançamentos de abertura serão gerados e o orçamento entrará em execução.')">
               <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-circle me-1"></i>Contabilizar abertura</button>
