@@ -78,6 +78,8 @@ const isoData = (d: Date) => d.toISOString().slice(0, 10)
 
 const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
 
+const MESES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
 /**
  * Registra as rotas de um "plano de contas da entidade" no `/app`. Os 3 planos
  * (contábil, receita, despesa) têm regras de desdobramento idênticas — esta
@@ -234,10 +236,13 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     const dataRef = dataRefDe(req)
     const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
     const saldoGenMap = cfg.saldoMapa ? await cfg.saldoMapa(entidadeId, ano, dataRef) : null
+    const mensalMap = cfg.mensalMapa ? await cfg.mensalMapa(entidadeId, ano) : null
 
     const colunas = ['Código', 'Descrição', 'Nível']
     if (cfg.saldos) colunas.push('Saldo inicial', 'Débito', 'Crédito', 'Saldo atual', 'Natureza')
     else if (cfg.saldoColunas) colunas.push(...cfg.saldoColunas.map((c) => c.rotulo))
+    // 12 colunas mensais (jan→dez) da métrica do plano (ver mensalRotulo no título).
+    if (mensalMap) colunas.push(...MESES)
 
     const linhas = contasVisiveis.map((c) => {
       const row: unknown[] = [c.codigo, c.descricao, c.nivel]
@@ -254,10 +259,14 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
         const g = saldoGenMap?.get(c.id) ?? null
         for (const col of cfg.saldoColunas) row.push(g?.[col.chave] ?? 0)
       }
+      if (mensalMap) {
+        const m = mensalMap.get(c.id) ?? []
+        for (let i = 0; i < 12; i++) row.push(m[i] ?? 0)
+      }
       return row
     })
 
-    const titulo = `${cfg.titulo} — ${(entidade as { nome: string }).nome} · ${ano}`
+    const titulo = `${cfg.titulo} — ${(entidade as { nome: string }).nome} · ${ano}${mensalMap && cfg.mensalRotulo ? ` · mensal: ${cfg.mensalRotulo}` : ''}`
     if (formato === 'pdf') {
       const rodape = `<div style="width:100%;font-size:9px;font-family:sans-serif;padding:0 12mm;display:flex;justify-content:space-between;color:#666"><span>${esc(titulo)}</span><span>Página <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`
       const pdf = await gerarPdf({ corpoHtml: montarCorpoHtml({ colunas, linhas }, titulo, 0, null), header: '<span></span>', footer: rodape, margemTopoMm: 12, margemRodapeMm: 16 })
