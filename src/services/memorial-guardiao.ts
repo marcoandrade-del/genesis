@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { MemorialRclService } from './memorial-rcl.js'
+import { DespesaPessoalService } from './despesa-pessoal.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
 const D0 = () => new Prisma.Decimal(0)
@@ -100,9 +101,11 @@ export class MemorialGuardiaoService {
         },
       })
 
-      // 2) Despesa com Pessoal (% da RCL) — base: dotação autorizada (execução não lançada).
+      // 2) Despesa com Pessoal (% da RCL) — DTP fiel (inclusões − exclusões, RGF Anexo 1).
+      // Base: dotação autorizada (execução não lançada).
       if (rcl.rcl > 0) {
-        const pessoal = await this.pessoalAutorizado(entidadeId, ano)
+        const dtp = await new DespesaPessoalService(this.prisma).calcular(entidadeId, ano)
+        const pessoal = dtp.despesaLiquida
         const pct = r1((pessoal / rcl.rcl) * 100)
         indicadores.push({
           indicador: 'Despesa com Pessoal',
@@ -115,11 +118,12 @@ export class MemorialGuardiaoService {
           alerta: 48.6,
           nivel: nivelDe(pct, 54, 51.3, 48.6),
           memorial: {
-            descricao:
-              'Despesa com pessoal (naturezas 3.1) ÷ RCL. Base: dotação autorizada — execução ainda não lançada.',
-            baseLegal: 'LRF arts. 19-20 (limite 54% Executivo), 22 (prudencial) e 59 (alerta do TCE).',
+            descricao: `Despesa Total com Pessoal (inclusões − exclusões, ${dtp.metodologia}) ÷ RCL. Base: dotação autorizada — execução ainda não lançada.`,
+            baseLegal: 'LRF arts. 18-20 (limite 54% Executivo), 22 (prudencial) e 59 (alerta do TCE).',
             linhas: [
-              { item: 'Despesa com pessoal (3.1, autorizado)', valor: pessoal },
+              ...dtp.inclusoes.map((l) => ({ item: l.rotulo, valor: l.valor })),
+              ...dtp.exclusoes.map((l) => ({ item: l.rotulo, valor: l.valor })),
+              { item: '= Despesa com Pessoal (líquida)', valor: pessoal },
               { item: 'RCL', valor: rcl.rcl },
             ],
           },
@@ -173,19 +177,5 @@ export class MemorialGuardiaoService {
       somaAutorizado({ funcao: { codigo: '10' } }),
     ])
     return { total, educacao, saude }
-  }
-
-  /** Soma da despesa autorizada nas naturezas de pessoal (código 3.1.x). */
-  private async pessoalAutorizado(entidadeId: string, ano: number): Promise<number> {
-    const orc = await this.prisma.orcamento.findUnique({
-      where: { entidadeId_ano: { entidadeId, ano } },
-      select: { id: true },
-    })
-    if (!orc) return 0
-    const agg = await this.prisma.dotacaoDespesa.aggregate({
-      where: { orcamentoId: orc.id, contaDespesa: { codigo: { startsWith: '3.1' } } },
-      _sum: { valorAutorizado: true },
-    })
-    return n(agg._sum.valorAutorizado ?? D0())
   }
 }
