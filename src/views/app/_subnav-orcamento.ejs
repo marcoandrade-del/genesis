@@ -1,0 +1,16 @@
+<%# Sub-navegação do Orçamento — barra única de abas entre as telas irmãs.
+    Param `atual` = chave da aba ativa (loa|saldo|execucao|creditos|diario|arrecadacao|anexos). %>
+<% var _abas = [
+     ['loa', '/app/orcamento', 'bi-file-earmark-text', 'LOA'],
+     ['saldo', '/app/orcamento/saldo', 'bi-wallet2', 'Saldo'],
+     ['execucao', '/app/orcamento/despesa/execucao', 'bi-diagram-3', 'Execução'],
+     ['creditos', '/app/orcamento/creditos', 'bi-plus-slash-minus', 'Créditos'],
+     ['diario', '/app/orcamento/despesa/diario', 'bi-graph-up-arrow', 'Diário'],
+     ['arrecadacao', '/app/orcamento/arrecadacao', 'bi-cash-stack', 'Arrecadação'],
+     ['anexos', '/app/orcamento/relatorios', 'bi-journal-text', 'Anexos'],
+   ]; var _atual = (typeof atual !== 'undefined') ? atual : '' %>
+<ul class="nav nav-pills small mb-3 gap-1 flex-wrap border-bottom pb-2">
+  <% _abas.forEach(function (a) { %>
+    <li class="nav-item"><a class="nav-link py-1 px-2 <%= _atual === a[0] ? 'active' : 'text-body' %>" href="<%= a[1] %>"><i class="bi <%= a[2] %> me-1"></i><%= a[3] %></a></li>
+  <% }) %>
+</ul>

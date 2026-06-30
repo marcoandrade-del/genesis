@@ -75,6 +75,7 @@ describe('appOrcamentoRoutes', () => {
     expect(res.body).toContain('3.3.90.30')
     expect(res.body).toContain('IPTU')
     expect(res.body).toContain('Em Execução')
+    expect(res.body).toContain('nav nav-pills') // subnav de orçamento presente
   })
 
   it('mostra estado vazio quando não há orçamento no exercício', async () => {
