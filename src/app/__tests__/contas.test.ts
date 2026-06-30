@@ -54,6 +54,9 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('Código')
     expect(res.body).toContain('ATIVO')
     expect(res.body).toContain('Caixa')
+    // 12 colunas mensais (jan→dez) anexadas ao CSV
+    expect(res.body).toContain('Jan')
+    expect(res.body).toContain('Dez')
   })
 
   it('rejeita formato de exportação inválido (400)', async () => {
