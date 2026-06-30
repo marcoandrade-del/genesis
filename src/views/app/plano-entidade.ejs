@@ -150,15 +150,15 @@
         <% contas.forEach(function(c) { %>
           <tr data-nivel="<%= c.nivel %>"<% if (c.mensal) { %> data-conta="<%= c.id %>" data-mensal="<%- JSON.stringify(c.mensal) %>" data-rotulo="<%= c.codigo %> · <%= c.descricao %>"<% } %>>
             <td class="ps-3">
-              <span style="padding-left: <%= (c.nivel - 1) * 18 %>px" class="d-inline-block">
-                <% if (c.mensal) { %><button type="button" class="btn btn-link btn-sm p-0 me-1 mensal-toggle align-baseline" onclick="abrirModalMensal('<%= c.id %>')" title="Desdobrar por período (<%= mensalRotulo %>)"><i class="bi bi-bar-chart-steps"></i></button><% } %>
-                <span class="font-monospace small text-muted"><%= c.codigo %></span>
-                <span class="<%= c.admiteMovimento ? '' : 'fw-semibold' %>"><%= c.descricao %></span>
-                <% if (c.redutora) { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-1" title="Conta redutora/retificadora (PCASP) — subtrai do saldo do grupo">redutora</span><% } %>
-                <% if (comSaldos && c.admiteMovimento) { %>
-                  <a href="<%= base %>/<%= c.id %>/razao" class="ms-1 text-decoration-none small" title="Ver razão (movimentações)"><i class="bi bi-journal-text"></i></a>
-                <% } %>
-              </span>
+              <div style="padding-left: <%= (c.nivel - 1) * 18 %>px">
+                <div>
+                  <% if (c.mensal) { %><button type="button" class="btn btn-link btn-sm p-0 me-1 mensal-toggle align-baseline" onclick="abrirModalMensal('<%= c.id %>')" title="Desdobrar por período (<%= mensalRotulo %>)"><i class="bi bi-bar-chart-steps"></i></button><% } %>
+                  <span class="font-monospace small text-muted"><%= c.codigo %></span>
+                  <% if (c.redutora) { %><span class="badge bg-warning bg-opacity-10 text-warning-emphasis ms-1" title="Conta redutora/retificadora (PCASP) — subtrai do saldo do grupo">redutora</span><% } %>
+                  <% if (comSaldos && c.admiteMovimento) { %><a href="<%= base %>/<%= c.id %>/razao" class="ms-1 text-decoration-none small" title="Ver razão (movimentações)"><i class="bi bi-journal-text"></i></a><% } %>
+                </div>
+                <div class="small <%= c.admiteMovimento ? 'text-muted' : 'fw-semibold' %>"><%= c.descricao %></div>
+              </div>
             </td>
             <% if (comSaldos) { %>
               <td class="col-detalhe small text-muted" title="<%= c.saldo ? [c.saldo.superavit ? 'Superávit: ' + c.saldo.superavit : '', c.saldo.funcao || ''].filter(Boolean).join(' — ') : '' %>">
@@ -207,7 +207,7 @@
   <% if (mensalRotulo) { %>
     <!-- Modal de desdobramento de UMA conta (aberto pelo ▸); abas de período dentro -->
     <div class="modal fade" id="modalMensal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered">
+      <div class="modal-dialog modal-dialog-scrollable modal-dialog-centered modal-sm">
         <div class="modal-content">
           <div class="modal-header py-2">
             <div>
@@ -228,6 +228,9 @@
               <tfoot><tr class="fw-semibold border-top"><td>Total</td><td class="valor font-monospace" id="mmTotal"></td><td></td></tr></tfoot>
             </table>
             <p class="small text-muted mt-2 mb-0"><i class="bi bi-diagram-3"></i> ver os lançamentos que formaram o valor — em breve.</p>
+          </div>
+          <div class="modal-footer py-1">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-1"></i>Voltar</button>
           </div>
         </div>
       </div>
