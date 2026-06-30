@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { ErroNegocio, statusDeErro } from '../errors.js'
 import type { SaldoContabilService } from '../services/saldo-contabil.js'
 import { ConfiguracaoDashboardService, aplicarGranularidade } from '../services/configuracao-dashboard.js'
+import { exportarResultado, formatoValido, nomeArquivo, FORMATOS, type FormatoExport } from '../services/relatorio-export.js'
+import { montarCorpoHtml, gerarPdf } from '../services/relatorio-pdf.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 
@@ -73,6 +75,8 @@ function dataRefDe(req: FastifyRequest): Date {
 }
 
 const isoData = (d: Date) => d.toISOString().slice(0, 10)
+
+const esc = (s: string) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]!)
 
 /**
  * Registra as rotas de um "plano de contas da entidade" no `/app`. Os 3 planos
@@ -170,6 +174,7 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
       podeEscrever: podeEscrever(nivel),
       comSaldos: !!cfg.saldos,
       saldoColunas: cfg.saldoColunas ?? null,
+      formatos: FORMATOS,
       mensalRotulo: cfg.mensalRotulo ?? null,
       analiseLink: cfg.analiseLink ?? null,
       subtitulo: cfg.subtitulo ?? null,
@@ -211,6 +216,58 @@ export function registrarRotasPlano(app: FastifyInstance, cfg: ConfigPlano) {
     }
 
     return renderLista(req, reply, entidade)
+  })
+
+  // ── Exportar (todos os formatos do projeto: HTML/TXT/PDF/CSV/XLSX/DOCX/XML/JSON) ─
+  // Reusa o serviço central de exportação. Mesmas linhas visíveis da tela
+  // (granularidade + posição da data), colunas = código/descrição/nível + saldos.
+  app.get<{ Params: { formato: string }; Querystring: { data?: string } }>(`${cfg.rota}/exportar/:formato`, async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const formato = req.params.formato
+    if (!formatoValido(formato)) return reply.code(400).send('Formato de exportação inválido.')
+
+    const { entidadeId, ano } = req.contexto
+    const contas = await cfg.listarFlat(entidadeId, ano)
+    const granularidade = await cfgDash.granularidadeRelatorio(entidadeId, cfg.rota)
+    const contasVisiveis = aplicarGranularidade(contas, granularidade)
+    const dataRef = dataRefDe(req)
+    const saldos = cfg.saldos ? await cfg.saldos.calcular(entidadeId, ano, dataRef) : null
+    const saldoGenMap = cfg.saldoMapa ? await cfg.saldoMapa(entidadeId, ano, dataRef) : null
+
+    const colunas = ['Código', 'Descrição', 'Nível']
+    if (cfg.saldos) colunas.push('Saldo inicial', 'Débito', 'Crédito', 'Saldo atual', 'Natureza')
+    else if (cfg.saldoColunas) colunas.push(...cfg.saldoColunas.map((c) => c.rotulo))
+
+    const linhas = contasVisiveis.map((c) => {
+      const row: unknown[] = [c.codigo, c.descricao, c.nivel]
+      if (cfg.saldos) {
+        const s = saldos?.get(c.id)
+        row.push(
+          s ? s.saldoInicial.toNumber() : 0,
+          s ? s.totalDebito.toNumber() : 0,
+          s ? s.totalCredito.toNumber() : 0,
+          s ? s.saldoAtual.toNumber() : 0,
+          s?.natureza ?? '',
+        )
+      } else if (cfg.saldoColunas) {
+        const g = saldoGenMap?.get(c.id) ?? null
+        for (const col of cfg.saldoColunas) row.push(g?.[col.chave] ?? 0)
+      }
+      return row
+    })
+
+    const titulo = `${cfg.titulo} — ${(entidade as { nome: string }).nome} · ${ano}`
+    if (formato === 'pdf') {
+      const rodape = `<div style="width:100%;font-size:9px;font-family:sans-serif;padding:0 12mm;display:flex;justify-content:space-between;color:#666"><span>${esc(titulo)}</span><span>Página <span class="pageNumber"></span>/<span class="totalPages"></span></span></div>`
+      const pdf = await gerarPdf({ corpoHtml: montarCorpoHtml({ colunas, linhas }, titulo, 0, null), header: '<span></span>', footer: rodape, margemTopoMm: 12, margemRodapeMm: 16 })
+      return reply.header('Content-Type', 'application/pdf').header('Content-Disposition', `inline; filename="${nomeArquivo(titulo, 'pdf')}"`).send(pdf)
+    }
+    const arq = await exportarResultado(formato as Exclude<FormatoExport, 'pdf'>, { colunas, linhas }, titulo, null)
+    return reply
+      .header('Content-Type', arq.mime)
+      .header('Content-Disposition', `${arq.download ? 'attachment' : 'inline'}; filename="${nomeArquivo(titulo, arq.ext)}"`)
+      .send(arq.conteudo)
   })
 
   // ── Desdobrar ───────────────────────────────────────────────────────────────
