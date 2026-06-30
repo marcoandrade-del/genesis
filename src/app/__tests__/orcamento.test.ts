@@ -130,8 +130,8 @@ describe('appOrcamentoRoutes', () => {
       resumo: { autorizado: 1000, empenhado: 500, liquidado: 400, pago: 300 },
       totalDotacoes: 1,
       dotacoes: [
-        { path: '02.001', parentPath: '', nivel: 1, uo: '02.001', funcaoSubf: '', programaAcao: '', natureza: '', fonte: '', rotulo: 'Chefia', temFilhos: true, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
-        { path: '02.001|04.122|0001.2001|3.3.90.30#100', parentPath: '02.001|04.122|0001.2001', nivel: 4, uo: '', funcaoSubf: '', programaAcao: '', natureza: '3.3.90.30', fonte: '100', rotulo: 'Material', temFilhos: false, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
+        { path: '02', parentPath: '', nivel: 1, orgao: '02', uo: '', funcaoSubf: '', programaAcao: '', natureza: '', fonte: '', rotulo: 'Órgão 02', temFilhos: true, autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
+        { path: '02|02.001|04.122|0001.2001|3.3.90.30#100', parentPath: '02|02.001|04.122|0001.2001', nivel: 5, orgao: '', uo: '', funcaoSubf: '', programaAcao: '', natureza: '3.3.90.30', fonte: '100', rotulo: 'Material', temFilhos: false, dotacaoId: 'd1', autorizado: 1000, empenhado: 500, aEmpenhar: 500, liquidado: 400, aLiquidar: 100, pago: 300, aPagar: 100 },
       ],
     })
     const res = await app.inject({ method: 'GET', url: '/orcamento/despesa/execucao' })
@@ -139,9 +139,11 @@ describe('appOrcamentoRoutes', () => {
     expect(execucaoCalcularMock).toHaveBeenCalledWith('ent1', 2026, undefined)
     expect(res.body).toContain('Execução da Despesa')
     expect(res.body).toContain('Dotações de despesa')
+    expect(res.body).toContain('Órgão') // nova coluna de órgão
     expect(res.body).toContain('Unid. Orç.')
     expect(res.body).toContain('a empenhar') // sub-rótulo das colunas (2 linhas)
     expect(res.body).toContain('3.3.90.30') // natureza da folha
+    expect(res.body).toContain('Material') // descrição (rotulo) visível na linha
     expect(res.body).toContain('toggleExecRow') // desdobrar por linha
     expect(res.body).toContain('Posição em') // seletor de data
   })

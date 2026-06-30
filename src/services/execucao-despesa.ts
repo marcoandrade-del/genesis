@@ -14,13 +14,14 @@ import type { PrismaClient } from '@prisma/client'
 export interface LinhaDotacao {
   path: string
   parentPath: string | null
-  nivel: number // 1=UO · 2=Função/Subf · 3=Programa/Ação · 4=dotação (natureza+fonte)
+  nivel: number // 1=Órgão · 2=UO · 3=Função/Subf · 4=Programa/Ação · 5=dotação (natureza+fonte)
+  orgao: string
   uo: string
   funcaoSubf: string
   programaAcao: string
   natureza: string
   fonte: string
-  rotulo: string // descrição do nível (nome da UO/função/ação/natureza)
+  rotulo: string // descrição do nível (nome do órgão/UO/função/ação/natureza)
   temFilhos: boolean
   autorizado: number
   empenhado: number
@@ -29,7 +30,7 @@ export interface LinhaDotacao {
   aLiquidar: number
   pago: number
   aPagar: number
-  dotacaoId?: string // só na folha (nível 4): a dotação única (p/ drill de lançamentos)
+  dotacaoId?: string // só na folha (nível 5): a dotação única (p/ drill de lançamentos)
 }
 
 export interface ExecucaoDespesa {
@@ -72,7 +73,7 @@ export class ExecucaoDespesaService {
 
     const dotacoes = await this.prisma.dotacaoDespesa.findMany({
       where: { orcamentoId: orcamento.id },
-      include: { unidadeOrcamentaria: true, funcao: true, subfuncao: true, programa: true, acao: true, fonteRecurso: true, contaDespesa: true },
+      include: { unidadeOrcamentaria: { include: { orgao: true } }, funcao: true, subfuncao: true, programa: true, acao: true, fonteRecurso: true, contaDespesa: true },
     })
 
     // Execução por dotação: soma o ledger MovimentoEmpenho (sinal por tipo) até a data.
@@ -101,7 +102,7 @@ export class ExecucaoDespesaService {
     let totalDotacoes = 0
 
     const acumular = (path: string, parentPath: string | null, nivel: number, cod: string, rotulo: string, e: { autorizado: number; empenhado: number; liquidado: number; pago: number }) => {
-      const n = nos.get(path) ?? { path, parentPath, nivel, cod, rotulo, temFilhos: nivel < 4, autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }
+      const n = nos.get(path) ?? { path, parentPath, nivel, cod, rotulo, temFilhos: nivel < 5, autorizado: 0, empenhado: 0, liquidado: 0, pago: 0 }
       n.autorizado += e.autorizado
       n.empenhado += e.empenhado
       n.liquidado += e.liquidado
@@ -118,22 +119,26 @@ export class ExecucaoDespesaService {
       resumo.liquidado += e.liquidado
       resumo.pago += e.pago
 
+      const orgaoCod = d.unidadeOrcamentaria.orgao?.codigo ?? (d.unidadeOrcamentaria.codigo.split('.')[0] ?? d.unidadeOrcamentaria.codigo)
+      const orgaoNome = d.unidadeOrcamentaria.orgao?.nome ?? `Órgão ${orgaoCod}`
       const uoCod = d.unidadeOrcamentaria.codigo
       const fsCod = `${d.funcao.codigo}.${d.subfuncao.codigo}`
       const paCod = `${d.programa.codigo}.${d.acao.codigo}`
       const natCod = d.contaDespesa.codigo
       const fonte = d.fonteRecurso.codigo
 
-      const p1 = uoCod
-      const p2 = `${p1}${SEP}${fsCod}`
-      const p3 = `${p2}${SEP}${paCod}`
-      const p4 = `${p3}${SEP}${natCod}#${fonte}`
-      acumular(p1, null, 1, uoCod, d.unidadeOrcamentaria.nome, e)
-      acumular(p2, p1, 2, fsCod, `${d.funcao.nome} / ${d.subfuncao.nome}`, e)
-      acumular(p3, p2, 3, paCod, d.acao.nome, e)
-      acumular(p4, p3, 4, natCod, d.contaDespesa.descricao, e)
+      const p1 = orgaoCod
+      const p2 = `${p1}${SEP}${uoCod}`
+      const p3 = `${p2}${SEP}${fsCod}`
+      const p4 = `${p3}${SEP}${paCod}`
+      const p5 = `${p4}${SEP}${natCod}#${fonte}`
+      acumular(p1, null, 1, orgaoCod, orgaoNome, e)
+      acumular(p2, p1, 2, uoCod, d.unidadeOrcamentaria.nome, e)
+      acumular(p3, p2, 3, fsCod, `${d.funcao.nome} / ${d.subfuncao.nome}`, e)
+      acumular(p4, p3, 4, paCod, d.acao.nome, e)
+      acumular(p5, p4, 5, natCod, d.contaDespesa.descricao, e)
       // a folha (dotação) carrega natureza + fonte nas suas colunas próprias.
-      const folha = nos.get(p4)!
+      const folha = nos.get(p5)!
       folha.temFilhos = false
       folha.fonte = fonte
       folha.dotacaoId = d.id
@@ -147,11 +152,12 @@ export class ExecucaoDespesaService {
         path: n.path,
         parentPath: n.parentPath,
         nivel: n.nivel,
-        uo: n.nivel === 1 ? n.cod : '',
-        funcaoSubf: n.nivel === 2 ? n.cod : '',
-        programaAcao: n.nivel === 3 ? n.cod : '',
-        natureza: n.nivel === 4 ? n.cod : '',
-        fonte: n.nivel === 4 ? fonte : '',
+        orgao: n.nivel === 1 ? n.cod : '',
+        uo: n.nivel === 2 ? n.cod : '',
+        funcaoSubf: n.nivel === 3 ? n.cod : '',
+        programaAcao: n.nivel === 4 ? n.cod : '',
+        natureza: n.nivel === 5 ? n.cod : '',
+        fonte: n.nivel === 5 ? fonte : '',
         ...(n.dotacaoId ? { dotacaoId: n.dotacaoId } : {}),
         rotulo: n.rotulo,
         temFilhos: n.temFilhos,
@@ -182,12 +188,13 @@ export class ExecucaoDespesaService {
     if (!orcamento) return null
     const dotacoes = await this.prisma.dotacaoDespesa.findMany({
       where: { orcamentoId: orcamento.id },
-      select: { id: true, unidadeOrcamentaria: { select: { codigo: true } }, funcao: { select: { codigo: true } }, subfuncao: { select: { codigo: true } }, programa: { select: { codigo: true } }, acao: { select: { codigo: true } }, contaDespesa: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } },
+      select: { id: true, unidadeOrcamentaria: { select: { codigo: true, orgao: { select: { codigo: true } } } }, funcao: { select: { codigo: true } }, subfuncao: { select: { codigo: true } }, programa: { select: { codigo: true } }, acao: { select: { codigo: true } }, contaDespesa: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } },
     })
     const ids = new Set<string>()
     for (const d of dotacoes) {
-      const p4 = `${d.unidadeOrcamentaria.codigo}${SEP}${d.funcao.codigo}.${d.subfuncao.codigo}${SEP}${d.programa.codigo}.${d.acao.codigo}${SEP}${d.contaDespesa.codigo}#${d.fonteRecurso.codigo}`
-      if (p4 === path || p4.startsWith(path + SEP)) ids.add(d.id)
+      const orgaoCod = d.unidadeOrcamentaria.orgao?.codigo ?? (d.unidadeOrcamentaria.codigo.split('.')[0] ?? d.unidadeOrcamentaria.codigo)
+      const p5 = `${orgaoCod}${SEP}${d.unidadeOrcamentaria.codigo}${SEP}${d.funcao.codigo}.${d.subfuncao.codigo}${SEP}${d.programa.codigo}.${d.acao.codigo}${SEP}${d.contaDespesa.codigo}#${d.fonteRecurso.codigo}`
+      if (p5 === path || p5.startsWith(path + SEP)) ids.add(d.id)
     }
     if (ids.size === 0) return null
     const movs = await this.prisma.movimentoEmpenho.findMany({
