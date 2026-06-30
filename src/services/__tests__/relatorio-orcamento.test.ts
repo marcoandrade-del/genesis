@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -281,6 +281,32 @@ describe('montarGuardiao', () => {
     expect(html).toContain('informativo') // educação sem limite
     expect(html).toContain('44,1%')
     expect(html).toContain('Memórias de cálculo')
+  })
+})
+
+describe('montarDespesaPessoal', () => {
+  it('renderiza inclusões, exclusões, a DTP e o % da RCL com situação', () => {
+    const html = montarDespesaPessoal({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      inclusoes: [{ rotulo: 'Pessoal e Encargos (3.1)', valor: 1148 }, { rotulo: 'Terceirização', valor: 18 }],
+      inclusoesTotal: 1166,
+      exclusoes: [{ rotulo: '(−) Indenizações', valor: 14 }],
+      exclusoesTotal: 14,
+      despesaLiquida: 1152,
+      rcl: 2604,
+      percentual: 44.23,
+      limite: 54,
+      prudencial: 51.3,
+      alerta: 48.6,
+      nivel: 'ok',
+      nota: 'LRF/STN',
+    })
+    expect(html).toContain('RGF Anexo 1 — Demonstrativo da Despesa com Pessoal')
+    expect(html).toContain('Pessoal e Encargos (3.1)')
+    expect(html).toContain('DESPESA TOTAL COM PESSOAL')
+    expect(html).toContain('44,23%')
+    expect(html).toContain('Dentro do limite')
+    expect(html).toContain('Limite legal: 54,00%')
   })
 })
 

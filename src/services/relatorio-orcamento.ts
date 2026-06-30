@@ -418,6 +418,59 @@ export function montarGuardiao(dados: DadosGuardiao): string {
   )
 }
 
+export interface DadosDespesaPessoal {
+  cabecalho: CabecalhoDemonstrativo
+  inclusoes: { rotulo: string; valor: number }[]
+  inclusoesTotal: number
+  exclusoes: { rotulo: string; valor: number }[]
+  exclusoesTotal: number
+  despesaLiquida: number
+  rcl: number
+  percentual: number
+  limite: number
+  prudencial: number
+  alerta: number
+  nivel: string
+  nota?: string // metodologia aplicada
+}
+
+/** Demonstrativo da Despesa com Pessoal (RGF Anexo 1, LRF arts. 18-20):
+ *  Despesa Bruta (inclusões) − Despesas Não Computadas (exclusões) = Despesa
+ *  Total com Pessoal; comparada à RCL (limite 54%, prudencial 95%, alerta 90%). */
+export function montarDespesaPessoal(dados: DadosDespesaPessoal): string {
+  const { cabecalho: c, inclusoes, inclusoesTotal, exclusoes, exclusoesTotal, despesaLiquida, rcl, percentual, limite, prudencial, alerta, nivel } = dados
+  const pct = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const linha = (l: { rotulo: string; valor: number }) =>
+    `<tr><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.valor)}</td></tr>`
+  const situacao = NIVEL_TXT[nivel] ?? nivel
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 1 — Demonstrativo da Despesa com Pessoal') +
+    (dados.nota ? `<div class="dem-sub">Metodologia: ${esc(dados.nota)} · base: dotação autorizada</div>` : '') +
+    `<h2 class="dem-sec">Despesa Bruta com Pessoal (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${inclusoes.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL DA DESPESA BRUTA (I)</th><th class="num">${formatarReais(inclusoesTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<h2 class="dem-sec">Despesas Não Computadas (II)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${exclusoes.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL NÃO COMPUTADO (II)</th><th class="num">${formatarReais(exclusoesTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th colspan="2">DESPESA TOTAL COM PESSOAL (III) = (I − II)</th><th class="num">${formatarReais(despesaLiquida)}</th></tr>` +
+    `<tr><td colspan="2">Receita Corrente Líquida (RCL)</td><td class="num">${formatarReais(rcl)}</td></tr>` +
+    `<tr><th colspan="2">% DA DESPESA COM PESSOAL SOBRE A RCL (III ÷ RCL)</th><th class="num">${pct(percentual)} — ${esc(situacao)}</th></tr>` +
+    `</tfoot></table>` +
+    `<div class="dem-sub" style="margin-top:6px">Limite legal: ${pct(limite)} (LRF art. 20 — Executivo municipal) · prudencial ${pct(prudencial)} (art. 22) · alerta ${pct(alerta)} (art. 59, TCE).</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 export interface DadosRclConsolidada {
   cabecalho: CabecalhoDemonstrativo
   entidades: { nome: string; correntes: number; deducoes: number; rcl: number }[]
