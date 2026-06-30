@@ -7,7 +7,8 @@ const n = (d: { toNumber(): number }) => d.toNumber()
 export interface LinhaMemorial {
   codigo?: string
   rotulo: string
-  valor: number
+  valor: number // previsto (LOA)
+  valorRealizado: number // arrecadado (execução)
 }
 
 export interface MemorialRcl {
@@ -20,6 +21,10 @@ export interface MemorialRcl {
   deducoes: LinhaMemorial[]
   deducoesTotal: number
   rcl: number
+  // RCL EXECUTADA (arrecadado), ao lado da prevista. Aditivo.
+  correntesRealizadoTotal: number
+  deducoesRealizadoTotal: number
+  rclRealizado: number
 }
 
 export interface MemorialRclConsolidada {
@@ -60,11 +65,14 @@ export class MemorialRclService {
       ano,
       metodologia: comp.nome,
       temOrcamento: r.temOrcamento,
-      correntes: r.correntes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: n(l.valor) })),
+      correntes: r.correntes.map((l) => ({ codigo: l.codigo, rotulo: l.rotulo, valor: n(l.valor), valorRealizado: n(l.valorRealizado) })),
       correntesTotal: n(r.correntesTotal),
-      deducoes: r.deducoes.map((l) => ({ rotulo: l.rotulo, valor: n(l.valor) })),
+      deducoes: r.deducoes.map((l) => ({ rotulo: l.rotulo, valor: n(l.valor), valorRealizado: n(l.valorRealizado) })),
       deducoesTotal: n(r.deducoesTotal),
       rcl: n(r.rcl),
+      correntesRealizadoTotal: n(r.correntesRealizadoTotal),
+      deducoesRealizadoTotal: n(r.deducoesRealizadoTotal),
+      rclRealizado: n(r.rclRealizado),
     }
   }
 

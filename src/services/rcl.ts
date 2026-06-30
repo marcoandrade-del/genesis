@@ -2,7 +2,8 @@ import { PrismaClient, Prisma } from '@prisma/client'
 
 const D0 = () => new Prisma.Decimal(0)
 
-export type LinhaRcl = { codigo: string; rotulo: string; valor: Prisma.Decimal }
+// valor = previsto (LOA); valorRealizado = arrecadado (execução, mesma natureza/dedução)
+export type LinhaRcl = { codigo: string; rotulo: string; valor: Prisma.Decimal; valorRealizado: Prisma.Decimal }
 
 export type ResultadoRcl = {
   temOrcamento: boolean
@@ -11,6 +12,10 @@ export type ResultadoRcl = {
   deducoes: LinhaRcl[] // linhas de dedução (nomeadas, conforme o Anexo 3)
   deducoesTotal: Prisma.Decimal
   rcl: Prisma.Decimal
+  // Execução (arrecadado) — RCL EXECUTADA, ao lado da prevista. Aditivo.
+  correntesRealizadoTotal: Prisma.Decimal
+  deducoesRealizadoTotal: Prisma.Decimal
+  rclRealizado: Prisma.Decimal
 }
 
 /** Uma linha de dedução da RCL: rótulo oficial + naturezas de receita (por prefixo de código). */
@@ -108,37 +113,50 @@ export class RclService {
       select: { id: true },
     })
     if (!orcamento) {
-      return { temOrcamento: false, correntes: [], correntesTotal: D0(), deducoes: [], deducoesTotal: D0(), rcl: D0() }
+      return {
+        temOrcamento: false, correntes: [], correntesTotal: D0(), deducoes: [], deducoesTotal: D0(), rcl: D0(),
+        correntesRealizadoTotal: D0(), deducoesRealizadoTotal: D0(), rclRealizado: D0(),
+      }
     }
 
     const previsoes = await this.prisma.previsaoReceita.findMany({
       where: { orcamentoId: orcamento.id },
-      select: { valorPrevisto: true, contaReceita: { select: { codigo: true } } },
+      select: { valorPrevisto: true, valorArrecadado: true, contaReceita: { select: { codigo: true } } },
     })
 
     const porSub = new Map<string, Prisma.Decimal>()
+    const porSubReal = new Map<string, Prisma.Decimal>()
     const dedValor = comp.deducoes.map(() => D0())
+    const dedReal = comp.deducoes.map(() => D0())
     let correntesTotal = D0()
+    let correntesRealizadoTotal = D0()
 
     for (const p of previsoes) {
       const cod = p.contaReceita.codigo
       const v = p.valorPrevisto
+      const a = p.valorArrecadado ?? D0()
       if (cod.startsWith('1')) {
         correntesTotal = correntesTotal.plus(v)
+        correntesRealizadoTotal = correntesRealizadoTotal.plus(a)
         const sub = cod.slice(0, 3)
         porSub.set(sub, (porSub.get(sub) ?? D0()).plus(v))
+        porSubReal.set(sub, (porSubReal.get(sub) ?? D0()).plus(a))
       }
       comp.deducoes.forEach((d, i) => {
-        if (d.prefixos.some((px) => cod.startsWith(px))) dedValor[i] = dedValor[i]!.plus(v)
+        if (d.prefixos.some((px) => cod.startsWith(px))) {
+          dedValor[i] = dedValor[i]!.plus(v)
+          dedReal[i] = dedReal[i]!.plus(a)
+        }
       })
     }
 
     const correntes = [...porSub.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([codigo, valor]) => ({ codigo, rotulo: SUBCATEGORIA[codigo] ?? 'Receitas Correntes', valor }))
+      .map(([codigo, valor]) => ({ codigo, rotulo: SUBCATEGORIA[codigo] ?? 'Receitas Correntes', valor, valorRealizado: porSubReal.get(codigo) ?? D0() }))
 
-    const deducoes = comp.deducoes.map((d, i) => ({ codigo: '', rotulo: d.rotulo, valor: dedValor[i]! }))
+    const deducoes = comp.deducoes.map((d, i) => ({ codigo: '', rotulo: d.rotulo, valor: dedValor[i]!, valorRealizado: dedReal[i]! }))
     const deducoesTotal = dedValor.reduce((acc, v) => acc.plus(v), D0())
+    const deducoesRealizadoTotal = dedReal.reduce((acc, v) => acc.plus(v), D0())
 
     return {
       temOrcamento: true,
@@ -147,6 +165,9 @@ export class RclService {
       deducoes,
       deducoesTotal,
       rcl: correntesTotal.minus(deducoesTotal),
+      correntesRealizadoTotal,
+      deducoesRealizadoTotal,
+      rclRealizado: correntesRealizadoTotal.minus(deducoesRealizadoTotal),
     }
   }
 }

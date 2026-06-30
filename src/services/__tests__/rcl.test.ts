@@ -92,6 +92,25 @@ describe('RclService.calcular', () => {
     expect(r.deducoesTotal.toString()).toBe('277')
     expect(r.rcl.toString()).toBe('1000') // correntes 1277 − FUNDEB 277
   })
+
+  it('RCL EXECUTADA: soma o arrecadado ao lado do previsto (correntes − deduções)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.previsaoReceita.findMany.mockResolvedValue([
+      { valorPrevisto: dec(1000), valorArrecadado: dec(600), contaReceita: { codigo: '1.1.1.0.00' } },
+      { valorPrevisto: dec(277), valorArrecadado: dec(100), contaReceita: { codigo: '1.7.5.1.50.0.1.01' } }, // FUNDEB
+    ])
+    const r = await svc.calcular('ent1', 2026, composicaoDoEstado('PR'))
+    // previsto: correntes 1277 − FUNDEB 277 = 1000
+    expect(r.rcl.toString()).toBe('1000')
+    // realizado: correntes 700 − FUNDEB 100 = 600
+    expect(r.correntesRealizadoTotal.toString()).toBe('700')
+    expect(r.deducoesRealizadoTotal.toString()).toBe('100')
+    expect(r.rclRealizado.toString()).toBe('600')
+    const fundeb = r.deducoes.find((l) => l.rotulo.includes('FUNDEB'))!
+    expect(fundeb.valorRealizado.toString()).toBe('100')
+    // correntes[0] = subcategoria 1.1 (só a previsão 1, arrecadado 600); 1.7 entra separada com 100
+    expect(r.correntes[0]!.valorRealizado.toString()).toBe('600')
+  })
 })
 
 describe('composicaoDoEstado', () => {
