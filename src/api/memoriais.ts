@@ -18,7 +18,7 @@ import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.3.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.4.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).

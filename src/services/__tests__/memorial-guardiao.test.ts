@@ -5,19 +5,20 @@ import { MemorialGuardiaoService } from '../memorial-guardiao.js'
 
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
-// Despesa por filtro: pessoal (contaDespesa 3.1) varia por teste; funções fixas; total = resto.
-let pessoalVal = 440
-const aggPorWhere = ({ where }: { where: { contaDespesa?: unknown; funcao?: { codigo: string } } }) => {
-  const v = where.contaDespesa ? pessoalVal : where.funcao?.codigo === '12' ? 600 : where.funcao?.codigo === '10' ? 800 : 3000
+// despesaFuncoes usa aggregate (por função / total); a Despesa com Pessoal usa
+// DespesaPessoalService (findMany das dotações 3.1/terceirização).
+const aggPorWhere = ({ where }: { where: { funcao?: { codigo: string } } }) => {
+  const v = where.funcao?.codigo === '12' ? 600 : where.funcao?.codigo === '10' ? 800 : 3000
   return Promise.resolve({ _sum: { valorAutorizado: dec(v) } })
 }
+// dotações de pessoal (DTP) — um único elemento 3.1 com o valor líquido desejado.
+const pessoal = (net: number) => [{ valorAutorizado: dec(net), contaDespesa: { codigo: '3.1.90.11.00.00' } }]
 
 describe('MemorialGuardiaoService', () => {
   let prisma: PrismaMock
   let svc: MemorialGuardiaoService
 
   beforeEach(() => {
-    pessoalVal = 440
     prisma = criarPrismaMock()
     svc = new MemorialGuardiaoService(prisma as never)
     prisma.entidade.findUnique.mockResolvedValue({
@@ -28,15 +29,16 @@ describe('MemorialGuardiaoService', () => {
     prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
     prisma.previsaoReceita.findMany.mockResolvedValue([{ valorPrevisto: dec(1000), contaReceita: { codigo: '1.1.1.0.00' } }])
     prisma.dotacaoDespesa.aggregate.mockImplementation(aggPorWhere as never)
+    prisma.dotacaoDespesa.findMany.mockResolvedValue(pessoal(440))
   })
 
   it('monta RCL + Pessoal + Educação + Saúde (informativos)', async () => {
     const g = await svc.guardiao('e1', 2026)
     const nomes = g!.indicadores.map((i) => i.indicador)
     expect(nomes).toEqual(['Receita Corrente Líquida', 'Despesa com Pessoal', 'Aplicação em Educação', 'Aplicação em Saúde'])
-    const pessoal = g!.indicadores[1]!
-    expect(pessoal.percentual).toBe(44) // 440/1000
-    expect(pessoal.limite).toBe(54)
+    const p = g!.indicadores[1]!
+    expect(p.percentual).toBe(44) // 440/1000
+    expect(p.limite).toBe(54)
     const edu = g!.indicadores[2]!
     expect(edu.unidade).toBe('% da despesa')
     expect(edu.limite).toBeNull() // informativo, não o índice constitucional
@@ -45,17 +47,16 @@ describe('MemorialGuardiaoService', () => {
   })
 
   it('escala o nível do Pessoal (alerta/prudencial/estouro)', async () => {
-    pessoalVal = 500 // 50% → alerta
+    prisma.dotacaoDespesa.findMany.mockResolvedValue(pessoal(500)) // 50% → alerta
     expect((await svc.guardiao('e1', 2026))!.indicadores[1]!.nivel).toBe('alerta')
-    pessoalVal = 520 // 52% → prudencial
+    prisma.dotacaoDespesa.findMany.mockResolvedValue(pessoal(520)) // 52% → prudencial
     expect((await svc.guardiao('e1', 2026))!.indicadores[1]!.nivel).toBe('prudencial')
-    pessoalVal = 550 // 55% → estouro
+    prisma.dotacaoDespesa.findMany.mockResolvedValue(pessoal(550)) // 55% → estouro
     expect((await svc.guardiao('e1', 2026))!.indicadores[1]!.nivel).toBe('estouro')
   })
 
-  it('sem dotação de pessoal (sum nulo) → pessoal 0', async () => {
-    prisma.dotacaoDespesa.aggregate.mockImplementation((({ where }: { where: { contaDespesa?: unknown } }) =>
-      Promise.resolve({ _sum: { valorAutorizado: where.contaDespesa ? null : dec(3000) } })) as never)
+  it('sem dotação de pessoal → DTP 0', async () => {
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([])
     const g = await svc.guardiao('e1', 2026)
     expect(g!.indicadores[1]!.valor).toBe(0)
     expect(g!.indicadores[1]!.percentual).toBe(0)
