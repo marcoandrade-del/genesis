@@ -140,8 +140,8 @@ describe('appOrcamentoRoutes', () => {
     expect(execucaoCalcularMock).toHaveBeenCalledWith('ent1', 2026, undefined)
     expect(res.body).toContain('Execução da Despesa')
     expect(res.body).toContain('Dotações de despesa')
-    expect(res.body).toContain('Órgão') // nova coluna de órgão
-    expect(res.body).toContain('Unid. Orç.')
+    expect(res.body).toContain('Órgão / Unidade') // coluna fundida órgão+unidade
+    expect(res.body).toContain('Função / Programa·Ação') // coluna fundida função+programa/ação
     expect(res.body).toContain('a empenhar') // sub-rótulo das colunas (2 linhas)
     expect(res.body).toContain('3.3.90.30') // natureza da folha
     expect(res.body).toContain('Material') // descrição (rotulo) visível na linha
