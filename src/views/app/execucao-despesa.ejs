@@ -70,11 +70,9 @@
         <table id="tbl-dot" class="table table-hover table-sm align-middle mb-0">
           <thead class="table-light">
             <tr>
-              <th class="ps-3" style="width:110px">Órgão</th>
-              <th style="width:120px">Unid. Orç.</th>
-              <th style="width:120px">Função/Subf.</th>
-              <th style="width:130px">Programa/Ação</th>
-              <th style="width:190px">Natureza</th>
+              <th class="ps-3" style="width:230px">Órgão / Unidade</th>
+              <th style="width:230px">Função / Programa·Ação</th>
+              <th style="width:210px">Natureza</th>
               <th style="width:70px">Fonte</th>
               <th class="text-end">Autorizado</th>
               <th class="text-end">Empenhado<br><span class="text-muted fw-normal exec-saldo">a empenhar</span></th>
@@ -86,17 +84,16 @@
           <tbody>
             <% execucao.dotacoes.forEach(function(l) {
                  var busca = ((l.orgao + ' ' + l.uo + ' ' + l.funcaoSubf + ' ' + l.programaAcao + ' ' + l.natureza + ' ' + l.fonte + ' ' + l.rotulo).trim()).toLowerCase()
-                 // célula do nível: código em cima + descrição (muted) embaixo.
-                 function celCod(cod, mostraChevron) { %>
-                   <% if (cod) { %><div><% if (mostraChevron) { %><button type="button" class="exec-chevron" onclick="toggleExecRow(this)"><i class="bi bi-chevron-<%= l.nivel <= 3 ? 'up' : 'down' %>"></i></button><% } %><span class="font-monospace small"><%= cod %></span></div><div class="small text-muted text-truncate" style="max-width:170px" title="<%= l.rotulo %>"><%= l.rotulo %></div><% } %>
+                 // célula do nível: código em cima + descrição (muted) embaixo; indent
+                 // separa o sub-nível dentro da coluna fundida (unidade sob órgão; ação sob função).
+                 function celCod(cod, mostraChevron, indent) { %>
+                   <% if (cod) { %><div style="padding-left:<%= indent || 0 %>px"><div><% if (mostraChevron) { %><button type="button" class="exec-chevron" onclick="toggleExecRow(this)"><i class="bi bi-chevron-<%= l.nivel <= 3 ? 'up' : 'down' %>"></i></button><% } %><span class="font-monospace small"><%= cod %></span></div><div class="small text-muted text-truncate" style="max-width:210px" title="<%= l.rotulo %>"><%= l.rotulo %></div></div><% } %>
                  <% } %>
               %>
               <tr data-path="<%= l.path %>" data-parent="<%= l.parentPath || '' %>" data-nivel="<%= l.nivel %>" data-busca="<%= busca %>" data-rotulo="<%= l.rotulo %>" data-aberto="<%= l.nivel <= 3 ? '1' : '0' %>"<% if (l.nivel > 4) { %> style="display:none"<% } %>>
-                <td class="ps-3"><% celCod(l.orgao, l.nivel === 1 && l.temFilhos) %></td>
-                <td><% celCod(l.uo, l.nivel === 2 && l.temFilhos) %></td>
-                <td><% celCod(l.funcaoSubf, l.nivel === 3 && l.temFilhos) %></td>
-                <td><% celCod(l.programaAcao, l.nivel === 4 && l.temFilhos) %></td>
-                <td><% if (l.natureza) { %><div class="font-monospace small"><%= l.natureza %></div><div class="small text-muted text-truncate" style="max-width:190px" title="<%= l.rotulo %>"><%= l.rotulo %></div><% } %></td>
+                <td class="ps-3"><% if (l.nivel === 1) { celCod(l.orgao, l.temFilhos, 0) } else if (l.nivel === 2) { celCod(l.uo, l.temFilhos, 18) } %></td>
+                <td><% if (l.nivel === 3) { celCod(l.funcaoSubf, l.temFilhos, 0) } else if (l.nivel === 4) { celCod(l.programaAcao, l.temFilhos, 18) } %></td>
+                <td><% if (l.natureza) { %><div class="font-monospace small"><%= l.natureza %></div><div class="small text-muted text-truncate" style="max-width:210px" title="<%= l.rotulo %>"><%= l.rotulo %></div><% } %></td>
                 <td class="font-monospace small text-muted"><%= l.fonte %></td>
                 <td class="text-end font-monospace small"><%= brl(l.autorizado) %></td>
                 <td class="text-end font-monospace small"><%= brl(l.empenhado) %><br><span class="text-muted exec-saldo <%= l.aEmpenhar < 0 ? 'text-danger' : '' %>"><%= brl(l.aEmpenhar) %></span></td>
@@ -108,7 +105,7 @@
                 </td>
               </tr>
             <% }) %>
-            <% if (execucao.dotacoes.length === 0) { %><tr><td colspan="11" class="text-center text-muted py-4">Sem dotações neste exercício.</td></tr><% } %>
+            <% if (execucao.dotacoes.length === 0) { %><tr><td colspan="9" class="text-center text-muted py-4">Sem dotações neste exercício.</td></tr><% } %>
           </tbody>
         </table>
       </div>
