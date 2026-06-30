@@ -5,6 +5,7 @@ import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/prog
 import { RclService, resolverComposicao } from '../services/rcl.js'
 import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
+import { DespesaPessoalService } from '../services/despesa-pessoal.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -13,6 +14,7 @@ import {
   montarRcl,
   montarRclConsolidada,
   montarGuardiao,
+  montarDespesaPessoal,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -42,6 +44,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const rclSvc = new RclService(app.prisma)
   const rclConsSvc = new RclConsolidadaService(app.prisma)
   const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
+  const pessoalSvc = new DespesaPessoalService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -541,6 +544,69 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="guardiao-lrf-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RGF Anexo 1 — Demonstrativo da Despesa com Pessoal ──────────────────────
+  async function despesaPessoal(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta, estadoRclComposicao }, dtp] = await Promise.all([
+      entidadeCtx(entidadeId, ano),
+      pessoalSvc.calcular(entidadeId, ano),
+    ])
+    const rclR = await rclSvc.calcular(entidadeId, ano, resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao))
+    const rcl = rclR.rcl.toNumber()
+    const temOrcamento = dtp.temOrcamento && rcl > 0
+    const percentual = rcl > 0 ? Math.round((dtp.despesaLiquida / rcl) * 10000) / 100 : 0
+    const nivel = percentual >= 54 ? 'estouro' : percentual >= 51.3 ? 'prudencial' : percentual >= 48.6 ? 'alerta' : 'ok'
+    const corpo = temOrcamento
+      ? montarDespesaPessoal({
+          cabecalho: cab(e, ano, meta),
+          inclusoes: dtp.inclusoes,
+          inclusoesTotal: dtp.inclusoesTotal,
+          exclusoes: dtp.exclusoes,
+          exclusoesTotal: dtp.exclusoesTotal,
+          despesaLiquida: dtp.despesaLiquida,
+          rcl,
+          percentual,
+          limite: 54,
+          prudencial: 51.3,
+          alerta: 48.6,
+          nivel,
+          nota: dtp.metodologia,
+        })
+      : ''
+    return { e, ano, temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/despesa-pessoal', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await despesaPessoal(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Despesa com Pessoal',
+      breadcrumb: 'Despesa com Pessoal (LRF)',
+      pdfUrl: '/app/orcamento/relatorios/despesa-pessoal.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/despesa-pessoal.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await despesaPessoal(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/despesa-pessoal')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Despesa com Pessoal ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Despesa com Pessoal', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="despesa-pessoal-${ano}.pdf"`)
       .send(pdf)
   })
 }
