@@ -64,6 +64,16 @@
           <i class="bi bi-plus-lg"></i>
         </button>
       </div>
+      <% if (typeof formatos !== 'undefined' && formatos) { %>
+        <div class="dropdown">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Exportar este plano"><i class="bi bi-download me-1"></i>Exportar</button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <% formatos.forEach(function (f) { %>
+              <li><a class="dropdown-item" href="<%= base %>/exportar/<%= f.id %>?data=<%= dataRef %>"<% if (!f.download) { %> target="_blank" rel="noopener"<% } %>><i class="bi <%= f.icone %> me-2"></i><%= f.label %></a></li>
+            <% }) %>
+          </ul>
+        </div>
+      <% } %>
       <span class="badge bg-light text-dark"><%= contas.length %> conta(s)</span>
     </div>
   </div>

@@ -41,6 +41,27 @@ describe('appContasRoutes', () => {
     expect(res.body).toContain('data-nivel="3"')
   })
 
+  it('exporta o plano (CSV) com as contas visíveis', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([
+      { id: 'c1', codigo: '1', descricao: 'ATIVO', nivel: 1, admiteMovimento: false, origem: 'MODELO' },
+      { id: 'c2', codigo: '1.1.1', descricao: 'Caixa', nivel: 3, admiteMovimento: true, origem: 'DESDOBRAMENTO' },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/contas/exportar/csv' })
+    expect(res.statusCode).toBe(200)
+    expect(res.headers['content-type']).toContain('text/csv')
+    expect(res.headers['content-disposition']).toContain('attachment')
+    expect(res.body).toContain('Código')
+    expect(res.body).toContain('ATIVO')
+    expect(res.body).toContain('Caixa')
+  })
+
+  it('rejeita formato de exportação inválido (400)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
+    const res = await app.inject({ method: 'GET', url: '/contas/exportar/banana' })
+    expect(res.statusCode).toBe(400)
+  })
+
   it('estado vazio quando o plano não foi copiado para o ano', async () => {
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
     prisma.contaContabilEntidade.findMany.mockResolvedValue([])
