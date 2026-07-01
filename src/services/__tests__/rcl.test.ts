@@ -153,4 +153,11 @@ describe('resolverComposicao', () => {
     expect(resolverComposicao('PR', null).nome).toContain('TCE-PR')
     expect(resolverComposicao('SP', null)).toBe(COMPOSICAO_STN)
   })
+  it('3 níveis: Estado > Modelo > default', () => {
+    const modelo = { nome: 'Modelo', deducoes: [{ rotulo: 'M', prefixos: ['1.7'] }] }
+    const estado = { nome: 'Estado', deducoes: [{ rotulo: 'E', prefixos: ['1.7'] }] }
+    expect(resolverComposicao('SP', estado, modelo).nome).toBe('Estado')
+    expect(resolverComposicao('SP', null, modelo).nome).toBe('Modelo')
+    expect(resolverComposicao('SP', null, null)).toBe(COMPOSICAO_STN)
+  })
 })

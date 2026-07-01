@@ -35,6 +35,44 @@ export const COMPOSICAO_PESSOAL_STN: ComposicaoPessoal = {
   ],
 }
 
+/** Composições por Estado (TCE). Deltas sobre a STN; vazio por ora (a STN é boa base). */
+export const COMPOSICAO_PESSOAL_POR_ESTADO: Record<string, ComposicaoPessoal> = {}
+
+/** Resolve a composição de pessoal pelo Estado (sigla); cai na STN se não houver delta. */
+export function composicaoPessoalDoEstado(sigla: string | null | undefined): ComposicaoPessoal {
+  return (sigla && COMPOSICAO_PESSOAL_POR_ESTADO[sigla]) || COMPOSICAO_PESSOAL_STN
+}
+
+/** Valida o JSON da composição editável (do banco). Retorna null se inválido/sem inclusões. */
+export function parsePessoal(json: unknown): ComposicaoPessoal | null {
+  if (!json || typeof json !== 'object') return null
+  const o = json as { nome?: unknown; inclusoes?: unknown; exclusoes?: unknown }
+  const regras = (arr: unknown): RegraPessoal[] => {
+    if (!Array.isArray(arr)) return []
+    const out: RegraPessoal[] = []
+    for (const r of arr) {
+      if (!r || typeof r !== 'object') continue
+      const rr = r as { rotulo?: unknown; prefixos?: unknown }
+      if (typeof rr.rotulo !== 'string' || !rr.rotulo.trim()) continue
+      const prefixos = Array.isArray(rr.prefixos) ? rr.prefixos.filter((p): p is string => typeof p === 'string' && !!p.trim()) : []
+      out.push({ rotulo: rr.rotulo.trim(), prefixos })
+    }
+    return out
+  }
+  const inclusoes = regras(o.inclusoes)
+  if (inclusoes.length === 0) return null
+  return {
+    nome: typeof o.nome === 'string' && o.nome.trim() ? o.nome.trim() : 'Personalizada (Estado)',
+    inclusoes,
+    exclusoes: regras(o.exclusoes),
+  }
+}
+
+/** Composição efetiva: config do Estado > config do Modelo > default do código. Aditivo (modeloJson opcional). */
+export function resolverComposicaoPessoal(sigla: string | null | undefined, estadoJson: unknown, modeloJson?: unknown): ComposicaoPessoal {
+  return parsePessoal(estadoJson) ?? parsePessoal(modeloJson) ?? composicaoPessoalDoEstado(sigla)
+}
+
 export interface LinhaPessoal { rotulo: string; valor: number }
 export interface ResultadoPessoal {
   temOrcamento: boolean

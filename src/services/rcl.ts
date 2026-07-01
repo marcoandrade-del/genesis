@@ -81,8 +81,8 @@ export function parseComposicao(json: unknown): ComposicaoRcl | null {
  * Composição efetiva: a config EDITÁVEL do Estado (JSON do banco) tem prioridade;
  * sem ela, cai no default do código (delta do Estado ou STN).
  */
-export function resolverComposicao(sigla: string | null | undefined, jsonConfig: unknown): ComposicaoRcl {
-  return parseComposicao(jsonConfig) ?? composicaoDoEstado(sigla)
+export function resolverComposicao(sigla: string | null | undefined, estadoJson: unknown, modeloJson?: unknown): ComposicaoRcl {
+  return parseComposicao(estadoJson) ?? parseComposicao(modeloJson) ?? composicaoDoEstado(sigla)
 }
 
 /** Rótulos STN das subcategorias da Receita Corrente (categoria 1). */

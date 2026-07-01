@@ -5,7 +5,7 @@ import { ProgramaTrabalhoService, type DimensaoPrograma } from '../services/prog
 import { RclService, resolverComposicao } from '../services/rcl.js'
 import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
-import { DespesaPessoalService } from '../services/despesa-pessoal.js'
+import { DespesaPessoalService, resolverComposicaoPessoal } from '../services/despesa-pessoal.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -61,7 +61,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   async function entidadeCtx(
     entidadeId: string,
     ano: number,
-  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; meta: CabMeta; estadoRclComposicao: unknown }> {
+  ): Promise<{ e: EntidadeCab; padrao: FormatoCodigo; meta: CabMeta; estadoRclComposicao: unknown; estadoPessoalComposicao: unknown }> {
     const [row, orc] = await Promise.all([
       app.prisma.entidade.findUnique({
         where: { id: entidadeId },
@@ -77,7 +77,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
               brasao: true,
               loaCodigoModo: true,
               loaCodigoNivel: true,
-              estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true, rclComposicao: true } },
+              estado: { select: { sigla: true, loaCodigoModo: true, loaCodigoNivel: true, rclComposicao: true, pessoalComposicao: true } },
             },
           },
         },
@@ -107,6 +107,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
       padrao: { modo, nivelMax },
       meta,
       estadoRclComposicao: m.estado.rclComposicao,
+      estadoPessoalComposicao: m.estado.pessoalComposicao,
     }
   }
 
@@ -550,11 +551,12 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   // ── RGF Anexo 1 — Demonstrativo da Despesa com Pessoal ──────────────────────
   async function despesaPessoal(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
-    const [{ e, meta, estadoRclComposicao }, dtp] = await Promise.all([
-      entidadeCtx(entidadeId, ano),
-      pessoalSvc.calcular(entidadeId, ano),
+    const { e, meta, estadoRclComposicao, estadoPessoalComposicao } = await entidadeCtx(entidadeId, ano)
+    const sigla = e.municipio.estado.sigla
+    const [dtp, rclR] = await Promise.all([
+      pessoalSvc.calcular(entidadeId, ano, resolverComposicaoPessoal(sigla, estadoPessoalComposicao)),
+      rclSvc.calcular(entidadeId, ano, resolverComposicao(sigla, estadoRclComposicao)),
     ])
-    const rclR = await rclSvc.calcular(entidadeId, ano, resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao))
     const rcl = rclR.rcl.toNumber()
     const temOrcamento = dtp.temOrcamento && rcl > 0
     const percentual = rcl > 0 ? Math.round((dtp.despesaLiquida / rcl) * 10000) / 100 : 0

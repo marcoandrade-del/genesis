@@ -4,6 +4,7 @@ import { EstadosService } from '../services/estados.js'
 import { RessincronizadorModelo, descreverResumo } from '../services/ressincronizador-modelo.js'
 import { parseComposicao } from '../services/rcl.js'
 import { parseClassificacaoFonte } from '../services/fonte-classificacao.js'
+import { parsePessoal } from '../services/despesa-pessoal.js'
 import { lerXlsxBase64 } from '../services/rcl-xlsx.js'
 import { RclImportIaService } from '../services/rcl-import-ia.js'
 import { ErroNegocio } from '../errors.js'
@@ -58,7 +59,7 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
 
   app.put<{
     Params: { id: string }
-    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; rclComposicao?: string; fonteClassificacao?: string }
+    Body: { modeloContabilId?: string; loaCodigoModo?: string; loaCodigoNivel?: string; rclComposicao?: string; fonteClassificacao?: string; pessoalComposicao?: string }
   }>(
     '/:id',
     async (req, reply) => {
@@ -89,10 +90,21 @@ export async function adminEstadosRoutes(app: FastifyInstance) {
           /* JSON inválido → mantém DbNull (limpa) */
         }
       }
+      // Composição da Despesa com Pessoal editável (mesmo padrão): vazio/inválido = limpa (volta ao default).
+      let pessoalComposicao: Prisma.InputJsonValue | typeof Prisma.DbNull = Prisma.DbNull
+      const rawPessoal = req.body.pessoalComposicao
+      if (rawPessoal && rawPessoal.trim()) {
+        try {
+          const cfg = JSON.parse(rawPessoal) as Prisma.InputJsonValue
+          if (parsePessoal(cfg)) pessoalComposicao = cfg
+        } catch {
+          /* JSON inválido → mantém DbNull (limpa) */
+        }
+      }
       try {
         await app.prisma.estado.update({
           where: { id: req.params.id },
-          data: { loaCodigoModo: modo, loaCodigoNivel: nivel, rclComposicao, fonteClassificacao },
+          data: { loaCodigoModo: modo, loaCodigoNivel: nivel, rclComposicao, fonteClassificacao, pessoalComposicao },
         })
         const r = await service.definirModelo(req.params.id, novoId)
         // Sinaliza ao admin quantos municípios foram tocados pela propagação.

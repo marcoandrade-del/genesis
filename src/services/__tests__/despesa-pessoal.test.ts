@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
-import { DespesaPessoalService, COMPOSICAO_PESSOAL_STN } from '../despesa-pessoal.js'
+import { DespesaPessoalService, COMPOSICAO_PESSOAL_STN, parsePessoal, resolverComposicaoPessoal } from '../despesa-pessoal.js'
 
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
@@ -40,5 +40,39 @@ describe('DespesaPessoalService.calcular', () => {
     expect(r.exclusoesTotal).toBe(70)
     // DTP = 1170 − 70 = 1100
     expect(r.despesaLiquida).toBe(1100)
+  })
+})
+
+describe('parsePessoal', () => {
+  it('aceita JSON válido (nome + inclusões + exclusões)', () => {
+    const c = parsePessoal({ nome: 'X', inclusoes: [{ rotulo: 'P', prefixos: ['3.1'] }], exclusoes: [{ rotulo: 'I', prefixos: ['3.1.90.94'] }] })
+    expect(c).toEqual({ nome: 'X', inclusoes: [{ rotulo: 'P', prefixos: ['3.1'] }], exclusoes: [{ rotulo: 'I', prefixos: ['3.1.90.94'] }] })
+  })
+  it('nome genérico quando ausente; filtra prefixo não-string; exclusões default []', () => {
+    const c = parsePessoal({ inclusoes: [{ rotulo: 'P', prefixos: ['3.1', 7, ' '] }] })
+    expect(c!.nome).toContain('Personalizada')
+    expect(c!.inclusoes).toEqual([{ rotulo: 'P', prefixos: ['3.1'] }])
+    expect(c!.exclusoes).toEqual([])
+  })
+  it('retorna null para inválido/sem inclusões', () => {
+    expect(parsePessoal(null)).toBeNull()
+    expect(parsePessoal('x')).toBeNull()
+    expect(parsePessoal({ inclusoes: [] })).toBeNull()
+    expect(parsePessoal({ exclusoes: [{ rotulo: 'I', prefixos: ['3.1'] }] })).toBeNull() // sem inclusões
+  })
+})
+
+describe('resolverComposicaoPessoal (3 níveis: Estado > Modelo > default)', () => {
+  const est = { nome: 'Estado', inclusoes: [{ rotulo: 'E', prefixos: ['3.1'] }], exclusoes: [] }
+  const mod = { nome: 'Modelo', inclusoes: [{ rotulo: 'M', prefixos: ['3.1'] }], exclusoes: [] }
+  it('override do Estado tem prioridade', () => {
+    expect(resolverComposicaoPessoal('PR', est, mod).nome).toBe('Estado')
+  })
+  it('sem Estado, usa o Modelo', () => {
+    expect(resolverComposicaoPessoal('PR', null, mod).nome).toBe('Modelo')
+  })
+  it('sem Estado nem Modelo, cai no default do código', () => {
+    expect(resolverComposicaoPessoal('PR', null)).toBe(COMPOSICAO_PESSOAL_STN)
+    expect(resolverComposicaoPessoal(null, null, null)).toBe(COMPOSICAO_PESSOAL_STN)
   })
 })

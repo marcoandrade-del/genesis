@@ -112,8 +112,8 @@ export function parseClassificacaoFonte(json: unknown): ClassificacaoFonte | nul
  * Composição efetiva: a config EDITÁVEL do Estado (JSON do banco) tem prioridade;
  * sem ela, cai no default do código (delta do Estado ou STN).
  */
-export function resolverClassificacaoFonte(sigla: string | null | undefined, jsonConfig: unknown): ClassificacaoFonte {
-  return parseClassificacaoFonte(jsonConfig) ?? classificacaoDoEstado(sigla)
+export function resolverClassificacaoFonte(sigla: string | null | undefined, estadoJson: unknown, modeloJson?: unknown): ClassificacaoFonte {
+  return parseClassificacaoFonte(estadoJson) ?? parseClassificacaoFonte(modeloJson) ?? classificacaoDoEstado(sigla)
 }
 
 /**

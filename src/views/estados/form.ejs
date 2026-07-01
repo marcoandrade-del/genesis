@@ -79,6 +79,14 @@
         placeholder='{"nome":"TCE-PR","regras":[{"finalidade":"MDE","prefixos":["1104"]}]}'><%= estado.fonteClassificacao ? JSON.stringify(estado.fonteClassificacao, null, 2) : '' %></textarea>
       <div class="form-text">Vazio = usa o padrão do código (STN, ou o delta do Estado). Finalidades: LIVRES, MDE, FUNDEB, ASPS, RPPS, DIVIDA, OUTRAS_VINCULADAS.</div>
     </div>
+
+    <hr class="my-3">
+    <div class="mb-2">
+      <label class="form-label small fw-semibold">Despesa com Pessoal — inclusões / exclusões (RGF Anexo 1)</label>
+      <textarea name="pessoalComposicao" rows="6" class="form-control form-control-sm font-monospace" style="font-size:.75rem"
+        placeholder='{"nome":"LRF/STN","inclusoes":[{"rotulo":"Pessoal (3.1)","prefixos":["3.1"]}],"exclusoes":[{"rotulo":"Indenizações","prefixos":["3.1.90.94"]}]}'><%= estado.pessoalComposicao ? JSON.stringify(estado.pessoalComposicao, null, 2) : '' %></textarea>
+      <div class="form-text">Vazio = usa o padrão do código (LRF/STN). DTP = inclusões (3.1 + terceirização) − exclusões (indenizações, decisão judicial, exercícios anteriores, inativos RPPS).</div>
+    </div>
   </div>
 
   <div class="modal-footer">
