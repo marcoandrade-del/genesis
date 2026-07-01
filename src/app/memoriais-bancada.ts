@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { PreviewMemoriaisService } from '../services/preview-memoriais.js'
+import { SolicitacoesMemorialService } from '../services/solicitacoes-memorial.js'
 
 const ROTA = '/app/memoriais/bancada'
 
@@ -95,4 +96,53 @@ export async function appMemoriaisBancadaRoutes(app: FastifyInstance) {
       return reply.send({ naturezas })
     },
   )
+
+  // CONFIRMAR: o proponente envia a metodologia para aprovação. O Estado-alvo é
+  // derivado do município testado (entidade→município→estado). Nada grava no
+  // Estado aqui — só cria a SolicitacaoMemorial PENDENTE (o admin aprova).
+  app.post<{
+    Body: { entidadePreviewId?: string; ano?: string | number; rcl?: unknown; fonte?: unknown; pessoal?: unknown; justificativa?: string }
+  }>('/memoriais/bancada/confirmar', async (req, reply) => {
+    if (!(await temPoder(req.user.sub))) return reply.code(403).send({ erro: 'Sem permissão.' })
+    const entidadePreviewId = req.body.entidadePreviewId
+    if (!entidadePreviewId) return reply.code(400).send({ erro: 'entidadePreviewId é obrigatório.' })
+    const ent = await app.prisma.entidade.findUnique({
+      where: { id: entidadePreviewId },
+      select: { municipio: { select: { estadoId: true } } },
+    })
+    if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    const ano = parseInt(String(req.body.ano ?? ''), 10)
+    try {
+      const sol = await new SolicitacoesMemorialService(app.prisma).criar({
+        usuarioId: req.user.sub,
+        estadoId: ent.municipio.estadoId,
+        entidadePreviewId,
+        ano: Number.isFinite(ano) ? ano : null,
+        rcl: req.body.rcl,
+        fonte: req.body.fonte,
+        pessoal: req.body.pessoal,
+        justificativa: req.body.justificativa,
+      })
+      return reply.send({ ok: true, id: sol.id })
+    } catch (e: unknown) {
+      return reply.code(400).send({ erro: e instanceof Error ? e.message : 'Erro ao enviar a proposta.' })
+    }
+  })
+
+  // Minhas propostas (status pendente/aprovada/rejeitada) — fecha o loop p/ o proponente.
+  app.get('/memoriais/minhas-solicitacoes', async (req: FastifyRequest, reply: FastifyReply) => {
+    if (!(await temPoder(req.user.sub))) return reply.code(403).send('Sem permissão para a bancada de memoriais.')
+    const solicitacoes = await new SolicitacoesMemorialService(app.prisma).listarMinhas(req.user.sub)
+    return reply.view('app/minhas-solicitacoes-memorial', { solicitacoes, layout: null })
+  })
+
+  app.post<{ Params: { id: string } }>('/memoriais/minhas-solicitacoes/:id/cancelar', async (req, reply) => {
+    if (!(await temPoder(req.user.sub))) return reply.code(403).send('Sem permissão.')
+    try {
+      await new SolicitacoesMemorialService(app.prisma).cancelar(req.params.id, req.user.sub)
+    } catch {
+      /* idempotente: já decidida/cancelada → só volta à lista */
+    }
+    return reply.redirect('/app/memoriais/minhas-solicitacoes')
+  })
 }

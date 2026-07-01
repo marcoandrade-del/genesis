@@ -1,0 +1,77 @@
+<% function brl(n){ return 'R$ ' + Number(n||0).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}) } %>
+<div class="d-flex justify-content-between align-items-start mb-3">
+  <div>
+    <h2 class="h5 fw-bold mb-1">
+      <i class="bi bi-sliders me-1 text-primary"></i>Propostas de memoriais de cálculo
+    </h2>
+    <div class="small text-muted">Pendentes de decisão (<%= pendentes.length %>) — aprovar grava a metodologia no Estado</div>
+  </div>
+</div>
+
+<% if (pendentes.length === 0) { %>
+  <div class="alert alert-secondary small mb-0">
+    <i class="bi bi-check2-circle me-1"></i>Nenhuma proposta pendente.
+  </div>
+<% } else { %>
+  <div class="card border-0 shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Solicitante</th>
+            <th>Estado</th>
+            <th>Memoriais</th>
+            <th style="width:260px">Impacto (efetivo → proposto)</th>
+            <th>Justificativa</th>
+            <th class="text-end pe-3" style="width:280px">Decisão</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% pendentes.forEach(function(s) { %>
+            <tr>
+              <td class="ps-3">
+                <div class="fw-semibold small"><%= s.usuario.nomeCompleto %></div>
+                <div class="text-muted" style="font-size:.75rem"><%= s.usuario.emailPrincipal %></div>
+              </td>
+              <td>
+                <div class="fw-semibold small"><%= s.estado.sigla %> — <%= s.estado.nome %></div>
+                <% if (s.ano) { %><div class="text-muted" style="font-size:.75rem">exercício <%= s.ano %></div><% } %>
+              </td>
+              <td class="small">
+                <% if (s.rclComposicao) { %><span class="badge bg-primary bg-opacity-10 text-primary me-1">RCL</span><% } %>
+                <% if (s.pessoalComposicao) { %><span class="badge bg-primary bg-opacity-10 text-primary me-1">Pessoal</span><% } %>
+                <% if (s.fonteClassificacao) { %><span class="badge bg-primary bg-opacity-10 text-primary">Fonte</span><% } %>
+              </td>
+              <td class="small">
+                <% if (s.preview) { %>
+                  <div><span class="text-muted">RCL</span> <%= brl(s.preview.rclEf) %>
+                    <i class="bi bi-arrow-right mx-1"></i><strong><%= brl(s.preview.rclPr) %></strong></div>
+                  <div><span class="text-muted">DTP/RCL</span> <%= s.preview.pctEf %>%
+                    <i class="bi bi-arrow-right mx-1"></i><strong><%= s.preview.pctPr %>%</strong></div>
+                <% } else { %>
+                  <span class="text-muted">—</span>
+                <% } %>
+              </td>
+              <td class="small text-muted"><%= s.justificativa || '—' %></td>
+              <td class="pe-3">
+                <div class="d-flex gap-1 justify-content-end align-items-center">
+                  <input name="observacao" class="form-control form-control-sm" placeholder="Observação" style="width:120px">
+                  <button class="btn btn-sm btn-success"
+                    hx-post="/admin/memoriais/solicitacoes/<%= s.id %>/aprovar"
+                    hx-include="closest tr">Aprovar</button>
+                  <button class="btn btn-sm btn-outline-danger"
+                    hx-post="/admin/memoriais/solicitacoes/<%= s.id %>/rejeitar"
+                    hx-include="closest tr"
+                    data-confirm-titulo="Rejeitar proposta"
+                    data-confirm-detalhe="A metodologia do Estado não será alterada."
+                    data-confirm-ok="Rejeitar"
+                    data-confirm-tipo="perigo">Rejeitar</button>
+                </div>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>

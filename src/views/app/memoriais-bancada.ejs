@@ -104,7 +104,7 @@
     <span class="mute" style="font-size:12.5px">Nada é gravado até confirmar. A alteração vai para aprovação do administrador.</span>
     <div style="display:flex;gap:8px">
       <button class="btn btn-ghost" id="descartar">Descartar</button>
-      <button class="btn btn-cta" id="confirmar" disabled title="Governança (próximo passo)"><i class="bi bi-send"></i> Confirmar e enviar</button>
+      <button class="btn btn-cta" id="confirmar" disabled title="Enviar a metodologia para aprovação do administrador"><i class="bi bi-send"></i> Confirmar e enviar</button>
     </div>
   </div>
 </div>
@@ -148,6 +148,7 @@
     ])
     nat={receita:nr.naturezas||[],despesa:nd.naturezas||[]}
     aviso(null); $('palco').style.display='grid'; $('foot').style.display='flex'; $('draft').style.display='none'
+    $('draft').style.color=''; $('confirmar').disabled=true
     renderMemos(); renderResultado(d)
   }
   const clone=(o)=>JSON.parse(JSON.stringify(o||{}))
@@ -211,7 +212,7 @@
   }
 
   // ── edição → recalcula ─────────────────────────────────────────────────────
-  function marcar(){$('draft').style.display='inline-block'}
+  function marcar(){$('draft').style.display='inline-block';$('confirmar').disabled=false}
   function onEdit(){marcar();renderMemos();clearTimeout(t);t=setTimeout(recalcular,400)}
   async function recalcular(){
     const entidadeId=$('entidade').value, ano=$('ano').value
@@ -249,6 +250,24 @@
   }
 
   $('descartar').addEventListener('click',()=>carregar())
+
+  // ── Confirmar e enviar → cria a solicitação (governança; grava só após aprovação) ──
+  $('confirmar').addEventListener('click', async ()=>{
+    const entidadeId=$('entidade').value, ano=$('ano').value
+    if(!entidadeId) return
+    const just=prompt('Enviar esta metodologia para aprovação do administrador.\n\nJustificativa (opcional):','')
+    if(just===null) return
+    $('confirmar').disabled=true
+    let d={}
+    try{
+      const res=await fetch('/app/memoriais/bancada/confirmar',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entidadePreviewId:entidadeId,ano,rcl:comp.rcl,fonte:comp.fonte,pessoal:comp.pessoal,justificativa:just})})
+      d=await res.json().catch(()=>({}))
+      if(res.ok){
+        const b=$('draft'); b.replaceChildren(); b.appendChild(el('i','bi bi-check-circle')); b.appendChild(document.createTextNode(' proposta enviada para aprovação'))
+        b.style.display='inline-block'; b.style.color='var(--positive)'
+      } else { aviso(d.erro||'Falha ao enviar a proposta.'); $('confirmar').disabled=false }
+    }catch(_){ aviso('Falha ao enviar a proposta.'); $('confirmar').disabled=false }
+  })
 })();
 </script>
 </body>

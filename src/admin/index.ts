@@ -35,6 +35,7 @@ import { adminEventosContabeisRoutes } from './eventos-contabeis.js'
 import { adminProgramasRoutes } from './programas.js'
 import { adminOrcamentosRoutes } from './orcamentos.js'
 import { adminAcessosEntidadeRoutes } from './acessos-entidade.js'
+import { adminMemoriaisRoutes } from './memoriais.js'
 import { adminItensCatalogoRoutes } from './itens-catalogo.js'
 import { adminReservasDotacaoRoutes } from './reservas-dotacao.js'
 import { adminPlanosContratacaoRoutes } from './planos-contratacao.js'
@@ -57,6 +58,7 @@ const PAGINAS_COMPLETAS_PROFUNDAS: ReadonlyArray<string | RegExp> = [
   /^orcamentos\/[^/]+$/,
   /^acessos-entidade\/usuario\/[^/]+$/,
   'acessos-entidade/solicitacoes',
+  'memoriais/solicitacoes',
 ]
 
 function ePaginaCompletaProfunda(path: string): boolean {
@@ -163,6 +165,7 @@ export async function adminRoutes(app: FastifyInstance) {
     admin.register(adminProgramasRoutes, { prefix: '/programas' })
     admin.register(adminOrcamentosRoutes, { prefix: '/orcamentos' })
     admin.register(adminAcessosEntidadeRoutes, { prefix: '/acessos-entidade' })
+    admin.register(adminMemoriaisRoutes, { prefix: '/memoriais' })
     admin.register(adminItensCatalogoRoutes, { prefix: '/itens-catalogo' })
     admin.register(adminReservasDotacaoRoutes, { prefix: '/reservas-dotacao' })
     admin.register(adminPlanosContratacaoRoutes, { prefix: '/planos-contratacao' })
