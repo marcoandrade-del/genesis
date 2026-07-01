@@ -3,126 +3,253 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Memoriais de cálculo — Bancada</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <title>Memoriais de cálculo — bancada</title>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <style>
-    body { background:#f6f7f9; font-size:.9rem }
-    .band { max-width:1100px; margin:0 auto; padding:1rem }
-    textarea { font-family:ui-monospace,Menlo,monospace; font-size:.72rem }
-    .memo { background:#fff; border:1px solid #e5e7eb; border-radius:.5rem; padding:.75rem; margin-bottom:.75rem }
-    .num { text-align:right; font-variant-numeric:tabular-nums }
-    .delta-up { color:#b26a00 } .delta-dn { color:#0a7d33 }
-    .cmp td, .cmp th { padding:.15rem .4rem }
+    :root{
+      --primary:#9fe870;--primary-pale:#e2f6d5;--canvas:#fff;--canvas-soft:#e8ebe6;
+      --ink:#0e0f0c;--ink-deep:#163300;--body:#454745;--mute:#868685;
+      --positive:#2ead4b;--positive-deep:#054d28;--warning:#ffd11a;--warning-deep:#b86700;
+      --negative:#d03238;--line:rgba(14,15,12,.08);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--canvas-soft);color:var(--ink);font-family:'Inter',system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+    h1,h2,h3{font-family:'Manrope',sans-serif;font-weight:800;letter-spacing:-.015em;margin:0}
+    .wrap{max-width:1240px;margin:0 auto;padding:20px}
+    .mute{color:var(--mute)} .num{font-variant-numeric:tabular-nums}
+    .card{background:var(--canvas);border-radius:24px;box-shadow:0 1px 2px rgba(14,15,12,.04),0 6px 20px rgba(14,15,12,.05)}
+    .btn{border:0;border-radius:9999px;font-family:'Inter';font-weight:600;padding:.5rem 1rem;cursor:pointer;font-size:13px;color:var(--ink)}
+    .btn-cta{background:var(--primary)} .btn-cta:disabled{opacity:.4;cursor:default}
+    .btn-ghost{background:transparent;border:1px solid rgba(14,15,12,.2)}
+    .btn-xs{padding:.2rem .6rem;font-size:12px}
+    .sel{background:var(--canvas);border:1px solid rgba(14,15,12,.15);border-radius:12px;padding:.4rem .7rem;font-size:13px;font-weight:500;color:var(--ink)}
+    .chip{display:inline-flex;align-items:center;gap:.3rem;background:var(--canvas-soft);border-radius:9999px;padding:.15rem .55rem;font-size:12px;font-family:ui-monospace,monospace;color:var(--ink-deep)}
+    .chip .x{color:var(--mute);cursor:pointer;font-family:'Inter'}
+    .draft{font-size:12px;color:var(--warning-deep);background:#fff3c2;border-radius:9999px;padding:.2rem .7rem;font-weight:600}
+    .top{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+    .grid{display:grid;grid-template-columns:1fr 380px;gap:16px;align-items:start}
+    /* memorial cards (compactos, accordion) */
+    .memo{margin-bottom:10px;overflow:hidden}
+    .memo>.head{display:flex;align-items:center;gap:12px;padding:14px 16px;cursor:pointer}
+    .memo>.head:hover{background:rgba(159,232,112,.06)}
+    .memo .tt{font-family:'Manrope';font-weight:800;font-size:15px}
+    .memo .sum{font-size:12.5px;color:var(--body)}
+    .memo .caret{margin-left:auto;color:var(--mute);transition:transform .15s}
+    .memo.open .caret{transform:rotate(90deg)}
+    .memo .body{display:none;padding:0 16px 14px}
+    .memo.open .body{display:block}
+    /* rule rows */
+    .grp-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600;margin:10px 0 4px}
+    .rule{display:grid;grid-template-columns:1fr 140px 30px;gap:10px;align-items:center;padding:10px;border-radius:14px;border:1px solid var(--line);margin-bottom:6px}
+    .rule .rot{border:0;border-bottom:1px solid transparent;font-weight:600;font-size:13.5px;width:100%;padding:2px 0;background:transparent;color:var(--ink)}
+    .rule .rot:focus{outline:0;border-bottom-color:var(--primary)}
+    .rule .fin{border:1px solid rgba(14,15,12,.15);border-radius:8px;font-size:12.5px;padding:.2rem .4rem;font-weight:600}
+    .nats{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .addnat{border:1px dashed rgba(14,15,12,.25);background:transparent;border-radius:9999px;font-size:11px;padding:.1rem .5rem;color:var(--body);cursor:pointer}
+    .impact .v{font-family:'Manrope';font-weight:700;font-size:13.5px;text-align:right}
+    .del{border:0;background:transparent;color:var(--mute);cursor:pointer}.del:hover{color:var(--negative)}
+    /* picker popover */
+    .pop{border:1px solid var(--line);border-radius:14px;background:var(--canvas);box-shadow:0 8px 24px rgba(14,15,12,.1);padding:8px;margin:6px 0 2px;max-height:230px;overflow:auto}
+    .pop .search{width:100%;border:1px solid rgba(14,15,12,.15);border-radius:8px;padding:.3rem .55rem;font-size:13px;margin-bottom:6px}
+    .pop .opt{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:.25rem .2rem;border-bottom:1px solid var(--line);font-size:12.5px;cursor:pointer}
+    .pop .opt:last-child{border-bottom:0} .pop .opt:hover{background:var(--canvas-soft)}
+    .pop .cod{font-family:ui-monospace,monospace;color:var(--ink-deep)}
+    /* result panel */
+    .res{position:sticky;top:16px}
+    .kpi{padding:13px 16px;border-bottom:1px solid var(--line)} .kpi:last-child{border-bottom:0}
+    .kpi .lab{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:600}
+    .kpi .r2{display:flex;align-items:baseline;justify-content:space-between;margin-top:3px}
+    .kpi .ef{font-size:13px;color:var(--body)} .kpi .pr{font-family:'Manrope';font-weight:800;font-size:20px}
+    .kpi .arrow{margin:0 5px;color:var(--mute)}
+    .up{color:var(--warning-deep)} .dn{color:var(--positive-deep)}
+    .gauge{height:11px;border-radius:9999px;margin-top:8px;position:relative;background:linear-gradient(90deg,var(--positive) 0 81%,var(--warning) 81% 95%,var(--negative) 95% 100%)}
+    .gauge .mk{position:absolute;top:-3px;width:3px;height:17px;border-radius:2px;background:var(--ink)}
+    .gauge .mk.ef{background:rgba(14,15,12,.4)}
+    .glab{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:2px}
+    .foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:14px 16px}
   </style>
 </head>
 <body>
-<div class="band">
-  <div class="d-flex align-items-center mb-3">
-    <a href="/app" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-arrow-left"></i></a>
-    <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Memoriais de cálculo — bancada</h5>
-  </div>
-  <p class="text-muted small">Adapte a metodologia do TCE (RCL, classificação de fonte, Despesa com Pessoal) e veja o valor recalculado ao vivo contra um município real. Nada é gravado aqui — a alteração vira uma solicitação depois.</p>
-
-  <div class="memo row g-2 align-items-end">
-    <div class="col-md-7">
-      <label class="form-label small fw-semibold mb-1">Município / entidade (dados reais para teste)</label>
-      <select id="entidade" class="form-select form-select-sm">
-        <option value="">— escolha —</option>
+<div class="wrap">
+  <div class="top">
+    <a href="/app" class="btn btn-ghost btn-xs"><i class="bi bi-arrow-left"></i></a>
+    <h1 style="font-size:20px">Memoriais de cálculo</h1>
+    <span class="chip" style="font-family:'Inter'" id="metodo">metodologia: —</span>
+    <span class="draft" id="draft" style="display:none"><i class="bi bi-pencil"></i> rascunho não salvo</span>
+    <div style="margin-left:auto;display:flex;gap:8px">
+      <select class="sel" id="entidade" style="max-width:340px">
+        <option value="">— escolha um município —</option>
         <% entidades.forEach(function(e){ %><option value="<%= e.id %>"><%= e.rotulo %></option><% }) %>
       </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label small fw-semibold mb-1">Ano</label>
-      <select id="ano" class="form-select form-select-sm">
-        <% anos.forEach(function(a){ %><option value="<%= a %>"><%= a %></option><% }) %>
-      </select>
-    </div>
-    <div class="col-md-3">
-      <button id="carregar" class="btn btn-sm btn-primary w-100"><i class="bi bi-arrow-repeat me-1"></i>Carregar</button>
+      <select class="sel" id="ano"><% anos.forEach(function(a){ %><option value="<%= a %>"><%= a %></option><% }) %></select>
+      <button class="btn btn-cta" id="carregar"><i class="bi bi-arrow-repeat"></i> Carregar</button>
     </div>
   </div>
 
-  <div id="aviso" class="alert alert-warning py-2 small d-none"></div>
+  <div id="aviso" class="card" style="display:none;padding:12px 16px;margin-bottom:12px;color:var(--warning-deep);background:#fff3c2"></div>
 
-  <% ['rcl','pessoal','fonte'].forEach(function(k){ %>
-  <div class="memo">
-    <div class="d-flex justify-content-between">
-      <strong><%= k==='rcl' ? 'RCL — deduções' : k==='pessoal' ? 'Despesa com Pessoal — inclusões/exclusões' : 'Classificação de fonte → finalidade' %></strong>
-      <span class="badge text-bg-light" id="metodo-<%= k %>">—</span>
-    </div>
-    <div class="row g-2 mt-1">
-      <div class="col-md-6">
-        <textarea id="edit-<%= k %>" rows="7" class="form-control form-control-sm" placeholder="edite aqui (JSON) — vazio usa o efetivo"></textarea>
+  <div class="grid" id="palco" style="display:none">
+    <div id="memos"></div>
+    <div class="res card">
+      <div style="padding:13px 16px;border-bottom:1px solid var(--line)">
+        <h2 style="font-size:14px">Resultado ao vivo</h2>
+        <div class="mute" style="font-size:11.5px">efetivo → <b style="color:var(--ink)">proposto</b> · os 3 memoriais somam aqui</div>
       </div>
-      <div class="col-md-6">
-        <table class="table table-sm cmp mb-0"><tbody id="painel-<%= k %>"></tbody></table>
-      </div>
+      <div id="kpis"></div>
     </div>
   </div>
-  <% }) %>
+
+  <div class="foot" id="foot" style="display:none">
+    <span class="mute" style="font-size:12.5px">Nada é gravado até confirmar. A alteração vai para aprovação do administrador.</span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost" id="descartar">Descartar</button>
+      <button class="btn btn-cta" id="confirmar" disabled title="Governança (próximo passo)"><i class="bi bi-send"></i> Confirmar e enviar</button>
+    </div>
+  </div>
 </div>
 
 <script>
-const brl = (n) => (n==null?'—':Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))
-const $ = (id) => document.getElementById(id)
-let t
+(function(){
+  const $=(id)=>document.getElementById(id)
+  const el=(t,cls,txt)=>{const n=document.createElement(t);if(cls)n.className=cls;if(txt!=null)n.textContent=txt;return n}
+  const brl=(n)=>n==null?'—':Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0})
+  const FINALIDADES=['LIVRES','MDE','FUNDEB','ASPS','RPPS','DIVIDA','OUTRAS_VINCULADAS','NAO_CLASSIFICADA']
 
-function jsonDoEditor(id){ const v=$(id).value.trim(); if(!v) return undefined; try { return JSON.parse(v) } catch(e){ return '__invalido__' } }
+  // config dos 3 memoriais: qual campo/tipo de dados e a forma da linha
+  const MEMOS=[
+    {key:'rcl',   tt:'RCL — deduções',              sub:'RREO Anexo 3 — o que se subtrai das receitas correntes', tipo:'receita', grupos:[{campo:'deducoes',lbl:'Deduções'}]},
+    {key:'pessoal',tt:'Despesa com Pessoal',        sub:'RGF Anexo 1 — inclusões menos exclusões (DTP)',          tipo:'despesa', grupos:[{campo:'inclusoes',lbl:'Inclusões'},{campo:'exclusoes',lbl:'Exclusões'}]},
+    {key:'fonte', tt:'Classificação de fonte',      sub:'fonte de recurso → finalidade (MDE/ASPS/FUNDEB…)',       tipo:'receita', fin:true, grupos:[{campo:'regras',lbl:'Regras'}]},
+  ]
+  let comp={}         // {rcl:{nome,deducoes:[]}, pessoal:{nome,inclusoes,exclusoes}, fonte:{nome,regras}}
+  let nat={receita:[],despesa:[]}   // código→valor p/ impacto por linha (client-side)
+  let aberto='rcl'    // memorial aberto (accordion)
+  let pickerRow=null  // referência da regra com o picker aberto
+  let t
 
-async function preview(prefill){
-  const entidadeId = $('entidade').value, ano = $('ano').value
-  if(!entidadeId){ return }
-  const body = { entidadeId, ano }
-  if(!prefill){ body.rcl = jsonDoEditor('edit-rcl'); body.fonte = jsonDoEditor('edit-fonte'); body.pessoal = jsonDoEditor('edit-pessoal') }
-  const res = await fetch('/app/memoriais/bancada/preview', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) })
-  if(!res.ok){ aviso('Falha ao calcular ('+res.status+').'); return }
-  const d = await res.json(); aviso(null)
-  if(prefill){
-    $('edit-rcl').value = JSON.stringify(d.efetivas.rcl, null, 2)
-    $('edit-fonte').value = JSON.stringify(d.efetivas.fonte, null, 2)
-    $('edit-pessoal').value = JSON.stringify(d.efetivas.pessoal, null, 2)
+  function aviso(m){const a=$('aviso');if(!m){a.style.display='none';return}a.textContent=m;a.style.display='block'}
+  function impactoRegra(tipo,prefixos){const lista=nat[tipo]||[];let s=0;for(const n of lista){if(prefixos.some(px=>n.codigo.startsWith(px)))s+=n.valor}return s}
+
+  // ── carregar (preview sem edições → efetivas + naturezas) ──────────────────
+  $('carregar').addEventListener('click', carregar)
+  async function carregar(){
+    const entidadeId=$('entidade').value, ano=$('ano').value
+    if(!entidadeId){aviso('Escolha um município.');return}
+    const res=await fetch('/app/memoriais/bancada/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entidadeId,ano})})
+    if(!res.ok){aviso('Falha ao carregar ('+res.status+').');return}
+    const d=await res.json()
+    comp={rcl:clone(d.efetivas.rcl),pessoal:clone(d.efetivas.pessoal),fonte:clone(d.efetivas.fonte)}
+    $('metodo').textContent='metodologia: '+(d.rcl.efetivo.metodologia||'—')
+    // naturezas p/ o impacto por linha
+    const [nr,nd]=await Promise.all([
+      fetch('/app/memoriais/bancada/naturezas?entidadeId='+entidadeId+'&ano='+ano+'&tipo=receita').then(r=>r.json()),
+      fetch('/app/memoriais/bancada/naturezas?entidadeId='+entidadeId+'&ano='+ano+'&tipo=despesa').then(r=>r.json()),
+    ])
+    nat={receita:nr.naturezas||[],despesa:nd.naturezas||[]}
+    aviso(null); $('palco').style.display='grid'; $('foot').style.display='flex'; $('draft').style.display='none'
+    renderMemos(); renderResultado(d)
   }
-  render(d)
-}
+  const clone=(o)=>JSON.parse(JSON.stringify(o||{}))
 
-// ── render seguro (DOM, sem innerHTML) ──────────────────────────────────────
-function cell(text, cls){ const e=document.createElement('td'); if(cls) e.className=cls; e.textContent=text; return e }
-function head(text, cls){ const e=document.createElement('th'); if(cls) e.className=cls; e.textContent=text; return e }
-function tr(nodes){ const r=document.createElement('tr'); nodes.forEach(n=>r.appendChild(n)); return r }
-function linha(rot, ef, pr, money){
-  const fmt = money ? brl : (x)=>(x==null?'—':String(x))
-  const c = document.createElement('td'); c.className='num'; c.textContent=fmt(pr)
-  if(Number(pr)>Number(ef)) c.classList.add('delta-up'); else if(Number(pr)<Number(ef)) c.classList.add('delta-dn')
-  return tr([cell(rot,'text-muted'), cell(fmt(ef),'num'), c])
-}
-function preencher(id, linhas){
-  const tb=$(id); tb.replaceChildren()
-  tb.appendChild(tr([head(''), head('efetivo','num'), head('proposto','num')]))
-  linhas.forEach(l=>tb.appendChild(l))
-}
-function render(d){
-  ;['rcl','pessoal','fonte'].forEach(k=>{ $('metodo-'+k).textContent = d[k].proposto.metodologia || '—' })
-  preencher('painel-rcl', [
-    linha('Correntes', d.rcl.efetivo.correntesTotal, d.rcl.proposto.correntesTotal, true),
-    linha('(−) Deduções', d.rcl.efetivo.deducoesTotal, d.rcl.proposto.deducoesTotal, true),
-    linha('= RCL', d.rcl.efetivo.rcl, d.rcl.proposto.rcl, true),
-  ])
-  preencher('painel-pessoal', [
-    linha('Inclusões', d.pessoal.efetivo.inclusoesTotal, d.pessoal.proposto.inclusoesTotal, true),
-    linha('(−) Exclusões', d.pessoal.efetivo.exclusoesTotal, d.pessoal.proposto.exclusoesTotal, true),
-    linha('= DTP', d.pessoal.efetivo.despesaLiquida, d.pessoal.proposto.despesaLiquida, true),
-    linha('% da RCL', d.pessoal.efetivo.percentualRcl+'%', d.pessoal.proposto.percentualRcl+'%', false),
-  ])
-  const fins = {}
-  d.fonte.efetivo.porFinalidade.forEach(l=>fins[l.finalidade]={rot:l.rotulo,ef:l.arrecadado,pr:0})
-  d.fonte.proposto.porFinalidade.forEach(l=>{ (fins[l.finalidade]=fins[l.finalidade]||{rot:l.rotulo,ef:0,pr:0}).pr=l.arrecadado })
-  preencher('painel-fonte', Object.values(fins).map(f=>linha(f.rot, f.ef, f.pr, true)))
-}
-function aviso(m){ const a=$('aviso'); if(!m){ a.classList.add('d-none'); return } a.textContent=m; a.classList.remove('d-none') }
+  // ── render dos 3 cartões (compactos + accordion) ───────────────────────────
+  function resumo(m){
+    const c=comp[m.key]; let regras=[]; m.grupos.forEach(g=>regras=regras.concat(c[g.campo]||[]))
+    const tot=regras.reduce((s,r)=>s+impactoRegra(m.tipo,r.prefixos||[]),0)
+    return regras.length+' '+(m.key==='fonte'?'regras':m.grupos.map(g=>g.lbl.toLowerCase()).join('/'))+' · '+brl(tot)
+  }
+  function renderMemos(){
+    const box=$('memos'); box.replaceChildren()
+    MEMOS.forEach(m=>{
+      const card=el('div','card memo'+(aberto===m.key?' open':''))
+      const head=el('div','head'); head.addEventListener('click',()=>{aberto=aberto===m.key?null:m.key;pickerRow=null;renderMemos()})
+      const info=el('div'); info.appendChild(el('div','tt',m.tt)); info.appendChild(el('div','sum',resumo(m)))
+      head.appendChild(info); const car=el('i','bi bi-chevron-right caret'); head.appendChild(car); card.appendChild(head)
+      const body=el('div','body')
+      if(aberto===m.key) m.grupos.forEach(g=>renderGrupo(body,m,g))
+      card.appendChild(body); box.appendChild(card)
+    })
+  }
+  function renderGrupo(body,m,g){
+    body.appendChild(el('div','grp-lbl',g.lbl))
+    const lista=comp[m.key][g.campo]||(comp[m.key][g.campo]=[])
+    lista.forEach((r,idx)=>body.appendChild(renderRegra(m,g,r,idx)))
+    const add=el('button','addnat'); add.style.marginTop='4px'; add.textContent='+ '+(m.fin?'regra':g.lbl.replace(/s$/,'').toLowerCase())
+    add.addEventListener('click',()=>{lista.push(m.fin?{finalidade:'OUTRAS_VINCULADAS',prefixos:[]}:{rotulo:'Nova linha',prefixos:[]});onEdit()})
+    body.appendChild(add)
+  }
+  function renderRegra(m,g,r,idx){
+    const row=el('div','rule')
+    const left=el('div')
+    if(m.fin){
+      const sel=el('select','fin'); FINALIDADES.forEach(f=>{const o=el('option',null,f);o.value=f;if(f===r.finalidade)o.selected=true;sel.appendChild(o)})
+      sel.addEventListener('change',()=>{r.finalidade=sel.value;onEdit()}); left.appendChild(sel)
+    } else {
+      const inp=el('input','rot'); inp.value=r.rotulo||''; inp.addEventListener('input',()=>{r.rotulo=inp.value;marcar()}); left.appendChild(inp)
+    }
+    const nats=el('div','nats')
+    ;(r.prefixos||[]).forEach(px=>{const c=el('span','chip');c.appendChild(el('span',null,px));const x=el('span','x','×');x.addEventListener('click',()=>{r.prefixos=r.prefixos.filter(p=>p!==px);onEdit()});c.appendChild(x);nats.appendChild(c)})
+    const addn=el('button','addnat','+ natureza'); addn.addEventListener('click',()=>{pickerRow=(pickerRow===r?null:r);renderMemos()}); nats.appendChild(addn)
+    left.appendChild(nats)
+    if(pickerRow===r) left.appendChild(renderPicker(m,r))
+    row.appendChild(left)
+    const imp=el('div','impact'); imp.appendChild(el('div','v num',brl(impactoRegra(m.tipo,r.prefixos||[])))); row.appendChild(imp)
+    const del=el('button','del'); del.appendChild(el('i','bi bi-trash')); del.addEventListener('click',()=>{const l=comp[m.key][g.campo];l.splice(idx,1);onEdit()}); row.appendChild(del)
+    return row
+  }
+  function renderPicker(m,r){
+    const pop=el('div','pop')
+    const s=el('input','search'); s.placeholder='buscar natureza — código ou descrição'; pop.appendChild(s)
+    const listBox=el('div')
+    const draw=(q)=>{listBox.replaceChildren();(nat[m.tipo]||[]).filter(n=>!q||n.codigo.includes(q)||n.descricao.toLowerCase().includes(q.toLowerCase())).slice(0,40).forEach(n=>{
+      const opt=el('div','opt'); const L=el('span'); L.appendChild(el('span','cod',n.codigo)); L.appendChild(el('span',null,' · '+n.descricao)); opt.appendChild(L)
+      opt.appendChild(el('span','mute num',brl(n.valor)))
+      opt.addEventListener('click',()=>{if(!r.prefixos.includes(n.codigo))r.prefixos.push(n.codigo);pickerRow=null;onEdit()})
+      listBox.appendChild(opt)
+    })}
+    s.addEventListener('input',()=>draw(s.value)); draw(''); pop.appendChild(listBox); return pop
+  }
 
-$('carregar').addEventListener('click', ()=>preview(true))
-;['edit-rcl','edit-fonte','edit-pessoal'].forEach(id=>$(id).addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>preview(false), 500) }))
+  // ── edição → recalcula ─────────────────────────────────────────────────────
+  function marcar(){$('draft').style.display='inline-block'}
+  function onEdit(){marcar();renderMemos();clearTimeout(t);t=setTimeout(recalcular,400)}
+  async function recalcular(){
+    const entidadeId=$('entidade').value, ano=$('ano').value
+    const res=await fetch('/app/memoriais/bancada/preview',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({entidadeId,ano,rcl:comp.rcl,fonte:comp.fonte,pessoal:comp.pessoal})})
+    if(res.ok) renderResultado(await res.json())
+  }
+
+  // ── painel Resultado (efetivo→proposto + medidor) ──────────────────────────
+  function kpi(lab,ef,pr,money){
+    const k=el('div','kpi'); k.appendChild(el('div','lab',lab))
+    const r=el('div','r2'); r.appendChild(el('span','ef num',money?brl(ef):ef))
+    const rt=el('span'); rt.appendChild(el('span','arrow','→'))
+    const p=el('span','pr num'+(prNum(pr)>prNum(ef)?' up':prNum(pr)<prNum(ef)?' dn':'')); p.textContent=money?brl(pr):pr; rt.appendChild(p)
+    r.appendChild(rt); k.appendChild(r); return k
+  }
+  const prNum=(x)=>typeof x==='number'?x:parseFloat(String(x))||0
+  function renderResultado(d){
+    const box=$('kpis'); box.replaceChildren()
+    box.appendChild(kpi('Receita Corrente Líquida', d.rcl.efetivo.rcl, d.rcl.proposto.rcl, true))
+    box.appendChild(kpi('Despesa com Pessoal (DTP)', d.pessoal.efetivo.despesaLiquida, d.pessoal.proposto.despesaLiquida, true))
+    // DTP/RCL com medidor
+    const k=el('div','kpi'); k.appendChild(el('div','lab','DTP / RCL — limite 54%'))
+    const r=el('div','r2'); r.appendChild(el('span','ef num',d.pessoal.efetivo.percentualRcl+'%'))
+    const rt=el('span'); rt.appendChild(el('span','arrow','→'))
+    const p=el('span','pr num'+(d.pessoal.proposto.percentualRcl>d.pessoal.efetivo.percentualRcl?' up':' dn')); p.textContent=d.pessoal.proposto.percentualRcl+'%'; rt.appendChild(p); r.appendChild(rt); k.appendChild(r)
+    const g=el('div','gauge'); const pos=(v)=>Math.max(0,Math.min(100,(v/60)*100))
+    const mkE=el('span','mk ef'); mkE.style.left=pos(d.pessoal.efetivo.percentualRcl)+'%'; g.appendChild(mkE)
+    const mkP=el('span','mk'); mkP.style.left=pos(d.pessoal.proposto.percentualRcl)+'%'; g.appendChild(mkP); k.appendChild(g)
+    const gl=el('div','glab'); ['0%','alerta 48,6','prud. 51,3','54%'].forEach(x=>gl.appendChild(el('span',null,x))); k.appendChild(gl)
+    box.appendChild(k)
+    // receita por finalidade (MDE/ASPS…) — do preview
+    const fin=el('div','kpi'); fin.appendChild(el('div','lab','Receita por finalidade (arrecadado)'))
+    ;(d.fonte.proposto.porFinalidade||[]).slice(0,4).forEach(l=>{const rr=el('div','r2');rr.appendChild(el('span','ef',l.rotulo));rr.appendChild(el('span','num',brl(l.arrecadado)));fin.appendChild(rr)})
+    box.appendChild(fin)
+  }
+
+  $('descartar').addEventListener('click',()=>carregar())
+})();
 </script>
 </body>
 </html>
