@@ -106,4 +106,35 @@ describe('appMemoriaisBancadaRoutes (bancada — item restrito)', () => {
     prisma.permissaoAcesso.findFirst.mockResolvedValue(null)
     expect((await app.inject({ method: 'GET', url: '/app/memoriais/bancada/naturezas?entidadeId=e1&ano=2026&tipo=receita' })).statusCode).toBe(403)
   })
+
+  // importar: caminho JSON não chama a IA (short-circuit determinístico) — testa route→service→resposta de verdade.
+  const b64 = (o: unknown) => Buffer.from(JSON.stringify(o), 'utf8').toString('base64')
+
+  it('importar 403 sem permissão', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue(null)
+    const res = await app.inject({ method: 'POST', url: '/app/memoriais/bancada/importar', payload: { formato: 'json', base64: b64({}) } })
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('importar 400 sem base64 ou formato inválido', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue({ id: 'p1' })
+    expect((await app.inject({ method: 'POST', url: '/app/memoriais/bancada/importar', payload: { formato: 'json' } })).statusCode).toBe(400)
+    expect((await app.inject({ method: 'POST', url: '/app/memoriais/bancada/importar', payload: { formato: 'pdf', base64: b64({}) } })).statusCode).toBe(400)
+  })
+
+  it('importar JSON no nosso formato → propõe os 3 memoriais (origem json, sem IA)', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue({ id: 'p1' })
+    const envelope = {
+      rcl: { nome: 'TCE-SC', deducoes: [{ rotulo: 'FUNDEB', prefixos: ['1.7'] }] },
+      fonte: { nome: 'F', regras: [{ finalidade: 'MDE', prefixos: ['103'] }] },
+      pessoal: { nome: 'P', inclusoes: [{ rotulo: 'Ativos', prefixos: ['3.1'] }], exclusoes: [] },
+    }
+    const res = await app.inject({ method: 'POST', url: '/app/memoriais/bancada/importar', payload: { formato: 'json', base64: b64(envelope) } })
+    expect(res.statusCode).toBe(200)
+    const d = res.json()
+    expect(d.origem).toBe('json')
+    expect(d.rcl.deducoes[0].prefixos).toEqual(['1.7'])
+    expect(d.fonte.regras[0].finalidade).toBe('MDE')
+    expect(d.pessoal.inclusoes[0].prefixos).toEqual(['3.1'])
+  })
 })

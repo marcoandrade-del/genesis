@@ -68,6 +68,7 @@
     .gauge .mk.ef{background:rgba(14,15,12,.4)}
     .glab{display:flex;justify-content:space-between;font-size:10px;color:var(--mute);margin-top:2px}
     .foot{display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding:14px 16px}
+    .impbar{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
   </style>
 </head>
 <body>
@@ -90,7 +91,14 @@
   <div id="aviso" class="card" style="display:none;padding:12px 16px;margin-bottom:12px;color:var(--warning-deep);background:#fff3c2"></div>
 
   <div class="grid" id="palco" style="display:none">
-    <div id="memos"></div>
+    <div>
+      <div class="impbar">
+        <button class="btn btn-ghost btn-xs" id="importar" title="Importar a memória de cálculo do TCE (xlsx, docx, json ou texto) e deixar a IA propor — cai nos editores, nada é gravado"><i class="bi bi-magic"></i> Importar com IA</button>
+        <input type="file" id="arquivo" accept=".xlsx,.docx,.json,.txt,.csv" style="display:none">
+        <span class="mute num" id="impstatus" style="font-size:12px"></span>
+      </div>
+      <div id="memos"></div>
+    </div>
     <div class="res card">
       <div style="padding:13px 16px;border-bottom:1px solid var(--line)">
         <h2 style="font-size:14px">Resultado ao vivo</h2>
@@ -250,6 +258,34 @@
   }
 
   $('descartar').addEventListener('click',()=>carregar())
+
+  // ── Importar com IA (xlsx/docx/json/texto → propõe os 3 → cai nos editores) ──
+  const lerBase64=(file)=>new Promise((resolve,reject)=>{
+    const r=new FileReader()
+    r.onload=()=>{const s=String(r.result||'');const i=s.indexOf(',');resolve(i>=0?s.slice(i+1):s)}
+    r.onerror=()=>reject(r.error); r.readAsDataURL(file)
+  })
+  $('importar').addEventListener('click',()=>$('arquivo').click())
+  $('arquivo').addEventListener('change', async (ev)=>{
+    const f=ev.target.files&&ev.target.files[0]; if(!f) return
+    const nome=f.name.toLowerCase()
+    const formato=nome.endsWith('.xlsx')?'xlsx':nome.endsWith('.docx')?'docx':nome.endsWith('.json')?'json':'texto'
+    $('impstatus').textContent='lendo "'+f.name+'"…'
+    let base64
+    try{base64=await lerBase64(f)}catch(_){$('impstatus').textContent='';aviso('Falha ao ler o arquivo.');return}
+    ev.target.value=''  // permite reimportar o mesmo arquivo
+    try{
+      const res=await fetch('/app/memoriais/bancada/importar',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({formato,base64})})
+      const d=await res.json().catch(()=>({}))
+      if(!res.ok){$('impstatus').textContent='';aviso(d.erro||'Falha ao importar.');return}
+      const veio=[]
+      ;['rcl','pessoal','fonte'].forEach(k=>{if(d[k]){comp[k]=d[k];veio.push(k)}})
+      if(!veio.length){$('impstatus').textContent='';aviso('Nenhum memorial reconhecido no arquivo.');return}
+      aberto=veio[0]; pickerRow=null
+      $('impstatus').textContent='importado via '+(d.origem==='ia'?'IA':'JSON')+': '+veio.join(', ')
+      aviso(null); marcar(); renderMemos(); recalcular()
+    }catch(_){$('impstatus').textContent='';aviso('Falha ao importar.')}
+  })
 
   // ── Confirmar e enviar → cria a solicitação (governança; grava só após aprovação) ──
   $('confirmar').addEventListener('click', async ()=>{
