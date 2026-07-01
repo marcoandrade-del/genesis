@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Memoriais de cálculo — Bancada</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    body { background:#f6f7f9; font-size:.9rem }
+    .band { max-width:1100px; margin:0 auto; padding:1rem }
+    textarea { font-family:ui-monospace,Menlo,monospace; font-size:.72rem }
+    .memo { background:#fff; border:1px solid #e5e7eb; border-radius:.5rem; padding:.75rem; margin-bottom:.75rem }
+    .num { text-align:right; font-variant-numeric:tabular-nums }
+    .delta-up { color:#b26a00 } .delta-dn { color:#0a7d33 }
+    .cmp td, .cmp th { padding:.15rem .4rem }
+  </style>
+</head>
+<body>
+<div class="band">
+  <div class="d-flex align-items-center mb-3">
+    <a href="/app" class="btn btn-sm btn-outline-secondary me-2"><i class="bi bi-arrow-left"></i></a>
+    <h5 class="mb-0"><i class="bi bi-sliders me-2"></i>Memoriais de cálculo — bancada</h5>
+  </div>
+  <p class="text-muted small">Adapte a metodologia do TCE (RCL, classificação de fonte, Despesa com Pessoal) e veja o valor recalculado ao vivo contra um município real. Nada é gravado aqui — a alteração vira uma solicitação depois.</p>
+
+  <div class="memo row g-2 align-items-end">
+    <div class="col-md-7">
+      <label class="form-label small fw-semibold mb-1">Município / entidade (dados reais para teste)</label>
+      <select id="entidade" class="form-select form-select-sm">
+        <option value="">— escolha —</option>
+        <% entidades.forEach(function(e){ %><option value="<%= e.id %>"><%= e.rotulo %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small fw-semibold mb-1">Ano</label>
+      <select id="ano" class="form-select form-select-sm">
+        <% anos.forEach(function(a){ %><option value="<%= a %>"><%= a %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button id="carregar" class="btn btn-sm btn-primary w-100"><i class="bi bi-arrow-repeat me-1"></i>Carregar</button>
+    </div>
+  </div>
+
+  <div id="aviso" class="alert alert-warning py-2 small d-none"></div>
+
+  <% ['rcl','pessoal','fonte'].forEach(function(k){ %>
+  <div class="memo">
+    <div class="d-flex justify-content-between">
+      <strong><%= k==='rcl' ? 'RCL — deduções' : k==='pessoal' ? 'Despesa com Pessoal — inclusões/exclusões' : 'Classificação de fonte → finalidade' %></strong>
+      <span class="badge text-bg-light" id="metodo-<%= k %>">—</span>
+    </div>
+    <div class="row g-2 mt-1">
+      <div class="col-md-6">
+        <textarea id="edit-<%= k %>" rows="7" class="form-control form-control-sm" placeholder="edite aqui (JSON) — vazio usa o efetivo"></textarea>
+      </div>
+      <div class="col-md-6">
+        <table class="table table-sm cmp mb-0"><tbody id="painel-<%= k %>"></tbody></table>
+      </div>
+    </div>
+  </div>
+  <% }) %>
+</div>
+
+<script>
+const brl = (n) => (n==null?'—':Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))
+const $ = (id) => document.getElementById(id)
+let t
+
+function jsonDoEditor(id){ const v=$(id).value.trim(); if(!v) return undefined; try { return JSON.parse(v) } catch(e){ return '__invalido__' } }
+
+async function preview(prefill){
+  const entidadeId = $('entidade').value, ano = $('ano').value
+  if(!entidadeId){ return }
+  const body = { entidadeId, ano }
+  if(!prefill){ body.rcl = jsonDoEditor('edit-rcl'); body.fonte = jsonDoEditor('edit-fonte'); body.pessoal = jsonDoEditor('edit-pessoal') }
+  const res = await fetch('/app/memoriais/bancada/preview', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) })
+  if(!res.ok){ aviso('Falha ao calcular ('+res.status+').'); return }
+  const d = await res.json(); aviso(null)
+  if(prefill){
+    $('edit-rcl').value = JSON.stringify(d.efetivas.rcl, null, 2)
+    $('edit-fonte').value = JSON.stringify(d.efetivas.fonte, null, 2)
+    $('edit-pessoal').value = JSON.stringify(d.efetivas.pessoal, null, 2)
+  }
+  render(d)
+}
+
+// ── render seguro (DOM, sem innerHTML) ──────────────────────────────────────
+function cell(text, cls){ const e=document.createElement('td'); if(cls) e.className=cls; e.textContent=text; return e }
+function head(text, cls){ const e=document.createElement('th'); if(cls) e.className=cls; e.textContent=text; return e }
+function tr(nodes){ const r=document.createElement('tr'); nodes.forEach(n=>r.appendChild(n)); return r }
+function linha(rot, ef, pr, money){
+  const fmt = money ? brl : (x)=>(x==null?'—':String(x))
+  const c = document.createElement('td'); c.className='num'; c.textContent=fmt(pr)
+  if(Number(pr)>Number(ef)) c.classList.add('delta-up'); else if(Number(pr)<Number(ef)) c.classList.add('delta-dn')
+  return tr([cell(rot,'text-muted'), cell(fmt(ef),'num'), c])
+}
+function preencher(id, linhas){
+  const tb=$(id); tb.replaceChildren()
+  tb.appendChild(tr([head(''), head('efetivo','num'), head('proposto','num')]))
+  linhas.forEach(l=>tb.appendChild(l))
+}
+function render(d){
+  ;['rcl','pessoal','fonte'].forEach(k=>{ $('metodo-'+k).textContent = d[k].proposto.metodologia || '—' })
+  preencher('painel-rcl', [
+    linha('Correntes', d.rcl.efetivo.correntesTotal, d.rcl.proposto.correntesTotal, true),
+    linha('(−) Deduções', d.rcl.efetivo.deducoesTotal, d.rcl.proposto.deducoesTotal, true),
+    linha('= RCL', d.rcl.efetivo.rcl, d.rcl.proposto.rcl, true),
+  ])
+  preencher('painel-pessoal', [
+    linha('Inclusões', d.pessoal.efetivo.inclusoesTotal, d.pessoal.proposto.inclusoesTotal, true),
+    linha('(−) Exclusões', d.pessoal.efetivo.exclusoesTotal, d.pessoal.proposto.exclusoesTotal, true),
+    linha('= DTP', d.pessoal.efetivo.despesaLiquida, d.pessoal.proposto.despesaLiquida, true),
+    linha('% da RCL', d.pessoal.efetivo.percentualRcl+'%', d.pessoal.proposto.percentualRcl+'%', false),
+  ])
+  const fins = {}
+  d.fonte.efetivo.porFinalidade.forEach(l=>fins[l.finalidade]={rot:l.rotulo,ef:l.arrecadado,pr:0})
+  d.fonte.proposto.porFinalidade.forEach(l=>{ (fins[l.finalidade]=fins[l.finalidade]||{rot:l.rotulo,ef:0,pr:0}).pr=l.arrecadado })
+  preencher('painel-fonte', Object.values(fins).map(f=>linha(f.rot, f.ef, f.pr, true)))
+}
+function aviso(m){ const a=$('aviso'); if(!m){ a.classList.add('d-none'); return } a.textContent=m; a.classList.remove('d-none') }
+
+$('carregar').addEventListener('click', ()=>preview(true))
+;['edit-rcl','edit-fonte','edit-pessoal'].forEach(id=>$(id).addEventListener('input', ()=>{ clearTimeout(t); t=setTimeout(()=>preview(false), 500) }))
+</script>
+</body>
+</html>

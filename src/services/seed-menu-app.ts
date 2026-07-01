@@ -8,6 +8,7 @@ type ItemSeed = {
   tipo: 'FUNCIONALIDADE' | 'SUBMENU'
   descricao?: string
   filhos?: ItemSeed[]
+  semGrant?: boolean // item RESTRITO: criado, mas NÃO concedido a todos no seed (o admin concede o poder)
 }
 
 /** Espelha as telas navegáveis do `/app`. `/login`/`/logout`/`/contexto` são infra e ficam fora. */
@@ -59,6 +60,12 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/compras/ordens-pagamento', nome: 'Ordens de pagamento', icone: 'bi-credit-card', tipo: 'FUNCIONALIDADE' },
     ],
   },
+  // Item RESTRITO (semGrant): a bancada de memoriais de cálculo é um poder específico —
+  // criada no menu, mas só quem o admin conceder (PermissaoAcesso) vê e usa.
+  {
+    rota: '/app/memoriais/bancada', nome: 'Memoriais de cálculo', icone: 'bi-sliders', tipo: 'FUNCIONALIDADE',
+    descricao: 'Bancada: adaptar RCL/fonte/pessoal ao TCE com cálculo ao vivo', semGrant: true,
+  },
 ]
 
 /**
@@ -95,7 +102,7 @@ export async function semearMenusApp(
       select: { id: true },
     })
     if (existente) {
-      idsItens.push(existente.id)
+      if (!seed.semGrant) idsItens.push(existente.id)
       return existente.id
     }
     const criado = await prisma.itemFuncionalidade.create({
@@ -113,7 +120,7 @@ export async function semearMenusApp(
       select: { id: true },
     })
     itens++
-    idsItens.push(criado.id)
+    if (!seed.semGrant) idsItens.push(criado.id)
     return criado.id
   }
 
