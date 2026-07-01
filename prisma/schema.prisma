@@ -116,6 +116,8 @@ model Usuario {
   transicoesOrcamento      TransicaoStatusOrcamento[]
   solicitacoesAcesso       SolicitacaoAcessoEntidade[] @relation("SolicitacaoAcessoUsuario")
   decisoesAcesso           SolicitacaoAcessoEntidade[] @relation("SolicitacaoAcessoDecisor")
+  solicitacoesMemorial     SolicitacaoMemorial[]       @relation("SolicitacaoMemorialUsuario")
+  decisoesMemorial         SolicitacaoMemorial[]       @relation("SolicitacaoMemorialDecisor")
 
   @@map("usuarios")
 }
@@ -413,6 +415,7 @@ model Estado {
   atualizadoEm     DateTime           @updatedAt
   modeloContabil   ModeloContabil?    @relation(fields: [modeloContabilId], references: [id])
   municipios       Municipio[]
+  solicitacoesMemorial SolicitacaoMemorial[]
 
   @@map("estados")
 }
@@ -1490,6 +1493,38 @@ model SolicitacaoAcessoEntidade {
   @@index([usuarioId])
   @@index([entidadeId, status])
   @@map("solicitacoes_acesso_entidade")
+}
+
+// Proposta de um usuário (poder específico da bancada) para alterar os memoriais
+// de cálculo (RCL, fonte→finalidade, Despesa com Pessoal) de um Estado, testada
+// ao vivo contra um município (entidadePreviewId/ano). Espelha
+// SolicitacaoAcessoEntidade: o ADMIN do sistema aprova → grava o override nos
+// campos JSON do Estado, na mesma transação. `entidadePreviewId`/`ano` são só
+// referência do teste (escalares, sem FK). Regra "no máx. 1 PENDENTE por
+// (usuário, estado)" é garantida no service.
+model SolicitacaoMemorial {
+  id                 String                  @id @default(uuid())
+  usuarioId          String
+  estadoId           String
+  entidadePreviewId  String?
+  ano                Int?
+  rclComposicao      Json? // snapshot proposto ({nome, deducoes:[...]})
+  fonteClassificacao Json? // snapshot proposto ({nome, regras:[...]})
+  pessoalComposicao  Json? // snapshot proposto ({nome, inclusoes:[...], exclusoes:[...]})
+  justificativa      String?
+  status             StatusSolicitacaoAcesso @default(PENDENTE)
+  decididoPorId      String?
+  decididoEm         DateTime?
+  observacaoDecisao  String?
+  criadoEm           DateTime                @default(now())
+  atualizadoEm       DateTime                @updatedAt
+  usuario            Usuario                 @relation("SolicitacaoMemorialUsuario", fields: [usuarioId], references: [id])
+  estado             Estado                  @relation(fields: [estadoId], references: [id])
+  decididoPor        Usuario?                @relation("SolicitacaoMemorialDecisor", fields: [decididoPorId], references: [id])
+
+  @@index([usuarioId])
+  @@index([estadoId, status])
+  @@map("solicitacoes_memorial")
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
