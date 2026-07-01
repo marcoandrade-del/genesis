@@ -152,7 +152,7 @@ describe('SolicitacoesMemorialService.aprovar', () => {
     await expect(service.aprovar('s1', 'adm')).rejects.toThrow('já foi decidida')
   })
 
-  it('grava o snapshot no Estado e marca APROVADA (com observação)', async () => {
+  it('ESPECIFICO_ESTADO (padrão) grava só os memoriais presentes no Estado (APROVADA, com observação)', async () => {
     prisma.solicitacaoMemorial.findUnique.mockResolvedValue({
       id: 's1',
       estadoId: 'est1',
@@ -163,18 +163,39 @@ describe('SolicitacoesMemorialService.aprovar', () => {
     })
     prisma.estado.update.mockResolvedValue({ id: 'est1' })
     prisma.solicitacaoMemorial.update.mockResolvedValue({ id: 's1', status: 'APROVADA' })
-    await service.aprovar('s1', 'adm', '  ok  ')
+    await service.aprovar('s1', 'adm', { observacao: '  ok  ' })
     expect(prisma.estado.update).toHaveBeenCalledWith({
       where: { id: 'est1' },
-      data: {
-        rclComposicao: RCL_OK,
-        fonteClassificacao: FONTE_OK,
-        pessoalComposicao: Prisma.DbNull,
-      },
+      data: { rclComposicao: RCL_OK, fonteClassificacao: FONTE_OK },
     })
+    expect(prisma.modeloContabil.update).not.toHaveBeenCalled()
     const data = prisma.solicitacaoMemorial.update.mock.calls[0][0].data
     expect(data).toMatchObject({ status: 'APROVADA', decididoPorId: 'adm', observacaoDecisao: 'ok' })
     expect(data.decididoEm).toBeInstanceOf(Date)
+  })
+
+  it('ALTERAR_MODELO grava no ModeloContabil e limpa o override do Estado', async () => {
+    prisma.solicitacaoMemorial.findUnique.mockResolvedValue({
+      id: 's1',
+      estadoId: 'est1',
+      status: 'PENDENTE',
+      rclComposicao: RCL_OK,
+      fonteClassificacao: null,
+      pessoalComposicao: null,
+    })
+    prisma.estado.findUnique.mockResolvedValue({ modeloContabilId: 'mod1' })
+    prisma.modeloContabil.update.mockResolvedValue({ id: 'mod1' })
+    prisma.estado.update.mockResolvedValue({ id: 'est1' })
+    prisma.solicitacaoMemorial.update.mockResolvedValue({ id: 's1', status: 'APROVADA' })
+    await service.aprovar('s1', 'adm', { modo: 'ALTERAR_MODELO' })
+    expect(prisma.modeloContabil.update).toHaveBeenCalledWith({ where: { id: 'mod1' }, data: { rclComposicao: RCL_OK } })
+    expect(prisma.estado.update).toHaveBeenCalledWith({ where: { id: 'est1' }, data: { rclComposicao: Prisma.DbNull } })
+  })
+
+  it('ALTERAR_MODELO sem modelo vinculado é barrado', async () => {
+    prisma.solicitacaoMemorial.findUnique.mockResolvedValue({ id: 's1', estadoId: 'est1', status: 'PENDENTE', rclComposicao: RCL_OK })
+    prisma.estado.findUnique.mockResolvedValue({ modeloContabilId: null })
+    await expect(service.aprovar('s1', 'adm', { modo: 'ALTERAR_MODELO' })).rejects.toThrow('sem modelo')
   })
 })
 

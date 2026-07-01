@@ -60,17 +60,29 @@ export class PreviewMemoriaisService {
       select: {
         nome: true,
         municipio: {
-          select: { nome: true, estado: { select: { sigla: true, rclComposicao: true, fonteClassificacao: true, pessoalComposicao: true } } },
+          select: {
+            nome: true,
+            estado: {
+              select: {
+                sigla: true,
+                rclComposicao: true,
+                fonteClassificacao: true,
+                pessoalComposicao: true,
+                modeloContabil: { select: { rclComposicao: true, fonteClassificacao: true, pessoalComposicao: true } },
+              },
+            },
+          },
         },
       },
     })
     if (!ent) return null
     const est = ent.municipio.estado
+    const mod = est.modeloContabil
 
-    // Efetivos (Estado override > default do código). Modelo entra no PR-D.
-    const rclEf = resolverComposicao(est.sigla, est.rclComposicao)
-    const fonteEf = resolverClassificacaoFonte(est.sigla, est.fonteClassificacao)
-    const pessoalEf = resolverComposicaoPessoal(est.sigla, est.pessoalComposicao)
+    // Efetivos: Estado override > Modelo > default do código (resolver de 3 níveis).
+    const rclEf = resolverComposicao(est.sigla, est.rclComposicao, mod?.rclComposicao)
+    const fonteEf = resolverClassificacaoFonte(est.sigla, est.fonteClassificacao, mod?.fonteClassificacao)
+    const pessoalEf = resolverComposicaoPessoal(est.sigla, est.pessoalComposicao, mod?.pessoalComposicao)
     // Propostos: a composição crua editada, se válida; senão cai no efetivo.
     const rclPr = parseComposicao(e.rcl) ?? rclEf
     const fontePr = parseClassificacaoFonte(e.fonte) ?? fonteEf

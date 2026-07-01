@@ -54,11 +54,11 @@ export class MemorialRclService {
       select: {
         id: true,
         nome: true,
-        municipio: { select: { nome: true, estado: { select: { sigla: true, rclComposicao: true } } } },
+        municipio: { select: { nome: true, estado: { select: { sigla: true, rclComposicao: true, modeloContabil: { select: { rclComposicao: true } } } } } },
       },
     })
     if (!ent) return null
-    const comp = resolverComposicao(ent.municipio.estado.sigla, ent.municipio.estado.rclComposicao)
+    const comp = resolverComposicao(ent.municipio.estado.sigla, ent.municipio.estado.rclComposicao, ent.municipio.estado.modeloContabil?.rclComposicao)
     const r = await new RclService(this.prisma).calcular(entidadeId, ano, comp)
     return {
       entidade: { id: ent.id, nome: ent.nome, municipio: ent.municipio.nome, estado: ent.municipio.estado.sigla },

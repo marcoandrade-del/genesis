@@ -55,7 +55,12 @@
               <td class="small text-muted"><%= s.justificativa || '—' %></td>
               <td class="pe-3">
                 <div class="d-flex gap-1 justify-content-end align-items-center">
-                  <input name="observacao" class="form-control form-control-sm" placeholder="Observação" style="width:120px">
+                  <select name="modo" class="form-select form-select-sm" style="width:auto"
+                    title="Onde gravar a metodologia aprovada">
+                    <option value="ESPECIFICO_ESTADO">específico do estado</option>
+                    <option value="ALTERAR_MODELO">alterar o modelo (todos os municípios)</option>
+                  </select>
+                  <input name="observacao" class="form-control form-control-sm" placeholder="Observação" style="width:110px">
                   <button class="btn btn-sm btn-success"
                     hx-post="/admin/memoriais/solicitacoes/<%= s.id %>/aprovar"
                     hx-include="closest tr">Aprovar</button>

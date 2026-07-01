@@ -108,32 +108,51 @@ export class SolicitacoesMemorialService {
   }
 
   /**
-   * Aprova: grava o snapshot proposto nos campos JSON do `Estado` (override) e
-   * marca a proposta APROVADA — na mesma transação. Memorial nulo no snapshot
-   * limpa o override daquele campo (DbNull). PR-D acrescenta a escolha
-   * "alterar o modelo × específico do estado".
+   * Aprova a proposta, na mesma transação, conforme o `modo` escolhido pelo admin
+   * (só os memoriais PRESENTES no snapshot são gravados; ausentes ficam intactos):
+   *  - `ESPECIFICO_ESTADO` (padrão): grava o override nos campos JSON do `Estado`.
+   *  - `ALTERAR_MODELO`: grava no `ModeloContabil` do estado (COMPARTILHADO → aflora
+   *    para todos que o usam) e LIMPA o override do Estado, para o valor do modelo
+   *    aflorar via o resolver de 3 níveis (Estado > Modelo > default).
    */
-  async aprovar(id: string, aprovadorId: string, observacao?: string) {
+  async aprovar(
+    id: string,
+    aprovadorId: string,
+    opts: { modo?: 'ESPECIFICO_ESTADO' | 'ALTERAR_MODELO'; observacao?: string } = {},
+  ) {
+    const modo = opts.modo === 'ALTERAR_MODELO' ? 'ALTERAR_MODELO' : 'ESPECIFICO_ESTADO'
     const sol = await this.prisma.solicitacaoMemorial.findUnique({ where: { id } })
     if (!sol) throw new ErroNegocio('RECURSO_NAO_ENCONTRADO', 'Proposta não encontrada.')
     if (sol.status !== 'PENDENTE') throw new ErroNegocio('CONFLITO', 'Proposta já foi decidida.')
+    const val = (v: unknown) => v as Prisma.InputJsonValue
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.estado.update({
-        where: { id: sol.estadoId },
-        data: {
-          rclComposicao: comoJson(sol.rclComposicao),
-          fonteClassificacao: comoJson(sol.fonteClassificacao),
-          pessoalComposicao: comoJson(sol.pessoalComposicao),
-        },
-      })
+      if (modo === 'ALTERAR_MODELO') {
+        const est = await tx.estado.findUnique({ where: { id: sol.estadoId }, select: { modeloContabilId: true } })
+        if (!est?.modeloContabilId) {
+          throw new ErroNegocio('CONFLITO', 'Estado sem modelo contábil vinculado — use “específico do estado”.')
+        }
+        const dataModelo: Prisma.ModeloContabilUpdateInput = {}
+        const dataEstado: Prisma.EstadoUpdateInput = {}
+        if (sol.rclComposicao != null) { dataModelo.rclComposicao = val(sol.rclComposicao); dataEstado.rclComposicao = Prisma.DbNull }
+        if (sol.fonteClassificacao != null) { dataModelo.fonteClassificacao = val(sol.fonteClassificacao); dataEstado.fonteClassificacao = Prisma.DbNull }
+        if (sol.pessoalComposicao != null) { dataModelo.pessoalComposicao = val(sol.pessoalComposicao); dataEstado.pessoalComposicao = Prisma.DbNull }
+        await tx.modeloContabil.update({ where: { id: est.modeloContabilId }, data: dataModelo })
+        await tx.estado.update({ where: { id: sol.estadoId }, data: dataEstado })
+      } else {
+        const dataEstado: Prisma.EstadoUpdateInput = {}
+        if (sol.rclComposicao != null) dataEstado.rclComposicao = val(sol.rclComposicao)
+        if (sol.fonteClassificacao != null) dataEstado.fonteClassificacao = val(sol.fonteClassificacao)
+        if (sol.pessoalComposicao != null) dataEstado.pessoalComposicao = val(sol.pessoalComposicao)
+        await tx.estado.update({ where: { id: sol.estadoId }, data: dataEstado })
+      }
       return tx.solicitacaoMemorial.update({
         where: { id },
         data: {
           status: 'APROVADA',
           decididoPorId: aprovadorId,
           decididoEm: new Date(),
-          observacaoDecisao: observacao?.trim() || null,
+          observacaoDecisao: opts.observacao?.trim() || null,
         },
       })
     })

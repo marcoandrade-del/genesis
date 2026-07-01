@@ -40,11 +40,11 @@ export class RclConsolidadaService {
     const municipio = await this.prisma.municipio.findUnique({
       where: { id: municipioId },
       select: {
-        estado: { select: { sigla: true, rclComposicao: true } },
+        estado: { select: { sigla: true, rclComposicao: true, modeloContabil: { select: { rclComposicao: true } } } },
         entidades: { where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } },
       },
     })
-    const comp = resolverComposicao(municipio?.estado.sigla, municipio?.estado.rclComposicao)
+    const comp = resolverComposicao(municipio?.estado.sigla, municipio?.estado.rclComposicao, municipio?.estado.modeloContabil?.rclComposicao)
     const rclSvc = new RclService(this.prisma)
 
     const entidades: RclEntidade[] = []

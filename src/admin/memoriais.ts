@@ -49,12 +49,13 @@ export async function adminMemoriaisRoutes(app: FastifyInstance) {
     )
   })
 
-  // ── APROVAR (POST) — grava o override no Estado ──────────────────────────────
-  app.post<{ Params: { id: string }; Body: { observacao?: string } }>(
+  // ── APROVAR (POST) — grava override no Estado ou no Modelo, conforme `modo` ───
+  app.post<{ Params: { id: string }; Body: { modo?: string; observacao?: string } }>(
     '/solicitacoes/:id/aprovar',
     async (req, reply) => {
       try {
-        await solicitacoesSvc.aprovar(req.params.id, req.user.sub, req.body.observacao)
+        const modo = req.body.modo === 'ALTERAR_MODELO' ? 'ALTERAR_MODELO' : 'ESPECIFICO_ESTADO'
+        await solicitacoesSvc.aprovar(req.params.id, req.user.sub, { modo, observacao: req.body.observacao })
         return reply.header('HX-Redirect', '/admin/memoriais/solicitacoes').status(204).send()
       } catch (e: unknown) {
         return reply.status(400).send(e instanceof Error ? e.message : 'Erro ao aprovar proposta.')
