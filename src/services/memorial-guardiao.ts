@@ -184,8 +184,8 @@ export class MemorialGuardiaoService {
   private async composicaoPessoal(entidadeId: string): Promise<ComposicaoPessoal> {
     const ent = await this.prisma.entidade.findUnique({
       where: { id: entidadeId },
-      select: { municipio: { select: { estado: { select: { sigla: true, pessoalComposicao: true } } } } },
+      select: { municipio: { select: { estado: { select: { sigla: true, pessoalComposicao: true, modeloContabil: { select: { pessoalComposicao: true } } } } } } },
     })
-    return resolverComposicaoPessoal(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.pessoalComposicao)
+    return resolverComposicaoPessoal(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.pessoalComposicao, ent?.municipio?.estado?.modeloContabil?.pessoalComposicao)
   }
 }

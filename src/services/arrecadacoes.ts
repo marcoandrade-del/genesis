@@ -263,9 +263,9 @@ export class ArrecadacoesService {
       ? null
       : await this.prisma.entidade.findUnique({
           where: { id: entidadeId },
-          select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true } } } } },
+          select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true, modeloContabil: { select: { fonteClassificacao: true } } } } } } },
         })
-    const comp = compOverride ?? resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao)
+    const comp = compOverride ?? resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao, ent?.municipio?.estado?.modeloContabil?.fonteClassificacao)
 
     const vazio: ResumoArrecadacao = {
       temOrcamento: false,

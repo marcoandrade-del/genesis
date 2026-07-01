@@ -378,6 +378,13 @@ model ModeloContabil {
   id                String               @id @default(uuid())
   descricao         String               @unique
   ativo             Boolean              @default(true)
+  // Memoriais de cálculo do MODELO (nível intermediário do resolver:
+  // Estado override > Modelo > default do código). Um modelo é COMPARTILHADO por
+  // vários estados, então alterá-lo aflora para todos que o usam. null = usa o
+  // default do código. Ver [[contabil-rcl-lrf-plano]].
+  rclComposicao     Json?
+  fonteClassificacao Json?
+  pessoalComposicao Json?
   criadoEm          DateTime             @default(now())
   atualizadoEm      DateTime             @updatedAt
   planos            PlanoDeContas[]
