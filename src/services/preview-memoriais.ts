@@ -47,6 +47,8 @@ export interface PreviewMemoriais {
   rcl: { efetivo: RclPreview; proposto: RclPreview }
   pessoal: { efetivo: PessoalPreview; proposto: PessoalPreview }
   fonte: { efetivo: FontePreview; proposto: FontePreview }
+  // Composições EFETIVAS (cruas) do Estado — para pré-preencher os editores na bancada.
+  efetivas: { rcl: unknown; fonte: unknown; pessoal: unknown }
 }
 
 export class PreviewMemoriaisService {
@@ -110,6 +112,7 @@ export class PreviewMemoriaisService {
       rcl: { efetivo: { ...rcl(rE), metodologia: rclEf.nome }, proposto: { ...rcl(rP), metodologia: rclPr.nome } },
       pessoal: { efetivo: pessoal(pE, pessoalEf, n(rE.rcl)), proposto: pessoal(pP, pessoalPr, n(rP.rcl)) },
       fonte: { efetivo: fonte(fE), proposto: fonte(fP) },
+      efetivas: { rcl: rclEf, fonte: fonteEf, pessoal: pessoalEf },
     }
   }
 }

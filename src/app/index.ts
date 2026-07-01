@@ -9,6 +9,7 @@ import { appOrcamentoRoutes } from './orcamento.js'
 import { appCreditosAdicionaisRoutes } from './creditos-adicionais.js'
 import { appArrecadacaoRoutes } from './arrecadacao.js'
 import { appConciliacaoRoutes } from './conciliacao.js'
+import { appMemoriaisBancadaRoutes } from './memoriais-bancada.js'
 import { appLancamentoTributarioRoutes } from './lancamento-tributario.js'
 import { appConfiguracaoRoutes } from './configuracao.js'
 import { appLancamentosRoutes } from './lancamentos.js'
@@ -90,7 +91,8 @@ export async function appContextoMiddleware(req: FastifyRequest, reply: FastifyR
   if (
     rawPath === 'contexto' ||
     rawPath.startsWith('solicitar-acesso') ||
-    rawPath.startsWith('minhas-solicitacoes')
+    rawPath.startsWith('minhas-solicitacoes') ||
+    rawPath.startsWith('memoriais') // bancada: escolhe o município na própria tela (não depende do contexto de trabalho); gate por permissão na rota
   ) {
     return
   }
@@ -147,6 +149,7 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appCreditosAdicionaisRoutes)
     autenticado.register(appArrecadacaoRoutes)
     autenticado.register(appConciliacaoRoutes)
+    autenticado.register(appMemoriaisBancadaRoutes)
     autenticado.register(appLancamentoTributarioRoutes)
     autenticado.register(appLancamentosRoutes)
     autenticado.register(appContasRoutes)
