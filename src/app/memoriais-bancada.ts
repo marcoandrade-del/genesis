@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { PreviewMemoriaisService } from '../services/preview-memoriais.js'
 import { SolicitacoesMemorialService } from '../services/solicitacoes-memorial.js'
+import { MemoriaisImportIaService, type FormatoImport } from '../services/memoriais-import-ia.js'
 
 const ROTA = '/app/memoriais/bancada'
 
@@ -94,6 +95,27 @@ export async function appMemoriaisBancadaRoutes(app: FastifyInstance) {
       }
       const naturezas = [...mapa.values()].sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }))
       return reply.send({ naturezas })
+    },
+  )
+
+  // IMPORTAR: um documento do TCE (xlsx/docx/json/texto, base64) vira proposta dos
+  // 3 memoriais via IA — que CAI nos editores (o cliente substitui só os que vieram).
+  // Nada grava; é só um atalho de preenchimento. bodyLimit alto p/ planilhas grandes.
+  app.post<{ Body: { formato?: string; base64?: string } }>(
+    '/memoriais/bancada/importar',
+    { bodyLimit: 12 * 1024 * 1024 },
+    async (req, reply) => {
+      if (!(await temPoder(req.user.sub))) return reply.code(403).send({ erro: 'Sem permissão.' })
+      const formato = req.body.formato
+      const base64 = req.body.base64
+      if (!base64 || !['xlsx', 'docx', 'json', 'texto'].includes(String(formato)))
+        return reply.code(400).send({ erro: 'formato (xlsx|docx|json|texto) e base64 são obrigatórios.' })
+      try {
+        const proposta = await new MemoriaisImportIaService(app.prisma).propor(req.user.sub, formato as FormatoImport, base64)
+        return reply.send(proposta)
+      } catch (e: unknown) {
+        return reply.code(400).send({ erro: e instanceof Error ? e.message : 'Falha ao importar.' })
+      }
     },
   )
 
