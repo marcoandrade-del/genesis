@@ -56,4 +56,43 @@ export async function appMemoriaisBancadaRoutes(app: FastifyInstance) {
       return reply.send(r)
     },
   )
+
+  // Naturezas (com impacto no município) para o PICKER dos editores: receita p/ RCL/fonte, despesa p/ pessoal.
+  app.get<{ Querystring: { entidadeId?: string; ano?: string; tipo?: string } }>(
+    '/memoriais/bancada/naturezas',
+    async (req, reply) => {
+      if (!(await temPoder(req.user.sub))) return reply.code(403).send({ erro: 'Sem permissão.' })
+      const entidadeId = req.query.entidadeId
+      const ano = parseInt(String(req.query.ano ?? ''), 10)
+      const tipo = req.query.tipo
+      if (!entidadeId || !Number.isFinite(ano) || (tipo !== 'receita' && tipo !== 'despesa'))
+        return reply.code(400).send({ erro: 'entidadeId, ano e tipo (receita|despesa) são obrigatórios.' })
+      const mapa = new Map<string, { codigo: string; descricao: string; valor: number }>()
+      if (tipo === 'receita') {
+        const ps = await app.prisma.previsaoReceita.findMany({
+          where: { orcamento: { entidadeId, ano } },
+          select: { valorArrecadado: true, valorPrevisto: true, contaReceita: { select: { codigo: true, descricao: true } } },
+        })
+        for (const p of ps) {
+          const k = p.contaReceita.codigo
+          const e = mapa.get(k) ?? { codigo: k, descricao: p.contaReceita.descricao, valor: 0 }
+          e.valor += Number(p.valorArrecadado) || Number(p.valorPrevisto)
+          mapa.set(k, e)
+        }
+      } else {
+        const ds = await app.prisma.dotacaoDespesa.findMany({
+          where: { orcamento: { entidadeId, ano } },
+          select: { valorAutorizado: true, contaDespesa: { select: { codigo: true, descricao: true } } },
+        })
+        for (const d of ds) {
+          const k = d.contaDespesa.codigo
+          const e = mapa.get(k) ?? { codigo: k, descricao: d.contaDespesa.descricao, valor: 0 }
+          e.valor += Number(d.valorAutorizado)
+          mapa.set(k, e)
+        }
+      }
+      const naturezas = [...mapa.values()].sort((a, b) => a.codigo.localeCompare(b.codigo, 'pt-BR', { numeric: true }))
+      return reply.send({ naturezas })
+    },
+  )
 }
