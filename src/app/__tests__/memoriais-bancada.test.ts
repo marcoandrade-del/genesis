@@ -73,4 +73,37 @@ describe('appMemoriaisBancadaRoutes (bancada — item restrito)', () => {
     const res = await app.inject({ method: 'GET', url: '/app/memoriais/bancada' })
     expect(res.statusCode).toBe(403)
   })
+
+  it('naturezas (picker) receita: agrega por código com impacto', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue({ id: 'p1' })
+    prisma.previsaoReceita.findMany.mockResolvedValue([
+      { valorArrecadado: '100', valorPrevisto: '200', contaReceita: { codigo: '1.1.1', descricao: 'IPTU' } },
+      { valorArrecadado: '50', valorPrevisto: '80', contaReceita: { codigo: '1.1.1', descricao: 'IPTU' } },
+      { valorArrecadado: '0', valorPrevisto: '30', contaReceita: { codigo: '1.7.5', descricao: 'FUNDEB' } },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/app/memoriais/bancada/naturezas?entidadeId=e1&ano=2026&tipo=receita' })
+    expect(res.statusCode).toBe(200)
+    const nat = res.json().naturezas
+    expect(nat).toEqual([
+      { codigo: '1.1.1', descricao: 'IPTU', valor: 150 }, // 100+50 arrecadado
+      { codigo: '1.7.5', descricao: 'FUNDEB', valor: 30 }, // arrecadado 0 → cai no previsto 30
+    ])
+  })
+
+  it('naturezas despesa usa dotações (autorizado)', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue({ id: 'p1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      { valorAutorizado: '900', contaDespesa: { codigo: '3.1.90.11', descricao: 'Vencimentos' } },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/app/memoriais/bancada/naturezas?entidadeId=e1&ano=2026&tipo=despesa' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().naturezas[0]).toEqual({ codigo: '3.1.90.11', descricao: 'Vencimentos', valor: 900 })
+  })
+
+  it('naturezas 400 com tipo inválido; 403 sem permissão', async () => {
+    prisma.permissaoAcesso.findFirst.mockResolvedValue({ id: 'p1' })
+    expect((await app.inject({ method: 'GET', url: '/app/memoriais/bancada/naturezas?entidadeId=e1&ano=2026&tipo=x' })).statusCode).toBe(400)
+    prisma.permissaoAcesso.findFirst.mockResolvedValue(null)
+    expect((await app.inject({ method: 'GET', url: '/app/memoriais/bancada/naturezas?entidadeId=e1&ano=2026&tipo=receita' })).statusCode).toBe(403)
+  })
 })
