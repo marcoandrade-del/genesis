@@ -408,6 +408,7 @@ model Estado {
   loaCodigoNivel   Int                @default(4)
   rclComposicao    Json? // composição editável da RCL ({nome, deducoes:[{rotulo,prefixos}]}); null = default do código
   fonteClassificacao Json? // classificação editável de fonte→finalidade ({nome, regras:[{finalidade,prefixos}]}); null = default do código
+  pessoalComposicao Json? // composição editável da Despesa com Pessoal ({nome, inclusoes:[{rotulo,prefixos}], exclusoes:[...]}); null = default do código
   criadoEm         DateTime           @default(now())
   atualizadoEm     DateTime           @updatedAt
   modeloContabil   ModeloContabil?    @relation(fields: [modeloContabilId], references: [id])

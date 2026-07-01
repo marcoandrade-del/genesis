@@ -1,6 +1,6 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { MemorialRclService } from './memorial-rcl.js'
-import { DespesaPessoalService } from './despesa-pessoal.js'
+import { DespesaPessoalService, resolverComposicaoPessoal, type ComposicaoPessoal } from './despesa-pessoal.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
 const D0 = () => new Prisma.Decimal(0)
@@ -104,7 +104,8 @@ export class MemorialGuardiaoService {
       // 2) Despesa com Pessoal (% da RCL) — DTP fiel (inclusões − exclusões, RGF Anexo 1).
       // Base: dotação autorizada (execução não lançada).
       if (rcl.rcl > 0) {
-        const dtp = await new DespesaPessoalService(this.prisma).calcular(entidadeId, ano)
+        const compPessoal = await this.composicaoPessoal(entidadeId)
+        const dtp = await new DespesaPessoalService(this.prisma).calcular(entidadeId, ano, compPessoal)
         const pessoal = dtp.despesaLiquida
         const pct = r1((pessoal / rcl.rcl) * 100)
         indicadores.push({
@@ -177,5 +178,14 @@ export class MemorialGuardiaoService {
       somaAutorizado({ funcao: { codigo: '10' } }),
     ])
     return { total, educacao, saude }
+  }
+
+  /** Composição de Despesa com Pessoal efetiva do Estado da entidade (override do banco > default). */
+  private async composicaoPessoal(entidadeId: string): Promise<ComposicaoPessoal> {
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipio: { select: { estado: { select: { sigla: true, pessoalComposicao: true } } } } },
+    })
+    return resolverComposicaoPessoal(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.pessoalComposicao)
   }
 }

@@ -87,4 +87,11 @@ describe('resolverClassificacaoFonte', () => {
     expect(resolverClassificacaoFonte('PR', null).nome).toContain('TCE-PR')
     expect(resolverClassificacaoFonte('SP', null)).toBe(CLASSIFICACAO_STN)
   })
+  it('3 níveis: Estado > Modelo > default', () => {
+    const modelo = { nome: 'Modelo', regras: [{ finalidade: 'MDE', prefixos: ['1'] }] }
+    const estado = { nome: 'Estado', regras: [{ finalidade: 'MDE', prefixos: ['1'] }] }
+    expect(resolverClassificacaoFonte('SP', estado, modelo).nome).toBe('Estado')
+    expect(resolverClassificacaoFonte('SP', null, modelo).nome).toBe('Modelo')
+    expect(resolverClassificacaoFonte('SP', null, null)).toBe(CLASSIFICACAO_STN)
+  })
 })
