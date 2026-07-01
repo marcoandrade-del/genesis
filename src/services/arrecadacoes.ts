@@ -9,6 +9,7 @@ import {
   ROTULO_FINALIDADE,
   ORDEM_FINALIDADE,
   type Finalidade,
+  type ClassificacaoFonte,
 } from './fonte-classificacao.js'
 
 export interface DadosArrecadacao {
@@ -256,13 +257,15 @@ export class ArrecadacoesService {
    * de receita COM roll-up (folha + ancestrais da árvore ContaReceitaEntidade)
    * — espelha o SaldoOrcamentarioService da despesa.
    */
-  async resumo(entidadeId: string, ano: number): Promise<ResumoArrecadacao> {
-    // Classificação de fonte→finalidade do Estado da entidade (default em código + override do banco).
-    const ent = await this.prisma.entidade.findUnique({
-      where: { id: entidadeId },
-      select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true } } } } },
-    })
-    const comp = resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao)
+  async resumo(entidadeId: string, ano: number, compOverride?: ClassificacaoFonte): Promise<ResumoArrecadacao> {
+    // Classificação de fonte→finalidade: override explícito (bancada de preview) ou o efetivo do Estado.
+    const ent = compOverride
+      ? null
+      : await this.prisma.entidade.findUnique({
+          where: { id: entidadeId },
+          select: { municipio: { select: { estado: { select: { sigla: true, fonteClassificacao: true } } } } },
+        })
+    const comp = compOverride ?? resolverClassificacaoFonte(ent?.municipio?.estado?.sigla, ent?.municipio?.estado?.fonteClassificacao)
 
     const vazio: ResumoArrecadacao = {
       temOrcamento: false,
