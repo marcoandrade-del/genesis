@@ -6,13 +6,22 @@ import { MemorialGuardiaoService } from '../memorial-guardiao.js'
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
 // despesaFuncoes usa aggregate (por função / total); a Despesa com Pessoal usa
-// DespesaPessoalService (findMany das dotações 3.1/terceirização).
+// DespesaPessoalService e os índices constitucionais usam IndiceConstitucionalService
+// (ambos findMany das dotações — as linhas carregam conta+função+fonte).
 const aggPorWhere = ({ where }: { where: { funcao?: { codigo: string } } }) => {
   const v = where.funcao?.codigo === '12' ? 600 : where.funcao?.codigo === '10' ? 800 : 3000
   return Promise.resolve({ _sum: { valorAutorizado: dec(v) } })
 }
-// dotações de pessoal (DTP) — um único elemento 3.1 com o valor líquido desejado.
-const pessoal = (net: number) => [{ valorAutorizado: dec(net), contaDespesa: { codigo: '3.1.90.11.00.00' } }]
+// dotações de pessoal (DTP) — um único elemento 3.1 com o valor líquido desejado
+// (função 04/fonte 1000: fora dos índices constitucionais).
+const pessoal = (net: number) => [
+  { valorAutorizado: dec(net), contaDespesa: { codigo: '3.1.90.11.00.00' }, funcao: { codigo: '04' }, fonteRecurso: { codigo: '1000' } },
+]
+// dotações dos índices constitucionais (custeio: fora do DTP).
+const indices = (mde: number, asps: number) => [
+  { valorAutorizado: dec(mde), contaDespesa: { codigo: '3.3.90.39.00.00' }, funcao: { codigo: '12' }, fonteRecurso: { codigo: '1104' } },
+  { valorAutorizado: dec(asps), contaDespesa: { codigo: '3.3.90.30.00.00' }, funcao: { codigo: '10' }, fonteRecurso: { codigo: '1303' } },
+]
 
 describe('MemorialGuardiaoService', () => {
   let prisma: PrismaMock
@@ -29,13 +38,20 @@ describe('MemorialGuardiaoService', () => {
     prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
     prisma.previsaoReceita.findMany.mockResolvedValue([{ valorPrevisto: dec(1000), contaReceita: { codigo: '1.1.1.0.00' } }])
     prisma.dotacaoDespesa.aggregate.mockImplementation(aggPorWhere as never)
-    prisma.dotacaoDespesa.findMany.mockResolvedValue(pessoal(440))
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([...pessoal(440), ...indices(300, 160)])
   })
 
-  it('monta RCL + Pessoal + Educação + Saúde (informativos)', async () => {
+  it('monta RCL + Pessoal + Educação/Saúde (informativos) + índices MDE/ASPS (fiéis)', async () => {
     const g = await svc.guardiao('e1', 2026)
     const nomes = g!.indicadores.map((i) => i.indicador)
-    expect(nomes).toEqual(['Receita Corrente Líquida', 'Despesa com Pessoal', 'Aplicação em Educação', 'Aplicação em Saúde'])
+    expect(nomes).toEqual([
+      'Receita Corrente Líquida',
+      'Despesa com Pessoal',
+      'Aplicação em Educação',
+      'Aplicação em Saúde',
+      'Índice MDE',
+      'Índice ASPS',
+    ])
     const p = g!.indicadores[1]!
     expect(p.percentual).toBe(44) // 440/1000
     expect(p.limite).toBe(54)
@@ -44,6 +60,26 @@ describe('MemorialGuardiaoService', () => {
     expect(edu.limite).toBeNull() // informativo, não o índice constitucional
     expect(edu.percentual).toBe(20) // 600/3000
     expect(g!.indicadores[3]!.percentual).toBeCloseTo(26.7, 1) // 800/3000
+    // índices constitucionais: base = receita 1.1.1 (1000)
+    const mde = g!.indicadores[4]!
+    expect(mde.unidade).toBe('% dos impostos')
+    expect(mde.percentual).toBe(30) // 300/1000 ≥ 25 → ok
+    expect(mde.limite).toBe(25)
+    expect(mde.nivel).toBe('ok')
+    const asps = g!.indicadores[5]!
+    expect(asps.percentual).toBe(16) // 160/1000 ≥ 15 → ok
+    expect(asps.nivel).toBe('ok')
+  })
+
+  it('índice abaixo do mínimo constitucional → nivel abaixo_minimo', async () => {
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([...pessoal(440), ...indices(200, 100)]) // 20% e 10%
+    const g = await svc.guardiao('e1', 2026)
+    const mde = g!.indicadores.find((i) => i.indicador === 'Índice MDE')!
+    const asps = g!.indicadores.find((i) => i.indicador === 'Índice ASPS')!
+    expect(mde.percentual).toBe(20)
+    expect(mde.nivel).toBe('abaixo_minimo')
+    expect(asps.percentual).toBe(10)
+    expect(asps.nivel).toBe('abaixo_minimo')
   })
 
   it('escala o nível do Pessoal (alerta/prudencial/estouro)', async () => {
@@ -70,10 +106,15 @@ describe('MemorialGuardiaoService', () => {
     expect(g!.indicadores[0]!.valor).toBe(0)
   })
 
-  it('despesa total zero → sem indicadores de função', async () => {
+  it('despesa total zero → sem informativos de função (índices seguem, base vem da receita)', async () => {
     prisma.dotacaoDespesa.aggregate.mockResolvedValue({ _sum: { valorAutorizado: dec(0) } })
     const g = await svc.guardiao('e1', 2026)
-    expect(g!.indicadores.map((i) => i.indicador)).toEqual(['Receita Corrente Líquida', 'Despesa com Pessoal'])
+    expect(g!.indicadores.map((i) => i.indicador)).toEqual([
+      'Receita Corrente Líquida',
+      'Despesa com Pessoal',
+      'Índice MDE',
+      'Índice ASPS',
+    ])
   })
 
   it('orçamento some entre as consultas (defensivo) → pessoal/funções zerados', async () => {

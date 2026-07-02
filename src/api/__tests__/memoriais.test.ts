@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn() }))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
@@ -28,8 +28,15 @@ vi.mock('../../services/saldo-bancario-mensal.js', () => ({
     consolidar = m.saldoBanc
   },
 }))
+vi.mock('../../services/indice-constitucional.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../services/indice-constitucional.js')>()),
+  IndiceConstitucionalService: class {
+    calcular = m.indices
+  },
+}))
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
+import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
 import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO } from '../memoriais.js'
 import type { FastifyInstance } from 'fastify'
 
@@ -38,6 +45,7 @@ const auth = { authorization: `Bearer ${TOKEN}` }
 
 describe('memoriaisApiRoutes (data API versionada)', () => {
   let app: FastifyInstance
+  let prisma: PrismaMock
   const envAntes = process.env.GENESIS_API_TOKEN
 
   beforeEach(async () => {
@@ -48,8 +56,9 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.valRec.mockReset()
     m.valDesp.mockReset()
     m.saldoBanc.mockReset()
+    m.indices.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
-    ;({ app } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
+    ;({ app, prisma } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
   afterEach(() => {
     if (envAntes === undefined) delete process.env.GENESIS_API_TOKEN
@@ -139,6 +148,24 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   it('404 saldo por fonte quando a entidade não existe', async () => {
     m.saldoFonte.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-fonte?entidadeId=x&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('200 índices constitucionais (MDE/ASPS) em envelope', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ municipio: { estado: { sigla: 'PR' } } })
+    m.indices.mockResolvedValue({ baseTotal: 1500, mde: { percentual: 30, atende: true }, asps: { percentual: 16, atende: true } })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/indices-constitucionais?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.recurso).toBe('indices-constitucionais')
+    expect(body.dados.mde.percentual).toBe(30)
+    // composição resolvida pelo Estado da entidade (PR) e repassada ao service
+    expect(m.indices).toHaveBeenCalledWith('e1', 2026, expect.objectContaining({ nome: expect.stringContaining('TCE-PR') }))
+  })
+
+  it('404 índices quando a entidade não existe', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/indices-constitucionais?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
   })
 
