@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -301,6 +301,23 @@ describe('montarIndicesConstitucionais', () => {
     expect(html).toContain('mínimo 25,00%')
     expect(html).toContain('Abaixo do mínimo constitucional')
     expect(html).toContain('sem despesa nas fontes vinculadas')
+  })
+})
+
+describe('montarDisponibilidadeFonte', () => {
+  it('renderiza fontes com caixa, RP e disponibilidade líquida (negativa em destaque)', () => {
+    const html = montarDisponibilidadeFonte({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      linhas: [
+        { fonte: '1000', nomenclatura: 'Livres', caixa: 400, rpProcessados: 50, rpNaoProcessados: 80, disponibilidade: 270 },
+        { fonte: '1303', nomenclatura: 'ASPS', caixa: 0, rpProcessados: 0, rpNaoProcessados: 90, disponibilidade: -90 },
+      ],
+      totais: { caixa: 400, rpProcessados: 50, rpNaoProcessados: 130, disponibilidade: 180 },
+    })
+    expect(html).toContain('RGF Anexo 5 — Disponibilidade de Caixa e Restos a Pagar')
+    expect(html).toContain('1000 — Livres')
+    expect(html).toContain('style="color:#b00"') // disponibilidade negativa destacada
+    expect(html).toContain('TOTAL')
   })
 })
 

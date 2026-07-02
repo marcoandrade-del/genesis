@@ -7,6 +7,7 @@ import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { DespesaPessoalService, resolverComposicaoPessoal } from '../services/despesa-pessoal.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado } from '../services/indice-constitucional.js'
+import { DisponibilidadeFonteService } from '../services/disponibilidade-fonte.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -17,6 +18,7 @@ import {
   montarGuardiao,
   montarDespesaPessoal,
   montarIndicesConstitucionais,
+  montarDisponibilidadeFonte,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -48,6 +50,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
   const pessoalSvc = new DespesaPessoalService(app.prisma)
   const indicesSvc = new IndiceConstitucionalService(app.prisma)
+  const disponibilidadeSvc = new DisponibilidadeFonteService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -666,6 +669,47 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="indices-constitucionais-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RGF Anexo 5 — Disponibilidade de Caixa e Restos a Pagar por fonte ───────
+  async function disponibilidadeFonte(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, disp] = await Promise.all([entidadeCtx(entidadeId, ano), disponibilidadeSvc.calcular(entidadeId, ano)])
+    const corpo = disp.temDados
+      ? montarDisponibilidadeFonte({ cabecalho: cab(e, ano, meta), linhas: disp.linhas, totais: disp.totais })
+      : ''
+    return { e, ano, temOrcamento: disp.temDados, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/disponibilidade-fonte', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await disponibilidadeFonte(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Disponibilidade de Caixa e RP',
+      breadcrumb: 'Disponibilidade por fonte (LRF)',
+      pdfUrl: '/app/orcamento/relatorios/disponibilidade-fonte.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/disponibilidade-fonte.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await disponibilidadeFonte(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/disponibilidade-fonte')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Disponibilidade de Caixa ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('RGF Anexo 5 — Disponibilidade de Caixa e RP', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="disponibilidade-fonte-${ano}.pdf"`)
       .send(pdf)
   })
 }
