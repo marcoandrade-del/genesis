@@ -3,6 +3,7 @@
 - [⚠️ Coordenação entre sessões](coordenacao-sessoes.md) — QUADRO VIVO: ler ao iniciar e atualizar ao assumir/concluir trabalho; quem está em qual branch/PR e zonas de colisão
 - [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
 - [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — mesmo .git/índice/working-tree: conferir `git show --stat` antes de pushar, branch única, reset --hard pro origin pra recuperar divergência
+- [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada ao vivo (Wise) + governança + vira-modelo + import-IA multi-formato; resolver 3 níveis Estado>Modelo>default; PRs #178→#184; ENCERRADO (só LRF-despesa gated na Elotech)
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
 - [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas
@@ -24,7 +25,7 @@
 - [Compras no /app (operador): plano](compras-no-app-plano.md) — trazer Compras p/ área do usuário escopada ao contexto; reusa services; aguarda #42 mergear
 - [Gerador de Relatórios: plano 3 PRs](relatorios-gerador-plano.md) — /app, escopo por entidade; R1 cabeçalho/rodapé+editor WYSIWYG em andamento
 - [Orçamento Maringá 2026 importado](orcamento-maringa-importado.md) — LOA real no banco dev (403 previsões + 2.325 dotações); fonte 9999 na despesa, receita bruta; script aguarda PR
-- [Arrecadação Maringá importada (por fonte)](arrecadacao-maringa-importada.md) — execução da receita realizada no dev, por fonte (96,72% cobertura, R$1,73bi jan-jun); PR #165; alimenta valores-mensais/OXY
+- [Arrecadação Maringá importada (por fonte)](arrecadacao-maringa-importada.md) — execução da receita realizada no dev, por fonte EXATA (relatório TCE-PR jan-maio, 1559 movs, 97% cobertura); PR #167 (substitui #165 aprox); FUNDEB/Dívida batem ao centavo; alimenta valores-mensais/OXY
 - [Import em massa não dispara sync](contabil-import-massa-bypassa-sync.md) — importar plano-MODELO via script fura o SincronizadorContas → entidades defasam; remediar com scripts/ressincronizar_entidades_modelo.ts (feito p/ Maringá 2026-06-09)
 - [Drift de migração no banco dev](prisma-migrate-drift-genesis.md) — NÃO `migrate reset`; aplicar migração via diff+db execute+resolve
 - [Bug do engine de migração Prisma 7.7](prisma-migrate-engine-bug-7.7.md) — `H.replace` crasha diff/db execute/resolve; aplicar migração via psql + INSERT à mão em _prisma_migrations
@@ -35,6 +36,7 @@
 - [Drag debug muta banco dev](feedback-drag-debug-muta-banco.md) — dirigir drag-drop via Playwright avulso completa o drop e escreve no banco; interceptar endpoints como o e2e ou não dar mouse.up
 - [Saldo do balancete por natureza](feedback-saldo-balancete-natureza.md) — rollup em saldo devedor COM SINAL; credora/retificadora subtrai; nunca somar saldos "positivos por natureza" (MCASP p.531)
 - [Integração receita→contábil (Tabela de Eventos)](integracao-receita-eventos.md) — arrecadação dispara E100/E200/E300; conta-corrente=dimensão no LancamentoItem (não código); de/para NR→VPA em ParametroReceita; PR #90
+- [Memoriais × planos: dependência e integridade](memoriais-dependencia-planos-integridade.md) — FUTURO: dependência por CÓDIGO/prefixo (não FK); excluir conta usada só em Parametro NÃO é bloqueado. DECISÃO: inteligência no sistema (ResolvedorDeVinculos + validação autoria/seleção/exclusão + painel saúde), FK só reforço pontual
 - [Conciliação bancária](conciliacao-bancaria.md) — extrato × arrecadações por conta (1:1, audita); parsers CSV/OFX/CNAB; auto-match valor+data; PR #94/#96
 - [Config dashboard: granularidade dos planos](config-dashboard-granularidade.md) — por entidade, painéis exibem plano padrão (modelo) ou com desdobramentos locais; PADRAO colapsa, totais batem; PR #99; seletor por relatório com memória
 - [Construir com defaults](feedback-construir-com-defaults.md) — direção clara → construir anunciando escolhas, não fazer várias perguntas; perguntar só o caro/bifurcante
