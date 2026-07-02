@@ -4,7 +4,7 @@
 - [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
 - [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — mesmo .git/índice/working-tree: conferir `git show --stat` antes de pushar, branch única, reset --hard pro origin pra recuperar divergência
 - [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada ao vivo (Wise) + governança + vira-modelo + import-IA multi-formato; resolver 3 níveis Estado>Modelo>default; PRs #178→#184; ENCERRADO (só LRF-despesa gated na Elotech)
-- [LRF-despesa: plano recuperado](lrf-despesa-epico-plano.md) — 7 tarefas da sessão remota 28/06: #1/#2 feitas; #4 RREO e #5 MetaFiscal livres; #3 MDE/ASPS e #7 Anexo 5 gated no QDD (fonte por dotação, xlsx da Elotech)
+- [LRF-despesa: plano + GATE DESTRAVADO](lrf-despesa-epico-plano.md) — #6 QDD FEITA (PR #185, 2026-07-02): fonte por dotação real, 9999 zerada, validada ao centavo × balancete Elotech; próximos: #3 MDE/ASPS fiel → #7 Anexo 5 → #4/#5
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
 - [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas

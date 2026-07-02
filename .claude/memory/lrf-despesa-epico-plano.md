@@ -19,28 +19,44 @@ produziu está no master.
 |---|------|--------|
 | 1 | `fonte-classificacao.ts` — fonte→finalidade por Estado, `porFinalidade` em arrecadações/saldo, API saldo-fonte 1.2.0 | ✅ mergeado (absorvido por #161) |
 | 2 | `despesa-pessoal.ts` — RGF Anexo 1 (inclusões 3.1 + 3.3.90.34 − exclusões), tela+PDF, Guardião 1.3.0 | ✅ mergeado (#174/#176) |
-| 3 | `indice-constitucional.ts` — MDE 25% (func 12 × fontes MDE\|FUNDEB) / ASPS 15% (func 10 × fontes ASPS); denominador impostos+transferências; Guardião 1.4.0; API `/memoriais/indices-constitucionais` | ⏳ falta — esqueleto dá sem QDD (números informativos); **fiel só com QDD** |
-| 4 | `despesa-funcao-rreo.ts` — demonstrativo despesa por função (RREO); reusa `saldoSvc.calcular().porFuncao`; sem schema | ⏳ falta — **NÃO gated**, candidato imediato |
-| 5 | `MetaFiscal` — modelo (entidade/ano/tipo/valorMeta/exercicioReferencia) + migração + CRUD admin + meta × projetado + API | ⏳ falta — **NÃO gated** |
-| 6 | **Import do QDD** — parser xlsx→csv + import TS; tabela ref MarcadorTceNatureza/Fonte; refina RCL/fonte-classificacao/despesa-pessoal | 🔒 **GATED: xlsx que o Marco traz da Elotech** |
-| 7 | Disponibilidade por fonte (caixa 1.1.1.x por `ContaBancaria.fonteCodigo`) + Restos a Pagar (`MovimentoEmpenho` empenhado−liquidado/pago) — RGF Anexo 5 | ⏳ falta — parte "por fonte" gated no QDD |
+| 3 | `indice-constitucional.ts` — MDE 25% (func 12 × fontes MDE\|FUNDEB) / ASPS 15% (func 10 × fontes ASPS); denominador impostos+transferências; Guardião 1.4.0; API `/memoriais/indices-constitucionais` | ⏳ falta — **DESTRAVADA** (fonte por dotação real no banco) |
+| 4 | `despesa-funcao-rreo.ts` — demonstrativo despesa por função (RREO); reusa `saldoSvc.calcular().porFuncao`; sem schema | ⏳ falta |
+| 5 | `MetaFiscal` — modelo (entidade/ano/tipo/valorMeta/exercicioReferencia) + migração + CRUD admin + meta × projetado + API | ⏳ falta |
+| 6 | **Import do QDD** — fonte por dotação | ✅ **FEITA 2026-07-02 (PR #185)** — ver abaixo |
+| 7 | Disponibilidade por fonte (caixa 1.1.1.x por `ContaBancaria.fonteCodigo`) + Restos a Pagar (`MovimentoEmpenho` empenhado−liquidado/pago) — RGF Anexo 5 | ⏳ falta — **DESTRAVADA** (parte "por fonte") |
 
-## O gate do QDD (por que trava #3/#6/#7)
+## GATE DESTRAVADO (2026-07-02) — como foi
 
-A LOA importada de Maringá **não tem fonte por dotação** — o portal não publica
-(API ignora o filtro; QDD público só existia p/ 2016). Resultado: **100% da
-despesa está na fonte 9999** ("Não classificada") — ver
-`memorial-saldo-fonte.ts:20` e [[orcamento-maringa-importado]]. MDE/ASPS reais e
-o Anexo 5 por fonte exigem saber qual fonte financia cada dotação.
+O QDD oficial estava dentro do **PDF da LOA 2026** (Lei 12.100, 914 p.,
+`data/Material didático/LOA 2026 Maringá.pdf`), **Anexo XXIV**: hierarquia
+dotação → natureza → fonte com valor, órgãos 01–61 (Câmara, Prefeitura,
+indiretas). Não precisou de export interno da Elotech pra fixada.
 
-**Destrave:** export do sistema da Elotech (ERP do município — a fonte existe lá
-na origem), xlsx/CSV, 1 linha por dotação, com: classificação institucional+
-funcional-programática, natureza, **código da fonte de recurso** e valor fixado
-(execução se tiver). Com isso a #6 roda, a despesa sai da 9999 e #3/#7 viram fiéis.
+- `scripts/qdd_loa_pdf_para_csv.py` → `data/qdd_loa_2026_maringa.csv`
+  (2.824 linhas; valida Σ = R$ 3.582.003.907,00 ao centavo).
+- `scripts/importar_qdd_fontes_2026.ts` (dry-run/--apply) — **aplicado no dev**:
+  2.325/2.325 dotações casadas, 206 desdobramentos multi-fonte (→2.531),
+  fonte 9999 ZERADA, Σ preservada (2.842.650.399). Fonte nova: 99999 Reserva.
+- **Validação independente**: balancete da despesa Elotech jan–mai
+  (`data/balancete_despesa_2026_jan-mai_elotech.xlsx`, traz reduzido +
+  execução) — 71 fontes, match ao centavo em todas.
+- Despesa por finalidade agora REAL e espelha a receita (equilíbrio por fonte):
+  MDE 377,9mi · ASPS 766,5mi · FUNDEB 281,1mi · Dívida 131,2mi ·
+  Livres 929,3mi · NÃO-CLASSIF 356,6mi (fontes sem regra: 1001, 99999… —
+  refinar regras via bancada de memoriais, não é problema de dado).
 
 ## Sequência recomendada
-`#6 assim que o xlsx chegar` (multiplicador) → `#3 fiel` → `#7`.
-Enquanto não chega: `#4` e `#5` (independentes, valor visível).
+`#3 fiel` (MDE/ASPS reais no Guardião) → `#7` (Anexo 5) → `#4`/`#5`.
+
+## Follow-ups anotados (fora do épico)
+- Balancete Elotech tem **execução acumulada jan–mai** (empenhado/liquidado/
+  pago por dotação×fonte, reduzidos) — importar exige decisão sobre o ledger
+  (movimentos sintéticos? só acumulado, sem abertura mensal). Não feito.
+- Suplementações jan–mai (autorizada − fixada no balancete) como créditos
+  adicionais. Não feito.
+- Orçamentos das outras entidades (Câmara 01, Previdência 31, autarquias
+  50/60/61) estão no QDD/CSV prontos pra importar se um dia entrar
+  consolidação municipal.
 
 **Why:** o plano vivia só no transcript da sessão morta; sem este doc, o próximo
 retomar do LRF-despesa teria que re-arqueologizar o jsonl de 10MB.
