@@ -4,7 +4,7 @@
 - [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
 - [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — mesmo .git/índice/working-tree: conferir `git show --stat` antes de pushar, branch única, reset --hard pro origin pra recuperar divergência
 - [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada ao vivo (Wise) + governança + vira-modelo + import-IA multi-formato; resolver 3 níveis Estado>Modelo>default; PRs #178→#184; ENCERRADO (só LRF-despesa gated na Elotech)
-- [LRF-despesa: plano + progresso](lrf-despesa-epico-plano.md) — #6 QDD (#185) e #3 índices MDE 36,09%/ASPS 16,06% fiéis (#186/#187) FEITAS 2026-07-02; contrato 1.5.0, nivel abaixo_minimo; restam #7 Anexo 5 → #4 RREO → #5 Metas; bancada p/ índices = follow-up
+- [LRF-despesa: ÉPICO COMPLETO](lrf-despesa-epico-plano.md) — 7/7 em 2026-07-02 (#185 QDD, #186/#187 índices MDE 36,09%/ASPS 16,06%, #188 Anexo 5, #189 RREO função, #190 Metas Fiscais); contrato 1.7.0; follow-ups: bancada p/ índices, metas reais da LDO, medidor Oxy
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
 - [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas

@@ -20,10 +20,15 @@ produziu está no master.
 | 1 | `fonte-classificacao.ts` — fonte→finalidade por Estado, `porFinalidade` em arrecadações/saldo, API saldo-fonte 1.2.0 | ✅ mergeado (absorvido por #161) |
 | 2 | `despesa-pessoal.ts` — RGF Anexo 1 (inclusões 3.1 + 3.3.90.34 − exclusões), tela+PDF, Guardião 1.3.0 | ✅ mergeado (#174/#176) |
 | 3 | `indice-constitucional.ts` — MDE 25% / ASPS 15% fiéis | ✅ **FEITA 2026-07-02 (PRs #186 service+Guardião+API 1.5.0, #187 tela+PDF+card)**. MDE = func 12 × fontes 1101-1104 (salário-educação 1107 FORA); ASPS = func 10 × fonte 1303 próprios (SUS federal FORA, LC 141); base = 1.1.1 + FPM/ITR/ICMS/IPVA/IPI (CIDE fora). Composição default por Estado em código (`COMPOSICAO_INDICES_POR_ESTADO`); **editável na bancada = follow-up**. Nivel novo `abaixo_minimo` (limite MÍNIMO). Ao vivo: base 1,725bi, MDE 36,09%, ASPS 16,06% |
-| 4 | `despesa-funcao-rreo.ts` — demonstrativo despesa por função (RREO); reusa `saldoSvc.calcular().porFuncao`; sem schema | ⏳ falta |
-| 5 | `MetaFiscal` — modelo (entidade/ano/tipo/valorMeta/exercicioReferencia) + migração + CRUD admin + meta × projetado + API | ⏳ falta |
+| 4 | RREO — execução da despesa por função | ✅ **FEITA 2026-07-02 (#189)** — `montarDespesaFuncaoRreo` reusa `saldoSvc.porFuncao` (autorizado/reservado/empenhado/disponível + %); tela+PDF+card. Complementa o anexo de PLANEJAMENTO (despesa-funcoes-programas) com a visão de EXECUÇÃO |
+| 5 | `MetaFiscal` — LDO × projetado da LOA | ✅ **FEITA 2026-07-02 (#190)** — modelo (5 tipos enum, unique entidade+ano+tipo; migração `20260702180000`), `MetasFiscaisService.comparativo` (receita=Σ previsões, despesa=Σ autorizado; primário/nominal/dívida SEM projeção até ter execução), admin `/admin/metas-fiscais` (cascade+HTMX), tela+PDF+card, API 1.7.0. Sem metas cadastradas (valores vêm da LDO real — cadastro pelo admin) |
 | 6 | **Import do QDD** — fonte por dotação | ✅ **FEITA 2026-07-02 (PR #185)** — ver abaixo |
-| 7 | Disponibilidade por fonte (caixa 1.1.1.x por `ContaBancaria.fonteCodigo`) + Restos a Pagar (`MovimentoEmpenho` empenhado−liquidado/pago) — RGF Anexo 5 | ⏳ falta — **DESTRAVADA** (parte "por fonte") |
+| 7 | RGF Anexo 5 — disponibilidade por fonte + RP | ✅ **FEITA 2026-07-02 (#188)** — `DisponibilidadeFonteService`: caixa por fonte (saldo acumulado das contas bancárias) − RP processados (liquidado−pago) − RP não processados (empenhado−liquidado) do razão `MovimentoEmpenho` com fonte real; estornos revertem estágios. Tela+PDF+card, API 1.6.0. Dev sem execução → RP zero (honesto, atualiza sozinho) |
+
+## ÉPICO 100% COMPLETO (2026-07-02) — 7/7 tarefas mergeadas
+Contrato `memoriais-lrf` foi 1.4.0 → **1.7.0** no dia (índices, disponibilidade,
+metas — tudo aditivo/MINOR). prisma-mock ganhou `movimentoBancario.groupBy` e
+delegate `metaFiscal` (zona 🔴). Suíte 3441 → **3469**.
 
 ## GATE DESTRAVADO (2026-07-02) — como foi
 
@@ -45,10 +50,13 @@ indiretas). Não precisou de export interno da Elotech pra fixada.
   Livres 929,3mi · NÃO-CLASSIF 356,6mi (fontes sem regra: 1001, 99999… —
   refinar regras via bancada de memoriais, não é problema de dado).
 
-## Sequência recomendada
-`#7` (RGF Anexo 5 — disponibilidade por fonte + restos a pagar) → `#4` (RREO
-por função) → `#5` (Metas Fiscais). Follow-up também: composição dos índices
-editável na bancada (4ª composição, exige coluna+migração+UI).
+## Follow-ups (fora do épico, anotados)
+- Composição dos índices MDE/ASPS editável na bancada (4ª composição: coluna
+  `indicesComposicao` + migração + UI + governança).
+- Cadastrar as metas fiscais REAIS da LDO de Maringá (admin) quando o Marco
+  trouxer o Anexo de Metas Fiscais.
+- Conferir o medidor do painel Oxy com `prudencial/alerta null` + nivel
+  `abaixo_minimo` (contrato 1.7.0 é aditivo, MAJOR não mudou).
 
 ## Follow-ups anotados (fora do épico)
 - Balancete Elotech tem **execução acumulada jan–mai** (empenhado/liquidado/
