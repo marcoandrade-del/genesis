@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -301,6 +301,24 @@ describe('montarIndicesConstitucionais', () => {
     expect(html).toContain('mínimo 25,00%')
     expect(html).toContain('Abaixo do mínimo constitucional')
     expect(html).toContain('sem despesa nas fontes vinculadas')
+  })
+})
+
+describe('montarDespesaFuncaoRreo', () => {
+  it('renderiza funções com valores, % da autorizada e total 100%', () => {
+    const html = montarDespesaFuncaoRreo({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      linhas: [
+        { codigo: '10', rotulo: 'Saúde', autorizado: 750, reservado: 0, empenhado: 100, disponivel: 650 },
+        { codigo: '12', rotulo: 'Educação', autorizado: 250, reservado: 10, empenhado: 0, disponivel: 240 },
+      ],
+      resumo: { autorizado: 1000, reservado: 10, empenhado: 100, disponivel: 890 },
+    })
+    expect(html).toContain('RREO — Execução da Despesa por Função de Governo')
+    expect(html).toContain('10 — Saúde')
+    expect(html).toContain('75,00%')
+    expect(html).toContain('25,00%')
+    expect(html).toContain('100,00%')
   })
 })
 

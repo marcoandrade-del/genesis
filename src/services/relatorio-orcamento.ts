@@ -589,6 +589,39 @@ export function montarDisponibilidadeFonte(dados: DadosDisponibilidadeFonte): st
   )
 }
 
+export interface DadosDespesaFuncaoRreo {
+  cabecalho: CabecalhoDemonstrativo
+  linhas: { codigo: string; rotulo: string; autorizado: number; reservado: number; empenhado: number; disponivel: number }[]
+  resumo: { autorizado: number; reservado: number; empenhado: number; disponivel: number }
+}
+
+/** RREO — Execução da despesa por FUNÇÃO de governo: dotação autorizada,
+ *  reservado, empenhado, disponível e participação de cada função no total. */
+export function montarDespesaFuncaoRreo(dados: DadosDespesaFuncaoRreo): string {
+  const { cabecalho: c, linhas, resumo } = dados
+  const pct = (v: number) => (resumo.autorizado > 0 ? ((v / resumo.autorizado) * 100).toFixed(2).replace('.', ',') + '%' : '—')
+  const linha = (l: DadosDespesaFuncaoRreo['linhas'][number]) =>
+    `<tr><td>${esc(l.codigo)} — ${esc(l.rotulo)}</td>` +
+    `<td class="num">${formatarReais(l.autorizado)}</td>` +
+    `<td class="num">${formatarReais(l.reservado)}</td>` +
+    `<td class="num">${formatarReais(l.empenhado)}</td>` +
+    `<td class="num">${formatarReais(l.disponivel)}</td>` +
+    `<td class="num">${pct(l.autorizado)}</td></tr>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RREO — Execução da Despesa por Função de Governo') +
+    `<div class="dem-sub">Dotação autorizada, reserva e empenho por função · % = participação da função na despesa autorizada</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Função</th><th class="num">Dotação autorizada</th><th class="num">Reservado</th><th class="num">Empenhado</th><th class="num">Disponível</th><th class="num">%</th></tr></thead>` +
+    `<tbody>${linhas.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL</th><th class="num">${formatarReais(resumo.autorizado)}</th><th class="num">${formatarReais(resumo.reservado)}</th><th class="num">${formatarReais(resumo.empenhado)}</th><th class="num">${formatarReais(resumo.disponivel)}</th><th class="num">100,00%</th></tr></tfoot>` +
+    `</table>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (
