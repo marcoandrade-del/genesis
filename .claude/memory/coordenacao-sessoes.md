@@ -20,7 +20,8 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
-> 🟢 **Sessão QDD (2026-07-02): GATE DO LRF-DESPESA DESTRAVADO — fonte por dotação REAL no banco (PR #185 mergeado). Nada em andamento.**
+> 🟢 **Sessão QDD (2026-07-02): gate destravado (#185) E Tarefa #3 do épico LRF FEITA — índices MDE/ASPS fiéis (#186 service+Guardião+API 1.5.0 mergeado; #187 tela+PDF em CI).**
+> Guardião agora dá 6 indicadores (RCL, Pessoal, informativos Educação/Saúde, **Índice MDE 36,09%**, **Índice ASPS 16,06%**); contrato memoriais-lrf **1.5.0** (aditivo — Oxy compatível; conferir se o medidor do painel Oxy lida com `prudencial/alerta null` + nivel novo `abaixo_minimo`). Restam do épico: #7 Anexo 5, #4 RREO por função, #5 Metas Fiscais — ver [[lrf-despesa-epico-plano]].
 > O QDD oficial estava no **PDF da LOA 2026** (Anexo XXIV, `data/Material didático/`) — não precisou de export interno da Elotech. `scripts/qdd_loa_pdf_para_csv.py` (PDF→CSV, Σ valida R$ 3.582.003.907 ao centavo) + `scripts/importar_qdd_fontes_2026.ts` (dry-run/--apply) **aplicado no dev**: 2.325/2.325 dotações casadas, 206 desdobramentos multi-fonte (→2.531), **fonte 9999 ZERADA**, Σ preservada. Validação independente contra o balancete Elotech jan–mai (`data/balancete_despesa_2026_jan-mai_elotech.xlsx`): 71 fontes, match ao centavo. Despesa por finalidade agora REAL (MDE 377,9mi · ASPS 766,5mi · FUNDEB 281,1mi — espelha a receita). Suíte 3441 verde; sem mudança em src/. **DESTRAVADAS: #3 índice MDE/ASPS fiel e #7 RGF Anexo 5** — plano e follow-ups em [[lrf-despesa-epico-plano]]. Antes disso a sessão sincronizou a tree (reset pro origin pós-épico Memoriais) e recuperou o plano LRF do transcript da sessão remota caída.
 
 > 🟢 **Sessão MEMORIAIS (2026-07-01): ÉPICO "Editor de Memoriais" — 100% COMPLETO (PR-A→B→B v2→C→D + import-IA todos mergeados). Nada pendente.**

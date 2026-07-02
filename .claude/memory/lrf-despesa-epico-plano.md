@@ -19,7 +19,7 @@ produziu está no master.
 |---|------|--------|
 | 1 | `fonte-classificacao.ts` — fonte→finalidade por Estado, `porFinalidade` em arrecadações/saldo, API saldo-fonte 1.2.0 | ✅ mergeado (absorvido por #161) |
 | 2 | `despesa-pessoal.ts` — RGF Anexo 1 (inclusões 3.1 + 3.3.90.34 − exclusões), tela+PDF, Guardião 1.3.0 | ✅ mergeado (#174/#176) |
-| 3 | `indice-constitucional.ts` — MDE 25% (func 12 × fontes MDE\|FUNDEB) / ASPS 15% (func 10 × fontes ASPS); denominador impostos+transferências; Guardião 1.4.0; API `/memoriais/indices-constitucionais` | ⏳ falta — **DESTRAVADA** (fonte por dotação real no banco) |
+| 3 | `indice-constitucional.ts` — MDE 25% / ASPS 15% fiéis | ✅ **FEITA 2026-07-02 (PRs #186 service+Guardião+API 1.5.0, #187 tela+PDF+card)**. MDE = func 12 × fontes 1101-1104 (salário-educação 1107 FORA); ASPS = func 10 × fonte 1303 próprios (SUS federal FORA, LC 141); base = 1.1.1 + FPM/ITR/ICMS/IPVA/IPI (CIDE fora). Composição default por Estado em código (`COMPOSICAO_INDICES_POR_ESTADO`); **editável na bancada = follow-up**. Nivel novo `abaixo_minimo` (limite MÍNIMO). Ao vivo: base 1,725bi, MDE 36,09%, ASPS 16,06% |
 | 4 | `despesa-funcao-rreo.ts` — demonstrativo despesa por função (RREO); reusa `saldoSvc.calcular().porFuncao`; sem schema | ⏳ falta |
 | 5 | `MetaFiscal` — modelo (entidade/ano/tipo/valorMeta/exercicioReferencia) + migração + CRUD admin + meta × projetado + API | ⏳ falta |
 | 6 | **Import do QDD** — fonte por dotação | ✅ **FEITA 2026-07-02 (PR #185)** — ver abaixo |
@@ -46,7 +46,9 @@ indiretas). Não precisou de export interno da Elotech pra fixada.
   refinar regras via bancada de memoriais, não é problema de dado).
 
 ## Sequência recomendada
-`#3 fiel` (MDE/ASPS reais no Guardião) → `#7` (Anexo 5) → `#4`/`#5`.
+`#7` (RGF Anexo 5 — disponibilidade por fonte + restos a pagar) → `#4` (RREO
+por função) → `#5` (Metas Fiscais). Follow-up também: composição dos índices
+editável na bancada (4ª composição, exige coluna+migração+UI).
 
 ## Follow-ups anotados (fora do épico)
 - Balancete Elotech tem **execução acumulada jan–mai** (empenhado/liquidado/
