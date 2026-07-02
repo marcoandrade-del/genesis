@@ -390,6 +390,7 @@ const NIVEL_TXT: Record<string, string> = {
   alerta: 'Alerta do TCE',
   prudencial: 'Limite prudencial',
   estouro: 'Acima do limite',
+  abaixo_minimo: 'Abaixo do mínimo constitucional',
 }
 
 /** Demonstrativo do Guardião LRF: os indicadores fiscais (RCL, Pessoal, aplicação

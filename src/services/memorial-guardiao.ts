@@ -1,6 +1,7 @@
 import { PrismaClient, Prisma } from '@prisma/client'
 import { MemorialRclService } from './memorial-rcl.js'
 import { DespesaPessoalService, resolverComposicaoPessoal, type ComposicaoPessoal } from './despesa-pessoal.js'
+import { IndiceConstitucionalService, composicaoIndicesDoEstado, type ResultadoIndice } from './indice-constitucional.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
 const D0 = () => new Prisma.Decimal(0)
@@ -132,9 +133,7 @@ export class MemorialGuardiaoService {
       }
 
       // 3) Aplicação em Educação e Saúde (informativo) — despesa por função ÷ despesa total.
-      // ⚠️ NÃO é o índice constitucional (MDE 25% / ASPS 15%): este exige a parcela
-      // financiada por impostos/transferências (vinculação por fonte), indisponível
-      // nesta base (tudo em fonte genérica). Aqui é a participação de cada função.
+      // Participação de cada função na despesa; o índice constitucional fiel é o item 4.
       const df = await this.despesaFuncoes(entidadeId, ano)
       if (df.total > 0) {
         indicadores.push(
@@ -143,7 +142,7 @@ export class MemorialGuardiaoService {
             df.educacao,
             df.total,
             'função 12 (Educação)',
-            'Informativo. O índice MDE (CF art. 212, 25%) exige a despesa com recursos de impostos/transferências — depende de vinculação por fonte, ainda não disponível.',
+            'Informativo (participação da função na despesa). O índice constitucional é o "Índice MDE" abaixo.',
           ),
         )
         indicadores.push(
@@ -152,7 +151,52 @@ export class MemorialGuardiaoService {
             df.saude,
             df.total,
             'função 10 (Saúde)',
-            'Informativo. O índice ASPS (CF art. 198 / LC 141, 15%) exige a despesa com recursos próprios — depende de vinculação por fonte, ainda não disponível.',
+            'Informativo (participação da função na despesa). O índice constitucional é o "Índice ASPS" abaixo.',
+          ),
+        )
+      }
+
+      // 4) Índices constitucionais FIÉIS (MDE 25% / ASPS 15%) — função × FONTE
+      // real (QDD aplicado) ÷ impostos + transferências. Limites MÍNIMOS:
+      // nivel "abaixo_minimo" quando não atende (semântica inversa do Pessoal).
+      const compIndices = composicaoIndicesDoEstado(rcl.entidade.estado)
+      const idx = await new IndiceConstitucionalService(this.prisma).calcular(entidadeId, ano, compIndices)
+      if (idx.baseTotal > 0) {
+        const indiceReal = (nome: string, r: ResultadoIndice, descBase: string, baseLegal: string): IndicadorGuardiao => ({
+          indicador: nome,
+          unidade: '% dos impostos',
+          valor: r.total,
+          base: idx.baseTotal,
+          percentual: r.percentual,
+          limite: r.minimo,
+          prudencial: null,
+          alerta: null,
+          nivel: r.atende ? 'ok' : 'abaixo_minimo',
+          memorial: {
+            descricao: `${descBase} ÷ receita de impostos e transferências (${idx.metodologia}). Limite MÍNIMO de ${r.minimo}%. Base: dotação autorizada.`,
+            baseLegal,
+            linhas: [
+              ...r.linhas.map((l) => ({ item: l.rotulo, valor: l.valor })),
+              { item: '= Aplicação total', valor: r.total },
+              ...idx.base.map((b) => ({ item: `Base: ${b.rotulo}`, valor: b.valor })),
+              { item: '= Base de impostos', valor: idx.baseTotal },
+            ],
+          },
+        })
+        indicadores.push(
+          indiceReal(
+            'Índice MDE',
+            idx.mde,
+            'Despesa na função 12 financiada pelas fontes de impostos vinculados à educação e FUNDEB',
+            'CF art. 212 (mínimo 25% dos impostos em manutenção e desenvolvimento do ensino).',
+          ),
+        )
+        indicadores.push(
+          indiceReal(
+            'Índice ASPS',
+            idx.asps,
+            'Despesa na função 10 financiada pela fonte de recursos próprios da saúde',
+            'CF art. 198 / LC 141 art. 7º (mínimo 15% dos impostos em ações e serviços públicos de saúde).',
           ),
         )
       }
