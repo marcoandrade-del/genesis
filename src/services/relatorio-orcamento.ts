@@ -556,6 +556,39 @@ export function montarIndicesConstitucionais(dados: DadosIndicesConstitucionais)
   )
 }
 
+export interface DadosDisponibilidadeFonte {
+  cabecalho: CabecalhoDemonstrativo
+  linhas: { fonte: string; nomenclatura: string; caixa: number; rpProcessados: number; rpNaoProcessados: number; disponibilidade: number }[]
+  totais: { caixa: number; rpProcessados: number; rpNaoProcessados: number; disponibilidade: number }
+}
+
+/** RGF Anexo 5 — Disponibilidade de Caixa e Restos a Pagar por fonte de
+ *  recurso: caixa bruta − RP (processados e não processados) = líquida. */
+export function montarDisponibilidadeFonte(dados: DadosDisponibilidadeFonte): string {
+  const { cabecalho: c, linhas, totais } = dados
+  const neg = (v: number) => (v < 0 ? ' style="color:#b00"' : '')
+  const linha = (l: DadosDisponibilidadeFonte['linhas'][number]) =>
+    `<tr><td>${esc(l.fonte)}${l.nomenclatura ? ` — ${esc(l.nomenclatura)}` : ''}</td>` +
+    `<td class="num">${formatarReais(l.caixa)}</td>` +
+    `<td class="num">${formatarReais(l.rpProcessados)}</td>` +
+    `<td class="num">${formatarReais(l.rpNaoProcessados)}</td>` +
+    `<td class="num"${neg(l.disponibilidade)}>${formatarReais(l.disponibilidade)}</td></tr>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 5 — Disponibilidade de Caixa e Restos a Pagar') +
+    `<div class="dem-sub">Por fonte de recurso · caixa = saldo bancário acumulado das contas da fonte · RP sobre o razão de empenhos (fonte real da dotação)</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Fonte de recurso</th><th class="num">Disponibilidade de caixa bruta (I)</th><th class="num">RP processados (II)</th><th class="num">RP não processados (III)</th><th class="num">Disponibilidade líquida (I−II−III)</th></tr></thead>` +
+    `<tbody>${linhas.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL</th><th class="num">${formatarReais(totais.caixa)}</th><th class="num">${formatarReais(totais.rpProcessados)}</th><th class="num">${formatarReais(totais.rpNaoProcessados)}</th><th class="num"${neg(totais.disponibilidade)}>${formatarReais(totais.disponibilidade)}</th></tr></tfoot>` +
+    `</table>` +
+    `<div class="dem-sub">LRF art. 55, III. Sem execução da despesa lançada, os restos a pagar são zero e o demonstrativo reflete apenas o caixa por fonte.</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

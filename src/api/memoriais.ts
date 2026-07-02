@@ -3,6 +3,7 @@ import { MemorialRclService } from '../services/memorial-rcl.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { MemorialSaldoFonteService } from '../services/memorial-saldo-fonte.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado } from '../services/indice-constitucional.js'
+import { DisponibilidadeFonteService } from '../services/disponibilidade-fonte.js'
 import { ValoresMensaisService } from '../services/valores-mensais.js'
 import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js'
 
@@ -19,7 +20,7 @@ import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.5.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.6.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
@@ -41,6 +42,7 @@ export function descreverContrato() {
       { recurso: 'guardiao', campos: ['entidade', 'ano', 'metodologia', 'temOrcamento', 'indicadores'] },
       { recurso: 'saldo-fonte', campos: ['entidade', 'ano', 'metodologia', 'receita', 'despesa'] },
       { recurso: 'indices-constitucionais', campos: ['temOrcamento', 'metodologia', 'base', 'baseTotal', 'mde', 'asps'] },
+      { recurso: 'disponibilidade-fonte', campos: ['temDados', 'linhas', 'totais'] },
     ],
   }
 }
@@ -62,6 +64,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const valoresSvc = new ValoresMensaisService(app.prisma)
   const saldoBancarioSvc = new SaldoBancarioMensalService(app.prisma)
   const indicesSvc = new IndiceConstitucionalService(app.prisma)
+  const disponibilidadeSvc = new DisponibilidadeFonteService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -114,6 +117,16 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const comp = composicaoIndicesDoEstado(ent.municipio?.estado?.sigla)
     const r = await indicesSvc.calcular(p.entidadeId, p.ano, comp)
     return reply.send(envelope('indices-constitucionais', r))
+  })
+
+  // RGF Anexo 5 — disponibilidade de caixa e restos a pagar por fonte.
+  app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/disponibilidade-fonte', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const ent = await app.prisma.entidade.findUnique({ where: { id: p.entidadeId }, select: { id: true } })
+    if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    const r = await disponibilidadeSvc.calcular(p.entidadeId, p.ano)
+    return reply.send(envelope('disponibilidade-fonte', r))
   })
 
   app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/saldo-fonte', async (req, reply) => {
