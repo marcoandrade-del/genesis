@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -281,6 +281,26 @@ describe('montarGuardiao', () => {
     expect(html).toContain('informativo') // educação sem limite
     expect(html).toContain('44,1%')
     expect(html).toContain('Memórias de cálculo')
+  })
+})
+
+describe('montarIndicesConstitucionais', () => {
+  it('renderiza base, MDE e ASPS com % e situação (atende / abaixo do mínimo)', () => {
+    const html = montarIndicesConstitucionais({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      metodologia: 'TCE-PR',
+      base: [{ rotulo: 'Impostos', valor: 1000 }, { rotulo: 'Cota-parte FPM', valor: 500 }],
+      baseTotal: 1500,
+      mde: { linhas: [{ rotulo: 'Fonte 1104', valor: 450 }], total: 450, percentual: 30, minimo: 25, atende: true },
+      asps: { linhas: [], total: 0, percentual: 0, minimo: 15, atende: false },
+    })
+    expect(html).toContain('Índices Constitucionais — MDE e ASPS')
+    expect(html).toContain('TOTAL DA BASE (I)')
+    expect(html).toContain('Fonte 1104')
+    expect(html).toContain('30,00% — Atende')
+    expect(html).toContain('mínimo 25,00%')
+    expect(html).toContain('Abaixo do mínimo constitucional')
+    expect(html).toContain('sem despesa nas fontes vinculadas')
   })
 })
 
