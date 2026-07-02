@@ -19,6 +19,7 @@ import {
   montarDespesaPessoal,
   montarIndicesConstitucionais,
   montarDisponibilidadeFonte,
+  montarDespesaFuncaoRreo,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -710,6 +711,47 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="disponibilidade-fonte-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RREO — Execução da despesa por função de governo ────────────────────────
+  async function despesaFuncaoRreo(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, saldo] = await Promise.all([entidadeCtx(entidadeId, ano), saldoSvc.calcular(entidadeId, ano)])
+    const corpo = saldo.temOrcamento
+      ? montarDespesaFuncaoRreo({ cabecalho: cab(e, ano, meta), linhas: saldo.porFuncao, resumo: saldo.resumo })
+      : ''
+    return { e, ano, temOrcamento: saldo.temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/despesa-funcao-rreo', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await despesaFuncaoRreo(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Execução da Despesa por Função',
+      breadcrumb: 'Despesa por função (RREO)',
+      pdfUrl: '/app/orcamento/relatorios/despesa-funcao-rreo.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/despesa-funcao-rreo.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await despesaFuncaoRreo(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/despesa-funcao-rreo')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Despesa por Função ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('RREO — Despesa por Função', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="despesa-funcao-rreo-${ano}.pdf"`)
       .send(pdf)
   })
 }
