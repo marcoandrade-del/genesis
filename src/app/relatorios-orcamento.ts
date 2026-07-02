@@ -6,6 +6,7 @@ import { RclService, resolverComposicao } from '../services/rcl.js'
 import { RclConsolidadaService } from '../services/rcl-consolidada.js'
 import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { DespesaPessoalService, resolverComposicaoPessoal } from '../services/despesa-pessoal.js'
+import { IndiceConstitucionalService, composicaoIndicesDoEstado } from '../services/indice-constitucional.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -15,6 +16,7 @@ import {
   montarRclConsolidada,
   montarGuardiao,
   montarDespesaPessoal,
+  montarIndicesConstitucionais,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -45,6 +47,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const rclConsSvc = new RclConsolidadaService(app.prisma)
   const guardiaoSvc = new MemorialGuardiaoService(app.prisma)
   const pessoalSvc = new DespesaPessoalService(app.prisma)
+  const indicesSvc = new IndiceConstitucionalService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -612,6 +615,57 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="despesa-pessoal-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Índices constitucionais — MDE 25% / ASPS 15% (função × fonte real) ──────
+  async function indicesConstitucionais(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const { e, meta } = await entidadeCtx(entidadeId, ano)
+    const comp = composicaoIndicesDoEstado(e.municipio.estado.sigla)
+    const idx = await indicesSvc.calcular(entidadeId, ano, comp)
+    const temOrcamento = idx.temOrcamento && idx.baseTotal > 0
+    const corpo = temOrcamento
+      ? montarIndicesConstitucionais({
+          cabecalho: cab(e, ano, meta),
+          metodologia: idx.metodologia,
+          base: idx.base,
+          baseTotal: idx.baseTotal,
+          mde: idx.mde,
+          asps: idx.asps,
+        })
+      : ''
+    return { e, ano, temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/indices-constitucionais', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await indicesConstitucionais(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Índices Constitucionais (MDE/ASPS)',
+      breadcrumb: 'Índices constitucionais (LRF)',
+      pdfUrl: '/app/orcamento/relatorios/indices-constitucionais.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/indices-constitucionais.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await indicesConstitucionais(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/indices-constitucionais')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Índices Constitucionais ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Índices Constitucionais (MDE/ASPS)', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="indices-constitucionais-${ano}.pdf"`)
       .send(pdf)
   })
 }

@@ -511,6 +511,51 @@ export function montarRclConsolidada(dados: DadosRclConsolidada): string {
   )
 }
 
+export interface DadosIndicesConstitucionais {
+  cabecalho: CabecalhoDemonstrativo
+  metodologia: string
+  base: { rotulo: string; valor: number }[]
+  baseTotal: number
+  mde: { linhas: { rotulo: string; valor: number }[]; total: number; percentual: number; minimo: number; atende: boolean }
+  asps: { linhas: { rotulo: string; valor: number }[]; total: number; percentual: number; minimo: number; atende: boolean }
+}
+
+/** Demonstrativo dos índices constitucionais de aplicação mínima: MDE (CF art.
+ *  212, ≥25%) e ASPS (LC 141, ≥15%) — despesa por fonte vinculada ÷ base de
+ *  impostos e transferências. */
+export function montarIndicesConstitucionais(dados: DadosIndicesConstitucionais): string {
+  const { cabecalho: c, base, baseTotal, mde, asps } = dados
+  const pct = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const linha = (l: { rotulo: string; valor: number }) =>
+    `<tr><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.valor)}</td></tr>`
+  const bloco = (titulo: string, r: DadosIndicesConstitucionais['mde'], baseLegal: string) =>
+    `<h2 class="dem-sec">${esc(titulo)}</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Aplicação por fonte de recurso</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${r.linhas.map(linha).join('') || '<tr><td colspan="2">— sem despesa nas fontes vinculadas —</td></tr>'}</tbody>` +
+    `<tfoot>` +
+    `<tr><th>APLICAÇÃO TOTAL</th><th class="num">${formatarReais(r.total)}</th></tr>` +
+    `<tr><th>% SOBRE A BASE DE IMPOSTOS (mínimo ${pct(r.minimo)})</th><th class="num">${pct(r.percentual)} — ${r.atende ? 'Atende' : 'Abaixo do mínimo constitucional'}</th></tr>` +
+    `</tfoot></table>` +
+    `<div class="dem-sub">${esc(baseLegal)}</div>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Índices Constitucionais — MDE e ASPS') +
+    `<div class="dem-sub">Metodologia: ${esc(dados.metodologia)} · base: dotação autorizada × fonte de recurso real (QDD)</div>` +
+    `<h2 class="dem-sec">Base de cálculo — impostos e transferências (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>${base.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL DA BASE (I)</th><th class="num">${formatarReais(baseTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    bloco('Manutenção e Desenvolvimento do Ensino — MDE (II)', mde, 'CF art. 212: mínimo de 25% da receita de impostos e transferências em manutenção e desenvolvimento do ensino.') +
+    bloco('Ações e Serviços Públicos de Saúde — ASPS (III)', asps, 'CF art. 198 / LC 141 art. 7º: mínimo de 15% da receita de impostos e transferências em ações e serviços públicos de saúde (recursos próprios).') +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (
