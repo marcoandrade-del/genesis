@@ -1,0 +1,48 @@
+<div class="modal-header">
+  <h5 class="modal-title fw-semibold">
+    <i class="bi bi-bullseye me-2 text-primary"></i><%= meta ? 'Editar Meta Fiscal' : 'Nova Meta Fiscal' %>
+  </h5>
+  <button type="button" class="btn-close" onclick="fecharModal()"></button>
+</div>
+
+<form
+  <% if (meta) { %>hx-put="/admin/metas-fiscais/<%= meta.id %>"<% } else { %>hx-post="/admin/metas-fiscais"<% } %>
+  hx-target="#modal-body" hx-swap="innerHTML">
+
+  <div class="modal-body">
+    <% if (erro) { %><div class="alert alert-danger py-2 small"><%= erro %></div><% } %>
+    <% if (!meta) { %>
+      <input type="hidden" name="entidadeId" value="<%= entidadeId %>">
+      <input type="hidden" name="ano" value="<%= ano %>">
+    <% } %>
+
+    <div class="row g-2">
+      <div class="col-12 mb-2">
+        <label class="form-label small fw-semibold">Meta <span class="text-danger">*</span></label>
+        <% if (meta) { %>
+          <input type="text" class="form-control form-control-sm" value="<%= rotulos[meta.tipo] %> — exercício <%= meta.ano %>" disabled>
+        <% } else { %>
+          <select name="tipo" class="form-select form-select-sm" required>
+            <% tipos.forEach(function(t) { %><option value="<%= t %>"><%= rotulos[t] %></option><% }) %>
+          </select>
+        <% } %>
+      </div>
+      <div class="col-7 mb-2">
+        <label class="form-label small fw-semibold">Valor da meta (R$) <span class="text-danger">*</span></label>
+        <input type="text" name="valorMeta" class="form-control form-control-sm font-monospace" value="<%= meta ? Number(meta.valorMeta).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '' %>" placeholder="ex.: 3.000.000,00" required>
+      </div>
+      <div class="col-5 mb-2">
+        <label class="form-label small fw-semibold">Ano da LDO <span class="text-danger">*</span></label>
+        <input type="number" name="exercicioReferencia" class="form-control form-control-sm" value="<%= meta ? meta.exercicioReferencia : ano - 1 %>" min="1900" max="2100" required>
+      </div>
+      <div class="col-12">
+        <div class="form-text small">Metas do Anexo de Metas Fiscais da LDO (LRF art. 4º §1º). Resultado primário/nominal e dívida aceitam valores negativos.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-sm btn-secondary" onclick="fecharModal()">Cancelar</button>
+    <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar</button>
+  </div>
+</form>

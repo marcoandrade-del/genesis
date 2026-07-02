@@ -855,6 +855,7 @@ model Entidade {
   contasBancarias          ContaBancaria[]
   solicitacoesAcesso       SolicitacaoAcessoEntidade[]
   configuracaoDashboard    ConfiguracaoDashboard?
+  metasFiscais             MetaFiscal[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -2108,4 +2109,30 @@ enum TipoMovimentoEmpenho {
   ESTORNO_LIQUIDACAO
   PAGAMENTO
   ESTORNO_PAGAMENTO
+}
+
+/// Tipo de meta fiscal fixada na LDO (Anexo de Metas Fiscais, LRF art. 4º §1º).
+enum TipoMetaFiscal {
+  RECEITA_TOTAL
+  DESPESA_TOTAL
+  RESULTADO_PRIMARIO
+  RESULTADO_NOMINAL
+  DIVIDA_CONSOLIDADA_LIQUIDA
+}
+
+/// Meta fiscal anual da LDO, por entidade e exercício — comparada ao
+/// projetado da LOA nos demonstrativos (LRF art. 4º §1º e art. 9º).
+model MetaFiscal {
+  id                  String         @id @default(uuid())
+  entidadeId          String
+  ano                 Int // exercício a que a meta se refere
+  tipo                TipoMetaFiscal
+  valorMeta           Decimal        @db.Decimal(18, 2)
+  exercicioReferencia Int // ano da LDO que fixou a meta
+  criadoEm            DateTime       @default(now())
+  atualizadoEm        DateTime       @updatedAt
+  entidade            Entidade       @relation(fields: [entidadeId], references: [id])
+
+  @@unique([entidadeId, ano, tipo])
+  @@map("metas_fiscais")
 }
