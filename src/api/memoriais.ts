@@ -4,6 +4,7 @@ import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { MemorialSaldoFonteService } from '../services/memorial-saldo-fonte.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado } from '../services/indice-constitucional.js'
 import { DisponibilidadeFonteService } from '../services/disponibilidade-fonte.js'
+import { MetasFiscaisService } from '../services/metas-fiscais.js'
 import { ValoresMensaisService } from '../services/valores-mensais.js'
 import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js'
 
@@ -20,7 +21,7 @@ import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.6.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.7.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
@@ -43,6 +44,7 @@ export function descreverContrato() {
       { recurso: 'saldo-fonte', campos: ['entidade', 'ano', 'metodologia', 'receita', 'despesa'] },
       { recurso: 'indices-constitucionais', campos: ['temOrcamento', 'metodologia', 'base', 'baseTotal', 'mde', 'asps'] },
       { recurso: 'disponibilidade-fonte', campos: ['temDados', 'linhas', 'totais'] },
+      { recurso: 'metas-fiscais', campos: ['temMetas', 'linhas'] },
     ],
   }
 }
@@ -65,6 +67,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const saldoBancarioSvc = new SaldoBancarioMensalService(app.prisma)
   const indicesSvc = new IndiceConstitucionalService(app.prisma)
   const disponibilidadeSvc = new DisponibilidadeFonteService(app.prisma)
+  const metasSvc = new MetasFiscaisService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -127,6 +130,16 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     const r = await disponibilidadeSvc.calcular(p.entidadeId, p.ano)
     return reply.send(envelope('disponibilidade-fonte', r))
+  })
+
+  // Metas fiscais da LDO × projetado da LOA.
+  app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/metas-fiscais', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const ent = await app.prisma.entidade.findUnique({ where: { id: p.entidadeId }, select: { id: true } })
+    if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    const r = await metasSvc.comparativo(p.entidadeId, p.ano)
+    return reply.send(envelope('metas-fiscais', r))
   })
 
   app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/saldo-fonte', async (req, reply) => {

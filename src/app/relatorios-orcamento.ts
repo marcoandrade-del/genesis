@@ -8,6 +8,7 @@ import { MemorialGuardiaoService } from '../services/memorial-guardiao.js'
 import { DespesaPessoalService, resolverComposicaoPessoal } from '../services/despesa-pessoal.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado } from '../services/indice-constitucional.js'
 import { DisponibilidadeFonteService } from '../services/disponibilidade-fonte.js'
+import { MetasFiscaisService } from '../services/metas-fiscais.js'
 import {
   montarReceitaPrevista,
   montarDespesaFixada,
@@ -20,6 +21,7 @@ import {
   montarIndicesConstitucionais,
   montarDisponibilidadeFonte,
   montarDespesaFuncaoRreo,
+  montarMetasFiscais,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -52,6 +54,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const pessoalSvc = new DespesaPessoalService(app.prisma)
   const indicesSvc = new IndiceConstitucionalService(app.prisma)
   const disponibilidadeSvc = new DisponibilidadeFonteService(app.prisma)
+  const metasSvc = new MetasFiscaisService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -752,6 +755,45 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="despesa-funcao-rreo-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── Metas Fiscais — LDO × projetado da LOA ──────────────────────────────────
+  async function metasFiscais(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, comp] = await Promise.all([entidadeCtx(entidadeId, ano), metasSvc.comparativo(entidadeId, ano)])
+    const corpo = comp.temMetas ? montarMetasFiscais({ cabecalho: cab(e, ano, meta), linhas: comp.linhas }) : ''
+    return { e, ano, temOrcamento: comp.temMetas, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/metas-fiscais', async (req, reply) => {
+    const { e, ano, temOrcamento, corpo } = await metasFiscais(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Metas Fiscais',
+      breadcrumb: 'Metas fiscais (LDO)',
+      pdfUrl: '/app/orcamento/relatorios/metas-fiscais.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/metas-fiscais.pdf', async (req, reply) => {
+    const { ano, temOrcamento, corpo, meta } = await metasFiscais(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/metas-fiscais')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Metas Fiscais ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Metas Fiscais (LDO × LOA)', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="metas-fiscais-${ano}.pdf"`)
       .send(pdf)
   })
 }

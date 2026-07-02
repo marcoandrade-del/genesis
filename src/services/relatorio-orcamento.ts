@@ -622,6 +622,35 @@ export function montarDespesaFuncaoRreo(dados: DadosDespesaFuncaoRreo): string {
   )
 }
 
+export interface DadosMetasFiscais {
+  cabecalho: CabecalhoDemonstrativo
+  linhas: { rotulo: string; valorMeta: number; exercicioReferencia: number; projetado: number | null; diferenca: number | null }[]
+}
+
+/** Metas Fiscais da LDO × projetado da LOA (LRF art. 4º §1º): meta, projeção
+ *  da base (quando existe) e diferença. */
+export function montarMetasFiscais(dados: DadosMetasFiscais): string {
+  const { cabecalho: c, linhas } = dados
+  const neg = (v: number) => (v < 0 ? ' style="color:#b00"' : '')
+  const linha = (l: DadosMetasFiscais['linhas'][number]) =>
+    `<tr><td>${esc(l.rotulo)} <span class="dem-sub">(LDO ${l.exercicioReferencia})</span></td>` +
+    `<td class="num">${formatarReais(l.valorMeta)}</td>` +
+    `<td class="num">${l.projetado != null ? formatarReais(l.projetado) : '—'}</td>` +
+    `<td class="num"${l.diferenca != null ? neg(l.diferenca) : ''}>${l.diferenca != null ? formatarReais(l.diferenca) : 'sem projeção na base'}</td></tr>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Metas Fiscais — LDO × Projetado da LOA') +
+    `<div class="dem-sub">Anexo de Metas Fiscais (LRF art. 4º §1º) · projetado = receita orçada / despesa autorizada da LOA; resultado primário/nominal e dívida exigem execução (sem projeção na base)</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Meta</th><th class="num">Meta (LDO)</th><th class="num">Projetado (LOA)</th><th class="num">Diferença</th></tr></thead>` +
+    `<tbody>${linhas.map(linha).join('')}</tbody>` +
+    `</table>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

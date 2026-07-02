@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn() }))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
@@ -26,6 +26,11 @@ vi.mock('../../services/valores-mensais.js', () => ({
 vi.mock('../../services/saldo-bancario-mensal.js', () => ({
   SaldoBancarioMensalService: class {
     consolidar = m.saldoBanc
+  },
+}))
+vi.mock('../../services/metas-fiscais.js', () => ({
+  MetasFiscaisService: class {
+    comparativo = m.metas
   },
 }))
 vi.mock('../../services/disponibilidade-fonte.js', () => ({
@@ -63,6 +68,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.saldoBanc.mockReset()
     m.indices.mockReset()
     m.disponibilidade.mockReset()
+    m.metas.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
     ;({ app, prisma } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
@@ -188,6 +194,22 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
   it('404 disponibilidade quando a entidade não existe', async () => {
     prisma.entidade.findUnique.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/disponibilidade-fonte?entidadeId=x&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('200 metas fiscais em envelope', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1' })
+    m.metas.mockResolvedValue({ temMetas: true, linhas: [{ rotulo: 'Receita Total', valorMeta: 3000, projetado: 3170, diferenca: 170 }] })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/metas-fiscais?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().contrato.recurso).toBe('metas-fiscais')
+    expect(res.json().dados.linhas[0].diferenca).toBe(170)
+    expect(m.metas).toHaveBeenCalledWith('e1', 2026)
+  })
+
+  it('404 metas quando a entidade não existe', async () => {
+    prisma.entidade.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/metas-fiscais?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
   })
 

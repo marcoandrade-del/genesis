@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -301,6 +301,23 @@ describe('montarIndicesConstitucionais', () => {
     expect(html).toContain('mínimo 25,00%')
     expect(html).toContain('Abaixo do mínimo constitucional')
     expect(html).toContain('sem despesa nas fontes vinculadas')
+  })
+})
+
+describe('montarMetasFiscais', () => {
+  it('renderiza meta × projetado com diferença e "sem projeção" quando não há base', () => {
+    const html = montarMetasFiscais({
+      cabecalho: { entidadeNome: 'P', municipio: 'M', estado: 'PR', ano: 2026, brasao: null },
+      linhas: [
+        { rotulo: 'Receita Total', valorMeta: 3000, exercicioReferencia: 2025, projetado: 3170, diferenca: 170 },
+        { rotulo: 'Despesa Total', valorMeta: 2900, exercicioReferencia: 2025, projetado: 2842, diferenca: -58 },
+        { rotulo: 'Resultado Primário', valorMeta: 100, exercicioReferencia: 2025, projetado: null, diferenca: null },
+      ],
+    })
+    expect(html).toContain('Metas Fiscais — LDO × Projetado da LOA')
+    expect(html).toContain('(LDO 2025)')
+    expect(html).toContain('sem projeção na base')
+    expect(html).toContain('style="color:#b00"') // diferença negativa destacada
   })
 })
 

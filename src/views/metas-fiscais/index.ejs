@@ -1,0 +1,74 @@
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="h5 fw-bold mb-0">Metas Fiscais (LDO)</h2>
+  <% if (entidade) { %>
+    <button class="btn btn-primary btn-sm" hx-get="/admin/metas-fiscais/form?entidadeId=<%= entidade.id %>&ano=<%= ano %>" hx-target="#modal-body" hx-swap="innerHTML">
+      <i class="bi bi-plus-lg me-1"></i>Nova Meta
+    </button>
+  <% } %>
+</div>
+
+<form class="mb-3 row g-2 align-items-end" method="get" action="/admin/metas-fiscais">
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Estado</label>
+    <select name="estadoId" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% estados.forEach(function(e) { %><option value="<%= e.id %>" <%= estadoSelecionadoId === e.id ? 'selected' : '' %>><%= e.sigla %> — <%= e.nome %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label small fw-semibold mb-1">Município</label>
+    <select name="municipioId" class="form-select form-select-sm" <%= estadoSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% municipios.forEach(function(m) { %><option value="<%= m.id %>" <%= municipioSelecionadoId === m.id ? 'selected' : '' %>><%= m.nome %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label small fw-semibold mb-1">Entidade</label>
+    <select name="entidadeId" class="form-select form-select-sm" <%= municipioSelecionadoId ? '' : 'disabled' %> onchange="this.form.submit()">
+      <option value="">— Selecione —</option>
+      <% entidades.forEach(function(e) { %><option value="<%= e.id %>" <%= entidade && e.id === entidade.id ? 'selected' : '' %>><%= e.nome %></option><% }) %>
+    </select>
+  </div>
+  <div class="col-md-2">
+    <label class="form-label small fw-semibold mb-1">Exercício</label>
+    <input type="number" name="ano" class="form-control form-control-sm" value="<%= ano %>" min="2000" max="2100" onchange="this.form.submit()">
+  </div>
+</form>
+
+<% if (!entidade) { %>
+  <div class="alert alert-info py-2 small"><i class="bi bi-info-circle me-1"></i>Selecione estado, município e entidade para listar as metas fiscais.</div>
+<% } else { %>
+  <div class="small text-muted mb-2"><strong><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %> · <%= entidade.nome %></strong> — exercício <%= ano %> — <%= metas.length %> meta(s)</div>
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th class="ps-3">Meta</th>
+            <th class="text-end" style="width:200px">Valor (R$)</th>
+            <th class="text-center" style="width:140px">LDO (referência)</th>
+            <th class="text-end pe-3" style="width:120px">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% if (metas.length === 0) { %>
+            <tr><td colspan="4" class="text-center text-muted py-5"><i class="bi bi-inbox fs-4 d-block mb-2"></i>Nenhuma meta cadastrada para <%= ano %>.</td></tr>
+          <% } %>
+          <% metas.forEach(function(m) { %>
+            <tr id="meta-<%= m.id %>">
+              <td class="ps-3 fw-semibold"><%= rotulos[m.tipo] %></td>
+              <td class="text-end font-monospace"><%= Number(m.valorMeta).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) %></td>
+              <td class="text-center"><%= m.exercicioReferencia %></td>
+              <td class="text-end pe-3">
+                <button class="btn btn-sm btn-outline-secondary me-1" hx-get="/admin/metas-fiscais/<%= m.id %>/form" hx-target="#modal-body" hx-swap="innerHTML" title="Editar"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-sm btn-outline-danger" data-id="<%= m.id %>" data-nome="<%= rotulos[m.tipo] %> <%= ano %>"
+                  onclick="confirmarExclusaoAsync('meta fiscal', this.dataset.id, this.dataset.nome, { url: '/admin/metas-fiscais/' + this.dataset.id, target: '#meta-' + this.dataset.id, swap: 'outerHTML' })" title="Excluir"><i class="bi bi-trash"></i></button>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="form-text small mt-2">O comparativo meta × projetado da LOA aparece nos relatórios da entidade (/app → Anexos da LOA → Metas fiscais).</div>
+<% } %>

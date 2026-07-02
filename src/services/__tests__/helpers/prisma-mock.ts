@@ -642,6 +642,14 @@ export function criarPrismaMock() {
       delete: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
+    metaFiscal: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn().mockResolvedValue(0),
+    },
     movimentoEmpenho: {
       findMany: vi.fn().mockResolvedValue([]),
       groupBy: vi.fn().mockResolvedValue([]),
