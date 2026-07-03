@@ -28,6 +28,11 @@ Despesa 2.842.650.399 (LOA, Δ=0) · Primário −56,02mi (slides, rótulo "META
 FISCAL") · DCL −539,62mi. **Falta a META do Resultado Nominal** — os 343,15 /
 402,12 são APURADOS, não cadastrar como meta.
 
+**Corroboração (2º resumo Gemini, 2026-07-02):** LOA 3,58bi ✓ · meta nominal
+−206,7mi ✓ (mesmo valor em duas respostas) · DCL −539,62 ✓ · empenhado 1,74bi ✓.
+⚠️ arrecadação até jun veio 1,71bi (antes: 1,732bi) — arredondamento ou escopo
+prefeitura×consolidado; o import de junho arbitra.
+
 **How to apply:** esses números são os gabaritos de conferência dos imports
 futuros (arrecadação de junho; execução da despesa ≈1.746,4mi empenhado até
 jun; saldos bancários ≈1.083,94mi). Divergência grande = investigar antes de
