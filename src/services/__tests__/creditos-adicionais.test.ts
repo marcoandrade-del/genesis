@@ -49,6 +49,26 @@ describe('CreditosAdicionaisService.criar', () => {
     expect(upd[1][0].data.valorAutorizado.decrement.toString()).toBe('300')
   })
 
+  it('aceita decreto SÓ de anulação (contingenciamento) e anulação > reforço (remanejamento)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue(ORC)
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([DOT_A, DOT_B])
+    prisma.creditoAdicional.create.mockResolvedValue({ id: 'cr1' })
+    // só anulação
+    await service.criar('o1', baseDados({ itens: [{ dotacaoId: 'dB', operacao: 'ANULACAO', valor: '300' }] }))
+    // anulação maior que o reforço
+    await service.criar(
+      'o1',
+      baseDados({
+        numero: '2/2026',
+        itens: [
+          { dotacaoId: 'dA', operacao: 'REFORCO', valor: '10' },
+          { dotacaoId: 'dB', operacao: 'ANULACAO', valor: '300' },
+        ],
+      }),
+    )
+    expect(prisma.creditoAdicional.create).toHaveBeenCalledTimes(2)
+  })
+
   it('rejeita orçamento em rascunho', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ ...ORC, status: 'RASCUNHO' })
     await expect(service.criar('o1', baseDados())).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
@@ -71,16 +91,10 @@ describe('CreditosAdicionaisService.criar', () => {
     await expect(service.criar('o1', dados)).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
   })
 
-  it('rejeita anulação maior que o total reforçado', async () => {
+  it('rejeita crédito sem itens', async () => {
     prisma.orcamento.findUnique.mockResolvedValue(ORC)
-    prisma.dotacaoDespesa.findMany.mockResolvedValue([DOT_A, DOT_B])
-    const dados = baseDados({
-      itens: [
-        { dotacaoId: 'dA', operacao: 'REFORCO', valor: '100' },
-        { dotacaoId: 'dB', operacao: 'ANULACAO', valor: '200' },
-      ],
-    })
-    await expect(service.criar('o1', dados)).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+    const dados = baseDados({ itens: [] })
+    await expect(service.criar('o1', dados)).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
     expect(prisma.creditoAdicional.create).not.toHaveBeenCalled()
   })
 
