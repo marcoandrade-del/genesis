@@ -53,12 +53,18 @@ indiretas). Não precisou de export interno da Elotech pra fixada.
 ## Follow-ups (fora do épico, anotados)
 - Composição dos índices MDE/ASPS editável na bancada (4ª composição: coluna
   `indicesComposicao` + migração + UI + governança).
-- Metas fiscais 2026 da Prefeitura: **RECEITA_TOTAL (3.170.223.793) e
-  DESPESA_TOTAL (2.842.650.399) CADASTRADAS em 2026-07-02** com os totais da
-  LOA (decisão do Marco; LRF art. 5º — LOA compatível com a LDO; Δ=0 esperado).
-  **Faltam 3**: Resultado Primário, Resultado Nominal e Dívida Consolidada
-  Líquida — não publicados no portal; melhor pista = slides da audiência
-  (ver [[portal-maringa-api-arquivos]], idArquivo 1118420).
+- Metas fiscais 2026 da Prefeitura: **4/5 CADASTRADAS em 2026-07-02** —
+  RECEITA_TOTAL 3.170.223.793 e DESPESA_TOTAL 2.842.650.399 (totais da LOA,
+  Δ=0); RESULTADO_PRIMARIO **−56,02mi** e DIVIDA_CONSOLIDADA_LIQUIDA
+  **−539,62mi** (dados oficiais dos slides/RGF An.2 que o Marco trouxe:
+  DC 544,32 − disponibilidade 1.083,94 = DCL negativa, caixa > dívida;
+  apurado "acima da linha" jan–mai: primário 320,89, nominal 343,15, juros
+  22,26 — APURADO ≠ meta). **Falta 1: meta do RESULTADO_NOMINAL** (não veio
+  com rótulo "META FISCAL" nos slides; não derivar de juros do período).
+- **Guardião ganhou o indicador Dívida Consolidada Líquida (#191, contrato
+  1.8.0)**: lê a DCL do cadastro de metas ÷ RCL viva, limite 120% (Res. Senado
+  40/2001); Maringá −20,7% [ok]. Vira cálculo vivo quando estoque da dívida +
+  saldos bancários reais entrarem. Sem cadastro → indicador não aparece.
 - Conferir o medidor do painel Oxy com `prudencial/alerta null` + nivel
   `abaixo_minimo` (contrato 1.7.0 é aditivo, MAJOR não mudou).
 
