@@ -39,6 +39,13 @@ Outros endpoints úteis do bundle (mapa parcial): `arrecadacoes`,
 download/)`, `dashboard/arrecadacao-despesa`. Bundle:
 `/portaltransparencia/static/js/main.*.chunk.js` (grep `"/api/`).
 
+## Entidades do portal (`GET /api/entidades/lista` — mapa oficial c/ CNPJ)
+1=Prefeitura (nosso banco) · 3=Maringá Previdência · 4=IAM · 6=Câmara ·
+9=AMR · 10=SBMG · 15=IPPLAM. Todo endpoint aceita `?entidade={id}` — p/
+consolidação municipal, puxar Câmara(6)/Previdência(3) etc.; o QDD deles já
+está em `data/qdd_loa_2026_maringa.csv` (órgãos 01/31/50/60/61). O portal
+também navega por `/portaltransparencia/{id}/...`.
+
 Links oficiais correlatos (Marco, 2026-07-02): TCE-PR SIM-AM
 tce.pr.gov.br/sim-sistema-de-informacoes-municipais (+ layouts em
 tce.pr.gov.br/layout-sim-am), STN gov.br/tesouronacional, Câmara cmm.pr.gov.br.
