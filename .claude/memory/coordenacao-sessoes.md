@@ -20,6 +20,8 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
+> 🟢 **Sessão SYNC (2026-07-03, noite): +#196 — menu da barra superior ganhou os 8 relatórios LRF (seed) e `scripts/conceder_acesso_total.ts <email>` dá ADMIN em todas entidades + EXCLUIR em todos os itens (aplicado a marco@teste.com, verificado ao vivo). Menu do /app agora espelha o produto.**
+
 > 🟢 **Sessão SYNC (2026-07-03, tarde): O GÊNESIS SE SINCRONIZA SOZINHO — receita E despesa (#193 import jun, #194 sync nível 2, #195 despesa em CI).**
 > Job diário 04h (env SINCRONIZAR_PORTAL_MARINGA=1): receita→despesa (ordem do Marco), mês corrente + fechamento do anterior; valida vs dashboard ANTES de gravar (guard permanente); log SincronizacaoPortal. Receita jan–jun no banco (1.672,0mi, 96,5% TCE; RCL executada 1.484,9mi). Despesa jan–jun capturada (empenhos sintéticos CAP-* + MovimentoEmpenho; Σ 1.746,2mi = dashboard EXATO, sem-dotação 0,00 — decretos cobriram tudo). **RGF Anexo 5 VIVO** (RP proc 70,4mi + nproc 547,2mi por fonte); valores-mensais OXY reais. ⚠️ prisma-mock (zona 🔴): +fornecedor.findFirst, +arrecadacao.createMany/deleteMany, +movimentoBancario.groupBy, +sincronizacaoPortal. Falta da fila: saldos bancários reais → nominal/DCL vivos. Ver [[portal-maringa-api-arquivos]], [[alteracoes-orcamentarias-dinamica]].
 
