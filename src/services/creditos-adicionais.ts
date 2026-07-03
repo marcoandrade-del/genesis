@@ -81,11 +81,11 @@ export class CreditosAdicionaisService {
       if (it.operacao === 'REFORCO') totalReforco = totalReforco.plus(it.valor)
       else totalAnulacao = totalAnulacao.plus(it.valor)
     }
-    if (totalReforco.lessThanOrEqualTo(0)) {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O crédito precisa reforçar ao menos uma dotação.')
-    }
-    if (totalAnulacao.greaterThan(totalReforco)) {
-      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'A anulação não pode superar o total reforçado.')
+    // Decretos reais incluem contingenciamento (só anulação) e remanejamento
+    // com anulação maior que o reforço (Lei 4.320; visto nos decretos de
+    // Maringá 2026) — por isso não se exige reforço>0 nem anulação≤reforço.
+    if (totalReforco.isZero() && totalAnulacao.isZero()) {
+      throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', 'O crédito precisa movimentar ao menos uma dotação.')
     }
 
     // Todas as dotações precisam pertencer a este orçamento.
