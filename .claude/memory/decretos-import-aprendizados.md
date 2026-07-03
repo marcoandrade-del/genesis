@@ -1,45 +1,46 @@
 ---
 name: decretos-import-aprendizados
-description: "Import dos decretos de Maringá (WIP na branch feat/creditos-decretos-reais): semântica dos campos validada, dedup de estornos, itens S/N; BLOQUEIO = ordem real dos movimentos ≠ nº do decreto (475 resíduos) — próximo passo: cadeia antes→saldo por dotação"
+description: "IMPORT DOS DECRETOS CONCLUÍDO (2026-07-03, PR #192): API decifrada (saldoAtualizado=atual; par {delta, atual−delta} em ordem AMBÍGUA), solver por dotação, 219 decretos lançados, 0 divergências × portal, Σ 3.325.289.298,63"
 metadata:
   type: project
 ---
 
-# Import dos decretos de Maringá — estado e aprendizados (2026-07-03)
+# Import dos decretos de Maringá — CONCLUÍDO (2026-07-03)
 
-Branch **`feat/creditos-decretos-reais`** (pushada, sem PR):
-- ✅ `CreditosAdicionaisService` relaxado p/ decretos reais: aceita
-  só-anulação (36 contingenciamentos) e anulação>reforço (12); mantém ≥1
-  item, valor>0, anulação≤saldoDisponivel. 11/11 testes.
-- ⚠️ `scripts/importar_decretos_2026.ts` **WIP — dry-run BLOQUEIA (correto)**.
+**PR #192** (branch `feat/creditos-decretos-reais`): 219 decretos lançados no
+dev via CreditosAdicionaisService; **0 dotações divergentes do portal**;
+Σ autorizado = **3.325.289.298,63** (Δ 0,00). Metas: Despesa Δ **+482,6mi**
+visível; Guardião reagiu (Pessoal 44,2→46,0%, MDE 35,89%). 140 fontes e 441
+dotações-fonte criadas (superávit 2xxx, convênios 5xxxx).
 
-## Semântica do `/api/creditosadicionais` (validada, 0 inconsistências/1.782)
-- Suplementar: antes=`valorInicial`, delta=+`valor`
-- Reduzida: antes=`valor`, delta=−`valorInicial`  (campos trocam de papel!)
-- saldoAtualizado = antes + delta, sempre.
-- Estornos: Suplementar com delta NEGATIVO (ex.: decreto 205/2026).
-- **Duplicatas**: certas anulações aparecem 2× (estorno Suplementar-negativo
-  num decreto + Reduzida formal noutro, mesmo saldo final) — dedup implementado.
-- 102 itens com decreto "null/null" = movimentos REAIS sem número
-  (+58,9/−31,9 = +27,1mi) — entram como lançamento "S/N-2026".
-- Dimensões: TODAS existem no banco (0 UO/função/programa/ação/conta
-  faltando); faltam só ~38 fontes (superávit 2xxx, convênios 5xxxx).
-- Efeito líquido bruto (sem dedup/ordem): +442,4mi → autorizado ~3,29bi.
+## O MODELO da API `/api/creditosadicionais` (a lição de ouro p/ APIs Elotech)
+1. `saldoAtualizado` = valor ATUAL da dotação (constante em todos os registros
+   da dotação — NÃO é saldo corrente da época).
+2. Cada registro traz o par **{delta do decreto, atual−delta}** nos campos
+   `(valorInicial, valor)` **EM ORDEM AMBÍGUA** — a identidade ini+val=saldo é
+   simétrica e NÃO discrimina. Reduzida = delta negativo; há estornos com a
+   natureza do doc original (sinal invertido).
+3. **Desambiguação = equação por dotação**: Σ deltas = atual − LOA(nossa).
+   Solver DFS custo-mínimo, delta ∈ {±ini, ±val} (custos 0/1/2/2), poda por
+   soma alcançável, 3M nós: 408 padrão + 647 flips + 85 com **item de
+   conciliação explícito** no doc S/N (rastreável, Σ −68,1mi).
+4. Itens decreto "null/null" = movimentos reais sem número → doc "S/N-2026",
+   aplicado POR ÚLTIMO (concilia no estado final).
+5. Netting por dotação dentro de cada decreto (o service valida anulação
+   contra o saldo PRÉ-documento).
+6. Retomada idempotente: pula números já lançados; base do solver = atual −
+   Σ créditos já lançados (aprendido na prática: 1ª aplicação parou em
+   214/219 e retomou limpa).
 
-## O BLOQUEIO (por que não aplicar ainda)
-A ordem real dos movimentos NÃO é o número do decreto: os `antes` se
-sobrepõem entre decretos → reconstruir por número gera **475 resíduos** e a
-"âncora de estado final" que tentei reescreve documentos em massa (infiel).
-**Próximo passo**: por dotação-fonte, ENCADEAR os movimentos por antes→saldo
-(a ordem emerge da cadeia); a abertura da cadeia deve bater com nossa LOA
-(divergência = investigar antes); só então emitir os decretos na ordem
-inferida e validar Σ final. Gabarito: Σ autorizado esperável ~3,0–3,3bi
-(conferir também contra `saldoAtualizado` por dotação e o balancete).
+## Armadilhas que custaram horas (não repetir)
+- Hipótese "ordem = nº do decreto" → 475 resíduos (falsa).
+- Hipótese "antes encadeia como razão corrente" → cadeias-ilha (falsa).
+- "Âncora de estado final" reescrevendo documentos em massa → infiel (não usar).
+- A simulação-guard bloqueou o --apply 2× por motivos REAIS. Num ledger,
+  quando o guard acusa, é dado — não bug.
 
-**Snapshot durável**: `data/creditos_portal_snapshot_2026-07-02.json` (o
-FALLBACK_JSON do script ainda aponta pro scratchpad volátil — atualizar ao
-retomar). Dados vivos: re-buscar na API (pode ter decretos novos).
-
-**How to apply:** retomar pela branch; NÃO rodar --apply antes de resolver a
-cadeia; a simulação do script é o guard-rail — se ela acusar, é dado, não bug.
-Ver [[portal-maringa-api-arquivos]], [[alteracoes-orcamentarias-dinamica]].
+**How to apply:** próximos imports Elotech (execução, outras entidades):
+suspeitar de campos espelhados/ambíguos; validar identidades em TODA a base;
+ancorar em invariantes por linha (valor atual) e resolver por equação. Ver
+[[portal-maringa-api-arquivos]], [[alteracoes-orcamentarias-dinamica]].
+Snapshot: `data/creditos_portal_snapshot_2026-07-02.json`.
