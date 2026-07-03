@@ -8,7 +8,7 @@ import {
 import { MeusRelatoriosService } from '../services/meus-relatorios.js'
 import { MeusRelatoriosOrgService } from '../services/meus-relatorios-org.js'
 import { criarExecutorPadrao } from '../services/relatorio-executor.js'
-import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf, type Faixa } from '../services/relatorio-pdf.js'
+import { montarTemplateFaixa, montarCorpoHtml, margemParaFaixa, gerarPdf, textoDaFaixa, type Faixa } from '../services/relatorio-pdf.js'
 import { exportarResultado, formatoValido, nomeArquivo, FORMATOS } from '../services/relatorio-export.js'
 import {
   montarRender,
@@ -557,11 +557,22 @@ export async function appRelatoriosRoutes(app: FastifyInstance) {
           .header('Content-Disposition', `inline; filename="${nomeArquivo(reg.nome, 'pdf')}"`)
           .send(pdf)
       }
+      // cabeçalho/rodapé do relatório também nos formatos-documento (html/txt/xlsx/docx)
+      const agora = new Date()
+      const dadosFaixa = {
+        nomeEntidade: entidade.nome,
+        enderecoEntidade: entidade.endereco ?? '',
+        nomeRelatorio: reg.nome,
+        brasao: entidade.brasao ?? null,
+        dataGeracao: agora.toLocaleDateString('pt-BR'),
+        horaGeracao: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      }
       const arq = await exportarResultado(
         formato,
         { colunas: resultado.colunas, linhas: resultado.linhas, truncado: resultado.truncado },
         reg.nome,
         lerTotaisConfig(reg.configuracao),
+        { cabecalho: textoDaFaixa(reg.cabecalho, dadosFaixa), rodape: textoDaFaixa(reg.rodape, dadosFaixa) },
       )
       return reply
         .header('Content-Type', arq.mime)

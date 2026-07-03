@@ -65,6 +65,42 @@ export function estiloElemento(el: ElLayout): string {
   return partes.join(';')
 }
 
+/**
+ * Faixa como LINHAS DE TEXTO (p/ exportações não-PDF: TXT/HTML/DOCX/XLSX).
+ * Resolve os mesmos elementos do PDF, exceto BRASAO (imagem) e NUMERO_PAGINA
+ * (não há páginas fora do PDF). Elementos são agrupados em linhas pela
+ * proximidade vertical (mesma banda de y) e ordenados por x.
+ */
+export function textoDaFaixa(faixa: Faixa, d: DadosFaixa): string[] {
+  if (!faixa) return []
+  const lista: ElLayout[] = Array.isArray(faixa.layout) ? (faixa.layout as ElLayout[]) : []
+  const texto = (el: ElLayout): string => {
+    switch (el.tipo) {
+      case 'NOME_ENTIDADE': return d.nomeEntidade
+      case 'NOME_RELATORIO': return d.nomeRelatorio
+      case 'DATA_GERACAO': return d.dataGeracao
+      case 'HORA_GERACAO': return d.horaGeracao
+      case 'ENDERECO_ENTIDADE': return d.enderecoEntidade
+      default: return '' // BRASAO/NUMERO_PAGINA não têm equivalente textual
+    }
+  }
+  const els = lista
+    .map((el) => ({ x: Number(el.x) || 0, y: Number(el.y) || 0, txt: texto(el).trim() }))
+    .filter((e) => e.txt)
+    .sort((a, b) => a.y - b.y || a.x - b.x)
+  const linhas: string[] = []
+  let yAtual = -999
+  for (const e of els) {
+    if (Math.abs(e.y - yAtual) > 12) {
+      linhas.push(e.txt)
+      yAtual = e.y
+    } else {
+      linhas[linhas.length - 1] += ` · ${e.txt}`
+    }
+  }
+  return linhas
+}
+
 /** Template de faixa (header/footer) do Playwright a partir do layout. */
 export function montarTemplateFaixa(faixa: Faixa, dados: DadosFaixa): string {
   if (!faixa) return '<span></span>'
