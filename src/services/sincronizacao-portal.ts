@@ -44,7 +44,8 @@ function pad12(codigo: string): string {
 const c2 = (n: number) => Math.round(n * 100) / 100
 
 type LinhaPortal = { receita: string; valorArrecadado: number }
-type DashboardMes = { mes: number; valorArrecadado: number }
+type DashboardMes = { mes: number; valorArrecadado: number; valorEmpenhado: number; valorPago: number }
+type LinhaDespesa = { programatica: string; nivel: number; valorEmpenhado: number; valorLiquidado: number; valorPago: number }
 
 export interface ResultadoSincronizacao {
   status: 'OK' | 'DIVERGENTE' | 'ERRO'
@@ -174,6 +175,189 @@ export class SincronizacaoPortalService {
       })
     }
   }
+
+  /**
+   * Sincroniza a EXECUÇÃO DA DESPESA de um mês (empenhado/liquidado/pago) —
+   * mesmo esquema da receita (decisão do Marco: despesa SEMPRE depois da
+   * receita do ciclo). Fonte: despesapornivel/detalhada (nível 11 =
+   * programática+elemento; a API ignora filtro de fonte, então o valor é
+   * RATEADO entre as fontes-dotação proporcionalmente ao autorizado atual —
+   * exato quando a programática tem fonte única, aproximação documentada nas
+   * demais; o balancete mensal oficial faz o true-up).
+   *
+   * Escrita = EXECUÇÃO CAPTURADA: 1 empenho sintético de captura por
+   * dotação-fonte (fornecedor "CAPTURA PORTAL", numero CAP-…, marcado) +
+   * MovimentoEmpenho com os deltas do mês (idempotente por histórico mensal).
+   * Alimenta valores-mensais/OXY, RP do Anexo 5 e RREO — não é escrituração.
+   */
+  async despesaMes(entidadeId: string, ano: number, mes: number): Promise<ResultadoSincronizacao> {
+    const registrar = async (r: ResultadoSincronizacao) => {
+      await this.prisma.sincronizacaoPortal.create({
+        data: { entidadeId, tipo: 'DESPESA_EXECUCAO', ano, mes, status: r.status, mensagem: r.mensagem, valorPortal: r.valorPortal, valorGravado: r.valorGravado },
+      })
+      return r
+    }
+    try {
+      const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
+      if (!orcamento) return registrar({ status: 'ERRO', mensagem: `Sem orçamento ${ano}.`, valorPortal: 0, valorGravado: 0 })
+
+      const dots = await this.prisma.dotacaoDespesa.findMany({
+        where: { orcamentoId: orcamento.id },
+        select: {
+          id: true,
+          valorAutorizado: true,
+          unidadeOrcamentaria: { select: { codigo: true } },
+          funcao: { select: { codigo: true } },
+          subfuncao: { select: { codigo: true } },
+          programa: { select: { codigo: true } },
+          acao: { select: { codigo: true } },
+          contaDespesa: { select: { codigo: true } },
+        },
+      })
+      const porChave = new Map<string, { id: string; autorizado: number }[]>()
+      for (const d of dots) {
+        const k = `${d.unidadeOrcamentaria.codigo}|${d.funcao.codigo}|${d.subfuncao.codigo}|${d.programa.codigo}|${d.acao.codigo}|${d.contaDespesa.codigo}`
+        const l = porChave.get(k) ?? []
+        l.push({ id: d.id, autorizado: Number(d.valorAutorizado) })
+        porChave.set(k, l)
+      }
+
+      const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate()
+      const linhas = await this.getJson<LinhaDespesa[]>(
+        `/despesapornivel/detalhada?dataInicial=${ano}-${String(mes).padStart(2, '0')}-01&dataFinal=${ano}-${String(mes).padStart(2, '0')}-${String(ultimoDia).padStart(2, '0')}`,
+        { entidade: ENTIDADE_PORTAL, exercicio: String(ano) },
+      )
+      // "02.010.04.122.0002.2001.3.1.90.07" → chave programática+elemento
+      const parse = (prog: string) => {
+        const p = prog.split('.')
+        if (p.length !== 10) return null
+        return `${p[0]}.${p[1]}|${p[2]}|${p[3]}|${p[4]}|${p[5]}|${p[6]}.${p[7]}.${p[8]}.${p[9]}.00.00`
+      }
+
+      type Delta = { dotacaoId: string; empenhado: number; liquidado: number; pago: number }
+      const deltas = new Map<string, Delta>()
+      let totalEmp = 0
+      let totalPago = 0
+      let semDotacao = 0
+      for (const l of linhas) {
+        if (l.nivel !== 11) continue
+        if (!l.valorEmpenhado && !l.valorLiquidado && !l.valorPago) continue
+        totalEmp = c2(totalEmp + l.valorEmpenhado)
+        totalPago = c2(totalPago + l.valorPago)
+        const k = parse(l.programatica)
+        const alvos = k ? porChave.get(k) : undefined
+        if (!alvos || alvos.length === 0) {
+          semDotacao = c2(semDotacao + l.valorEmpenhado)
+          continue
+        }
+        // rateio proporcional ao autorizado (resto no último p/ fechar centavos)
+        const somaAut = alvos.reduce((x, a) => x + a.autorizado, 0)
+        let accE = 0
+        let accL = 0
+        let accP = 0
+        alvos.forEach((a, i) => {
+          const fr = somaAut > 0 ? a.autorizado / somaAut : 1 / alvos.length
+          const e = i === alvos.length - 1 ? c2(l.valorEmpenhado - accE) : c2(l.valorEmpenhado * fr)
+          const q = i === alvos.length - 1 ? c2(l.valorLiquidado - accL) : c2(l.valorLiquidado * fr)
+          const g = i === alvos.length - 1 ? c2(l.valorPago - accP) : c2(l.valorPago * fr)
+          accE = c2(accE + e)
+          accL = c2(accL + q)
+          accP = c2(accP + g)
+          if (!e && !q && !g) return
+          const d = deltas.get(a.id) ?? { dotacaoId: a.id, empenhado: 0, liquidado: 0, pago: 0 }
+          d.empenhado = c2(d.empenhado + e)
+          d.liquidado = c2(d.liquidado + q)
+          d.pago = c2(d.pago + g)
+          deltas.set(a.id, d)
+        })
+      }
+
+      // validação ANTES de gravar: dashboard (empenhado do mês)
+      const dash = await this.getJson<DashboardMes[]>(`/api/dashboard/arrecadacao-despesa?exercicio=${ano}`, { entidade: ENTIDADE_PORTAL, exercicio: String(ano) })
+      const doMes = dash.find((m) => m.mes === mes)?.valorEmpenhado ?? 0
+      const divergencia = doMes > 0 ? Math.abs(totalEmp - doMes) / doMes : totalEmp > 0 ? 1 : 0
+      if (divergencia > TOLERANCIA) {
+        return registrar({
+          status: 'DIVERGENTE',
+          mensagem: `Empenhado capturado R$ ${totalEmp.toFixed(2)} × dashboard R$ ${doMes.toFixed(2)} (${(divergencia * 100).toFixed(2)}%) — nada gravado.`,
+          valorPortal: doMes,
+          valorGravado: 0,
+        })
+      }
+
+      // infra de captura: fornecedor sintético + usuário do sistema
+      let fornecedor = await this.prisma.fornecedor.findFirst({ where: { razaoSocial: 'CAPTURA PORTAL DA TRANSPARÊNCIA' }, select: { id: true } })
+      if (!fornecedor) {
+        fornecedor = await this.prisma.fornecedor.create({
+          data: { tipoPessoa: 'PJ', razaoSocial: 'CAPTURA PORTAL DA TRANSPARÊNCIA', nomeFantasia: 'Execução capturada do portal (não é credor real)' },
+          select: { id: true },
+        })
+      }
+      const usuario = await this.prisma.usuario.findFirst({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
+      if (!usuario) return registrar({ status: 'ERRO', mensagem: 'Sem usuário para criadoPorId.', valorPortal: doMes, valorGravado: 0 })
+
+      const historico = `CAPTURA PORTAL despesa ${String(mes).padStart(2, '0')}/${ano}`
+      const dataMov = new Date(Date.UTC(ano, mes, 0))
+      await this.prisma.$transaction(async (tx) => {
+        // empenho de captura por dotação (numero estável CAP-{id8})
+        const ids = [...deltas.keys()]
+        const existentes = await tx.empenho.findMany({
+          where: { entidadeId, dotacaoDespesaId: { in: ids }, numero: { startsWith: 'CAP-' } },
+          select: { id: true, dotacaoDespesaId: true },
+        })
+        const empPorDot = new Map(existentes.map((e) => [e.dotacaoDespesaId, e.id]))
+        for (const id of ids) {
+          if (empPorDot.has(id)) continue
+          const novo = await tx.empenho.create({
+            data: {
+              entidadeId,
+              dotacaoDespesaId: id,
+              fornecedorId: fornecedor!.id,
+              numero: `CAP-${id.slice(0, 8)}`,
+              tipo: 'ESTIMATIVO',
+              data: dataMov,
+              valor: 0,
+              historico: 'Empenho de CAPTURA da execução do portal (não é escrituração).',
+            },
+            select: { id: true },
+          })
+          empPorDot.set(id, novo.id)
+        }
+        // movimentos do mês (idempotente por histórico)
+        await tx.movimentoEmpenho.deleteMany({ where: { entidadeId, historico } })
+        const movRows: { entidadeId: string; empenhoId: string; tipo: 'EMPENHO' | 'ESTORNO_EMPENHO' | 'LIQUIDACAO' | 'ESTORNO_LIQUIDACAO' | 'PAGAMENTO' | 'ESTORNO_PAGAMENTO'; valor: number; data: Date; criadoPorId: string; historico: string }[] = []
+        for (const d of deltas.values()) {
+          const eId = empPorDot.get(d.dotacaoId)!
+          const push = (v: number, pos: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO', neg: 'ESTORNO_EMPENHO' | 'ESTORNO_LIQUIDACAO' | 'ESTORNO_PAGAMENTO') => {
+            if (!v) return
+            movRows.push({ entidadeId, empenhoId: eId, tipo: v > 0 ? pos : neg, valor: Math.abs(v), data: dataMov, criadoPorId: usuario!.id, historico })
+          }
+          push(d.empenhado, 'EMPENHO', 'ESTORNO_EMPENHO')
+          push(d.liquidado, 'LIQUIDACAO', 'ESTORNO_LIQUIDACAO')
+          push(d.pago, 'PAGAMENTO', 'ESTORNO_PAGAMENTO')
+        }
+        await tx.movimentoEmpenho.createMany({ data: movRows })
+        // rematerializa: empenho.valor/valorLiquidado e dotacao.valorEmpenhado
+        for (const [dotId, empId] of empPorDot) {
+          const ag = await tx.movimentoEmpenho.groupBy({ by: ['tipo'], where: { empenhoId: empId }, _sum: { valor: true } })
+          const soma = (t: string) => Number(ag.find((g) => g.tipo === t)?._sum.valor ?? 0)
+          const emp = c2(soma('EMPENHO') - soma('ESTORNO_EMPENHO'))
+          const liq = c2(soma('LIQUIDACAO') - soma('ESTORNO_LIQUIDACAO'))
+          await tx.empenho.update({ where: { id: empId }, data: { valor: emp, valorLiquidado: liq } })
+          await tx.dotacaoDespesa.update({ where: { id: dotId }, data: { valorEmpenhado: emp } })
+        }
+      }, { timeout: 120000 })
+
+      return registrar({
+        status: 'OK',
+        mensagem: `${deltas.size} dotações; empenhado R$ ${totalEmp.toFixed(2)}, pago R$ ${totalPago.toFixed(2)}; sem dotação R$ ${semDotacao.toFixed(2)}.`,
+        valorPortal: doMes,
+        valorGravado: totalEmp,
+      })
+    } catch (e) {
+      return registrar({ status: 'ERRO', mensagem: e instanceof Error ? e.message : String(e), valorPortal: 0, valorGravado: 0 })
+    }
+  }
 }
 
 /**
@@ -196,13 +380,18 @@ export function agendarSincronizacaoPortal(prisma: PrismaClient, log: (msg: stri
       const agora = new Date()
       const ano = agora.getFullYear()
       const mes = agora.getMonth() + 1
+      // ordem do Marco: RECEITA sempre antes da DESPESA no ciclo
       const r1 = await svc.arrecadacaoMes(ent.id, ano, mes)
       log(`[sync-portal] arrecadação ${mes}/${ano}: ${r1.status} — ${r1.mensagem}`)
+      const d1 = await svc.despesaMes(ent.id, ano, mes)
+      log(`[sync-portal] despesa ${mes}/${ano}: ${d1.status} — ${d1.mensagem}`)
       if (agora.getDate() <= 3) {
         const mAnt = mes === 1 ? 12 : mes - 1
         const aAnt = mes === 1 ? ano - 1 : ano
         const r2 = await svc.arrecadacaoMes(ent.id, aAnt, mAnt)
         log(`[sync-portal] arrecadação ${mAnt}/${aAnt} (fechamento): ${r2.status} — ${r2.mensagem}`)
+        const d2 = await svc.despesaMes(ent.id, aAnt, mAnt)
+        log(`[sync-portal] despesa ${mAnt}/${aAnt} (fechamento): ${d2.status} — ${d2.mensagem}`)
       }
     } catch (e) {
       log(`[sync-portal] falha: ${e instanceof Error ? e.message : e}`)
