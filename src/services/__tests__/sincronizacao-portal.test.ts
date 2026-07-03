@@ -92,6 +92,73 @@ describe('SincronizacaoPortalService.arrecadacaoMes', () => {
   })
 })
 
+describe('SincronizacaoPortalService.despesaMes', () => {
+  let prisma: PrismaMock
+  let svc: SincronizacaoPortalService
+
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    svc = new SincronizacaoPortalService(prisma as never)
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      // mesma programática em DUAS fontes (70/30) → rateio proporcional
+      { id: 'd1', valorAutorizado: '700', unidadeOrcamentaria: { codigo: '02.010' }, funcao: { codigo: '04' }, subfuncao: { codigo: '122' }, programa: { codigo: '0002' }, acao: { codigo: '2001' }, contaDespesa: { codigo: '3.1.90.11.00.00' } },
+      { id: 'd2', valorAutorizado: '300', unidadeOrcamentaria: { codigo: '02.010' }, funcao: { codigo: '04' }, subfuncao: { codigo: '122' }, programa: { codigo: '0002' }, acao: { codigo: '2001' }, contaDespesa: { codigo: '3.1.90.11.00.00' } },
+    ])
+    prisma.fornecedor.findFirst.mockResolvedValue({ id: 'forn1' })
+    prisma.usuario.findFirst.mockResolvedValue({ id: 'u1' })
+    prisma.empenho.findMany.mockResolvedValue([])
+    prisma.empenho.create.mockResolvedValueOnce({ id: 'e1' }).mockResolvedValueOnce({ id: 'e2' })
+    prisma.movimentoEmpenho.groupBy.mockResolvedValue([{ tipo: 'EMPENHO', _sum: { valor: '70' } }])
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  const stubDespesa = (empDash: number) =>
+    stubFetch({
+      despesapornivel: [
+        { programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: 100, valorLiquidado: 50, valorPago: 20 },
+        { programatica: '02.010.04.122.0002', nivel: 5, valorEmpenhado: 100, valorLiquidado: 50, valorPago: 20 }, // nível ≠ 11 — fora
+      ],
+      'dashboard/arrecadacao-despesa': [{ mes: 6, valorArrecadado: 0, valorEmpenhado: empDash, valorPago: 20 }],
+    })
+
+  it('rateia por fonte proporcional ao autorizado, valida e grava (OK)', async () => {
+    stubDespesa(100)
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    expect(r.valorGravado).toBe(100)
+    // 2 empenhos de captura criados + movimentos com rateio 70/30
+    expect(prisma.empenho.create).toHaveBeenCalledTimes(2)
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const empenhos = rows.filter((m: { tipo: string }) => m.tipo === 'EMPENHO').map((m: { valor: number }) => m.valor)
+    expect(empenhos.sort((a: number, b: number) => a - b)).toEqual([30, 70])
+    // materializa dotacao.valorEmpenhado e empenho.valor
+    expect(prisma.dotacaoDespesa.update).toHaveBeenCalled()
+    expect(prisma.sincronizacaoPortal.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ tipo: 'DESPESA_EXECUCAO', status: 'OK' }) }),
+    )
+  })
+
+  it('divergência do dashboard → DIVERGENTE e nada gravado', async () => {
+    stubDespesa(200) // capturado 100 × dashboard 200
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('DIVERGENTE')
+    expect(prisma.movimentoEmpenho.createMany).not.toHaveBeenCalled()
+    expect(prisma.empenho.create).not.toHaveBeenCalled()
+  })
+
+  it('delta negativo no mês vira ESTORNO', async () => {
+    stubFetch({
+      despesapornivel: [{ programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: -40, valorLiquidado: 0, valorPago: 0 }],
+      'dashboard/arrecadacao-despesa': [{ mes: 6, valorArrecadado: 0, valorEmpenhado: -40, valorPago: 0 }],
+    })
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    expect(rows.some((m: { tipo: string; valor: number }) => m.tipo === 'ESTORNO_EMPENHO' && m.valor === 28)).toBe(true) // 70% de 40
+  })
+})
+
 describe('agendarSincronizacaoPortal', () => {
   it('desligado sem a env (retorna null, nada agendado)', () => {
     delete process.env['SINCRONIZAR_PORTAL_MARINGA']
