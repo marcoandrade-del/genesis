@@ -22,11 +22,18 @@ São APURADOS de execução — **não confundir com as metas da LDO**.
 | Dívida Consolidada | R$ 544,32mi | saldo atual | — |
 | Disponibilidade de caixa líquida | R$ 1.083,94mi | saldo atual | alvo do import de saldos bancários reais |
 | DCL | **−R$ 539,62mi** (−18,62% RCL ajustada) | saldo atual | cadastrada como meta + indicador do Guardião (#191) |
+| DCL saldo INICIAL 2026 | **−R$ 137.507.930,95** | 1º/jan (herdado de 2025) | deep search; base do nominal ao vivo |
+| Resultado nominal apurado EXATO | +R$ 402.115.811,24 | 1º quad | = ΔDCL: −137,51 − 402,12 = −539,62 ✓ FECHA AO CENTAVO |
 
-**Metas da LDO 2026 (cadastro MetaFiscal): 4/5.** Receita 3.170.223.793 ·
-Despesa 2.842.650.399 (LOA, Δ=0) · Primário −56,02mi (slides, rótulo "META
-FISCAL") · DCL −539,62mi. **Falta a META do Resultado Nominal** — os 343,15 /
-402,12 são APURADOS, não cadastrar como meta.
+**Metas da LDO 2026 (cadastro MetaFiscal): 5/5 COMPLETAS.** Receita
+3.170.223.793 · Despesa 2.842.650.399 (LOA, Δ=0) · Primário −56,02mi (slides,
+rótulo "META FISCAL") · Nominal −206.708.509,11 (AMF via Gemini, corroborado
+2×, coerente com a DCL) · DCL −539,62mi. Os 343,15/402,12 são APURADOS do 1º
+quad — nunca cadastrar como meta. ⚠️ Deep search contradisse o slide na meta
+do primário (disse 0,00 genérico; slide oficial diz −56,02 — MANTIDO −56,02)
+e deu meta DCL 0,00 (genérico; mantida a posição −539,62 como referência).
+Convenção de sinal do nominal: apurado POSITIVO = dívida caiu; cravar
+convenção ao computar ao vivo. Ver [[feedback-gemini-deep-search]].
 
 **Corroboração (2º resumo Gemini, 2026-07-02):** LOA 3,58bi ✓ · meta nominal
 −206,7mi ✓ (mesmo valor em duas respostas) · DCL −539,62 ✓ · empenhado 1,74bi ✓.

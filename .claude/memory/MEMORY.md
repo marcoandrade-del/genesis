@@ -6,6 +6,7 @@
 - [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada ao vivo (Wise) + governança + vira-modelo + import-IA multi-formato; resolver 3 níveis Estado>Modelo>default; PRs #178→#184; ENCERRADO (só LRF-despesa gated na Elotech)
 - [LRF-despesa: ÉPICO COMPLETO](lrf-despesa-epico-plano.md) — 7/7 em 2026-07-02 (#185 QDD, #186/#187 índices MDE 36,09%/ASPS 16,06%, #188 Anexo 5, #189 RREO função, #190 Metas Fiscais); contrato 1.7.0; follow-ups: bancada p/ índices, metas reais da LDO, medidor Oxy
 - [Alterações orçamentárias (decretos)](alteracoes-orcamentarias-dinamica.md) — autorizado é VIVO (créditos aplicam no valorAutorizado); meta fiscal fica FIXA na LOA inicial e o Δ mostra o desvio; importar decretos reais de Maringá = pendente
+- [Gemini: confirmar 2× com deep search](feedback-gemini-deep-search.md) — 1ª resposta mistura apurado/meta; deep search trouxe DCL inicial −137,51mi que fecha a conta ao centavo; MCP gemini-cli sem auth (configurar)
 - [Apurados TCE 2026](apurados-tce-2026.md) — gabaritos oficiais: receita até jun 1.732,2mi (banco: 1.461,2 jan–mai), despesa empenhada 1.746,4mi (alvo do import), primário +320,89, DCL −539,62; nominal 402,12 é APURADO não meta
 - [Portal Maringá: API de arquivos](portal-maringa-api-arquivos.md) — baixar publicações via /api/files/arquivo/{idArquivo}; LDO 2026: renúncia XLS baixada, Metas Anuais NÃO publicadas (slides 1118420 = melhor pista, baixar no navegador)
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
