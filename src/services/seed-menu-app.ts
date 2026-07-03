@@ -34,6 +34,12 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/relatorios/programa-governo', nome: 'Programa de trabalho de governo', icone: 'bi-diagram-2', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 7 — consolidado por função' },
       { rota: '/app/orcamento/relatorios/despesa-funcoes-programas', nome: 'Despesa por funções e programas', icone: 'bi-bar-chart-steps', tipo: 'FUNCIONALIDADE', descricao: 'Função → programa → subfunção' },
       { rota: '/app/orcamento/relatorios/sumario', nome: 'Sumário geral', icone: 'bi-list-columns', tipo: 'FUNCIONALIDADE', descricao: 'Receita por fontes × despesa por funções' },
+    ],
+  },
+  {
+    rota: '/app/orcamento/relatorios/lrf', nome: 'LRF', icone: 'bi-shield-check', tipo: 'SUBMENU',
+    descricao: 'Lei de Responsabilidade Fiscal — limites, execução e metas',
+    filhos: [
       { rota: '/app/orcamento/relatorios/rcl', nome: 'Receita Corrente Líquida', icone: 'bi-percent', tipo: 'FUNCIONALIDADE', descricao: 'RREO Anexo 3 — base dos limites da LRF' },
       { rota: '/app/orcamento/relatorios/rcl-consolidada', nome: 'RCL Consolidada', icone: 'bi-bank2', tipo: 'FUNCIONALIDADE', descricao: 'Soma das entidades do município' },
       { rota: '/app/orcamento/relatorios/despesa-pessoal', nome: 'Despesa com Pessoal', icone: 'bi-people', tipo: 'FUNCIONALIDADE', descricao: 'RGF Anexo 1 — DTP e % da RCL (limite 54%)' },
@@ -107,9 +113,13 @@ export async function semearMenusApp(
   const garantirItem = async (seed: ItemSeed, ordem: number, parentId: string | null): Promise<string> => {
     const existente = await prisma.itemFuncionalidade.findFirst({
       where: { menuId: menu.id, rota: seed.rota },
-      select: { id: true },
+      select: { id: true, parentId: true, ordem: true },
     })
     if (existente) {
+      // reorganizações do menu (ex.: LOA × LRF) movem itens já semeados
+      if (existente.parentId !== parentId || existente.ordem !== ordem) {
+        await prisma.itemFuncionalidade.update({ where: { id: existente.id }, data: { parentId, ordem } })
+      }
       if (!seed.semGrant) idsItens.push(existente.id)
       return existente.id
     }

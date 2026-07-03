@@ -152,6 +152,13 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply.view('app/relatorios-loa', { entidade: e, ano, nivel: req.contexto.nivel, layout: null })
   })
 
+  // ── Índice dos relatórios da LRF (landing do menu próprio) ──────────────────
+  app.get('/orcamento/relatorios/lrf', async (req, reply) => {
+    const { entidadeId, ano } = req.contexto
+    const { e } = await entidadeCtx(entidadeId, ano)
+    return reply.view('app/relatorios-lrf', { entidade: e, ano, nivel: req.contexto.nivel, layout: null })
+  })
+
   // ── Receita Orçada ──────────────────────────────────────────────────────────
   async function receita(req: FastifyRequest) {
     const { entidadeId, ano } = req.contexto
