@@ -59,8 +59,12 @@ indiretas). Não precisou de export interno da Elotech pra fixada.
   **−539,62mi** (dados oficiais dos slides/RGF An.2 que o Marco trouxe:
   DC 544,32 − disponibilidade 1.083,94 = DCL negativa, caixa > dívida;
   apurado "acima da linha" jan–mai: primário 320,89, nominal 343,15, juros
-  22,26 — APURADO ≠ meta). **Falta 1: meta do RESULTADO_NOMINAL** (não veio
-  com rótulo "META FISCAL" nos slides; não derivar de juros do período).
+  22,26 — APURADO ≠ meta). **5/5 COMPLETAS**: RESULTADO_NOMINAL
+  **−206.708.509,11** cadastrado em 2026-07-02 (AMF Dem.1 via Gemini — NÃO
+  verificado em doc oficial, mas aritmeticamente coerente: DCL partida −332,9
+  − 206,7 ≈ −539,6 = DCL alvo; conferir no AMF quando disponível). Gemini
+  também deu nominal 2027 −25,6mi / 2028 +95,5mi (arredondados, não
+  cadastrados — cadastrar se vier o AMF trienal oficial).
 - **Guardião ganhou o indicador Dívida Consolidada Líquida (#191, contrato
   1.8.0)**: lê a DCL do cadastro de metas ÷ RCL viva, limite 120% (Res. Senado
   40/2001); Maringá −20,7% [ok]. Vira cálculo vivo quando estoque da dívida +
