@@ -49,6 +49,12 @@ no dia 2 (é tempo quase real). Fonte p/ execução mensal do Gênesis/OXY e
 gabarito vivo dos imports. Meses 2026: arr 298,2/436,4/310,0/224,7/236,8/225,5;
 emp 311,8/345,5/276,7/272,1/307,8/232,3; pago Σ 969,8mi jan–jun.
 
+⚠️ **Regra do Marco (2026-07-02): o TCE NÃO é tempo real** — recebe os dados
+só após a validação contábil das entidades (20–90 dias de atraso em média).
+O PORTAL da transparência é o tempo real. Papéis: portal = fonte viva do dia
+a dia; TCE = auditoria/homologação a posteriori (números de períodos já
+validados). Imports recentes: conferir contra o portal; fechamentos: TCE.
+
 Fontes TCE-PR indicadas pelo deep search (explorar próxima sessão):
 - Gerador de relatórios LRF homologados (RREO/RGF):
   servicos.tce.pr.gov.br/consultas/RelatoriosLRFSolicitarNovo.aspx
