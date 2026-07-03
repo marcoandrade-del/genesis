@@ -21,6 +21,28 @@ Base: `https://transparencia.maringa.pr.gov.br/portaltransparencia-api`
   `/api/receitas`, `/api/receitas/fonte-recursos`, `/api/despesas...`
   (ver `scripts/importar_orcamento_maringa_2026.ts`).
 
+## 🎯 ENDPOINT DOS DECRETOS (achado 2026-07-02, sondado e FUNCIONANDO)
+`GET /api/creditosadicionais?entidade=1&exercicio=2026` → 200, JSON paginado
+Spring (`content[]`; usar `?page=N&size=M`). Cada item = UM item de decreto:
+`{despesa: "26.010.06.181.0021.2.125.4.4.90.52.00.00" (programática+natureza),
+valorInicial, valor, saldoAtualizado, decreto: "731/2026", natureza:
+"Suplementar", fonteRecurso: 2000, sequencia}` — decreto a decreto, com FONTE.
+**É a fonte do import de créditos adicionais** (melhor que o líquido do
+balancete); casar com DotacaoDespesa pela programática+natureza+fonte e lançar
+via CreditosAdicionaisService (nunca editar valorAutorizado na mão — ver
+[[alteracoes-orcamentarias-dinamica]]). Há também `/creditosadicionais/report`.
+
+Outros endpoints úteis do bundle (mapa parcial): `arrecadacoes`,
+`contab/renuncia-receitas`, `dividas-ativas(/total)`, `liquidacoes/*`
+(agenda/aptos/ordem-cronológica de pagamentos), `movimentacao/`,
+`receitaxdespesa/empenhado-anual`, `repasses`, `audiencias-publicas(/anexo/
+download/)`, `dashboard/arrecadacao-despesa`. Bundle:
+`/portaltransparencia/static/js/main.*.chunk.js` (grep `"/api/`).
+
+Links oficiais correlatos (Marco, 2026-07-02): TCE-PR SIM-AM
+tce.pr.gov.br/sim-sistema-de-informacoes-municipais (+ layouts em
+tce.pr.gov.br/layout-sim-am), STN gov.br/tesouronacional, Câmara cmm.pr.gov.br.
+
 ## LDO 2026 (Lei 11.998, de 21/07/2025) — o que o portal TEM (2026-07-02)
 - `idArquivo 1167829` — **Anexo Metas Fiscais, Demonstrativo 7 (Renúncia de
   Receita)**, XLS oficial da Fazenda (01/07/2025) → salvo em
