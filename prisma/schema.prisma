@@ -856,6 +856,7 @@ model Entidade {
   solicitacoesAcesso       SolicitacaoAcessoEntidade[]
   configuracaoDashboard    ConfiguracaoDashboard?
   metasFiscais             MetaFiscal[]
+  sincronizacoesPortal     SincronizacaoPortal[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -2135,4 +2136,37 @@ model MetaFiscal {
 
   @@unique([entidadeId, ano, tipo])
   @@map("metas_fiscais")
+}
+
+/// Tipo de dado sincronizado do Portal da Transparência (Elotech/OXY).
+enum TipoSincronizacaoPortal {
+  ARRECADACAO
+  DESPESA_EXECUCAO
+  DECRETOS
+}
+
+enum StatusSincronizacaoPortal {
+  OK
+  DIVERGENTE
+  ERRO
+}
+
+/// Log das sincronizações automáticas com o portal (execução CAPTURADA p/
+/// painéis — nunca escrituração contábil). Divergência da validação contra o
+/// dashboard do portal ⇒ NÃO grava os dados, só o log.
+model SincronizacaoPortal {
+  id           String                    @id @default(uuid())
+  entidadeId   String
+  tipo         TipoSincronizacaoPortal
+  ano          Int
+  mes          Int
+  status       StatusSincronizacaoPortal
+  mensagem     String?
+  valorPortal  Decimal?                  @db.Decimal(18, 2) // total no portal (validação)
+  valorGravado Decimal?                  @db.Decimal(18, 2) // total efetivamente gravado
+  criadoEm     DateTime                  @default(now())
+  entidade     Entidade                  @relation(fields: [entidadeId], references: [id])
+
+  @@index([entidadeId, tipo, ano, mes])
+  @@map("sincronizacoes_portal")
 }

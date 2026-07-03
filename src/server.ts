@@ -1,4 +1,5 @@
 import { app } from './app.js'
+import { agendarSincronizacaoPortal } from './services/sincronizacao-portal.js'
 
 const PORT = Number(process.env.PORT ?? 3000)
 
@@ -12,4 +13,6 @@ app.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     app.log.error(err)
     process.exit(1)
   }
+  // Sincronização automática com o Portal da Transparência (env-gated).
+  agendarSincronizacaoPortal(app.prisma, (m) => app.log.info(m))
 })
