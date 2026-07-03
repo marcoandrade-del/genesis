@@ -53,8 +53,12 @@ indiretas). Não precisou de export interno da Elotech pra fixada.
 ## Follow-ups (fora do épico, anotados)
 - Composição dos índices MDE/ASPS editável na bancada (4ª composição: coluna
   `indicesComposicao` + migração + UI + governança).
-- Cadastrar as metas fiscais REAIS da LDO de Maringá (admin) quando o Marco
-  trouxer o Anexo de Metas Fiscais.
+- Metas fiscais 2026 da Prefeitura: **RECEITA_TOTAL (3.170.223.793) e
+  DESPESA_TOTAL (2.842.650.399) CADASTRADAS em 2026-07-02** com os totais da
+  LOA (decisão do Marco; LRF art. 5º — LOA compatível com a LDO; Δ=0 esperado).
+  **Faltam 3**: Resultado Primário, Resultado Nominal e Dívida Consolidada
+  Líquida — não publicados no portal; melhor pista = slides da audiência
+  (ver [[portal-maringa-api-arquivos]], idArquivo 1118420).
 - Conferir o medidor do painel Oxy com `prudencial/alerta null` + nivel
   `abaixo_minimo` (contrato 1.7.0 é aditivo, MAJOR não mudou).
 
