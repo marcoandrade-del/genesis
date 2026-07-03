@@ -20,6 +20,8 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
+> 🟡 **FECHAMENTO DA SEMANA (2026-07-03, sexta à noite) — PENDÊNCIA DE SEGUNDA (lembrete na nuvem agendado, rotina trig_01U186fdR3XDPMzvBbF37Zyr, 06/07 09:00 BRT):** (1) Marco validar ao vivo a exportação com cabeçalho/rodapé (#198 mergeado, não testado por ele); (2) retomar a rodada de testes do produto. Sexta fechou com: #198 exportação com faixas nos formatos-documento (CSV/XML/JSON dados-puros de propósito); **#199 menus separados — 'Anexos da LOA' (6, Lei 4.320) × 'LRF' (8, submenu próprio + hub /orcamento/relatorios/lrf)**; seed agora MOVE itens em reorganizações (parentId/ordem). Servidor dev derrubado a pedido. Total da semana: **17 PRs (#185–#199)**, suíte 3.441→3.486.
+
 > 🟢 **Sessão SYNC (2026-07-03, noite): +#197 — navbar do /app com Priority+ ('Mais ▾' recebe o que não cabe; a causa era overflow-x:auto com scrollbar ESCONDIDA na .gx-nav). Marco testando o app ao vivo e reportando achados.**
 
 > 🟢 **Sessão SYNC (2026-07-03, noite): +#196 — menu da barra superior ganhou os 8 relatórios LRF (seed) e `scripts/conceder_acesso_total.ts <email>` dá ADMIN em todas entidades + EXCLUIR em todos os itens (aplicado a marco@teste.com, verificado ao vivo). Menu do /app agora espelha o produto.**
