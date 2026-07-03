@@ -7,6 +7,22 @@ metadata:
 
 # Alterações orçamentárias durante o exercício (decretos)
 
+**DECISÃO (2026-07-03): sincronização automática NÍVEL 2 aprovada pelo Marco**
+— job DENTRO do Gênesis (scheduler + log persistido + validação contra o
+dashboard ANTES de gravar; divergência = loga e não grava). v1 = arrecadação
+mensal automática. **A DESPESA vai seguir o MESMO esquema** (sync de execução
+da despesa no mesmo molde, sempre DEPOIS da receita do ciclo). Decretos-sync
+automático = fase 2 (script manual idempotente enquanto isso). Tela
+"Conectores" por entidade (botão sincronizar, toggle, alertas) = épico nível 3.
+Sync grava EXECUÇÃO CAPTURADA (painéis/indicadores) — NUNCA escrituração
+contábil automática.
+
+**Regra de ordem do Marco (2026-07-03): RECEITA sempre antes da DESPESA** —
+"precisa ter dinheiro antes de gastar". Vale pra sequência dos imports de
+execução (arrecadação do mês entra antes da execução da despesa do mês) e
+reflete a lógica fiscal (suplementação por excesso de arrecadação pressupõe
+a receita reconhecida).
+
 Regra do Marco (2026-07-02): suplementações e reduções de dotação mudam os
 números ao longo do ano — receita/despesa "da LOA" não são estáticas.
 

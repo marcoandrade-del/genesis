@@ -20,6 +20,9 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
+> 🟢 **Sessão SYNC (2026-07-03, tarde): O GÊNESIS SE SINCRONIZA SOZINHO — receita E despesa (#193 import jun, #194 sync nível 2, #195 despesa em CI).**
+> Job diário 04h (env SINCRONIZAR_PORTAL_MARINGA=1): receita→despesa (ordem do Marco), mês corrente + fechamento do anterior; valida vs dashboard ANTES de gravar (guard permanente); log SincronizacaoPortal. Receita jan–jun no banco (1.672,0mi, 96,5% TCE; RCL executada 1.484,9mi). Despesa jan–jun capturada (empenhos sintéticos CAP-* + MovimentoEmpenho; Σ 1.746,2mi = dashboard EXATO, sem-dotação 0,00 — decretos cobriram tudo). **RGF Anexo 5 VIVO** (RP proc 70,4mi + nproc 547,2mi por fonte); valores-mensais OXY reais. ⚠️ prisma-mock (zona 🔴): +fornecedor.findFirst, +arrecadacao.createMany/deleteMany, +movimentoBancario.groupBy, +sincronizacaoPortal. Falta da fila: saldos bancários reais → nominal/DCL vivos. Ver [[portal-maringa-api-arquivos]], [[alteracoes-orcamentarias-dinamica]].
+
 > 🟢 **Sessão QDD/LRF (2026-07-03): IMPORT DOS DECRETOS CONCLUÍDO (#192 mergeado) — 219 decretos, banco espelha o portal dotação a dotação (0 divergências, Σ 3.325.289.298,63).** API decifrada (par {delta, atual−delta} em ordem AMBÍGUA; solver por equação por dotação — ver [[decretos-import-aprendizados]], vale p/ toda API Elotech). **O Δ das metas ACENDEU: Despesa +482,6mi**; Guardião reagiu sozinho (Pessoal 44,2→46,0%, MDE 35,89%). Metas 5/5; Guardião 7 indicadores. Próximos da fila: execução da despesa (gabarito 1.746,4mi empenhado até jun; endpoint dashboard mensal validado Δ0,01%), arrecadação jun (1.732,2mi), saldos bancários (1.083,94mi) → nominal/DCL vivos — [[portal-maringa-api-arquivos]], [[apurados-tce-2026]].
 
 > 🟢 **Sessão QDD/LRF (2026-07-02): ÉPICO LRF-DESPESA 100% COMPLETO — 7/7 tarefas mergeadas no dia (#185 QDD, #186/#187 índices MDE/ASPS, #188 RGF Anexo 5, #189 RREO por função, #190 Metas Fiscais).**

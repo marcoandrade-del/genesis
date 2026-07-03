@@ -63,6 +63,18 @@ Fontes TCE-PR indicadas pelo deep search (explorar próxima sessão):
 - Página de planejamento do portal (anexos LOA/LDO/PPA 2026-2029, Lei 12.099
   = PPA): maringa.oxy.elotech.com.br/portaltransparencia (seção orçamento).
 
+## Execução por período (endpoints do sync, validados 2026-07-03)
+- **Receita natureza×fonte×período**: `/api/receitas/fonte-recursos/detalhes
+  ?entidade=1&exercicio=A&fonteRecurso=X&dataInicial=&dataFinal=` (query params).
+- **Despesa por programática×período**: `/despesapornivel/detalhada?dataInicial=
+  &dataFinal=` com **HEADERS entidade+exercicio** (query de fonte é IGNORADA →
+  rateio por fonte no sync). Nível 11 = programática+elemento
+  ("02.010.04.122.0002.2001.3.1.90.07" — ação 4 dígitos colada). Campos:
+  valorEmpenhado/valorLiquidado/valorPago/valorEmLiquidacao do PERÍODO.
+  Σ nível-11 = dashboard ao centavo (validado 6/6 meses).
+- ⚠️ Padrão da API: alguns endpoints querem entidade/exercicio como QUERY,
+  outros como HEADER (dashboard e despesapornivel = header; 500 se faltar).
+
 ## Entidades do portal (`GET /api/entidades/lista` — mapa oficial c/ CNPJ)
 1=Prefeitura (nosso banco) · 3=Maringá Previdência · 4=IAM · 6=Câmara ·
 9=AMR · 10=SBMG · 15=IPPLAM. Todo endpoint aceita `?entidade={id}` — p/
