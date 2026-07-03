@@ -55,9 +55,11 @@
     text-transform:uppercase; color: rgba(232,235,230,.45); line-height:1; margin-top:2px; }
 
   /* ── Navegação em pílulas ─────────────────────────────────────────────── */
+  /* Priority+: nada de scroll escondido — o que não cabe colapsa no "Mais". */
   .gx-nav { display: flex; align-items: center; gap: .25rem; min-width: 0;
-    overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; }
-  .gx-nav::-webkit-scrollbar { display: none; }
+    overflow: visible; flex: 1 1 auto; flex-wrap: nowrap; }
+  .gx-nav .gx-oculto { display: none !important; }
+  .gx-mega-sec + .gx-mega-sec { margin-top: .6rem; border-top: 1px solid var(--bs-border-color, rgba(14,15,12,.08)); padding-top: .6rem; }
   .gx-pill {
     display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap;
     padding: .5rem .85rem; border-radius: 9999px; border: 0; background: transparent;
@@ -235,10 +237,10 @@
 
   <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
     <div class="gx-nav">
-      <% menuApp.forEach(function (area) { %>
+      <% menuApp.forEach(function (area, areaIdx) { %>
         <% if (area.filhos && area.filhos.length) { %>
           <% const wide = (area.filhos.length + (area.rota ? 1 : 0)) > 5 %>
-          <div class="dropdown">
+          <div class="dropdown" data-gx-area="<%= areaIdx %>">
             <button class="gx-pill" data-gx-route="<%= area.rota || '' %>" type="button"
                     data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
               <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
@@ -287,7 +289,7 @@
             </div>
           </div>
         <% } else { %>
-          <div class="gx-pill-wrap">
+          <div class="gx-pill-wrap" data-gx-area="<%= areaIdx %>">
             <a class="gx-pill" data-gx-route="<%= area.rota || '' %>" href="<%= area.rota || '#' %>">
               <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
             </a>
@@ -302,6 +304,41 @@
           </div>
         <% } %>
       <% }) %>
+
+      <%# Priority+: recebe as áreas que não couberem na barra (JS decide). %>
+      <div class="dropdown gx-oculto" id="gx-mais">
+        <button class="gx-pill" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+          <i class="bi bi-three-dots"></i>Mais
+          <i class="bi bi-chevron-down gx-caret"></i>
+        </button>
+        <div class="dropdown-menu gx-mega">
+          <% menuApp.forEach(function (area, areaIdx) { %>
+            <div class="gx-mega-sec gx-oculto" data-gx-more="<%= areaIdx %>">
+              <div class="gx-mega-head"><%= area.nome %></div>
+              <div class="gx-mega-grid">
+                <% if (area.rota) { %>
+                  <a class="gx-tile gx-overview" href="<%= area.rota %>">
+                    <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
+                    <span class="gx-tile-body">
+                      <span class="gx-tile-title"><%= area.nome %></span>
+                      <% if (area.descricao) { %><span class="gx-tile-desc"><%= area.descricao %></span><% } %>
+                    </span>
+                  </a>
+                <% } %>
+                <% (area.filhos || []).forEach(function (f) { %>
+                  <a class="gx-tile" href="<%= f.rota || '#' %>">
+                    <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
+                    <span class="gx-tile-body">
+                      <span class="gx-tile-title"><%= f.nome %></span>
+                      <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
+                    </span>
+                  </a>
+                <% }) %>
+              </div>
+            </div>
+          <% }) %>
+        </div>
+      </div>
     </div>
   <% } else { %>
     <div class="flex-grow-1"></div>
@@ -413,6 +450,47 @@
   })();
 </script>
 <% } %>
+
+<%# ── Priority+: colapsa no "Mais" os itens que não couberem na barra ─────── %>
+<script>
+  (function () {
+    var nav = document.querySelector('.gx-nav');
+    var mais = document.getElementById('gx-mais');
+    if (!nav || !mais) return;
+    var itens = Array.prototype.slice.call(nav.querySelectorAll('[data-gx-area]'));
+    var secoes = {};
+    mais.querySelectorAll('[data-gx-more]').forEach(function (el) { secoes[el.getAttribute('data-gx-more')] = el; });
+
+    function recalc() {
+      // 1) mostra tudo p/ medir de verdade
+      itens.forEach(function (el) { el.classList.remove('gx-oculto'); });
+      mais.classList.remove('gx-oculto');
+      var maisW = mais.offsetWidth + 6;
+      var limite = nav.clientWidth;
+      // 2) acumula larguras; primeiro que estourar (reservando o Mais) → esconde dali em diante
+      var usado = 0, corte = itens.length;
+      for (var i = 0; i < itens.length; i++) {
+        usado += itens[i].offsetWidth + 4; // gap
+        var reserva = i < itens.length - 1 ? maisW : 0; // último cabendo dispensa o Mais
+        if (usado + reserva > limite) { corte = i; break; }
+      }
+      var algumOculto = corte < itens.length;
+      itens.forEach(function (el, i) {
+        var esconde = i >= corte;
+        el.classList.toggle('gx-oculto', esconde);
+        var sec = secoes[el.getAttribute('data-gx-area')];
+        if (sec) sec.classList.toggle('gx-oculto', !esconde);
+      });
+      mais.classList.toggle('gx-oculto', !algumOculto);
+    }
+
+    var t;
+    window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(recalc, 120); });
+    // fontes podem carregar depois e mudar larguras
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(recalc);
+    recalc();
+  })();
+</script>
 
 <%# ── Marca item ativo comparando a rota com o pathname atual ─────────────── %>
 <script>
