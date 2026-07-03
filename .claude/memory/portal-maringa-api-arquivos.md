@@ -39,6 +39,24 @@ Outros endpoints úteis do bundle (mapa parcial): `arrecadacoes`,
 download/)`, `dashboard/arrecadacao-despesa`. Bundle:
 `/portaltransparencia/static/js/main.*.chunk.js` (grep `"/api/`).
 
+## 🔴 AO VIVO: execução mensal (`/api/dashboard/arrecadacao-despesa`)
+⚠️ Este endpoint exige `entidade` como **HTTP HEADER** (não query): 
+`curl -H "entidade: 1" ...?exercicio=2026`. Devolve 12 meses com
+valorArrecadado/valorEmpenhado/valorPago/repasses por mês. **VALIDADO
+2026-07-02**: Σ jan–jun arrecadado 1.731,66mi (TCE: 1.732,16 — Δ0,03%) e
+empenhado 1.746,20mi (TCE: 1.746,40 — Δ0,01%); julho já mostrava movimento
+no dia 2 (é tempo quase real). Fonte p/ execução mensal do Gênesis/OXY e
+gabarito vivo dos imports. Meses 2026: arr 298,2/436,4/310,0/224,7/236,8/225,5;
+emp 311,8/345,5/276,7/272,1/307,8/232,3; pago Σ 969,8mi jan–jun.
+
+Fontes TCE-PR indicadas pelo deep search (explorar próxima sessão):
+- Gerador de relatórios LRF homologados (RREO/RGF):
+  servicos.tce.pr.gov.br/consultas/RelatoriosLRFSolicitarNovo.aspx
+- PIT — download em massa do SIM-AM (contábil/licitações/contratos):
+  pit.tce.pr.gov.br/Dados/DadosConsulta/Consulta
+- Página de planejamento do portal (anexos LOA/LDO/PPA 2026-2029, Lei 12.099
+  = PPA): maringa.oxy.elotech.com.br/portaltransparencia (seção orçamento).
+
 ## Entidades do portal (`GET /api/entidades/lista` — mapa oficial c/ CNPJ)
 1=Prefeitura (nosso banco) · 3=Maringá Previdência · 4=IAM · 6=Câmara ·
 9=AMR · 10=SBMG · 15=IPPLAM. Todo endpoint aceita `?entidade={id}` — p/
