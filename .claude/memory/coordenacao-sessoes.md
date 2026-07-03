@@ -20,6 +20,8 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
+> 🟢 **Sessão SYNC (2026-07-03, noite): +#197 — navbar do /app com Priority+ ('Mais ▾' recebe o que não cabe; a causa era overflow-x:auto com scrollbar ESCONDIDA na .gx-nav). Marco testando o app ao vivo e reportando achados.**
+
 > 🟢 **Sessão SYNC (2026-07-03, noite): +#196 — menu da barra superior ganhou os 8 relatórios LRF (seed) e `scripts/conceder_acesso_total.ts <email>` dá ADMIN em todas entidades + EXCLUIR em todos os itens (aplicado a marco@teste.com, verificado ao vivo). Menu do /app agora espelha o produto.**
 
 > 🟢 **Sessão SYNC (2026-07-03, tarde): O GÊNESIS SE SINCRONIZA SOZINHO — receita E despesa (#193 import jun, #194 sync nível 2, #195 despesa em CI).**
