@@ -2,6 +2,7 @@ import { PrismaClient, Prisma } from '@prisma/client'
 import { MemorialRclService } from './memorial-rcl.js'
 import { DespesaPessoalService, resolverComposicaoPessoal, type ComposicaoPessoal } from './despesa-pessoal.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado, type ResultadoIndice } from './indice-constitucional.js'
+import { ROTULO_META } from './metas-fiscais.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
 const D0 = () => new Prisma.Decimal(0)
@@ -199,6 +200,41 @@ export class MemorialGuardiaoService {
             'CF art. 198 / LC 141 art. 7º (mínimo 15% dos impostos em ações e serviços públicos de saúde).',
           ),
         )
+      }
+
+      // 5) Dívida Consolidada Líquida (% da RCL, limite 120% — Res. Senado 40/2001).
+      // Valor INFORMADO (cadastro de metas fiscais, fonte RGF Anexo 2) — vira
+      // cálculo vivo quando o estoque da dívida e os saldos bancários reais
+      // entrarem na base. DCL negativa = caixa maior que a dívida.
+      if (rcl.rcl > 0) {
+        const dcl = await this.prisma.metaFiscal.findUnique({
+          where: { entidadeId_ano_tipo: { entidadeId, ano, tipo: 'DIVIDA_CONSOLIDADA_LIQUIDA' } },
+          select: { valorMeta: true },
+        })
+        if (dcl) {
+          const valor = n(dcl.valorMeta)
+          const pct = r1((valor / rcl.rcl) * 100)
+          indicadores.push({
+            indicador: ROTULO_META.DIVIDA_CONSOLIDADA_LIQUIDA,
+            unidade: '% da RCL',
+            valor,
+            base: rcl.rcl,
+            percentual: pct,
+            limite: 120,
+            prudencial: null,
+            alerta: null,
+            nivel: nivelDe(pct, 120, 120, 120),
+            memorial: {
+              descricao:
+                'DCL informada (RGF Anexo 2 — dívida consolidada − disponibilidade de caixa − haveres) ÷ RCL. Valor do cadastro de metas fiscais; passa a ser calculado ao vivo quando o estoque da dívida e os saldos bancários entrarem na base. Negativa = caixa supera a dívida.',
+              baseLegal: 'Resolução do Senado nº 40/2001 (limite de 120% da RCL para municípios); LRF art. 30.',
+              linhas: [
+                { item: 'Dívida Consolidada Líquida (informada)', valor },
+                { item: 'RCL', valor: rcl.rcl },
+              ],
+            },
+          })
+        }
       }
     }
 

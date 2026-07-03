@@ -71,6 +71,24 @@ describe('MemorialGuardiaoService', () => {
     expect(asps.nivel).toBe('ok')
   })
 
+  it('DCL cadastrada nas metas → indicador com % da RCL e limite 120% (negativa = ok)', async () => {
+    prisma.metaFiscal.findUnique.mockResolvedValue({ valorMeta: dec(-500) })
+    const g = await svc.guardiao('e1', 2026)
+    const dcl = g!.indicadores.find((i) => i.indicador === 'Dívida Consolidada Líquida')!
+    expect(dcl.percentual).toBe(-50) // −500/1000
+    expect(dcl.limite).toBe(120)
+    expect(dcl.nivel).toBe('ok')
+    prisma.metaFiscal.findUnique.mockResolvedValue({ valorMeta: dec(1300) }) // 130% > 120%
+    const g2 = await svc.guardiao('e1', 2026)
+    expect(g2!.indicadores.find((i) => i.indicador === 'Dívida Consolidada Líquida')!.nivel).toBe('estouro')
+  })
+
+  it('sem DCL cadastrada → Guardião não inclui o indicador', async () => {
+    prisma.metaFiscal.findUnique.mockResolvedValue(null)
+    const g = await svc.guardiao('e1', 2026)
+    expect(g!.indicadores.some((i) => i.indicador === 'Dívida Consolidada Líquida')).toBe(false)
+  })
+
   it('índice abaixo do mínimo constitucional → nivel abaixo_minimo', async () => {
     prisma.dotacaoDespesa.findMany.mockResolvedValue([...pessoal(440), ...indices(200, 100)]) // 20% e 10%
     const g = await svc.guardiao('e1', 2026)
