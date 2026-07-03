@@ -204,3 +204,35 @@ describe('relatorio-export', () => {
     })
   })
 })
+
+describe('cabeçalho/rodapé nos formatos-documento (FaixasExport)', () => {
+  const R = { colunas: ['A'], linhas: [['x']] }
+  const FAIXAS = { cabecalho: ['PREFEITURA DE MARINGÁ', 'Av. XV de Novembro'], rodape: ['Gerado em 03/07/2026'] }
+
+  it('HTML embute cabeçalho e rodapé', async () => {
+    const arq = await exportarResultado('html', R, 'Meu Rel', null, FAIXAS)
+    const html = String(arq.conteudo)
+    expect(html).toContain('PREFEITURA DE MARINGÁ')
+    expect(html).toContain('class="faixa faixa-cab"')
+    expect(html).toContain('Gerado em 03/07/2026')
+  })
+
+  it('TXT tem as linhas no topo e no fim', async () => {
+    const arq = await exportarResultado('txt', R, 'Meu Rel', null, FAIXAS)
+    const txt = String(arq.conteudo)
+    expect(txt.startsWith('PREFEITURA DE MARINGÁ')).toBe(true)
+    expect(txt.trimEnd().endsWith('Gerado em 03/07/2026')).toBe(true)
+  })
+
+  it('CSV/JSON permanecem dados-puros (sem faixa)', async () => {
+    const csv = await exportarResultado('csv', R, 'Meu Rel', null, FAIXAS)
+    expect(String(csv.conteudo)).not.toContain('PREFEITURA')
+    const json = await exportarResultado('json', R, 'Meu Rel', null, FAIXAS)
+    expect(String(json.conteudo)).not.toContain('PREFEITURA')
+  })
+
+  it('sem faixas, nada muda (retrocompatível)', async () => {
+    const arq = await exportarResultado('html', R, 'Meu Rel')
+    expect(String(arq.conteudo)).not.toContain('class="faixa faixa-cab"')
+  })
+})
