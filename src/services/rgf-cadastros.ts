@@ -59,7 +59,13 @@ const tipoOp = (v: unknown): TipoOperacaoCredito => {
 export interface TotaisRgf {
   divida: { porCategoria: { categoria: CategoriaDivida; rotulo: string; total: number }[]; total: number }
   garantias: { porTipo: { tipo: TipoGarantia; rotulo: string; total: number; contragarantias: number }[]; total: number; contragarantias: number }
-  operacoes: { sujeitas: number; aro: number; naoSujeitas: number; total: number }
+  operacoes: {
+    porTipo: { tipo: TipoOperacaoCredito; rotulo: string; sujeitaLimite: boolean; total: number }[]
+    sujeitas: number
+    aro: number
+    naoSujeitas: number
+    total: number
+  }
 }
 
 export class RgfCadastrosService {
@@ -150,6 +156,12 @@ export class RgfCadastrosService {
     const sujeitas = soma((t) => sujeitasTipos.has(t))
     const aro = soma((t) => t === 'ARO')
     const naoSujeitas = soma((t) => !sujeitasTipos.has(t) && t !== 'ARO')
+    const opsPorTipo = TIPOS_OPERACAO_CREDITO.map((t) => ({
+      tipo: t.valor,
+      rotulo: t.rotulo,
+      sujeitaLimite: t.sujeitaLimite,
+      total: soma((x) => x === t.valor),
+    }))
     return {
       divida: { porCategoria, total: r2(porCategoria.reduce((a, c) => a + c.total, 0)) },
       garantias: {
@@ -157,7 +169,7 @@ export class RgfCadastrosService {
         total: r2(porTipo.reduce((a, t) => a + t.total, 0)),
         contragarantias: r2(porTipo.reduce((a, t) => a + t.contragarantias, 0)),
       },
-      operacoes: { sujeitas, aro, naoSujeitas, total: r2(sujeitas + aro + naoSujeitas) },
+      operacoes: { porTipo: opsPorTipo, sujeitas, aro, naoSujeitas, total: r2(sujeitas + aro + naoSujeitas) },
     }
   }
 }
