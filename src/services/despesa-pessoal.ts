@@ -84,6 +84,18 @@ export interface ResultadoPessoal {
   despesaLiquida: number // DTP = inclusões − exclusões
 }
 
+export interface LinhaPessoalMensal { rotulo: string; mensal: number[]; total: number }
+export interface ResultadoPessoalExecutado {
+  temExecucao: boolean
+  metodologia: string
+  inclusoes: LinhaPessoalMensal[]
+  inclusoesTotal: number
+  exclusoes: LinhaPessoalMensal[]
+  exclusoesTotal: number
+  dtp: number // executada = inclusões − exclusões (liquidado)
+  ultimoMesComDado: number // 1–12; 0 = sem movimento no período
+}
+
 const r2 = (n: number) => Math.round(n * 100) / 100
 const casa = (cod: string, regra: RegraPessoal) => regra.prefixos.some((px) => cod.startsWith(px))
 
@@ -123,6 +135,62 @@ export class DespesaPessoalService {
       temOrcamento: true, metodologia: comp.nome,
       inclusoes, inclusoesTotal, exclusoes, exclusoesTotal,
       despesaLiquida: r2(inclusoesTotal - exclusoesTotal),
+    }
+  }
+
+  /**
+   * DTP EXECUTADA (RGF Anexo 1 oficial): despesa liquidada no período, mês a
+   * mês, pela mesma composição. Fonte: MovimentoEmpenho LIQUIDACAO −
+   * ESTORNO_LIQUIDACAO, casando o código da conta da dotação do empenho.
+   * `fimPeriodo` corta o quadrimestre (datas `@db.Date` = meia-noite UTC →
+   * mês por getUTCMonth).
+   */
+  async calcularExecutado(entidadeId: string, ano: number, comp: ComposicaoPessoal = COMPOSICAO_PESSOAL_STN, fimPeriodo?: Date): Promise<ResultadoPessoalExecutado> {
+    const fim = fimPeriodo ?? new Date(Date.UTC(ano, 12, 0))
+    const movimentos = await this.prisma.movimentoEmpenho.findMany({
+      where: {
+        entidadeId,
+        tipo: { in: ['LIQUIDACAO', 'ESTORNO_LIQUIDACAO'] },
+        data: { gte: new Date(Date.UTC(ano, 0, 1)), lte: fim },
+      },
+      select: {
+        tipo: true,
+        valor: true,
+        data: true,
+        empenho: { select: { dotacaoDespesa: { select: { contaDespesa: { select: { codigo: true } } } } } },
+      },
+    })
+
+    const zeros = () => Array<number>(12).fill(0)
+    const inc = comp.inclusoes.map(zeros)
+    const exc = comp.exclusoes.map(zeros)
+    let ultimoMesComDado = 0
+    for (const m of movimentos) {
+      const cod = m.empenho.dotacaoDespesa.contaDespesa.codigo
+      const mes = m.data.getUTCMonth() // 0–11
+      const v = Number(m.valor) * (m.tipo === 'ESTORNO_LIQUIDACAO' ? -1 : 1)
+      let casou = false
+      comp.inclusoes.forEach((r, i) => { if (casa(cod, r)) { inc[i]![mes] += v; casou = true } })
+      comp.exclusoes.forEach((r, i) => { if (casa(cod, r)) { exc[i]![mes] += v; casou = true } })
+      if (casou) ultimoMesComDado = Math.max(ultimoMesComDado, mes + 1)
+    }
+
+    const linhas = (regras: RegraPessoal[], acc: number[][]): LinhaPessoalMensal[] =>
+      regras.map((r, i) => ({
+        rotulo: r.rotulo,
+        mensal: acc[i]!.map(r2),
+        total: r2(acc[i]!.reduce((a, b) => a + b, 0)),
+      }))
+    const inclusoes = linhas(comp.inclusoes, inc)
+    const exclusoes = linhas(comp.exclusoes, exc)
+    const inclusoesTotal = r2(inclusoes.reduce((a, l) => a + l.total, 0))
+    const exclusoesTotal = r2(exclusoes.reduce((a, l) => a + l.total, 0))
+    return {
+      temExecucao: ultimoMesComDado > 0,
+      metodologia: comp.nome,
+      inclusoes, inclusoesTotal, exclusoes, exclusoesTotal,
+      dtp: r2(inclusoesTotal - exclusoesTotal),
+      ultimoMesComDado,
     }
   }
 }

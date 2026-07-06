@@ -22,11 +22,13 @@ import {
   montarDisponibilidadeFonte,
   montarDespesaFuncaoRreo,
   montarMetasFiscais,
+  montarRgfAnexo1,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
 } from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
+import { parseQuadrimestre, periodoQuadrimestre, formatarDataUtc } from '../services/quadrimestre.js'
 
 type EntidadeCab = {
   nome: string
@@ -629,6 +631,79 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     return reply
       .header('Content-Type', 'application/pdf')
       .header('Content-Disposition', `inline; filename="despesa-pessoal-${ano}.pdf"`)
+      .send(pdf)
+  })
+
+  // ── RGF Anexo 1 oficial (MDF 9ª ed.) — DTP executada por quadrimestre ───────
+  async function rgfAnexo1(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const { e, meta, estadoRclComposicao, estadoPessoalComposicao, modeloRclComposicao, modeloPessoalComposicao } =
+      await entidadeCtx(entidadeId, ano)
+    const sigla = e.municipio.estado.sigla
+    const hoje = new Date()
+    const q = parseQuadrimestre((req.query as { q?: string }).q, ano, hoje)
+    const per = periodoQuadrimestre(ano, q)
+    const [exec, rclR] = await Promise.all([
+      pessoalSvc.calcularExecutado(entidadeId, ano, resolverComposicaoPessoal(sigla, estadoPessoalComposicao, modeloPessoalComposicao), per.fim),
+      rclSvc.calcular(entidadeId, ano, resolverComposicao(sigla, estadoRclComposicao, modeloRclComposicao)),
+    ])
+    const rcl = rclR.rcl.toNumber()
+    const temOrcamento = exec.temExecucao && rcl > 0
+    const percentual = rcl > 0 ? Math.round((exec.dtp / rcl) * 10000) / 100 : 0
+    const nivel = percentual >= 54 ? 'estouro' : percentual >= 51.3 ? 'prudencial' : percentual >= 48.6 ? 'alerta' : 'ok'
+    const mesCorte = Math.min(per.mesFim, exec.ultimoMesComDado || per.mesFim)
+    const corpo = temOrcamento
+      ? montarRgfAnexo1({
+          cabecalho: cab(e, ano, meta),
+          quadrimestre: {
+            rotulo: `${per.rotulo} de ${ano}`,
+            prazoPublicacao: formatarDataUtc(per.prazoPublicacao),
+            parcial: hoje < per.fim,
+          },
+          mesCorte,
+          inclusoes: exec.inclusoes,
+          inclusoesTotal: exec.inclusoesTotal,
+          exclusoes: exec.exclusoes,
+          exclusoesTotal: exec.exclusoesTotal,
+          dtp: exec.dtp,
+          rcl,
+          rclRealizada: rclR.rclRealizado.toNumber(),
+          percentual,
+          nivel,
+          nota: exec.metodologia,
+        })
+      : ''
+    return { e, ano, q, temOrcamento, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/rgf/anexo1', async (req, reply) => {
+    const { e, ano, q, temOrcamento, corpo } = await rgfAnexo1(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'RGF Anexo 1 — Despesa com Pessoal',
+      breadcrumb: 'RGF Anexo 1 (Pessoal)',
+      pdfUrl: `/app/orcamento/relatorios/rgf/anexo1.pdf?q=${q}`,
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/rgf/anexo1.pdf', async (req, reply) => {
+    const { ano, q, temOrcamento, corpo, meta } = await rgfAnexo1(req)
+    if (!temOrcamento) return reply.redirect('/app/orcamento/relatorios/rgf/anexo1')
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`RGF Anexo 1 — ${q}º Quadrimestre ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('RGF Anexo 1 — Despesa com Pessoal', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="rgf-anexo1-${ano}-q${q}.pdf"`)
       .send(pdf)
   })
 
