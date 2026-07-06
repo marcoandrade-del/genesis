@@ -96,4 +96,51 @@ describe('MemoriaisImportIaService.propor', () => {
     expect(r.pessoal?.nome).toBe('Pessoal SC')
     expect(ia.chamar.mock.calls[0][0].user).toContain('Inclusão Pessoal 3.1')
   })
+
+  /** PDF mínimo válido (1 página, Helvetica) com o texto dado — offsets de xref calculados. */
+  function pdfMinimo(texto: string): string {
+    const objs = [
+      '<< /Type /Catalog /Pages 2 0 R >>',
+      '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+      '', // 4: stream (montado abaixo)
+      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    ]
+    const stream = `BT /F1 12 Tf 72 720 Td (${texto}) Tj ET`
+    objs[3] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`
+    let corpo = '%PDF-1.4\n'
+    const offsets: number[] = []
+    objs.forEach((o, i) => {
+      offsets.push(corpo.length)
+      corpo += `${i + 1} 0 obj\n${o}\nendobj\n`
+    })
+    const xref = corpo.length
+    corpo += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`
+    for (const off of offsets) corpo += `${String(off).padStart(10, '0')} 00000 n \n`
+    corpo += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`
+    return Buffer.from(corpo, 'latin1').toString('base64')
+  }
+
+  it('pdf → extrai a camada de texto e manda à IA (doc só com fonte → só fonte volta)', async () => {
+    ia.chamar.mockResolvedValue({ texto: JSON.stringify({ rcl: null, fonte: FONTE, pessoal: null }) })
+    const r = await svc.propor('u1', 'pdf', pdfMinimo('FONTES E DESTINACAO DE RECURSOS 550 MDE'))
+    expect(r.fonte?.regras[0]!.finalidade).toBe('MDE')
+    expect(r.rcl).toBeNull()
+    expect(r.pessoal).toBeNull()
+    expect(ia.chamar.mock.calls[0][0].user).toContain('FONTES E DESTINACAO DE RECURSOS 550 MDE')
+  })
+
+  it('PDF disfarçado de texto (magic %PDF) → extrai igual, não manda bytes crus à IA', async () => {
+    ia.chamar.mockResolvedValue({ texto: JSON.stringify({ rcl: null, fonte: FONTE, pessoal: null }) })
+    const r = await svc.propor('u1', 'texto', pdfMinimo('Classificacao de fonte 540 FUNDEB'))
+    expect(r.fonte?.nome).toBe('Fonte SC')
+    const prompt = ia.chamar.mock.calls[0][0].user as string
+    expect(prompt).toContain('Classificacao de fonte 540 FUNDEB')
+    expect(prompt).not.toContain('%PDF')
+  })
+
+  it('PDF sem camada de texto → erro claro de documento sem conteúdo legível', async () => {
+    await expect(svc.propor('u1', 'pdf', pdfMinimo(''))).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+    expect(ia.chamar).not.toHaveBeenCalled()
+  })
 })

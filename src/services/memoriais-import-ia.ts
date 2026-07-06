@@ -9,7 +9,7 @@ import { MotorIaClientHttp, type MotorIaClient } from './ia-cliente.js'
 import { lerXlsxBase64 } from './rcl-xlsx.js'
 
 /** Formatos aceitos pelo import da bancada (detectados pela extensão no browser). */
-export type FormatoImport = 'xlsx' | 'docx' | 'json' | 'texto'
+export type FormatoImport = 'xlsx' | 'docx' | 'json' | 'texto' | 'pdf'
 
 /** Proposta para os 3 editores da bancada. Cada memorial é null quando não foi
  *  identificado no documento — o cliente só substitui os que vieram. */
@@ -88,7 +88,33 @@ async function extrairTextoDocx(base64: string): Promise<string> {
     .trim()
 }
 
+/** Extrai a camada de texto de um PDF (pdfjs). PDF escaneado (imagem, sem OCR)
+ *  volta vazio — o chamador acusa "sem conteúdo legível". Import dinâmico: o
+ *  pdfjs é pesado e só é pago quando chega PDF de verdade. */
+async function extrairTextoPdf(base64: string): Promise<string> {
+  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs')
+  const tarefa = getDocument({ data: new Uint8Array(Buffer.from(base64, 'base64')), useSystemFonts: true })
+  const doc = await tarefa.promise
+  try {
+    const partes: string[] = []
+    for (let p = 1; p <= doc.numPages; p++) {
+      const pagina = await doc.getPage(p)
+      const conteudo = await pagina.getTextContent()
+      partes.push(conteudo.items.map((i) => ('str' in i ? i.str : '')).join(' '))
+    }
+    return partes
+      .join('\n')
+      .replace(/[ \t]{2,}/g, ' ')
+      .trim()
+  } finally {
+    await tarefa.destroy()
+  }
+}
+
+const MAGIC_PDF_B64 = 'JVBERi' // = base64 de "%PDF-" — PDF renomeado p/ .txt cai aqui
+
 async function extrairTexto(formato: FormatoImport, base64: string): Promise<string> {
+  if (formato === 'pdf' || base64.startsWith(MAGIC_PDF_B64)) return extrairTextoPdf(base64)
   if (formato === 'xlsx') return lerXlsxBase64(base64)
   if (formato === 'docx') return extrairTextoDocx(base64)
   return Buffer.from(base64, 'base64').toString('utf8') // json | texto
@@ -96,7 +122,7 @@ async function extrairTexto(formato: FormatoImport, base64: string): Promise<str
 
 /**
  * Import multi-formato dos memoriais da bancada. Extrai texto do documento
- * (xlsx/docx/json/texto), tenta ler diretamente como JSON dos nossos formatos
+ * (xlsx/docx/pdf/json/texto), tenta ler diretamente como JSON dos nossos formatos
  * (grátis, determinístico — permite reimportar o que a bancada exporta) e, se
  * não for, delega à IA (motor preferido do usuário). A saída é SEMPRE validada
  * pelos parses (reuso) — o que não validar volta null e o cliente ignora.
