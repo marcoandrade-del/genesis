@@ -3,6 +3,8 @@ import { MemorialRclService } from './memorial-rcl.js'
 import { DespesaPessoalService, resolverComposicaoPessoal, type ComposicaoPessoal } from './despesa-pessoal.js'
 import { IndiceConstitucionalService, composicaoIndicesDoEstado, type ResultadoIndice } from './indice-constitucional.js'
 import { ROTULO_META } from './metas-fiscais.js'
+import { DclService } from './dcl.js'
+import { RgfCadastrosService } from './rgf-cadastros.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
 const D0 = () => new Prisma.Decimal(0)
@@ -203,38 +205,84 @@ export class MemorialGuardiaoService {
       }
 
       // 5) Dívida Consolidada Líquida (% da RCL, limite 120% — Res. Senado 40/2001).
-      // Valor INFORMADO (cadastro de metas fiscais, fonte RGF Anexo 2) — vira
-      // cálculo vivo quando o estoque da dívida e os saldos bancários reais
-      // entrarem na base. DCL negativa = caixa maior que a dívida.
+      // Agora VIVA (RGF Anexo 2): DC do cadastro − deduções de caixa/RP. A DCL
+      // informada na LDO fica no memorial como comparativo — o Δ mostra o que a
+      // base ainda não captura (ex.: saldos bancários reais). Negativa = caixa
+      // supera a dívida.
       if (rcl.rcl > 0) {
-        const dcl = await this.prisma.metaFiscal.findUnique({
-          where: { entidadeId_ano_tipo: { entidadeId, ano, tipo: 'DIVIDA_CONSOLIDADA_LIQUIDA' } },
-          select: { valorMeta: true },
+        const dcl = await new DclService(this.prisma).calcular(entidadeId, ano)
+        const pct = r1((dcl.dcl / rcl.rcl) * 100)
+        indicadores.push({
+          indicador: ROTULO_META.DIVIDA_CONSOLIDADA_LIQUIDA,
+          unidade: '% da RCL',
+          valor: dcl.dcl,
+          base: rcl.rcl,
+          percentual: pct,
+          limite: 120,
+          prudencial: null,
+          alerta: 108,
+          nivel: nivelDe(pct, 120, 120, 108),
+          memorial: {
+            descricao:
+              'DCL apurada ao vivo (RGF Anexo 2): dívida consolidada do cadastro − (disponibilidade de caixa − RP processados). A DCL informada na LDO aparece abaixo como comparativo. Negativa = caixa supera a dívida.',
+            baseLegal: 'Resolução do Senado nº 40/2001 (limite de 120% da RCL para municípios); LRF art. 30; alerta LRF art. 59 §1º, III.',
+            linhas: [
+              { item: 'Dívida Consolidada (cadastro)', valor: dcl.dividaTotal },
+              { item: '(−) Deduções (caixa − RP processados)', valor: dcl.deducoes.total },
+              { item: 'DCL apurada', valor: dcl.dcl },
+              ...(dcl.metaLdo != null ? [{ item: 'DCL informada na LDO (comparativo)', valor: dcl.metaLdo }] : []),
+              { item: 'RCL', valor: rcl.rcl },
+            ],
+          },
         })
-        if (dcl) {
-          const valor = n(dcl.valorMeta)
-          const pct = r1((valor / rcl.rcl) * 100)
-          indicadores.push({
-            indicador: ROTULO_META.DIVIDA_CONSOLIDADA_LIQUIDA,
-            unidade: '% da RCL',
-            valor,
-            base: rcl.rcl,
-            percentual: pct,
-            limite: 120,
-            prudencial: null,
-            alerta: null,
-            nivel: nivelDe(pct, 120, 120, 120),
-            memorial: {
-              descricao:
-                'DCL informada (RGF Anexo 2 — dívida consolidada − disponibilidade de caixa − haveres) ÷ RCL. Valor do cadastro de metas fiscais; passa a ser calculado ao vivo quando o estoque da dívida e os saldos bancários entrarem na base. Negativa = caixa supera a dívida.',
-              baseLegal: 'Resolução do Senado nº 40/2001 (limite de 120% da RCL para municípios); LRF art. 30.',
-              linhas: [
-                { item: 'Dívida Consolidada Líquida (informada)', valor },
-                { item: 'RCL', valor: rcl.rcl },
-              ],
-            },
-          })
-        }
+
+        // 6) Garantias concedidas (% da RCL, limite 22% — Res. Senado 43/2001 art. 9º).
+        // 7) Operações de crédito sujeitas (16%) e ARO (7%) — Res. Senado 43/2001.
+        const totais = await new RgfCadastrosService(this.prisma).totais(entidadeId, ano)
+        const pctGar = r1((totais.garantias.total / rcl.rcl) * 100)
+        indicadores.push({
+          indicador: 'Garantias de valores',
+          unidade: '% da RCL',
+          valor: totais.garantias.total,
+          base: rcl.rcl,
+          percentual: pctGar,
+          limite: 22,
+          prudencial: null,
+          alerta: 19.8,
+          nivel: nivelDe(pctGar, 22, 22, 19.8),
+          memorial: {
+            descricao: 'Garantias concedidas (RGF Anexo 3, cadastro do RGF) ÷ RCL. Contragarantias recebidas no memorial do anexo.',
+            baseLegal: 'Resolução do Senado nº 43/2001, art. 9º (22% da RCL); alerta LRF art. 59 §1º.',
+            linhas: [
+              { item: 'Garantias concedidas', valor: totais.garantias.total },
+              { item: 'Contragarantias recebidas', valor: totais.garantias.contragarantias },
+              { item: 'RCL', valor: rcl.rcl },
+            ],
+          },
+        })
+        const pctOp = r1((totais.operacoes.sujeitas / rcl.rcl) * 100)
+        const pctAro = r1((totais.operacoes.aro / rcl.rcl) * 100)
+        indicadores.push({
+          indicador: 'Operações de crédito',
+          unidade: '% da RCL',
+          valor: totais.operacoes.sujeitas,
+          base: rcl.rcl,
+          percentual: pctOp,
+          limite: 16,
+          prudencial: null,
+          alerta: 14.4,
+          nivel: pctAro >= 7 ? 'estouro' : nivelDe(pctOp, 16, 16, 14.4),
+          memorial: {
+            descricao: 'Operações de crédito sujeitas ao limite (RGF Anexo 4, cadastro do RGF) ÷ RCL. A ARO tem limite próprio de 7% e contamina a situação quando estoura.',
+            baseLegal: 'Resolução do Senado nº 43/2001 (16% da RCL; ARO 7%); alerta LRF art. 59 §1º.',
+            linhas: [
+              { item: 'Sujeitas ao limite (16%)', valor: totais.operacoes.sujeitas },
+              { item: 'ARO (limite próprio 7%)', valor: totais.operacoes.aro },
+              { item: 'Não sujeitas', valor: totais.operacoes.naoSujeitas },
+              { item: 'RCL', valor: rcl.rcl },
+            ],
+          },
+        })
       }
     }
 
