@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn() }))
+vi.mock('../../services/dcl.js', () => ({
+  DclService: class {
+    calcular = m.dcl
+  },
+}))
+vi.mock('../../services/rgf-simplificado.js', () => ({
+  RgfSimplificadoService: class {
+    calcular = m.rgfSimples
+  },
+}))
 vi.mock('../../services/memorial-rcl.js', () => ({
   MemorialRclService: class {
     rcl = m.rcl
@@ -94,7 +104,33 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.recursos.map((r: { recurso: string }) => r.recurso)).toContain('rcl')
+    expect(body.versao).toBe('1.9.0') // bump do épico RGF (aditivo → MINOR)
+    const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
+    expect(recursos).toContain('rcl')
+    expect(recursos).toContain('dcl')
+    expect(recursos).toContain('rgf-simplificado')
+  })
+
+  it('200 DCL em envelope versionado', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1' })
+    m.dcl.mockResolvedValue({ dcl: -539.62, dividaTotal: 544.32 })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/dcl?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.recurso).toBe('dcl')
+    expect(body.dados.dcl).toBe(-539.62)
+    expect(m.dcl).toHaveBeenCalledWith('e1', 2026)
+  })
+
+  it('200 RGF simplificado em envelope; q default 3, q=2 respeitado', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1' })
+    m.rgfSimples.mockResolvedValue({ temOrcamento: true, linhas: [] })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/rgf-simplificado?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().contrato.recurso).toBe('rgf-simplificado')
+    expect(m.rgfSimples).toHaveBeenCalledWith('e1', 2026, 3)
+    await app.inject({ method: 'GET', url: '/api/memoriais/rgf-simplificado?entidadeId=e1&ano=2026&q=2', headers: auth })
+    expect(m.rgfSimples).toHaveBeenLastCalledWith('e1', 2026, 2)
   })
 
   it('400 quando faltam entidadeId/ano', async () => {

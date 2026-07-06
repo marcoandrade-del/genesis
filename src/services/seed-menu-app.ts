@@ -47,6 +47,7 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/relatorios/rgf/anexo2', nome: 'RGF Anexo 2 — DCL', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Dívida Consolidada Líquida viva (limite 120% RCL)' },
       { rota: '/app/orcamento/relatorios/rgf/anexo3', nome: 'RGF Anexo 3 — Garantias', icone: 'bi-shield-lock', tipo: 'FUNCIONALIDADE', descricao: 'Garantias e contragarantias (limite 22% RCL)' },
       { rota: '/app/orcamento/relatorios/rgf/anexo4', nome: 'RGF Anexo 4 — Op. de Crédito', icone: 'bi-cash-coin', tipo: 'FUNCIONALIDADE', descricao: 'Operações de crédito (16% RCL + ARO 7%)' },
+      { rota: '/app/orcamento/relatorios/rgf/anexo6', nome: 'RGF Anexo 6 — Simplificado', icone: 'bi-clipboard-data', tipo: 'FUNCIONALIDADE', descricao: 'Quadro-resumo dos limites do RGF' },
       { rota: '/app/orcamento/rgf/cadastros', nome: 'Cadastros do RGF', icone: 'bi-journal-bookmark', tipo: 'FUNCIONALIDADE', descricao: 'Dívida consolidada, garantias e operações de crédito' },
       { rota: '/app/orcamento/relatorios/indices-constitucionais', nome: 'Índices constitucionais', icone: 'bi-mortarboard', tipo: 'FUNCIONALIDADE', descricao: 'MDE 25% e ASPS 15% — aplicação por fonte' },
       { rota: '/app/orcamento/relatorios/despesa-funcao-rreo', nome: 'Despesa por função (RREO)', icone: 'bi-columns-gap', tipo: 'FUNCIONALIDADE', descricao: 'Execução por função — empenhado e %' },
