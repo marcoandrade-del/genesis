@@ -57,6 +57,7 @@ const AREAS: readonly ItemSeed[] = [
   { rota: '/app/contas-despesa', nome: 'Plano de Despesa', icone: 'bi-graph-down-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de despesa do exercício' },
   { rota: '/app/relatorios', nome: 'Relatórios', icone: 'bi-file-earmark-bar-graph', tipo: 'FUNCIONALIDADE', descricao: 'Cabeçalhos e rodapés' },
   { rota: '/app/configuracao', nome: 'Configuração', icone: 'bi-gear', tipo: 'FUNCIONALIDADE', descricao: 'Configuração do dashboard (granularidade dos planos)' },
+  { rota: '/app/sincronizacao', nome: 'Sincronização', icone: 'bi-arrow-repeat', tipo: 'FUNCIONALIDADE', descricao: 'Portal da Transparência: sincronizar agora + log das execuções' },
   {
     rota: '/app/compras', nome: 'Compras', icone: 'bi-cart', tipo: 'SUBMENU',
     descricao: 'Planejamento (Lei 14.133)',
