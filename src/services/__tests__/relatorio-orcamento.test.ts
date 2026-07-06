@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -379,6 +379,68 @@ describe('montarDespesaPessoal', () => {
     expect(html).toContain('44,23%')
     expect(html).toContain('Dentro do limite')
     expect(html).toContain('Limite legal: 54,00%')
+  })
+})
+
+describe('montarRgfAnexo1', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    quadrimestre: { rotulo: '2º Quadrimestre (maio a agosto) de 2026', prazoPublicacao: '30/09/2026', parcial: true },
+    mesCorte: 7,
+    inclusoes: [
+      { rotulo: 'Pessoal e Encargos Sociais (3.1)', mensal: [100, 110, 0, 0, 120, 0, 130, 0, 0, 0, 0, 0], total: 460 },
+      { rotulo: 'Terceirização (3.3.90.34)', mensal: [0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 0, 0], total: 40 },
+    ],
+    inclusoesTotal: 500,
+    exclusoes: [{ rotulo: '(−) Indenizações (3.1.90.94)', mensal: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], total: 0 }],
+    exclusoesTotal: 0,
+    dtp: 500,
+    rcl: 1000,
+    rclRealizada: 700,
+    percentual: 50,
+    nivel: 'alerta',
+    nota: 'LRF/STN (padrão)',
+  }
+
+  it('renderiza cabeçalho, quadrimestre, colunas mensais até o corte e limites em R$ e %', () => {
+    const html = montarRgfAnexo1(base)
+    expect(html).toContain('RGF Anexo 1')
+    expect(html).toContain('2º Quadrimestre (maio a agosto) de 2026')
+    expect(html).toContain('posição parcial')
+    expect(html).toContain('30/09/2026')
+    expect(html).toContain('<th class="num">Jul</th>')
+    expect(html).not.toContain('<th class="num">Ago</th>') // corte em jul
+    expect(html).toContain('DESPESA TOTAL COM PESSOAL')
+    // limites: 54% de 1000 = 540; prudencial 513; alerta 486
+    expect(html).toContain('540,00')
+    expect(html).toContain('513,00')
+    expect(html).toContain('486,00')
+    expect(html).toContain('50,00%')
+    expect(html).toContain('Alerta do TCE')
+    expect(html).toContain('RCL realizada acumulada')
+  })
+
+  it('totaliza a coluna do mês no rodapé da tabela (I)', () => {
+    const html = montarRgfAnexo1(base)
+    // jan: 100 + 0 = 100 na linha de total
+    expect(html).toContain('TOTAL DA DESPESA BRUTA (I)')
+    expect(html).toContain('<th class="num">100,00</th>')
+  })
+
+  it('quadrimestre fechado não marca posição parcial; escapa HTML', () => {
+    const html = montarRgfAnexo1({
+      ...base,
+      quadrimestre: { ...base.quadrimestre, parcial: false },
+      inclusoes: [{ rotulo: 'A & B <x>', mensal: Array(12).fill(0), total: 0 }],
+    })
+    expect(html).not.toContain('posição parcial')
+    expect(html).toContain('A &amp; B &lt;x&gt;')
+  })
+
+  it('mesCorte fora da faixa não quebra (mínimo 1, máximo 12)', () => {
+    expect(montarRgfAnexo1({ ...base, mesCorte: 0 })).toContain('<th class="num">Jan</th>')
+    expect(montarRgfAnexo1({ ...base, mesCorte: 99 })).toContain('<th class="num">Dez</th>')
   })
 })
 

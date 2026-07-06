@@ -43,6 +43,63 @@ describe('DespesaPessoalService.calcular', () => {
   })
 })
 
+describe('DespesaPessoalService.calcularExecutado', () => {
+  let prisma: PrismaMock
+  let svc: DespesaPessoalService
+
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    svc = new DespesaPessoalService(prisma as never)
+  })
+
+  const mov = (tipo: string, valor: number, mesUtc: number, codigo: string) => ({
+    tipo,
+    valor: dec(valor),
+    data: new Date(Date.UTC(2026, mesUtc - 1, 15)),
+    empenho: { dotacaoDespesa: { contaDespesa: { codigo } } },
+  })
+
+  it('sem movimentos → temExecucao false, DTP 0', async () => {
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([])
+    const r = await svc.calcularExecutado('e1', 2026)
+    expect(r.temExecucao).toBe(false)
+    expect(r.dtp).toBe(0)
+    expect(r.ultimoMesComDado).toBe(0)
+  })
+
+  it('soma liquidações por mês, desconta estornos e aplica as exclusões', async () => {
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      mov('LIQUIDACAO', 1000, 1, '3.1.90.11.00.00'), // jan
+      mov('LIQUIDACAO', 500, 2, '3.1.90.11.00.00'), // fev
+      mov('ESTORNO_LIQUIDACAO', 100, 2, '3.1.90.11.00.00'), // fev: −100
+      mov('LIQUIDACAO', 80, 3, '3.3.90.34.00.00'), // terceirização mar
+      mov('LIQUIDACAO', 50, 3, '3.1.90.94.00.00'), // indenização: inclusão 3.1 E exclusão
+      mov('LIQUIDACAO', 999, 4, '4.4.90.51.00.00'), // capital — fora
+    ])
+    const r = await svc.calcularExecutado('e1', 2026)
+    expect(r.temExecucao).toBe(true)
+    // Pessoal 3.1: jan 1000, fev 400, mar 50 → 1450; terceirização mar 80
+    expect(r.inclusoes[0]!.mensal[0]).toBe(1000)
+    expect(r.inclusoes[0]!.mensal[1]).toBe(400)
+    expect(r.inclusoes[0]!.total).toBe(1450)
+    expect(r.inclusoes[1]!.mensal[2]).toBe(80)
+    expect(r.inclusoesTotal).toBe(1530)
+    // exclusão: indenização 50
+    expect(r.exclusoesTotal).toBe(50)
+    expect(r.dtp).toBe(1480)
+    expect(r.ultimoMesComDado).toBe(3) // capital de abril não conta
+  })
+
+  it('passa o corte do quadrimestre para a query (lte fimPeriodo)', async () => {
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([])
+    const fim = new Date(Date.UTC(2026, 3, 30))
+    await svc.calcularExecutado('e1', 2026, COMPOSICAO_PESSOAL_STN, fim)
+    const where = prisma.movimentoEmpenho.findMany.mock.calls[0]![0]!.where
+    expect(where.data.lte).toEqual(fim)
+    expect(where.tipo.in).toEqual(['LIQUIDACAO', 'ESTORNO_LIQUIDACAO'])
+  })
+})
+
 describe('parsePessoal', () => {
   it('aceita JSON válido (nome + inclusões + exclusões)', () => {
     const c = parsePessoal({ nome: 'X', inclusoes: [{ rotulo: 'P', prefixos: ['3.1'] }], exclusoes: [{ rotulo: 'I', prefixos: ['3.1.90.94'] }] })

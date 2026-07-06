@@ -42,7 +42,8 @@ const AREAS: readonly ItemSeed[] = [
     filhos: [
       { rota: '/app/orcamento/relatorios/rcl', nome: 'Receita Corrente Líquida', icone: 'bi-percent', tipo: 'FUNCIONALIDADE', descricao: 'RREO Anexo 3 — base dos limites da LRF' },
       { rota: '/app/orcamento/relatorios/rcl-consolidada', nome: 'RCL Consolidada', icone: 'bi-bank2', tipo: 'FUNCIONALIDADE', descricao: 'Soma das entidades do município' },
-      { rota: '/app/orcamento/relatorios/despesa-pessoal', nome: 'Despesa com Pessoal', icone: 'bi-people', tipo: 'FUNCIONALIDADE', descricao: 'RGF Anexo 1 — DTP e % da RCL (limite 54%)' },
+      { rota: '/app/orcamento/relatorios/despesa-pessoal', nome: 'Despesa com Pessoal (projeção)', icone: 'bi-people', tipo: 'FUNCIONALIDADE', descricao: 'DTP pela dotação autorizada e % da RCL (limite 54%)' },
+      { rota: '/app/orcamento/relatorios/rgf/anexo1', nome: 'RGF Anexo 1 — Pessoal', icone: 'bi-people-fill', tipo: 'FUNCIONALIDADE', descricao: 'DTP executada por quadrimestre (MDF 9ª ed.)' },
       { rota: '/app/orcamento/relatorios/indices-constitucionais', nome: 'Índices constitucionais', icone: 'bi-mortarboard', tipo: 'FUNCIONALIDADE', descricao: 'MDE 25% e ASPS 15% — aplicação por fonte' },
       { rota: '/app/orcamento/relatorios/despesa-funcao-rreo', nome: 'Despesa por função (RREO)', icone: 'bi-columns-gap', tipo: 'FUNCIONALIDADE', descricao: 'Execução por função — empenhado e %' },
       { rota: '/app/orcamento/relatorios/disponibilidade-fonte', nome: 'Disponibilidade e RP', icone: 'bi-safe', tipo: 'FUNCIONALIDADE', descricao: 'RGF Anexo 5 — caixa − restos a pagar por fonte' },

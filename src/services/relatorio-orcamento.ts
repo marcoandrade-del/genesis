@@ -651,6 +651,76 @@ export function montarMetasFiscais(dados: DadosMetasFiscais): string {
   )
 }
 
+export const MESES_ABREV = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+
+export interface DadosRgfAnexo1 {
+  cabecalho: CabecalhoDemonstrativo
+  quadrimestre: { rotulo: string; prazoPublicacao: string; parcial: boolean }
+  mesCorte: number // 1–12: colunas jan..corte
+  inclusoes: { rotulo: string; mensal: number[]; total: number }[]
+  inclusoesTotal: number
+  exclusoes: { rotulo: string; mensal: number[]; total: number }[]
+  exclusoesTotal: number
+  dtp: number
+  rcl: number
+  rclRealizada: number
+  percentual: number
+  nivel: string
+  nota?: string // metodologia
+}
+
+/** RGF Anexo 1 OFICIAL (MDF 9ª ed.): DTP EXECUTADA (liquidada) mês a mês até o
+ *  corte do quadrimestre, com o bloco de limites em R$ e % (54/51,3/48,6 da
+ *  RCL). Difere do demonstrativo por dotação autorizada (projeção), que segue
+ *  existindo à parte. RCL do exercício ≈ RCL 12 meses (aproximação declarada). */
+export function montarRgfAnexo1(dados: DadosRgfAnexo1): string {
+  const { cabecalho: c, quadrimestre: qd, mesCorte, inclusoes, inclusoesTotal, exclusoes, exclusoesTotal, dtp, rcl, rclRealizada, percentual, nivel } = dados
+  const meses = MESES_ABREV.slice(0, Math.min(12, Math.max(1, mesCorte)))
+  const pctF = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const cabMeses = meses.map((m) => `<th class="num">${m}</th>`).join('')
+  const linha = (l: { rotulo: string; mensal: number[]; total: number }) =>
+    `<tr><td>${esc(l.rotulo)}</td>` +
+    meses.map((_, i) => `<td class="num">${formatarReais(l.mensal[i] ?? 0)}</td>`).join('') +
+    `<td class="num"><strong>${formatarReais(l.total)}</strong></td></tr>`
+  const totalRow = (rotulo: string, linhas: { mensal: number[] }[], total: number) =>
+    `<tr><th>${esc(rotulo)}</th>` +
+    meses.map((_, i) => `<th class="num">${formatarReais(linhas.reduce((a, l) => a + (l.mensal[i] ?? 0), 0))}</th>`).join('') +
+    `<th class="num">${formatarReais(total)}</th></tr>`
+  const tabela = (titulo: string, linhas: { rotulo: string; mensal: number[]; total: number }[], rotuloTotal: string, total: number) =>
+    `<h2 class="dem-sec">${esc(titulo)}</h2>` +
+    `<table class="dem-tab dem-tab-meses">` +
+    `<thead><tr><th>Especificação</th>${cabMeses}<th class="num">TOTAL</th></tr></thead>` +
+    `<tbody>${linhas.map(linha).join('')}</tbody>` +
+    `<tfoot>${totalRow(rotuloTotal, linhas, total)}</tfoot>` +
+    `</table>`
+  const limite = (rotulo: string, pctLim: number) =>
+    `<tr><td>${esc(rotulo)}</td><td class="num">${formatarReais(Math.round(rcl * pctLim) / 100)}</td><td class="num">${pctF(pctLim)}</td></tr>`
+  const situacao = NIVEL_TXT[nivel] ?? nivel
+  return (
+    ESTILO +
+    `<style>.dem-tab-meses{font-size:.68rem}.dem-tab-meses th,.dem-tab-meses td{padding:3px 5px}</style>` +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 1 — Demonstrativo da Despesa com Pessoal (MDF 9ª ed.)') +
+    `<div class="dem-sub">Período de referência: ${esc(qd.rotulo)}${qd.parcial ? ' — <strong>posição parcial</strong> (quadrimestre em andamento)' : ''} · Publicação até ${esc(qd.prazoPublicacao)} (LRF art. 55 §2º)</div>` +
+    (dados.nota ? `<div class="dem-sub">Metodologia: ${esc(dados.nota)} · base: despesa LIQUIDADA no exercício (execução capturada)</div>` : '') +
+    tabela('Despesa Bruta com Pessoal (I)', inclusoes, 'TOTAL DA DESPESA BRUTA (I)', inclusoesTotal) +
+    tabela('Despesas Não Computadas (II) — LRF art. 19 §1º', exclusoes, 'TOTAL NÃO COMPUTADO (II)', exclusoesTotal) +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th>DESPESA TOTAL COM PESSOAL — DTP (III) = (I − II)</th><th class="num">${formatarReais(dtp)}</th><th class="num">—</th></tr>` +
+    `<tr><td>RECEITA CORRENTE LÍQUIDA — RCL (IV)</td><td class="num">${formatarReais(rcl)}</td><td class="num">—</td></tr>` +
+    `<tr><td>RCL AJUSTADA (V) = (IV)</td><td class="num">${formatarReais(rcl)}</td><td class="num">—</td></tr>` +
+    `<tr><th>% DA DTP SOBRE A RCL AJUSTADA (VI) = (III ÷ V)</th><th class="num">—</th><th class="num">${pctF(percentual)}</th></tr>` +
+    limite('LIMITE MÁXIMO (VII) — LRF art. 20, III, "b"', 54) +
+    limite('LIMITE PRUDENCIAL (VIII) = 0,95 × (VII) — LRF art. 22', 51.3) +
+    limite('LIMITE DE ALERTA (IX) = 0,90 × (VII) — LRF art. 59 §1º, II', 48.6) +
+    `</tfoot></table>` +
+    `<div class="dem-sub">Situação: <strong>${esc(situacao)}</strong> · RCL realizada acumulada no exercício: ${formatarReais(rclRealizada)} (informativo)</div>` +
+    `<div class="dem-sub">Nota metodológica: RCL apurada pela previsão anual do exercício — aproximação da RCL dos últimos 12 meses (LRF art. 2º §3º); a execução disponível cobre o exercício corrente.</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (
