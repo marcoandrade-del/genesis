@@ -857,6 +857,9 @@ model Entidade {
   configuracaoDashboard    ConfiguracaoDashboard?
   metasFiscais             MetaFiscal[]
   sincronizacoesPortal     SincronizacaoPortal[]
+  dividaItens              DividaItem[]
+  garantias                Garantia[]
+  operacoesCredito         OperacaoCredito[]
 
   @@unique([municipioId, nome])
   @@map("entidades")
@@ -2136,6 +2139,82 @@ model MetaFiscal {
 
   @@unique([entidadeId, ano, tipo])
   @@map("metas_fiscais")
+}
+
+/// Categoria de um item da Dívida Consolidada (RGF Anexo 2, MDF 9ª ed.).
+enum CategoriaDivida {
+  MOBILIARIA
+  CONTRATUAL
+  PRECATORIOS // posteriores a 5/5/2000 (LRF art. 30 §7º)
+  DEMAIS
+}
+
+/// Item do estoque da Dívida Consolidada, por entidade/exercício (cadastro do
+/// RGF Anexo 2). Saldo informado — o cálculo vivo da DCL deduz caixa e RP.
+model DividaItem {
+  id         String          @id @default(uuid())
+  entidadeId String
+  ano        Int
+  categoria  CategoriaDivida
+  descricao  String
+  valorSaldo Decimal         @db.Decimal(18, 2)
+  criadoEm   DateTime        @default(now())
+  atualizadoEm DateTime      @updatedAt
+  entidade   Entidade        @relation(fields: [entidadeId], references: [id])
+
+  @@index([entidadeId, ano])
+  @@map("divida_itens")
+}
+
+enum TipoGarantia {
+  INTERNA
+  EXTERNA
+}
+
+/// Garantia concedida (RGF Anexo 3): aval/fiança a operação de terceiros, com
+/// a contragarantia recebida (Res. Senado 43/2001 art. 9º — limite 22% RCL).
+model Garantia {
+  id             String       @id @default(uuid())
+  entidadeId     String
+  ano            Int
+  tipo           TipoGarantia
+  beneficiario   String
+  valor          Decimal      @db.Decimal(18, 2)
+  contragarantia Decimal      @default(0) @db.Decimal(18, 2)
+  criadoEm       DateTime     @default(now())
+  atualizadoEm   DateTime     @updatedAt
+  entidade       Entidade     @relation(fields: [entidadeId], references: [id])
+
+  @@index([entidadeId, ano])
+  @@map("garantias")
+}
+
+/// Tipo da operação de crédito (RGF Anexo 4). Os quatro primeiros contam no
+/// limite de 16% da RCL; ARO tem limite próprio de 7% (Res. Senado 43/2001).
+enum TipoOperacaoCredito {
+  MOBILIARIA
+  CONTRATUAL_INTERNA
+  CONTRATUAL_EXTERNA
+  ARO // antecipação de receita orçamentária — limite 7%
+  REESTRUTURACAO // não sujeita ao limite
+  DEMAIS_NAO_SUJEITAS
+}
+
+/// Operação de crédito realizada no exercício (cadastro do RGF Anexo 4).
+model OperacaoCredito {
+  id         String              @id @default(uuid())
+  entidadeId String
+  ano        Int
+  tipo       TipoOperacaoCredito
+  credor     String
+  valor      Decimal             @db.Decimal(18, 2)
+  data       DateTime            @db.Date
+  criadoEm   DateTime            @default(now())
+  atualizadoEm DateTime          @updatedAt
+  entidade   Entidade            @relation(fields: [entidadeId], references: [id])
+
+  @@index([entidadeId, ano])
+  @@map("operacoes_credito")
 }
 
 /// Tipo de dado sincronizado do Portal da Transparência (Elotech/OXY).

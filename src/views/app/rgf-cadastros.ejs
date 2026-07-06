@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastros do RGF · <%= entidade.nome %> · <%= ano %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  const fmt = (v) => Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const rotuloDe = (lista, valor) => (lista.find((x) => x.valor === valor) || { rotulo: valor }).rotulo
+%>
+
+<div class="container py-4" style="max-width:1000px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/orcamento/relatorios/lrf" class="text-decoration-none">LRF</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Cadastros do RGF</li>
+    </ol>
+  </nav>
+
+  <h2 class="h4 fw-bold mb-1"><i class="bi bi-journal-bookmark me-1 text-primary"></i>Cadastros do RGF <span class="text-muted fw-normal">· exercício <%= ano %></span></h2>
+  <p class="text-muted small mb-3">Dados que não nascem da execução orçamentária e alimentam os anexos oficiais do RGF (MDF 9ª ed.): estoque da Dívida Consolidada (Anexo 2), garantias concedidas (Anexo 3) e operações de crédito (Anexo 4).</p>
+
+  <% if (erro) { %><div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div><% } %>
+  <% if (aviso) { %><div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i><%= aviso %></div><% } %>
+
+  <!-- ── Dívida Consolidada ─────────────────────────────────────────────── -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-bank me-1 text-primary"></i>Dívida Consolidada (Anexo 2) <span class="badge text-bg-secondary ms-1">total R$ <%= fmt(totais.divida.total) %></span></h6>
+    <% if (divida.length) { %>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr class="small text-muted"><th>Categoria</th><th>Descrição</th><th class="text-end">Saldo (R$)</th><th></th></tr></thead>
+        <tbody>
+          <% for (const d of divida) { %>
+            <tr class="small">
+              <td><%= rotuloDe(categoriasDivida, d.categoria) %></td>
+              <td><%= d.descricao %></td>
+              <td class="text-end text-nowrap"><%= fmt(d.valorSaldo) %></td>
+              <td class="text-end">
+                <% if (podeEscrever) { %>
+                  <form method="post" action="/app/orcamento/rgf/cadastros/divida/excluir" class="m-0 d-inline">
+                    <input type="hidden" name="id" value="<%= d.id %>">
+                    <button class="btn btn-sm btn-outline-danger py-0" title="Excluir"><i class="bi bi-trash"></i></button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table></div>
+    <% } else { %>
+      <div class="small text-muted mb-2">Nenhum item — o Anexo 2 mostra a dívida zerada até o estoque ser cadastrado.</div>
+    <% } %>
+    <% if (podeEscrever) { %>
+      <form method="post" action="/app/orcamento/rgf/cadastros/divida" class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label small mb-0">Categoria</label>
+          <select name="categoria" class="form-select form-select-sm"><% for (const c of categoriasDivida) { %><option value="<%= c.valor %>"><%= c.rotulo %></option><% } %></select></div>
+        <div class="col-md-5"><label class="form-label small mb-0">Descrição</label>
+          <input name="descricao" class="form-control form-control-sm" placeholder="ex.: Financiamento CAIXA — Saneamento" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Saldo (R$)</label>
+          <input name="valorSaldo" class="form-control form-control-sm" placeholder="0,00" required></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Adicionar</button></div>
+      </form>
+    <% } %>
+  </div></div>
+
+  <!-- ── Garantias ──────────────────────────────────────────────────────── -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-shield-lock me-1 text-primary"></i>Garantias concedidas (Anexo 3) <span class="badge text-bg-secondary ms-1">total R$ <%= fmt(totais.garantias.total) %></span></h6>
+    <% if (garantias.length) { %>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr class="small text-muted"><th>Tipo</th><th>Beneficiário</th><th class="text-end">Valor (R$)</th><th class="text-end">Contragarantia (R$)</th><th></th></tr></thead>
+        <tbody>
+          <% for (const g of garantias) { %>
+            <tr class="small">
+              <td><%= rotuloDe(tiposGarantia, g.tipo) %></td>
+              <td><%= g.beneficiario %></td>
+              <td class="text-end text-nowrap"><%= fmt(g.valor) %></td>
+              <td class="text-end text-nowrap"><%= fmt(g.contragarantia) %></td>
+              <td class="text-end">
+                <% if (podeEscrever) { %>
+                  <form method="post" action="/app/orcamento/rgf/cadastros/garantia/excluir" class="m-0 d-inline">
+                    <input type="hidden" name="id" value="<%= g.id %>">
+                    <button class="btn btn-sm btn-outline-danger py-0" title="Excluir"><i class="bi bi-trash"></i></button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table></div>
+    <% } else { %>
+      <div class="small text-muted mb-2">Nenhuma garantia — o Anexo 3 sai zerado (situação comum em municípios).</div>
+    <% } %>
+    <% if (podeEscrever) { %>
+      <form method="post" action="/app/orcamento/rgf/cadastros/garantia" class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label small mb-0">Tipo</label>
+          <select name="tipo" class="form-select form-select-sm"><% for (const t of tiposGarantia) { %><option value="<%= t.valor %>"><%= t.rotulo %></option><% } %></select></div>
+        <div class="col-md-4"><label class="form-label small mb-0">Beneficiário</label>
+          <input name="beneficiario" class="form-control form-control-sm" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Valor (R$)</label>
+          <input name="valor" class="form-control form-control-sm" placeholder="0,00" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Contragarantia</label>
+          <input name="contragarantia" class="form-control form-control-sm" placeholder="0,00"></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Adicionar</button></div>
+      </form>
+    <% } %>
+  </div></div>
+
+  <!-- ── Operações de crédito ───────────────────────────────────────────── -->
+  <div class="card border-0 shadow-sm"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-cash-coin me-1 text-primary"></i>Operações de crédito (Anexo 4) <span class="badge text-bg-secondary ms-1">sujeitas R$ <%= fmt(totais.operacoes.sujeitas) %> · ARO R$ <%= fmt(totais.operacoes.aro) %></span></h6>
+    <% if (operacoes.length) { %>
+      <div class="table-responsive"><table class="table table-sm align-middle">
+        <thead><tr class="small text-muted"><th>Data</th><th>Tipo</th><th>Credor</th><th class="text-end">Valor (R$)</th><th></th></tr></thead>
+        <tbody>
+          <% for (const o of operacoes) { %>
+            <tr class="small">
+              <td class="text-nowrap"><%= o.data.toLocaleDateString('pt-BR', { timeZone: 'UTC' }) %></td>
+              <td><%= rotuloDe(tiposOperacao, o.tipo) %></td>
+              <td><%= o.credor %></td>
+              <td class="text-end text-nowrap"><%= fmt(o.valor) %></td>
+              <td class="text-end">
+                <% if (podeEscrever) { %>
+                  <form method="post" action="/app/orcamento/rgf/cadastros/operacao/excluir" class="m-0 d-inline">
+                    <input type="hidden" name="id" value="<%= o.id %>">
+                    <button class="btn btn-sm btn-outline-danger py-0" title="Excluir"><i class="bi bi-trash"></i></button>
+                  </form>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table></div>
+    <% } else { %>
+      <div class="small text-muted mb-2">Nenhuma operação — o Anexo 4 sai zerado.</div>
+    <% } %>
+    <% if (podeEscrever) { %>
+      <form method="post" action="/app/orcamento/rgf/cadastros/operacao" class="row g-2 align-items-end">
+        <div class="col-md-2"><label class="form-label small mb-0">Data</label>
+          <input type="date" name="data" class="form-control form-control-sm" required></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Tipo</label>
+          <select name="tipo" class="form-select form-select-sm"><% for (const t of tiposOperacao) { %><option value="<%= t.valor %>"><%= t.rotulo %></option><% } %></select></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Credor</label>
+          <input name="credor" class="form-control form-control-sm" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Valor (R$)</label>
+          <input name="valor" class="form-control form-control-sm" placeholder="0,00" required></div>
+        <div class="col-md-2"><button class="btn btn-sm btn-primary w-100"><i class="bi bi-plus-lg me-1"></i>Adicionar</button></div>
+      </form>
+    <% } %>
+  </div></div>
+</div>
+</body>
+</html>

@@ -13,6 +13,7 @@ import { appMemoriaisBancadaRoutes } from './memoriais-bancada.js'
 import { appLancamentoTributarioRoutes } from './lancamento-tributario.js'
 import { appConfiguracaoRoutes } from './configuracao.js'
 import { appSincronizacaoRoutes } from './sincronizacao.js'
+import { appRgfRoutes } from './rgf.js'
 import { appLancamentosRoutes } from './lancamentos.js'
 import { appContasRoutes } from './contas.js'
 import { appContasReceitaRoutes } from './contas-receita.js'
@@ -161,6 +162,7 @@ export async function appRoutes(app: FastifyInstance) {
     autenticado.register(appContasBancariasRoutes)
     autenticado.register(appConfiguracaoRoutes)
     autenticado.register(appSincronizacaoRoutes)
+    autenticado.register(appRgfRoutes)
     autenticado.register(appFavoritosRoutes)
   })
 }
