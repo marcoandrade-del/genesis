@@ -41,7 +41,7 @@ describe('MemorialGuardiaoService', () => {
     prisma.dotacaoDespesa.findMany.mockResolvedValue([...pessoal(440), ...indices(300, 160)])
   })
 
-  it('monta RCL + Pessoal + Educação/Saúde (informativos) + índices MDE/ASPS (fiéis)', async () => {
+  it('monta RCL + Pessoal + Educação/Saúde (informativos) + índices MDE/ASPS (fiéis) + DCL/Garantias/Op. Crédito', async () => {
     const g = await svc.guardiao('e1', 2026)
     const nomes = g!.indicadores.map((i) => i.indicador)
     expect(nomes).toEqual([
@@ -51,6 +51,9 @@ describe('MemorialGuardiaoService', () => {
       'Aplicação em Saúde',
       'Índice MDE',
       'Índice ASPS',
+      'Dívida Consolidada Líquida',
+      'Garantias de valores',
+      'Operações de crédito',
     ])
     const p = g!.indicadores[1]!
     expect(p.percentual).toBe(44) // 440/1000
@@ -71,22 +74,41 @@ describe('MemorialGuardiaoService', () => {
     expect(asps.nivel).toBe('ok')
   })
 
-  it('DCL cadastrada nas metas → indicador com % da RCL e limite 120% (negativa = ok)', async () => {
+  it('DCL VIVA: dívida do cadastro − deduções; % da RCL, limite 120% e alerta 108', async () => {
+    prisma.dividaItem.findMany.mockResolvedValue([{ categoria: 'DEMAIS', valorSaldo: dec(1300) }]) // 130% > 120%
+    const g = await svc.guardiao('e1', 2026)
+    const dcl = g!.indicadores.find((i) => i.indicador === 'Dívida Consolidada Líquida')!
+    expect(dcl.valor).toBe(1300) // deduções 0 (sem contas/movimentos no mock)
+    expect(dcl.percentual).toBe(130)
+    expect(dcl.limite).toBe(120)
+    expect(dcl.alerta).toBe(108)
+    expect(dcl.nivel).toBe('estouro')
+  })
+
+  it('DCL: a meta da LDO entra no memorial como comparativo, não no cálculo', async () => {
     prisma.metaFiscal.findUnique.mockResolvedValue({ valorMeta: dec(-500) })
     const g = await svc.guardiao('e1', 2026)
     const dcl = g!.indicadores.find((i) => i.indicador === 'Dívida Consolidada Líquida')!
-    expect(dcl.percentual).toBe(-50) // −500/1000
-    expect(dcl.limite).toBe(120)
+    expect(dcl.valor).toBe(0) // cadastro vazio → DCL 0, não a meta
     expect(dcl.nivel).toBe('ok')
-    prisma.metaFiscal.findUnique.mockResolvedValue({ valorMeta: dec(1300) }) // 130% > 120%
-    const g2 = await svc.guardiao('e1', 2026)
-    expect(g2!.indicadores.find((i) => i.indicador === 'Dívida Consolidada Líquida')!.nivel).toBe('estouro')
+    expect(dcl.memorial.linhas.find((l) => l.item.includes('LDO'))!.valor).toBe(-500)
   })
 
-  it('sem DCL cadastrada → Guardião não inclui o indicador', async () => {
-    prisma.metaFiscal.findUnique.mockResolvedValue(null)
+  it('Garantias e Op. Crédito viram indicadores; ARO ≥ 7% contamina a situação', async () => {
+    prisma.garantia.findMany.mockResolvedValue([{ tipo: 'INTERNA', valor: dec(50), contragarantia: dec(0) }])
+    prisma.operacaoCredito.findMany.mockResolvedValue([
+      { tipo: 'CONTRATUAL_INTERNA', valor: dec(100) },
+      { tipo: 'ARO', valor: dec(80) }, // 8% > 7%
+    ])
     const g = await svc.guardiao('e1', 2026)
-    expect(g!.indicadores.some((i) => i.indicador === 'Dívida Consolidada Líquida')).toBe(false)
+    const gar = g!.indicadores.find((i) => i.indicador === 'Garantias de valores')!
+    expect(gar.percentual).toBe(5)
+    expect(gar.limite).toBe(22)
+    expect(gar.nivel).toBe('ok')
+    const op = g!.indicadores.find((i) => i.indicador === 'Operações de crédito')!
+    expect(op.percentual).toBe(10) // sujeitas 100/1000; ARO fora do valor principal
+    expect(op.nivel).toBe('estouro') // ARO 8% ≥ 7%
+    expect(op.memorial.linhas.find((l) => l.item.includes('ARO'))!.valor).toBe(80)
   })
 
   it('índice abaixo do mínimo constitucional → nivel abaixo_minimo', async () => {
@@ -132,6 +154,9 @@ describe('MemorialGuardiaoService', () => {
       'Despesa com Pessoal',
       'Índice MDE',
       'Índice ASPS',
+      'Dívida Consolidada Líquida',
+      'Garantias de valores',
+      'Operações de crédito',
     ])
   })
 
@@ -139,7 +164,13 @@ describe('MemorialGuardiaoService', () => {
     prisma.orcamento.findUnique.mockReset()
     prisma.orcamento.findUnique.mockResolvedValueOnce({ id: 'o1' }).mockResolvedValue(null)
     const g = await svc.guardiao('e1', 2026)
-    expect(g!.indicadores.map((i) => i.indicador)).toEqual(['Receita Corrente Líquida', 'Despesa com Pessoal'])
+    expect(g!.indicadores.map((i) => i.indicador)).toEqual([
+      'Receita Corrente Líquida',
+      'Despesa com Pessoal',
+      'Dívida Consolidada Líquida',
+      'Garantias de valores',
+      'Operações de crédito',
+    ])
     expect(g!.indicadores[1]!.valor).toBe(0)
   })
 
