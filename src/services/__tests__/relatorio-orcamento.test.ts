@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, montarRgfAnexo4, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, montarRgfAnexo4, montarRgfAnexo6, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -563,6 +563,39 @@ describe('montarRgfAnexo4', () => {
   it('sem operações anota a ausência no período', () => {
     const html = montarRgfAnexo4({ ...base, sujeitasTotal: 0, naoSujeitasTotal: 0, aro: 0, pctSujeitas: 0, pctAro: 0 })
     expect(html).toContain('sem operações de crédito realizadas')
+  })
+})
+
+describe('montarRgfAnexo6', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    quadrimestre: { rotulo: '2º Quadrimestre (maio a agosto) de 2026', prazoPublicacao: '30/09/2026', parcial: true },
+    rcl: 1000,
+    rclRealizada: 700,
+    linhas: [
+      { rotulo: 'Despesa Total com Pessoal — DTP (executada)', valor: 500, pctRcl: 50, limitePct: 54, limiteValor: 540, nivel: 'alerta' },
+      { rotulo: 'Dívida Consolidada Líquida — DCL', valor: -100, pctRcl: -10, limitePct: 120, limiteValor: 1200, nivel: 'ok' },
+    ],
+    disponibilidade: null,
+  }
+
+  it('renderiza o quadro-resumo com valores, %, limites e situação', () => {
+    const html = montarRgfAnexo6(base)
+    expect(html).toContain('RGF Anexo 6')
+    expect(html).toContain('Despesa Total com Pessoal')
+    expect(html).toContain('540,00')
+    expect(html).toContain('Alerta do TCE')
+    expect(html).toMatch(/color:#b00[^>]*>-100,00/) // DCL negativa em vermelho
+    expect(html).toContain('RCL realizada acumulada')
+    expect(html).not.toContain('3º quadrimestre') // bloco só no q=3
+  })
+
+  it('no 3º quadrimestre mostra disponibilidade × RP', () => {
+    const html = montarRgfAnexo6({ ...base, disponibilidade: { caixaLiquida: 200, rpNaoProcessados: 40 } })
+    expect(html).toContain('Disponibilidade de caixa × Restos a Pagar')
+    expect(html).toContain('200,00')
+    expect(html).toContain('40,00')
   })
 })
 

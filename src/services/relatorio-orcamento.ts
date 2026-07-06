@@ -878,6 +878,54 @@ export function montarRgfAnexo4(dados: DadosRgfAnexo4): string {
   )
 }
 
+export interface DadosRgfAnexo6 {
+  cabecalho: CabecalhoDemonstrativo
+  quadrimestre: { rotulo: string; prazoPublicacao: string; parcial: boolean }
+  rcl: number
+  rclRealizada: number
+  linhas: { rotulo: string; valor: number; pctRcl: number | null; limitePct: number | null; limiteValor: number | null; nivel: string }[]
+  disponibilidade: { caixaLiquida: number; rpNaoProcessados: number } | null // só q=3
+}
+
+/** RGF Anexo 6 (MDF 9ª ed.): Demonstrativo Simplificado — o quadro-resumo dos
+ *  limites (Pessoal, DCL, Garantias, Operações de Crédito e ARO), composto dos
+ *  MESMOS cálculos dos anexos-fonte. Disponibilidade × RP só no 3º quadrimestre. */
+export function montarRgfAnexo6(dados: DadosRgfAnexo6): string {
+  const { cabecalho: c, quadrimestre: qd, rcl, rclRealizada, linhas, disponibilidade } = dados
+  const pctF = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const linha = (l: DadosRgfAnexo6['linhas'][number]) =>
+    `<tr><td>${esc(l.rotulo)}</td>` +
+    `<td class="num"${neg(l.valor)}>${formatarReais(l.valor)}</td>` +
+    `<td class="num">${l.pctRcl != null ? pctF(l.pctRcl) : '—'}</td>` +
+    `<td class="num">${l.limitePct != null ? pctF(l.limitePct) : '—'}</td>` +
+    `<td class="num">${l.limiteValor != null ? formatarReais(l.limiteValor) : '—'}</td>` +
+    `<td>${NIVEL_TXT[l.nivel] ?? l.nivel}</td></tr>`
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 6 — Demonstrativo Simplificado do Relatório de Gestão Fiscal (MDF 9ª ed.)') +
+    `<div class="dem-sub">Período de referência: ${esc(qd.rotulo)}${qd.parcial ? ' — <strong>posição parcial</strong>' : ''} · Publicação até ${esc(qd.prazoPublicacao)} (LRF art. 55 §2º)</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Indicador</th><th class="num">Valor (R$)</th><th class="num">% da RCL</th><th class="num">Limite (%)</th><th class="num">Limite (R$)</th><th>Situação</th></tr></thead>` +
+    `<tbody>${linhas.map(linha).join('')}</tbody>` +
+    `<tfoot>` +
+    `<tr><th>RECEITA CORRENTE LÍQUIDA — RCL</th><th class="num">${formatarReais(rcl)}</th><th colspan="4"></th></tr>` +
+    `<tr><td>RCL realizada acumulada no exercício (informativo)</td><td class="num">${formatarReais(rclRealizada)}</td><td colspan="4"></td></tr>` +
+    `</tfoot>` +
+    `</table>` +
+    (disponibilidade
+      ? `<h2 class="dem-sec">Disponibilidade de caixa × Restos a Pagar (3º quadrimestre)</h2>` +
+        `<table class="dem-tab"><tfoot>` +
+        `<tr><td>Disponibilidade de caixa líquida (caixa − RP processados)</td><td class="num"${neg(disponibilidade.caixaLiquida)}>${formatarReais(disponibilidade.caixaLiquida)}</td></tr>` +
+        `<tr><td>Restos a pagar não processados inscritos</td><td class="num">${formatarReais(disponibilidade.rpNaoProcessados)}</td></tr>` +
+        `</tfoot></table>`
+      : '') +
+    `<div class="dem-sub">Composto dos mesmos cálculos dos Anexos 1–5 — os números fecham entre os demonstrativos. Detalhes e memórias de cálculo nos anexos-fonte.</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

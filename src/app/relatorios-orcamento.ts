@@ -26,6 +26,7 @@ import {
   montarRgfAnexo2,
   montarRgfAnexo3,
   montarRgfAnexo4,
+  montarRgfAnexo6,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -34,6 +35,7 @@ import { gerarPdf } from '../services/relatorio-pdf.js'
 import { parseQuadrimestre, periodoQuadrimestre, formatarDataUtc } from '../services/quadrimestre.js'
 import { DclService } from '../services/dcl.js'
 import { RgfCadastrosService } from '../services/rgf-cadastros.js'
+import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
 
 type EntidadeCab = {
   nome: string
@@ -64,6 +66,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const metasSvc = new MetasFiscaisService(app.prisma)
   const dclSvc = new DclService(app.prisma)
   const rgfCadSvc = new RgfCadastrosService(app.prisma)
+  const rgfSimplesSvc = new RgfSimplificadoService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -858,7 +861,25 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
 
   rotasRgf('anexo2', 'RGF Anexo 2 — Dívida Consolidada Líquida', 'RGF Anexo 2 (DCL)', rgfAnexo2)
   rotasRgf('anexo3', 'RGF Anexo 3 — Garantias e Contragarantias', 'RGF Anexo 3 (Garantias)', rgfAnexo3)
+  async function rgfAnexo6(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, ctx] = [await entidadeCtx(entidadeId, ano), ctxQuadrimestre(req, ano)]
+    const r = await rgfSimplesSvc.calcular(entidadeId, ano, ctx.q)
+    const corpo = r.temOrcamento
+      ? montarRgfAnexo6({
+          cabecalho: cab(e, ano, meta),
+          quadrimestre: ctx.quadrimestre,
+          rcl: r.rcl,
+          rclRealizada: r.rclRealizada,
+          linhas: r.linhas,
+          disponibilidade: r.disponibilidade,
+        })
+      : ''
+    return { e, ano, q: ctx.q, temOrcamento: r.temOrcamento, corpo, meta }
+  }
+
   rotasRgf('anexo4', 'RGF Anexo 4 — Operações de Crédito', 'RGF Anexo 4 (Op. Crédito)', rgfAnexo4)
+  rotasRgf('anexo6', 'RGF Anexo 6 — Demonstrativo Simplificado', 'RGF Anexo 6 (Simplificado)', rgfAnexo6)
 
   // ── Índices constitucionais — MDE 25% / ASPS 15% (função × fonte real) ──────
   async function indicesConstitucionais(req: FastifyRequest) {
