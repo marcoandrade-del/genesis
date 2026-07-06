@@ -721,6 +721,110 @@ export function montarRgfAnexo1(dados: DadosRgfAnexo1): string {
   )
 }
 
+export interface DadosRgfAnexo2 {
+  cabecalho: CabecalhoDemonstrativo
+  quadrimestre: { rotulo: string; prazoPublicacao: string; parcial: boolean }
+  dividaPorCategoria: { rotulo: string; total: number }[]
+  dividaTotal: number
+  deducoes: { caixa: number; rpProcessados: number; total: number }
+  dcl: number
+  rcl: number
+  pctDc: number // DC ÷ RCL
+  pctDcl: number // DCL ÷ RCL
+  nivel: string
+  metaLdo: number | null
+  temDivida: boolean
+}
+
+const neg = (v: number) => (v < 0 ? ' style="color:#b00"' : '')
+
+/** RGF Anexo 2 (MDF 9ª ed.): Dívida Consolidada (I) − deduções de caixa/RP
+ *  (II) = DCL (III), com %DC/%DCL sobre a RCL e limite de 120% (Res. Senado
+ *  40/2001; alerta 108%, LRF art. 59 §1º). A DCL informada na LDO aparece como
+ *  comparativo — Δ é informação, não erro. */
+export function montarRgfAnexo2(dados: DadosRgfAnexo2): string {
+  const { cabecalho: c, quadrimestre: qd, dividaPorCategoria, dividaTotal, deducoes, dcl, rcl, pctDc, pctDcl, nivel, metaLdo } = dados
+  const pctF = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const linhaCat = (l: { rotulo: string; total: number }) =>
+    `<tr><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.total)}</td></tr>`
+  const situacao = NIVEL_TXT[nivel] ?? nivel
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 2 — Demonstrativo da Dívida Consolidada Líquida (MDF 9ª ed.)') +
+    `<div class="dem-sub">Período de referência: ${esc(qd.rotulo)}${qd.parcial ? ' — <strong>posição parcial</strong>' : ''} · Publicação até ${esc(qd.prazoPublicacao)} (LRF art. 55 §2º)</div>` +
+    (!dados.temDivida ? `<div class="dem-sub"><strong>Sem itens no cadastro da dívida</strong> — o estoque aparece zerado até o cadastro (Cadastros do RGF).</div>` : '') +
+    `<h2 class="dem-sec">Dívida Consolidada — DC (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Saldo (R$)</th></tr></thead>` +
+    `<tbody>${dividaPorCategoria.map(linhaCat).join('')}</tbody>` +
+    `<tfoot><tr><th>DÍVIDA CONSOLIDADA (I)</th><th class="num">${formatarReais(dividaTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<h2 class="dem-sec">Deduções (II)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor (R$)</th></tr></thead>` +
+    `<tbody>` +
+    `<tr><td>Disponibilidade de caixa bruta</td><td class="num">${formatarReais(deducoes.caixa)}</td></tr>` +
+    `<tr><td>(−) Restos a pagar processados</td><td class="num">${formatarReais(deducoes.rpProcessados)}</td></tr>` +
+    `</tbody>` +
+    `<tfoot><tr><th>TOTAL DAS DEDUÇÕES (II)</th><th class="num">${formatarReais(deducoes.total)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><th>DÍVIDA CONSOLIDADA LÍQUIDA — DCL (III) = (I − II)</th><th class="num"${neg(dcl)}>${formatarReais(dcl)}</th></tr>` +
+    `<tr><td>RECEITA CORRENTE LÍQUIDA — RCL</td><td class="num">${formatarReais(rcl)}</td></tr>` +
+    `<tr><td>% DA DC SOBRE A RCL (I ÷ RCL)</td><td class="num">${pctF(pctDc)}</td></tr>` +
+    `<tr><th>% DA DCL SOBRE A RCL (III ÷ RCL)</th><th class="num">${pctF(pctDcl)}</th></tr>` +
+    `<tr><td>LIMITE — 120% da RCL (Res. Senado 40/2001)</td><td class="num">${formatarReais(Math.round(rcl * 120) / 100)}</td></tr>` +
+    `<tr><td>LIMITE DE ALERTA — 108% da RCL (LRF art. 59 §1º, III)</td><td class="num">${formatarReais(Math.round(rcl * 108) / 100)}</td></tr>` +
+    `</tfoot></table>` +
+    `<div class="dem-sub">Situação: <strong>${esc(situacao)}</strong>` +
+    (metaLdo != null ? ` · DCL informada na LDO: <span${neg(metaLdo)}>${formatarReais(metaLdo)}</span> (comparativo — a diferença reflete o que a base ainda não captura, ex.: saldos bancários reais)` : '') +
+    `</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
+export interface DadosRgfAnexo3 {
+  cabecalho: CabecalhoDemonstrativo
+  quadrimestre: { rotulo: string; prazoPublicacao: string; parcial: boolean }
+  garantiasPorTipo: { rotulo: string; total: number; contragarantias: number }[]
+  total: number
+  contragarantias: number
+  rcl: number
+  percentual: number
+  nivel: string
+}
+
+/** RGF Anexo 3 (MDF 9ª ed.): garantias e contragarantias de valores — total
+ *  concedido × limite de 22% da RCL (Res. Senado 43/2001 art. 9º; alerta 19,8%). */
+export function montarRgfAnexo3(dados: DadosRgfAnexo3): string {
+  const { cabecalho: c, quadrimestre: qd, garantiasPorTipo, total, contragarantias, rcl, percentual, nivel } = dados
+  const pctF = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const situacao = NIVEL_TXT[nivel] ?? nivel
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 3 — Demonstrativo das Garantias e Contragarantias de Valores (MDF 9ª ed.)') +
+    `<div class="dem-sub">Período de referência: ${esc(qd.rotulo)}${qd.parcial ? ' — <strong>posição parcial</strong>' : ''} · Publicação até ${esc(qd.prazoPublicacao)} (LRF art. 55 §2º)</div>` +
+    `<h2 class="dem-sec">Garantias concedidas (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Tipo</th><th class="num">Garantias (R$)</th><th class="num">Contragarantias (R$)</th></tr></thead>` +
+    `<tbody>${garantiasPorTipo.map((g) => `<tr><td>${esc(g.rotulo)}</td><td class="num">${formatarReais(g.total)}</td><td class="num">${formatarReais(g.contragarantias)}</td></tr>`).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL (I)</th><th class="num">${formatarReais(total)}</th><th class="num">${formatarReais(contragarantias)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><td>RECEITA CORRENTE LÍQUIDA — RCL</td><td class="num">${formatarReais(rcl)}</td></tr>` +
+    `<tr><th>% DAS GARANTIAS SOBRE A RCL (I ÷ RCL)</th><th class="num">${pctF(percentual)}</th></tr>` +
+    `<tr><td>LIMITE — 22% da RCL (Res. Senado 43/2001, art. 9º)</td><td class="num">${formatarReais(Math.round(rcl * 22) / 100)}</td></tr>` +
+    `<tr><td>LIMITE DE ALERTA — 19,80% da RCL (LRF art. 59 §1º)</td><td class="num">${formatarReais(Math.round(rcl * 19.8) / 100)}</td></tr>` +
+    `</tfoot></table>` +
+    `<div class="dem-sub">Situação: <strong>${esc(situacao)}</strong>${total === 0 ? ' · sem garantias concedidas no exercício (situação comum em municípios)' : ''}</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

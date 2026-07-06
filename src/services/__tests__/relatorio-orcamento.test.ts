@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -441,6 +441,85 @@ describe('montarRgfAnexo1', () => {
   it('mesCorte fora da faixa não quebra (mínimo 1, máximo 12)', () => {
     expect(montarRgfAnexo1({ ...base, mesCorte: 0 })).toContain('<th class="num">Jan</th>')
     expect(montarRgfAnexo1({ ...base, mesCorte: 99 })).toContain('<th class="num">Dez</th>')
+  })
+})
+
+describe('montarRgfAnexo2', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    quadrimestre: { rotulo: '2º Quadrimestre (maio a agosto) de 2026', prazoPublicacao: '30/09/2026', parcial: true },
+    dividaPorCategoria: [
+      { rotulo: 'Dívida contratual', total: 500 },
+      { rotulo: 'Precatórios (posteriores a 5/5/2000)', total: 44.32 },
+    ],
+    dividaTotal: 544.32,
+    deducoes: { caixa: 1083.94, rpProcessados: 50, total: 1033.94 },
+    dcl: -489.62,
+    rcl: 1000,
+    pctDc: 54.43,
+    pctDcl: -48.96,
+    nivel: 'ok',
+    metaLdo: -539.62,
+    temDivida: true,
+  }
+
+  it('renderiza DC (I), deduções (II), DCL (III) negativa em vermelho, limites e comparativo LDO', () => {
+    const html = montarRgfAnexo2(base)
+    expect(html).toContain('RGF Anexo 2')
+    expect(html).toContain('DÍVIDA CONSOLIDADA (I)')
+    expect(html).toContain('544,32')
+    expect(html).toContain('Restos a pagar processados')
+    expect(html).toContain('TOTAL DAS DEDUÇÕES (II)')
+    expect(html).toMatch(/color:#b00[^>]*>-489,62/)
+    expect(html).toContain('120% da RCL')
+    expect(html).toContain('1.200,00') // limite
+    expect(html).toContain('1.080,00') // alerta 108%
+    expect(html).toContain('DCL informada na LDO')
+    expect(html).toContain('-539,62')
+  })
+
+  it('sem itens no cadastro avisa que o estoque está zerado', () => {
+    const html = montarRgfAnexo2({ ...base, temDivida: false, dividaTotal: 0 })
+    expect(html).toContain('Sem itens no cadastro da dívida')
+  })
+
+  it('sem meta LDO não mostra o comparativo', () => {
+    const html = montarRgfAnexo2({ ...base, metaLdo: null })
+    expect(html).not.toContain('DCL informada na LDO')
+  })
+})
+
+describe('montarRgfAnexo3', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    quadrimestre: { rotulo: '1º Quadrimestre (janeiro a abril) de 2026', prazoPublicacao: '30/05/2026', parcial: false },
+    garantiasPorTipo: [
+      { rotulo: 'Interna', total: 50, contragarantias: 50 },
+      { rotulo: 'Externa', total: 0, contragarantias: 0 },
+    ],
+    total: 50,
+    contragarantias: 50,
+    rcl: 1000,
+    percentual: 5,
+    nivel: 'ok',
+  }
+
+  it('renderiza garantias por tipo, contragarantias e o limite de 22% em R$', () => {
+    const html = montarRgfAnexo3(base)
+    expect(html).toContain('RGF Anexo 3')
+    expect(html).toContain('Interna')
+    expect(html).toContain('22% da RCL')
+    expect(html).toContain('220,00') // 22% de 1000
+    expect(html).toContain('198,00') // alerta 19,8%
+    expect(html).toContain('5,00%')
+    expect(html).not.toContain('posição parcial')
+  })
+
+  it('total zero anota a situação comum de municípios', () => {
+    const html = montarRgfAnexo3({ ...base, total: 0, percentual: 0 })
+    expect(html).toContain('sem garantias concedidas')
   })
 })
 

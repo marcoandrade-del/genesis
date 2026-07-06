@@ -44,6 +44,8 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/relatorios/rcl-consolidada', nome: 'RCL Consolidada', icone: 'bi-bank2', tipo: 'FUNCIONALIDADE', descricao: 'Soma das entidades do município' },
       { rota: '/app/orcamento/relatorios/despesa-pessoal', nome: 'Despesa com Pessoal (projeção)', icone: 'bi-people', tipo: 'FUNCIONALIDADE', descricao: 'DTP pela dotação autorizada e % da RCL (limite 54%)' },
       { rota: '/app/orcamento/relatorios/rgf/anexo1', nome: 'RGF Anexo 1 — Pessoal', icone: 'bi-people-fill', tipo: 'FUNCIONALIDADE', descricao: 'DTP executada por quadrimestre (MDF 9ª ed.)' },
+      { rota: '/app/orcamento/relatorios/rgf/anexo2', nome: 'RGF Anexo 2 — DCL', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Dívida Consolidada Líquida viva (limite 120% RCL)' },
+      { rota: '/app/orcamento/relatorios/rgf/anexo3', nome: 'RGF Anexo 3 — Garantias', icone: 'bi-shield-lock', tipo: 'FUNCIONALIDADE', descricao: 'Garantias e contragarantias (limite 22% RCL)' },
       { rota: '/app/orcamento/rgf/cadastros', nome: 'Cadastros do RGF', icone: 'bi-journal-bookmark', tipo: 'FUNCIONALIDADE', descricao: 'Dívida consolidada, garantias e operações de crédito' },
       { rota: '/app/orcamento/relatorios/indices-constitucionais', nome: 'Índices constitucionais', icone: 'bi-mortarboard', tipo: 'FUNCIONALIDADE', descricao: 'MDE 25% e ASPS 15% — aplicação por fonte' },
       { rota: '/app/orcamento/relatorios/despesa-funcao-rreo', nome: 'Despesa por função (RREO)', icone: 'bi-columns-gap', tipo: 'FUNCIONALIDADE', descricao: 'Execução por função — empenhado e %' },

@@ -23,12 +23,16 @@ import {
   montarDespesaFuncaoRreo,
   montarMetasFiscais,
   montarRgfAnexo1,
+  montarRgfAnexo2,
+  montarRgfAnexo3,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
 } from '../services/relatorio-orcamento.js'
 import { gerarPdf } from '../services/relatorio-pdf.js'
 import { parseQuadrimestre, periodoQuadrimestre, formatarDataUtc } from '../services/quadrimestre.js'
+import { DclService } from '../services/dcl.js'
+import { RgfCadastrosService } from '../services/rgf-cadastros.js'
 
 type EntidadeCab = {
   nome: string
@@ -57,6 +61,8 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const indicesSvc = new IndiceConstitucionalService(app.prisma)
   const disponibilidadeSvc = new DisponibilidadeFonteService(app.prisma)
   const metasSvc = new MetasFiscaisService(app.prisma)
+  const dclSvc = new DclService(app.prisma)
+  const rgfCadSvc = new RgfCadastrosService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -706,6 +712,117 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
       .header('Content-Disposition', `inline; filename="rgf-anexo1-${ano}-q${q}.pdf"`)
       .send(pdf)
   })
+
+  // ── RGF Anexo 2 (DCL viva) e Anexo 3 (Garantias) ────────────────────────────
+  function ctxQuadrimestre(req: FastifyRequest, ano: number) {
+    const hoje = new Date()
+    const q = parseQuadrimestre((req.query as { q?: string }).q, ano, hoje)
+    const per = periodoQuadrimestre(ano, q)
+    return {
+      q,
+      per,
+      quadrimestre: { rotulo: `${per.rotulo} de ${ano}`, prazoPublicacao: formatarDataUtc(per.prazoPublicacao), parcial: hoje < per.fim },
+    }
+  }
+
+  async function rgfAnexo2(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const { e, meta, estadoRclComposicao, modeloRclComposicao } = await entidadeCtx(entidadeId, ano)
+    const { q, quadrimestre } = ctxQuadrimestre(req, ano)
+    const [d, rclR] = await Promise.all([
+      dclSvc.calcular(entidadeId, ano),
+      rclSvc.calcular(entidadeId, ano, resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao, modeloRclComposicao)),
+    ])
+    const rcl = rclR.rcl.toNumber()
+    const temOrcamento = rcl > 0
+    const pctDc = rcl > 0 ? Math.round((d.dividaTotal / rcl) * 10000) / 100 : 0
+    const pctDcl = rcl > 0 ? Math.round((d.dcl / rcl) * 10000) / 100 : 0
+    const nivel = pctDcl >= 120 ? 'estouro' : pctDcl >= 108 ? 'alerta' : 'ok'
+    const corpo = temOrcamento
+      ? montarRgfAnexo2({
+          cabecalho: cab(e, ano, meta),
+          quadrimestre,
+          dividaPorCategoria: d.dividaPorCategoria,
+          dividaTotal: d.dividaTotal,
+          deducoes: d.deducoes,
+          dcl: d.dcl,
+          rcl,
+          pctDc,
+          pctDcl,
+          nivel,
+          metaLdo: d.metaLdo,
+          temDivida: d.temDivida,
+        })
+      : ''
+    return { e, ano, q, temOrcamento, corpo, meta }
+  }
+
+  async function rgfAnexo3(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const { e, meta, estadoRclComposicao, modeloRclComposicao } = await entidadeCtx(entidadeId, ano)
+    const { q, per, quadrimestre } = ctxQuadrimestre(req, ano)
+    const [totais, rclR] = await Promise.all([
+      rgfCadSvc.totais(entidadeId, ano, per.fim),
+      rclSvc.calcular(entidadeId, ano, resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao, modeloRclComposicao)),
+    ])
+    const rcl = rclR.rcl.toNumber()
+    const temOrcamento = rcl > 0
+    const percentual = rcl > 0 ? Math.round((totais.garantias.total / rcl) * 10000) / 100 : 0
+    const nivel = percentual >= 22 ? 'estouro' : percentual >= 19.8 ? 'alerta' : 'ok'
+    const corpo = temOrcamento
+      ? montarRgfAnexo3({
+          cabecalho: cab(e, ano, meta),
+          quadrimestre,
+          garantiasPorTipo: totais.garantias.porTipo,
+          total: totais.garantias.total,
+          contragarantias: totais.garantias.contragarantias,
+          rcl,
+          percentual,
+          nivel,
+        })
+      : ''
+    return { e, ano, q, temOrcamento, corpo, meta }
+  }
+
+  const rotasRgf = (
+    slug: string,
+    titulo: string,
+    breadcrumb: string,
+    fn: (req: FastifyRequest) => Promise<{ e: EntidadeCab; ano: number; q: number; temOrcamento: boolean; corpo: string; meta: CabMeta }>,
+  ) => {
+    app.get(`/orcamento/relatorios/rgf/${slug}`, async (req, reply) => {
+      const { e, ano, q, temOrcamento, corpo } = await fn(req)
+      return reply.view('app/relatorio-demonstrativo', {
+        tituloPagina: titulo,
+        breadcrumb,
+        pdfUrl: `/app/orcamento/relatorios/rgf/${slug}.pdf?q=${q}`,
+        entidade: e,
+        ano,
+        nivel: req.contexto.nivel,
+        temOrcamento,
+        corpo,
+        layout: null,
+      })
+    })
+    app.get(`/orcamento/relatorios/rgf/${slug}.pdf`, async (req, reply) => {
+      const { ano, q, temOrcamento, corpo, meta } = await fn(req)
+      if (!temOrcamento) return reply.redirect(`/app/orcamento/relatorios/rgf/${slug}`)
+      const pdf = await gerarPdf({
+        corpoHtml: documentoPdf(`${titulo} — ${q}º Quadrimestre ${ano}`, corpo),
+        header: '<span></span>',
+        footer: footer(titulo, emissaoRodape(meta)),
+        margemTopoMm: 12,
+        margemRodapeMm: 16,
+      })
+      return reply
+        .header('Content-Type', 'application/pdf')
+        .header('Content-Disposition', `inline; filename="rgf-${slug}-${ano}-q${q}.pdf"`)
+        .send(pdf)
+    })
+  }
+
+  rotasRgf('anexo2', 'RGF Anexo 2 — Dívida Consolidada Líquida', 'RGF Anexo 2 (DCL)', rgfAnexo2)
+  rotasRgf('anexo3', 'RGF Anexo 3 — Garantias e Contragarantias', 'RGF Anexo 3 (Garantias)', rgfAnexo3)
 
   // ── Índices constitucionais — MDE 25% / ASPS 15% (função × fonte real) ──────
   async function indicesConstitucionais(req: FastifyRequest) {
