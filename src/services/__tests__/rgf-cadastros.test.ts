@@ -82,6 +82,8 @@ describe('RgfCadastrosService', () => {
       expect(t.operacoes.aro).toBe(30)
       expect(t.operacoes.naoSujeitas).toBe(5)
       expect(t.operacoes.total).toBe(155)
+      expect(t.operacoes.porTipo.find((p) => p.tipo === 'CONTRATUAL_INTERNA')).toEqual({ tipo: 'CONTRATUAL_INTERNA', rotulo: 'Contratual interna', sujeitaLimite: true, total: 100 })
+      expect(t.operacoes.porTipo.find((p) => p.tipo === 'ARO')!.total).toBe(30)
     })
 
     it('corte de período filtra as operações (lte fimPeriodo)', async () => {

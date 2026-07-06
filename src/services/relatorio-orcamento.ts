@@ -825,6 +825,59 @@ export function montarRgfAnexo3(dados: DadosRgfAnexo3): string {
   )
 }
 
+export interface DadosRgfAnexo4 {
+  cabecalho: CabecalhoDemonstrativo
+  quadrimestre: { rotulo: string; prazoPublicacao: string; parcial: boolean }
+  sujeitas: { rotulo: string; total: number }[]
+  sujeitasTotal: number
+  naoSujeitas: { rotulo: string; total: number }[] // inclui a ARO (destacada pelo rótulo)
+  naoSujeitasTotal: number
+  aro: number
+  rcl: number
+  pctSujeitas: number
+  pctAro: number
+  nivel: string
+}
+
+/** RGF Anexo 4 (MDF 9ª ed.): operações de crédito realizadas no período —
+ *  sujeitas ao limite de 16% da RCL (alerta 14,4%) e não sujeitas, com a ARO
+ *  destacada contra o limite próprio de 7% (Res. Senado 43/2001). */
+export function montarRgfAnexo4(dados: DadosRgfAnexo4): string {
+  const { cabecalho: c, quadrimestre: qd, sujeitas, sujeitasTotal, naoSujeitas, naoSujeitasTotal, aro, rcl, pctSujeitas, pctAro, nivel } = dados
+  const pctF = (v: number) => v.toFixed(2).replace('.', ',') + '%'
+  const linha = (l: { rotulo: string; total: number }) =>
+    `<tr><td>${esc(l.rotulo)}</td><td class="num">${formatarReais(l.total)}</td></tr>`
+  const situacao = NIVEL_TXT[nivel] ?? nivel
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'RGF Anexo 4 — Demonstrativo das Operações de Crédito (MDF 9ª ed.)') +
+    `<div class="dem-sub">Período de referência: ${esc(qd.rotulo)}${qd.parcial ? ' — <strong>posição parcial</strong>' : ''} · Publicação até ${esc(qd.prazoPublicacao)} (LRF art. 55 §2º)</div>` +
+    `<h2 class="dem-sec">Sujeitas ao limite para fins de contratação (I)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor realizado (R$)</th></tr></thead>` +
+    `<tbody>${sujeitas.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL SUJEITAS AO LIMITE (I)</th><th class="num">${formatarReais(sujeitasTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<h2 class="dem-sec">Não sujeitas ao limite (II)</h2>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>Especificação</th><th class="num">Valor realizado (R$)</th></tr></thead>` +
+    `<tbody>${naoSujeitas.map(linha).join('')}</tbody>` +
+    `<tfoot><tr><th>TOTAL NÃO SUJEITAS (II)</th><th class="num">${formatarReais(naoSujeitasTotal)}</th></tr></tfoot>` +
+    `</table>` +
+    `<table class="dem-tab"><tfoot>` +
+    `<tr><td>RECEITA CORRENTE LÍQUIDA — RCL</td><td class="num">${formatarReais(rcl)}</td></tr>` +
+    `<tr><th>% DAS OPERAÇÕES SUJEITAS SOBRE A RCL (I ÷ RCL)</th><th class="num">${pctF(pctSujeitas)}</th></tr>` +
+    `<tr><td>LIMITE — 16% da RCL (Res. Senado 43/2001)</td><td class="num">${formatarReais(Math.round(rcl * 16) / 100)}</td></tr>` +
+    `<tr><td>LIMITE DE ALERTA — 14,40% da RCL (LRF art. 59 §1º)</td><td class="num">${formatarReais(Math.round(rcl * 14.4) / 100)}</td></tr>` +
+    `<tr><th>ARO REALIZADA × LIMITE PRÓPRIO — 7% da RCL</th><th class="num">${formatarReais(aro)} de ${formatarReais(Math.round(rcl * 7) / 100)} (${pctF(pctAro)})</th></tr>` +
+    `</tfoot></table>` +
+    `<div class="dem-sub">Situação: <strong>${esc(situacao)}</strong>${sujeitasTotal + naoSujeitasTotal === 0 ? ' · sem operações de crédito realizadas no período' : ''}</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (

@@ -25,6 +25,7 @@ import {
   montarRgfAnexo1,
   montarRgfAnexo2,
   montarRgfAnexo3,
+  montarRgfAnexo4,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -821,8 +822,43 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
     })
   }
 
+  async function rgfAnexo4(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const { e, meta, estadoRclComposicao, modeloRclComposicao } = await entidadeCtx(entidadeId, ano)
+    const { q, per, quadrimestre } = ctxQuadrimestre(req, ano)
+    const [totais, rclR] = await Promise.all([
+      rgfCadSvc.totais(entidadeId, ano, per.fim),
+      rclSvc.calcular(entidadeId, ano, resolverComposicao(e.municipio.estado.sigla, estadoRclComposicao, modeloRclComposicao)),
+    ])
+    const rcl = rclR.rcl.toNumber()
+    const temOrcamento = rcl > 0
+    const ops = totais.operacoes
+    const pctSujeitas = rcl > 0 ? Math.round((ops.sujeitas / rcl) * 10000) / 100 : 0
+    const pctAro = rcl > 0 ? Math.round((ops.aro / rcl) * 10000) / 100 : 0
+    // situação pelo pior dos dois limites (16% sujeitas; 7% ARO)
+    const nivel =
+      pctSujeitas >= 16 || pctAro >= 7 ? 'estouro' : pctSujeitas >= 14.4 ? 'alerta' : 'ok'
+    const corpo = temOrcamento
+      ? montarRgfAnexo4({
+          cabecalho: cab(e, ano, meta),
+          quadrimestre,
+          sujeitas: ops.porTipo.filter((t) => t.sujeitaLimite).map((t) => ({ rotulo: t.rotulo, total: t.total })),
+          sujeitasTotal: ops.sujeitas,
+          naoSujeitas: ops.porTipo.filter((t) => !t.sujeitaLimite).map((t) => ({ rotulo: t.rotulo, total: t.total })),
+          naoSujeitasTotal: Math.round((ops.aro + ops.naoSujeitas) * 100) / 100,
+          aro: ops.aro,
+          rcl,
+          pctSujeitas,
+          pctAro,
+          nivel,
+        })
+      : ''
+    return { e, ano, q, temOrcamento, corpo, meta }
+  }
+
   rotasRgf('anexo2', 'RGF Anexo 2 — Dívida Consolidada Líquida', 'RGF Anexo 2 (DCL)', rgfAnexo2)
   rotasRgf('anexo3', 'RGF Anexo 3 — Garantias e Contragarantias', 'RGF Anexo 3 (Garantias)', rgfAnexo3)
+  rotasRgf('anexo4', 'RGF Anexo 4 — Operações de Crédito', 'RGF Anexo 4 (Op. Crédito)', rgfAnexo4)
 
   // ── Índices constitucionais — MDE 25% / ASPS 15% (função × fonte real) ──────
   async function indicesConstitucionais(req: FastifyRequest) {

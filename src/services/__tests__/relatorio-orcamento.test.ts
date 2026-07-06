@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, montarRgfAnexo4, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -520,6 +520,49 @@ describe('montarRgfAnexo3', () => {
   it('total zero anota a situação comum de municípios', () => {
     const html = montarRgfAnexo3({ ...base, total: 0, percentual: 0 })
     expect(html).toContain('sem garantias concedidas')
+  })
+})
+
+describe('montarRgfAnexo4', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    quadrimestre: { rotulo: '2º Quadrimestre (maio a agosto) de 2026', prazoPublicacao: '30/09/2026', parcial: true },
+    sujeitas: [
+      { rotulo: 'Mobiliária', total: 0 },
+      { rotulo: 'Contratual interna', total: 100 },
+      { rotulo: 'Contratual externa', total: 0 },
+    ],
+    sujeitasTotal: 100,
+    naoSujeitas: [
+      { rotulo: 'Antecipação de Receita Orçamentária (ARO)', total: 30 },
+      { rotulo: 'Reestruturação da dívida', total: 5 },
+      { rotulo: 'Demais (não sujeitas ao limite)', total: 0 },
+    ],
+    naoSujeitasTotal: 35,
+    aro: 30,
+    rcl: 1000,
+    pctSujeitas: 10,
+    pctAro: 3,
+    nivel: 'ok',
+  }
+
+  it('renderiza os grupos I/II, os limites de 16% e ARO 7% em R$', () => {
+    const html = montarRgfAnexo4(base)
+    expect(html).toContain('RGF Anexo 4')
+    expect(html).toContain('TOTAL SUJEITAS AO LIMITE (I)')
+    expect(html).toContain('TOTAL NÃO SUJEITAS (II)')
+    expect(html).toContain('16% da RCL')
+    expect(html).toContain('160,00') // 16% de 1000
+    expect(html).toContain('144,00') // alerta 14,4%
+    expect(html).toContain('70,00') // ARO 7% de 1000
+    expect(html).toContain('10,00%')
+    expect(html).toContain('3,00%')
+  })
+
+  it('sem operações anota a ausência no período', () => {
+    const html = montarRgfAnexo4({ ...base, sujeitasTotal: 0, naoSujeitasTotal: 0, aro: 0, pctSujeitas: 0, pctAro: 0 })
+    expect(html).toContain('sem operações de crédito realizadas')
   })
 })
 
