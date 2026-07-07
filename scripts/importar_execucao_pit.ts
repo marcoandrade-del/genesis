@@ -41,6 +41,9 @@ const ANO = parseInt(arg('--ano', '2026'), 10)
 const IBGE6 = arg('--ibge', '411520')
 const ZIP_ARG = arg('--zip', '')
 const PIT_ENTIDADE = arg('--pit-entidade', 'MUNICÍPIO DE MARINGÁ')
+// lado banco: por padrão a Prefeitura; --entidade-banco <parte-do-nome> p/ conciliar
+// as demais entidades do município (Câmara, Previdência, autarquias)
+const ENTIDADE_BANCO = arg('--entidade-banco', '')
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
@@ -166,14 +169,11 @@ async function lerPit(zipBuf: Buffer, fontesCatalogo: Set<string>) {
 
 // ── 3. agregado do banco (MovimentoEmpenho → dotação → função/fonte) ────────
 async function lerBanco() {
-  const entidade = await prisma.entidade.findFirst({
-    where: {
-      tipo: 'PREFEITURA',
-      municipio: { is: { nome: { contains: 'Maring', mode: 'insensitive' }, estado: { is: { sigla: 'PR' } } } },
-    },
-    select: { id: true, nome: true },
-  })
-  if (!entidade) throw new Error('entidade PREFEITURA de Maringá/PR não encontrada no banco')
+  const filtroMunicipio = { municipio: { is: { nome: { contains: 'Maring', mode: 'insensitive' as const }, estado: { is: { sigla: 'PR' } } } } }
+  const entidade = ENTIDADE_BANCO
+    ? await prisma.entidade.findFirst({ where: { ...filtroMunicipio, nome: { contains: ENTIDADE_BANCO, mode: 'insensitive' } }, select: { id: true, nome: true } })
+    : await prisma.entidade.findFirst({ where: { ...filtroMunicipio, tipo: 'PREFEITURA' }, select: { id: true, nome: true } })
+  if (!entidade) throw new Error(`entidade ${ENTIDADE_BANCO || 'PREFEITURA'} de Maringá/PR não encontrada no banco`)
 
   const movs = await prisma.movimentoEmpenho.findMany({
     where: { entidadeId: entidade.id, data: { gte: new Date(`${ANO}-01-01`), lte: new Date(`${ANO}-12-31`) } },
