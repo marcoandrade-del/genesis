@@ -81,9 +81,18 @@ function* registros(xml: string, tag: string): Generator<Attrs> {
   }
 }
 
+// De/para dos códigos IRREGULARES — fogem da regra geral d+g+spec (a família
+// "via decreto" 21045 usa grupo+spec4 sem destino; 231150 não tem irmão g2 no
+// catálogo). Casados por NOMENCLATURA/valor contra o catálogo (2026-07-07).
+const DE_PARA_FONTE: Record<string, string> = {
+  '1045': '11045', // Outros Recursos não Vinculados (g1)
+  '2045': '21045', // idem, exercícios anteriores (g2)
+  '231150': '31150', // PETE g2 → catálogo só tem o g1
+}
+
 type Agregado = { emp: number; liq: number; pag: number }
 
-async function lerPit(zipBuf: Buffer) {
+async function lerPit(zipBuf: Buffer, fontesCatalogo: Set<string>) {
   const zip = await JSZip.loadAsync(zipBuf)
   const nomeXml = Object.keys(zip.files).find((n) => /_Empenho\.xml$/.test(n))
   if (!nomeXml) throw new Error(`Empenho.xml não encontrado no ZIP (${Object.keys(zip.files).join(', ')})`)
@@ -117,11 +126,34 @@ async function lerPit(zipBuf: Buffer) {
     }
     const mes = parseInt(r.nrMesCompetencia || '0', 10)
     // Fonte no código do catálogo (QDD/LOA) = cdGrupoFonte + cdFonteReceita, SEM
-    // padding: 1+000→1000, 1+486→1486, 1+097→1097, 1+1045→11045, 2+1045→21045,
-    // 4+1197→41197 (regra validada contra FonteRecursoEntidade de Maringá 2026).
-    // Atenção: é a fonte da RECEITA (cdFonteReceita) — o cdFontePadrao (despesa)
-    // diverge em pares como 494(despesa)/486(receita) e NÃO casa com o QDD.
-    const fonte = `${(r.cdGrupoFonte || '1').trim()}${(r.cdFonteReceita || '').trim()}`
+    // padding: 1+000→1000, 1+486→1486, 1+097→1097 (regra validada contra
+    // FonteRecursoEntidade de Maringá 2026). Atenção: é a fonte da RECEITA
+    // (cdFonteReceita) — o cdFontePadrao (despesa) diverge (494≠486) e NÃO casa.
+    // As fontes de safra nova (spec 4 dígitos) fogem da regra: o prefixo do
+    // catálogo é o grupo de DESTINAÇÃO Elotech/TCE (1=tesouro, 3=transf.
+    // federal, 4=op. crédito), não o grupo de exercício do PIT — de/para
+    // explícito abaixo, casado por NOMENCLATURA contra o catálogo (2026-07-07).
+    const g = (r.cdGrupoFonte || '1').trim()
+    const spec = (r.cdFonteReceita || '').trim()
+    const composto = `${g}${spec}`
+    // Codificação do catálogo (Elotech/QDD) p/ fontes de 5 dígitos:
+    //   destino(1 díg: 1=tesouro, 3=transf. federal, 4=op. crédito, 5=doações…)
+    //   + grupoExercício(1 díg: 1=corrente, 2=anteriores) + spec(3 díg).
+    // O PIT manda grupo+spec (sem destino) — o resolver tenta, nesta ordem:
+    // composto direto no catálogo → DE_PARA (irregulares) → candidato ÚNICO
+    // d+g+spec3 no catálogo → pendente (listado no relatório).
+    let fonte = composto
+    if (!fontesCatalogo.has(composto)) {
+      const dePara = DE_PARA_FONTE[composto]
+      if (dePara) fonte = dePara
+      else {
+        const spec3 = spec.slice(-3)
+        const candidatos = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+          .map((d) => `${d}${g}${spec3}`)
+          .filter((c) => fontesCatalogo.has(c))
+        if (candidatos.length === 1) fonte = candidatos[0]
+      }
+    }
     const chave = `${mes}|${r.cdFuncao}|${fonte}`
     const ag = porMFF.get(chave) ?? { emp: 0, liq: 0, pag: 0 }
     ag.emp += emp
@@ -186,7 +218,12 @@ async function lerBanco() {
     if (mv.empenho.numero.startsWith('CAP-')) nCap++
     else nOutros++
   }
-  return { entidade, porMFF, total, nCap, nOutros }
+  const catalogo = new Set(
+    (
+      await prisma.fonteRecursoEntidade.findMany({ where: { entidadeId: entidade.id, ano: ANO }, select: { codigo: true } })
+    ).map((f) => f.codigo.trim()),
+  )
+  return { entidade, porMFF, total, nCap, nOutros, catalogo }
 }
 
 // ── 4. relatório ────────────────────────────────────────────────────────────
@@ -199,8 +236,9 @@ function linha(rotulo: string, pit: number, banco: number): string {
 async function main() {
   console.log(`\n═══ Conciliação execução da despesa ${ANO} — PIT/TCE-PR × Gênesis (READ-ONLY) ═══\n`)
   const zipBuf = await obterZip()
-  const pit = await lerPit(zipBuf)
   const banco = await lerBanco()
+  const fontesCatalogo = banco.catalogo // catálogo COMPLETO (não só fontes com movimento)
+  const pit = await lerPit(zipBuf, fontesCatalogo)
 
   console.log(`\nPIT: entidade-alvo "${PIT_ENTIDADE}" → ${pit.nAlvo} empenhos · corte SIM-AM: ${pit.corte}`)
   console.log('     entidades no arquivo:')
