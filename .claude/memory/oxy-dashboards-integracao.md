@@ -33,6 +33,7 @@ Decisão do Marco: **tudo calculado no Gênesis**, o Oxy **só exibe** (inputs +
 - **Oxy (consumidor):** `oxy-ia-backend/src/genesis.ts` — conector com `CONTRATO_MEMORIAIS_MAJOR` (=1). Compara o MAJOR do envelope; **MAJOR diferente ⇒ 409 "conector desatualizado"** (NÃO renderiza dado errado). `checarContratoMemoriais()` roda no boot (index.ts) e loga compatibilidade. Rotas `/api/memoriais/{rcl,rcl-consolidada}` (sessao) repassam o `dados` pronto.
 - **Regra de versão (os dois honram SemVer):** mudou cálculo/forma no Gênesis ⇒ bump da versão. Quebra (campo removido/renomeado/semântica) = **MAJOR** → Oxy detecta e pede atualização. Adição compatível = MINOR (Oxy segue). 
 - ⚠️ **oxy-ia-backend NÃO é repo git** (editei direto, typecheck limpo, e2e verificado). Falta: o **front (oxy-dashboards)** chamar `/api/memoriais/*` pra exibir; e por chaves no `.env` dos dois lados (`GENESIS_API_TOKEN` igual).
+- **ANTHROPIC_API_KEY real no ar (2026-07-06):** Marco criou a chave; está no `.env` do Gênesis (import-IA de memoriais OK, 200 em 4s) e do oxy-ia-backend (Análise Profunda REAL, `mock:false`, ~R$0,13/análise). Armadilhas corrigidas: o oxy **não carregava .env** (sem dotenv) → scripts agora usam `tsx --env-file=.env`; e a chave tinha vazado pro `.env.example` → sanitizado. Login demo do oxy: `marco`/`demo` (:4000).
 - Verificado e2e (2026-06-27): compatível→RCL 2.604.051.913; MAJOR divergente→409; token errado→502.
 
 ## Topologia REAL dos repos Oxy (apurada 2026-06-27) + fatia 1 da integração
