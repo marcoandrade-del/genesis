@@ -1,8 +1,19 @@
 import { PrismaClient } from '@prisma/client'
 import { RclService, resolverComposicao } from './rcl.js'
 import { RclConsolidadaService } from './rcl-consolidada.js'
+import { ConsolidacaoService } from './consolidacao.js'
 
 const n = (d: { toNumber(): number }) => d.toNumber()
+
+export interface MemorialDespesaConsolidada {
+  municipio: string
+  estado: string
+  ano: number
+  entidades: { nome: string; empenhado: number; intraEmpenhado: number }[]
+  empenhadoBruto: number
+  intraEliminada: number
+  empenhadoConsolidado: number
+}
 
 export interface LinhaMemorial {
   codigo?: string
@@ -99,6 +110,27 @@ export class MemorialRclService {
       deducoesTotal: n(cons.deducoesTotal),
       intra: n(cons.intra),
       rclTotal: n(cons.rclTotal),
+    }
+  }
+
+  /** Despesa consolidada do ENTE — soma das entidades com eliminação da
+   *  parcela intra-orçamentária (modalidade 91). Recebe uma entidade qualquer
+   *  do município e devolve o consolidado. */
+  async despesaConsolidada(entidadeId: string, ano: number): Promise<MemorialDespesaConsolidada | null> {
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipioId: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
+    })
+    if (!ent) return null
+    const cons = await new ConsolidacaoService(this.prisma).despesa(ent.municipioId, ano)
+    return {
+      municipio: ent.municipio.nome,
+      estado: ent.municipio.estado.sigla,
+      ano,
+      entidades: cons.entidades.map((e) => ({ nome: e.nome, empenhado: n(e.empenhado), intraEmpenhado: n(e.intraEmpenhado) })),
+      empenhadoBruto: n(cons.empenhadoBruto),
+      intraEliminada: n(cons.intraEliminada),
+      empenhadoConsolidado: n(cons.empenhadoConsolidado),
     }
   }
 }
