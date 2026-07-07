@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, montarRgfAnexo4, montarRgfAnexo6, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
+import { montarReceitaPrevista, montarDespesaFixada, montarProgramaTrabalho, montarSumarioGeral, montarRcl, montarRclConsolidada, montarGuardiao, montarDespesaPessoal, montarIndicesConstitucionais, montarDisponibilidadeFonte, montarDespesaFuncaoRreo, montarMetasFiscais, montarRgfAnexo1, montarRgfAnexo2, montarRgfAnexo3, montarRgfAnexo4, montarRgfAnexo6, montarConsistencia, documentoPdf, formatarReais, formatarCodigoConta, formatarEmissao } from '../relatorio-orcamento.js'
 import type { LinhaArrecadacao } from '../arrecadacoes.js'
 import type { LinhaSaldo } from '../saldo-orcamentario.js'
 
@@ -596,6 +596,35 @@ describe('montarRgfAnexo6', () => {
     expect(html).toContain('Disponibilidade de caixa × Restos a Pagar')
     expect(html).toContain('200,00')
     expect(html).toContain('40,00')
+  })
+})
+
+describe('montarConsistencia', () => {
+  const cab = { entidadeNome: 'Prefeitura de Maringá', municipio: 'Maringá', estado: 'PR', ano: 2026, brasao: null }
+  const base = {
+    cabecalho: cab,
+    verificacoes: [
+      { codigo: 'V1_ARRECADACAO', titulo: 'Arrecadação: movimentos × materializado', status: 'OK', esperado: 100, obtido: 100, delta: 0, detalhe: 'razão = materializado' },
+      { codigo: 'V5_EQUILIBRIO_CREDITOS', titulo: 'Equilíbrio da LOA + créditos', status: 'DIVERGENTE', esperado: 1000, obtido: 1120, delta: 120, detalhe: 'autorizado editado fora da máquina' },
+      { codigo: 'V8_SINCRONIZACAO', titulo: 'Sincronização com o portal', status: 'NAO_APLICAVEL', esperado: null, obtido: null, delta: null, detalhe: 'sem execuções' },
+    ],
+    selo: { aprovadas: 1, avaliadas: 2, total: 3 },
+  }
+
+  it('mostra o selo N/M, as três situações e o Δ da divergente em destaque', () => {
+    const html = montarConsistencia(base)
+    expect(html).toContain('Selo: 1 de 2 verificações consistentes')
+    expect(html).toContain('(1 não aplicável)')
+    expect(html).toContain('✓ Consistente')
+    expect(html).toContain('✗ Divergente')
+    expect(html).toContain('— Não aplicável')
+    expect(html).toMatch(/color:#b00[^>]*>120,00/)
+    expect(html).toContain('Há divergências')
+  })
+
+  it('selo cheio muda a nota para todas fecharam', () => {
+    const html = montarConsistencia({ ...base, verificacoes: [base.verificacoes[0]!], selo: { aprovadas: 1, avaliadas: 1, total: 1 } })
+    expect(html).toContain('Todas as identidades verificadas fecharam')
   })
 })
 
