@@ -109,12 +109,13 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.versao).toBe('1.10.0') // 1.9.0 = épico RGF; 1.10.0 = selo de consistência (aditivos → MINOR)
+    expect(body.versao).toBe('1.11.0') // 1.9.0 RGF; 1.10.0 selo de consistência; 1.11.0 despesa-consolidada (aditivos → MINOR)
     const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
     expect(recursos).toContain('rcl')
     expect(recursos).toContain('dcl')
     expect(recursos).toContain('rgf-simplificado')
     expect(recursos).toContain('consistencia')
+    expect(recursos).toContain('despesa-consolidada')
   })
 
   it('200 consistência em envelope: selo N/M e verificações com Δ', async () => {
