@@ -223,6 +223,19 @@ describe('SincronizacaoPortalService.despesaMes', () => {
     expect(liqs.sort((a: number, b: number) => a - b)).toEqual([10, 90]) // não 70/30
   })
 
+  it('re-run rematerializa dotação que perdeu todos os movimentos do mês', async () => {
+    // captura anterior tinha movimento em d-velha; no re-run o rateio não lhe dá nada
+    prisma.movimentoEmpenho.findMany.mockImplementation(async (args: { where: { historico?: string } }) =>
+      args.where.historico ? [{ empenhoId: 'e-velho', empenho: { dotacaoDespesaId: 'd-velha' } }] : [],
+    )
+    stubDespesa(100)
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    // e-velho rematerializado a partir dos movimentos restantes (groupBy mockado → 70)
+    expect(prisma.empenho.update).toHaveBeenCalledWith({ where: { id: 'e-velho' }, data: { valor: 70, valorLiquidado: 0 } })
+    expect(prisma.dotacaoDespesa.update).toHaveBeenCalledWith({ where: { id: 'd-velha' }, data: { valorEmpenhado: 70 } })
+  })
+
   it('delta negativo no mês vira ESTORNO', async () => {
     stubFetch({
       despesapornivel: [{ programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: -40, valorLiquidado: 0, valorPago: 0 }],

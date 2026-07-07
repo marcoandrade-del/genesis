@@ -395,7 +395,17 @@ export class SincronizacaoPortalService {
           })
           empPorDot.set(id, novo.id)
         }
-        // movimentos do mês (idempotente por histórico)
+        // movimentos do mês (idempotente por histórico); quem TINHA movimento
+        // neste mês também rematerializa — um re-run pode tirar todo o
+        // movimento de uma dotação e ela não pode ficar com o valor velho
+        const anteriores = await tx.movimentoEmpenho.findMany({
+          where: { entidadeId, historico },
+          distinct: ['empenhoId'],
+          select: { empenhoId: true, empenho: { select: { dotacaoDespesaId: true } } },
+        })
+        for (const a of anteriores) {
+          if (!empPorDot.has(a.empenho.dotacaoDespesaId)) empPorDot.set(a.empenho.dotacaoDespesaId, a.empenhoId)
+        }
         await tx.movimentoEmpenho.deleteMany({ where: { entidadeId, historico } })
         const movRows: { entidadeId: string; empenhoId: string; tipo: 'EMPENHO' | 'ESTORNO_EMPENHO' | 'LIQUIDACAO' | 'ESTORNO_LIQUIDACAO' | 'PAGAMENTO' | 'ESTORNO_PAGAMENTO'; valor: number; data: Date; criadoPorId: string; historico: string }[] = []
         for (const d of deltas.values()) {
