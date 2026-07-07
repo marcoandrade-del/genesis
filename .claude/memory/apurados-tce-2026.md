@@ -22,7 +22,7 @@ São APURADOS de execução — **não confundir com as metas da LDO**.
 | Dívida Consolidada | R$ 544,32mi | saldo atual | — |
 | Disponibilidade de caixa líquida | R$ 1.083,94mi | saldo atual | alvo do import de saldos bancários reais |
 | DCL | **−R$ 539,62mi** (−18,62% RCL ajustada) | saldo atual | cadastrada como meta + indicador do Guardião (#191) |
-| DCL saldo INICIAL 2026 | **−R$ 137.507.930,95** | 1º/jan (herdado de 2025) | deep search; base do nominal ao vivo |
+| DCL saldo INICIAL 2026 | **−R$ 137.505.240,95** (REVISADA: RGF A2 1ºQ2026 confirma −137.507.930,95 = Gemini ✓; o 3ºQ2025 publicava −137.505.240,95 pré-revisão) | 1º/jan (herdado de 2025) | deep search; base do nominal ao vivo |
 | Resultado nominal apurado EXATO | +R$ 402.115.811,24 | 1º quad | = ΔDCL: −137,51 − 402,12 = −539,62 ✓ FECHA AO CENTAVO |
 
 **Metas da LDO 2026 (cadastro MetaFiscal): 5/5 COMPLETAS.** Receita
@@ -42,5 +42,8 @@ prefeitura×consolidado; o import de junho arbitra.
 
 **How to apply:** esses números são os gabaritos de conferência dos imports
 futuros (arrecadação de junho; execução da despesa ≈1.746,4mi empenhado até
-jun; saldos bancários ≈1.083,94mi). Divergência grande = investigar antes de
+jun; saldos bancários ≈1.083,94mi ✅ IMPORTADOS 2026-07-07 via RGF Anexo 5
+oficial do portal, #210: caixa bruta 1.283,35mi por categoria; a dedução
+1.083,93 = bruta A2 1.124,48 − RP proc 22,87 — o A2 EXCLUI RPPS/extra da
+bruta, regra MDF). Divergência grande = investigar antes de
 gravar. Ver [[lrf-despesa-epico-plano]], [[alteracoes-orcamentarias-dinamica]].

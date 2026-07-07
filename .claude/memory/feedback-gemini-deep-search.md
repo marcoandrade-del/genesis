@@ -30,9 +30,17 @@ errada (−332,9) e parecia plausível.
 **How to apply:** prompt à 1ª pergunta normal; na 2ª: "confirme fazendo deep
 search, cite documento/URL, responda 'não disponível' em vez de estimar".
 Validar TUDO contra o banco antes de gravar (ver [[apurados-tce-2026]]).
-O MCP gemini-cli local existe mas está SEM AUTH (exit 41 — configurar
-GEMINI_API_KEY ou login em ~/.gemini/settings.json p/ eu consultar direto;
-re-testado 2026-07-03, segue sem auth — o MCP "conecta" mas toda chamada falha).
+**Status do MCP gemini-cli (2026-07-06): BECO SEM SAÍDA no free tier.**
+- API key do Marco: autentica, mas o projeto Google tem cota ZERO (429
+  "limit per minute for a region" permanente, pro E flash) — só resolve com
+  key nova em projeto com cota ou billing.
+- Login Google (oauth-personal): morto — `IneligibleTierError:
+  UNSUPPORTED_CLIENT`, Google aposentou o Code Assist for individuals e
+  empurra pro Antigravity. CLI 0.49.0 = última versão; não é versão velha.
+- **Fallback operacional: WebSearch/WebFetch nativos do Claude Code** — o
+  papel "minerador" passa pro Claude; o protocolo de dupla verificação +
+  fonte primária continua idêntico. Validado 2026-07-06 (achou SIM-AM/dados
+  abertos TCE-PR de primeira).
 
 Divisão de papéis (Marco, 2026-07-02): **"Gemini acha, Claude verifica e
 crava"** — Gemini é minerador de sites, nunca fonte de verdade; a palavra

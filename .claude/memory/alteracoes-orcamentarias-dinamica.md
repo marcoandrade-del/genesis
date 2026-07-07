@@ -13,7 +13,11 @@ dashboard ANTES de gravar; divergência = loga e não grava). v1 = arrecadação
 mensal automática. **A DESPESA vai seguir o MESMO esquema** (sync de execução
 da despesa no mesmo molde, sempre DEPOIS da receita do ciclo). Decretos-sync
 automático = fase 2 (script manual idempotente enquanto isso). Tela
-"Conectores" por entidade (botão sincronizar, toggle, alertas) = épico nível 3.
+"Conectores" por entidade (botão sincronizar, toggle, alertas) = épico nível 3;
+**semente já existe (2026-07-06, PR #200): tela `/app/sincronizacao`** (item
+"Sincronização" no menu) com botão "Sincronizar agora" (receita→despesa do mês
+corrente, assíncrono, trava por entidade, ESCRITA/ADMIN) + log das execuções +
+estado do agendamento. Falta do épico: toggle por entidade, alertas, decretos.
 Sync grava EXECUÇÃO CAPTURADA (painéis/indicadores) — NUNCA escrituração
 contábil automática.
 
