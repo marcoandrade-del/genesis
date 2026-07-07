@@ -43,6 +43,49 @@ function pad12(codigo: string): string {
 }
 const c2 = (n: number) => Math.round(n * 100) / 100
 
+/**
+ * Divide `valor` (em CENTAVOS) entre os alvos proporcionalmente ao peso, sem
+ * ultrapassar o teto individual: o que excederia o teto de um alvo é
+ * redistribuído entre os que ainda têm saldo; esgotados todos os tetos do
+ * grupo, o resíduo volta a ser proporcional ao peso — o estouro REAL continua
+ * visível (V6 do selo), só o estouro ARTIFICIAL do rateio é evitado.
+ * Valor negativo (estorno líquido do mês) não tem teto: proporcional ao peso,
+ * resto no último. Σ do retorno = valor, sempre.
+ */
+export function distribuirComTeto(valor: number, pesos: number[], tetos: number[]): number[] {
+  const n = pesos.length
+  const out: number[] = new Array(n).fill(0)
+  const proporcional = (v: number) => {
+    const somaP = pesos.reduce((s, p) => s + p, 0)
+    let resto = v
+    pesos.forEach((p, i) => {
+      const q = i === n - 1 ? resto : Math.round(v * (somaP > 0 ? p / somaP : 1 / n))
+      out[i]! += q
+      resto -= q
+    })
+  }
+  if (valor <= 0) {
+    if (valor < 0) proporcional(valor)
+    return out
+  }
+  let resto = valor
+  // cada rodada zera o resto ou satura ao menos um teto ⇒ termina em ≤ n rodadas
+  for (let rodada = 0; resto > 0 && rodada < n; rodada++) {
+    const abertos = [...Array(n).keys()].filter((i) => out[i]! < tetos[i]!)
+    if (abertos.length === 0) break
+    const somaP = abertos.reduce((s, i) => s + pesos[i]!, 0)
+    const base = resto
+    abertos.forEach((i, j) => {
+      const quota = j === abertos.length - 1 ? resto : Math.min(resto, Math.round(base * (somaP > 0 ? pesos[i]! / somaP : 1 / abertos.length)))
+      const v = Math.min(quota, tetos[i]! - out[i]!)
+      out[i]! += v
+      resto -= v
+    })
+  }
+  if (resto > 0) proporcional(resto) // grupo sem capacidade — estouro real
+  return out
+}
+
 type LinhaPortal = { receita: string; valorArrecadado: number }
 type DashboardMes = { mes: number; valorArrecadado: number; valorEmpenhado: number; valorPago: number }
 type LinhaDespesa = { programatica: string; nivel: number; valorEmpenhado: number; valorLiquidado: number; valorPago: number }
@@ -181,8 +224,10 @@ export class SincronizacaoPortalService {
    * mesmo esquema da receita (decisão do Marco: despesa SEMPRE depois da
    * receita do ciclo). Fonte: despesapornivel/detalhada (nível 11 =
    * programática+elemento; a API ignora filtro de fonte, então o valor é
-   * RATEADO entre as fontes-dotação proporcionalmente ao autorizado atual —
-   * exato quando a programática tem fonte única, aproximação documentada nas
+   * RATEADO entre as fontes-dotação proporcionalmente ao autorizado, COM TETO
+   * no disponível de cada uma (autorizado − reservado − executado acumulado):
+   * o rateio nunca cria estouro artificial de dotação (V6 do selo) — exato
+   * quando a programática tem fonte única, aproximação documentada nas
    * demais; o balancete mensal oficial faz o true-up).
    *
    * Escrita = EXECUÇÃO CAPTURADA: 1 empenho sintético de captura por
@@ -206,6 +251,7 @@ export class SincronizacaoPortalService {
         select: {
           id: true,
           valorAutorizado: true,
+          valorReservado: true,
           unidadeOrcamentaria: { select: { codigo: true } },
           funcao: { select: { codigo: true } },
           subfuncao: { select: { codigo: true } },
@@ -214,12 +260,35 @@ export class SincronizacaoPortalService {
           contaDespesa: { select: { codigo: true } },
         },
       })
-      const porChave = new Map<string, { id: string; autorizado: number }[]>()
+      const porChave = new Map<string, { id: string; autorizado: number; reservado: number }[]>()
       for (const d of dots) {
         const k = `${d.unidadeOrcamentaria.codigo}|${d.funcao.codigo}|${d.subfuncao.codigo}|${d.programa.codigo}|${d.acao.codigo}|${d.contaDespesa.codigo}`
         const l = porChave.get(k) ?? []
-        l.push({ id: d.id, autorizado: Number(d.valorAutorizado) })
+        l.push({ id: d.id, autorizado: Number(d.valorAutorizado), reservado: Number(d.valorReservado ?? 0) })
         porChave.set(k, l)
+      }
+
+      // execução acumulada por dotação ANTES do mês (em centavos) — é o teto do
+      // rateio; movimentos do próprio mês ficam de fora (a captura os reescreve)
+      const movsAnteriores = await this.prisma.movimentoEmpenho.findMany({
+        where: { entidadeId, data: { gte: new Date(Date.UTC(ano, 0, 1)), lt: new Date(Date.UTC(ano, mes - 1, 1)) } },
+        select: { tipo: true, valor: true, empenho: { select: { dotacaoDespesaId: true } } },
+      })
+      const SINAL: Record<string, { k: 'emp' | 'liq' | 'pag'; s: number }> = {
+        EMPENHO: { k: 'emp', s: 1 },
+        ESTORNO_EMPENHO: { k: 'emp', s: -1 },
+        LIQUIDACAO: { k: 'liq', s: 1 },
+        ESTORNO_LIQUIDACAO: { k: 'liq', s: -1 },
+        PAGAMENTO: { k: 'pag', s: 1 },
+        ESTORNO_PAGAMENTO: { k: 'pag', s: -1 },
+      }
+      const acumPorDot = new Map<string, { emp: number; liq: number; pag: number }>()
+      for (const m of movsAnteriores) {
+        const alvo = SINAL[m.tipo]
+        if (!alvo) continue
+        const v = acumPorDot.get(m.empenho.dotacaoDespesaId) ?? { emp: 0, liq: 0, pag: 0 }
+        v[alvo.k] += alvo.s * Math.round(Number(m.valor) * 100)
+        acumPorDot.set(m.empenho.dotacaoDespesaId, v)
       }
 
       const ultimoDia = new Date(Date.UTC(ano, mes, 0)).getUTCDate()
@@ -250,24 +319,27 @@ export class SincronizacaoPortalService {
           semDotacao = c2(semDotacao + l.valorEmpenhado)
           continue
         }
-        // rateio proporcional ao autorizado (resto no último p/ fechar centavos)
-        const somaAut = alvos.reduce((x, a) => x + a.autorizado, 0)
-        let accE = 0
-        let accL = 0
-        let accP = 0
+        // rateio proporcional ao autorizado com teto no disponível de cada
+        // fonte-dotação; liquidado ≤ empenhado e pago ≤ liquidado acumulados,
+        // pela mesma régua (tudo em centavos)
+        const pesos = alvos.map((a) => Math.round(a.autorizado * 100))
+        const acums = alvos.map((a) => {
+          let v = acumPorDot.get(a.id)
+          if (!v) acumPorDot.set(a.id, (v = { emp: 0, liq: 0, pag: 0 }))
+          return v
+        })
+        const empC = distribuirComTeto(Math.round(l.valorEmpenhado * 100), pesos, alvos.map((a, i) => Math.round((a.autorizado - a.reservado) * 100) - acums[i]!.emp))
+        const liqC = distribuirComTeto(Math.round(l.valorLiquidado * 100), pesos, alvos.map((_, i) => acums[i]!.emp + empC[i]! - acums[i]!.liq))
+        const pagC = distribuirComTeto(Math.round(l.valorPago * 100), pesos, alvos.map((_, i) => acums[i]!.liq + liqC[i]! - acums[i]!.pag))
         alvos.forEach((a, i) => {
-          const fr = somaAut > 0 ? a.autorizado / somaAut : 1 / alvos.length
-          const e = i === alvos.length - 1 ? c2(l.valorEmpenhado - accE) : c2(l.valorEmpenhado * fr)
-          const q = i === alvos.length - 1 ? c2(l.valorLiquidado - accL) : c2(l.valorLiquidado * fr)
-          const g = i === alvos.length - 1 ? c2(l.valorPago - accP) : c2(l.valorPago * fr)
-          accE = c2(accE + e)
-          accL = c2(accL + q)
-          accP = c2(accP + g)
-          if (!e && !q && !g) return
+          acums[i]!.emp += empC[i]!
+          acums[i]!.liq += liqC[i]!
+          acums[i]!.pag += pagC[i]!
+          if (!empC[i] && !liqC[i] && !pagC[i]) return
           const d = deltas.get(a.id) ?? { dotacaoId: a.id, empenhado: 0, liquidado: 0, pago: 0 }
-          d.empenhado = c2(d.empenhado + e)
-          d.liquidado = c2(d.liquidado + q)
-          d.pago = c2(d.pago + g)
+          d.empenhado = c2(d.empenhado + empC[i]! / 100)
+          d.liquidado = c2(d.liquidado + liqC[i]! / 100)
+          d.pago = c2(d.pago + pagC[i]! / 100)
           deltas.set(a.id, d)
         })
       }

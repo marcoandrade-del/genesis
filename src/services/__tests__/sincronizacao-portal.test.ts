@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { Prisma } from '@prisma/client'
 import { criarPrismaMock, type PrismaMock } from './helpers/prisma-mock.js'
-import { SincronizacaoPortalService, agendarSincronizacaoPortal } from '../sincronizacao-portal.js'
+import { SincronizacaoPortalService, agendarSincronizacaoPortal, distribuirComTeto } from '../sincronizacao-portal.js'
 
 const dec = (v: Prisma.Decimal.Value) => new Prisma.Decimal(v)
 
@@ -147,6 +147,82 @@ describe('SincronizacaoPortalService.despesaMes', () => {
     expect(prisma.empenho.create).not.toHaveBeenCalled()
   })
 
+  it('fonte no teto não recebe além do disponível — excedente vai à outra fonte do grupo', async () => {
+    // d1 já executou 650 de 700 autorizados → teto 50; os outros 50 vão pra d2
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: '650', empenho: { dotacaoDespesaId: 'd1' } },
+    ])
+    stubDespesa(100)
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const empenhos = rows.filter((m: { tipo: string }) => m.tipo === 'EMPENHO').map((m: { valor: number }) => m.valor)
+    expect(empenhos.sort((a: number, b: number) => a - b)).toEqual([50, 50]) // não mais 70/30
+    // acumulados consideram só movimentos ANTERIORES ao mês (o próprio mês é reescrito)
+    expect(prisma.movimentoEmpenho.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ data: { gte: new Date(Date.UTC(2026, 0, 1)), lt: new Date(Date.UTC(2026, 5, 1)) } }) }),
+    )
+  })
+
+  it('grupo inteiro sem capacidade → resíduo proporcional (estouro real visível, total preservado)', async () => {
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: '700', empenho: { dotacaoDespesaId: 'd1' } },
+      { tipo: 'EMPENHO', valor: '300', empenho: { dotacaoDespesaId: 'd2' } },
+    ])
+    stubDespesa(100)
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const empenhos = rows.filter((m: { tipo: string }) => m.tipo === 'EMPENHO').map((m: { valor: number }) => m.valor)
+    expect(empenhos.sort((a: number, b: number) => a - b)).toEqual([30, 70]) // volta ao proporcional
+  })
+
+  it('fonte já estourada (teto negativo) não recebe nada; tipos desconhecidos no acumulado são ignorados', async () => {
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: '800', empenho: { dotacaoDespesaId: 'd1' } }, // 800 > 700 autorizados
+      { tipo: 'AJUSTE_FUTURO', valor: '999', empenho: { dotacaoDespesaId: 'd1' } }, // fora do mapa de sinais
+    ])
+    stubFetch({
+      despesapornivel: [{ programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: 10, valorLiquidado: 0, valorPago: 0 }],
+      'dashboard/arrecadacao-despesa': [{ mes: 6, valorArrecadado: 0, valorEmpenhado: 10, valorPago: 0 }],
+    })
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const empenhos = rows.filter((m: { tipo: string }) => m.tipo === 'EMPENHO').map((m: { valor: number }) => m.valor)
+    expect(empenhos).toEqual([10]) // tudo em d2; d1 (estourada) não gera movimento
+  })
+
+  it('valor reservado da dotação conta no teto do rateio', async () => {
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      { id: 'd1', valorAutorizado: '700', valorReservado: '680', unidadeOrcamentaria: { codigo: '02.010' }, funcao: { codigo: '04' }, subfuncao: { codigo: '122' }, programa: { codigo: '0002' }, acao: { codigo: '2001' }, contaDespesa: { codigo: '3.1.90.11.00.00' } },
+      { id: 'd2', valorAutorizado: '300', valorReservado: '0', unidadeOrcamentaria: { codigo: '02.010' }, funcao: { codigo: '04' }, subfuncao: { codigo: '122' }, programa: { codigo: '0002' }, acao: { codigo: '2001' }, contaDespesa: { codigo: '3.1.90.11.00.00' } },
+    ])
+    stubDespesa(100)
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const empenhos = rows.filter((m: { tipo: string }) => m.tipo === 'EMPENHO').map((m: { valor: number }) => m.valor)
+    expect(empenhos.sort((a: number, b: number) => a - b)).toEqual([20, 80]) // d1: 700−680=20
+  })
+
+  it('liquidado do mês respeita o empenhado acumulado de cada fonte', async () => {
+    // empenhado acumulado: d1=10, d2=90; mês só liquida 100 → d1 no máx 10
+    prisma.movimentoEmpenho.findMany.mockResolvedValue([
+      { tipo: 'EMPENHO', valor: '10', empenho: { dotacaoDespesaId: 'd1' } },
+      { tipo: 'EMPENHO', valor: '90', empenho: { dotacaoDespesaId: 'd2' } },
+    ])
+    stubFetch({
+      despesapornivel: [{ programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: 0, valorLiquidado: 100, valorPago: 0 }],
+      'dashboard/arrecadacao-despesa': [{ mes: 6, valorArrecadado: 0, valorEmpenhado: 0, valorPago: 0 }],
+    })
+    const r = await svc.despesaMes('e1', 2026, 6)
+    expect(r.status).toBe('OK')
+    const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
+    const liqs = rows.filter((m: { tipo: string }) => m.tipo === 'LIQUIDACAO').map((m: { valor: number }) => m.valor)
+    expect(liqs.sort((a: number, b: number) => a - b)).toEqual([10, 90]) // não 70/30
+  })
+
   it('delta negativo no mês vira ESTORNO', async () => {
     stubFetch({
       despesapornivel: [{ programatica: '02.010.04.122.0002.2001.3.1.90.11', nivel: 11, valorEmpenhado: -40, valorLiquidado: 0, valorPago: 0 }],
@@ -156,6 +232,30 @@ describe('SincronizacaoPortalService.despesaMes', () => {
     expect(r.status).toBe('OK')
     const rows = prisma.movimentoEmpenho.createMany.mock.calls[0][0].data
     expect(rows.some((m: { tipo: string; valor: number }) => m.tipo === 'ESTORNO_EMPENHO' && m.valor === 28)).toBe(true) // 70% de 40
+  })
+})
+
+describe('distribuirComTeto', () => {
+  it('proporcional quando todos têm teto de sobra; Σ = valor', () => {
+    expect(distribuirComTeto(10000, [70000, 30000], [70000, 30000])).toEqual([7000, 3000])
+  })
+
+  it('clampa no teto e redistribui; Σ = valor', () => {
+    expect(distribuirComTeto(10000, [70000, 30000], [5000, 30000])).toEqual([5000, 5000])
+  })
+
+  it('valor zero → tudo zero; negativo → proporcional sem teto', () => {
+    expect(distribuirComTeto(0, [70000, 30000], [0, 0])).toEqual([0, 0])
+    expect(distribuirComTeto(-4000, [70000, 30000], [0, 0])).toEqual([-2800, -1200])
+  })
+
+  it('teto negativo (já estourada) não recebe nada enquanto o grupo tem saldo', () => {
+    expect(distribuirComTeto(10000, [70000, 30000], [-500, 30000])).toEqual([0, 10000])
+  })
+
+  it('pesos zerados dividem por igual', () => {
+    expect(distribuirComTeto(10000, [0, 0], [10000, 10000])).toEqual([5000, 5000])
+    expect(distribuirComTeto(-10000, [0, 0], [0, 0])).toEqual([-5000, -5000])
   })
 })
 
