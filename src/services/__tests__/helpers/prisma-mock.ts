@@ -627,6 +627,7 @@ export function criarPrismaMock() {
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      aggregate: vi.fn().mockResolvedValue({ _sum: { valor: null, valorLiquidado: null } }),
       count: vi.fn().mockResolvedValue(0),
     },
     liquidacao: {

@@ -27,6 +27,7 @@ import {
   montarRgfAnexo3,
   montarRgfAnexo4,
   montarRgfAnexo6,
+  montarConsistencia,
   documentoPdf,
   formatarEmissao,
   type FormatoCodigo,
@@ -36,6 +37,7 @@ import { parseQuadrimestre, periodoQuadrimestre, formatarDataUtc } from '../serv
 import { DclService } from '../services/dcl.js'
 import { RgfCadastrosService } from '../services/rgf-cadastros.js'
 import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
+import { ConsistenciaService } from '../services/consistencia.js'
 
 type EntidadeCab = {
   nome: string
@@ -67,6 +69,7 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
   const dclSvc = new DclService(app.prisma)
   const rgfCadSvc = new RgfCadastrosService(app.prisma)
   const rgfSimplesSvc = new RgfSimplificadoService(app.prisma)
+  const consistenciaSvc = new ConsistenciaService(app.prisma)
 
   // Busca o cabeçalho + o padrão de código HERDADO (município sobrescreve estado)
   // + a legenda legal (status/lei do orçamento).
@@ -880,6 +883,44 @@ export async function appRelatoriosOrcamentoRoutes(app: FastifyInstance) {
 
   rotasRgf('anexo4', 'RGF Anexo 4 — Operações de Crédito', 'RGF Anexo 4 (Op. Crédito)', rgfAnexo4)
   rotasRgf('anexo6', 'RGF Anexo 6 — Demonstrativo Simplificado', 'RGF Anexo 6 (Simplificado)', rgfAnexo6)
+
+  // ── Selo de Consistência — identidades contábeis verificadas por máquina ────
+  async function consistencia(req: FastifyRequest) {
+    const { entidadeId, ano } = req.contexto
+    const [{ e, meta }, r] = await Promise.all([entidadeCtx(entidadeId, ano), consistenciaSvc.verificar(entidadeId, ano)])
+    const corpo = montarConsistencia({ cabecalho: cab(e, ano, meta), verificacoes: r.verificacoes, selo: r.selo })
+    return { e, ano, q: 0, temOrcamento: true, corpo, meta }
+  }
+
+  app.get('/orcamento/relatorios/consistencia', async (req, reply) => {
+    const { e, ano, corpo } = await consistencia(req)
+    return reply.view('app/relatorio-demonstrativo', {
+      tituloPagina: 'Selo de Consistência',
+      breadcrumb: 'Selo de Consistência',
+      pdfUrl: '/app/orcamento/relatorios/consistencia.pdf',
+      entidade: e,
+      ano,
+      nivel: req.contexto.nivel,
+      temOrcamento: true,
+      corpo,
+      layout: null,
+    })
+  })
+
+  app.get('/orcamento/relatorios/consistencia.pdf', async (req, reply) => {
+    const { ano, corpo, meta } = await consistencia(req)
+    const pdf = await gerarPdf({
+      corpoHtml: documentoPdf(`Selo de Consistência ${ano}`, corpo),
+      header: '<span></span>',
+      footer: footer('Selo de Consistência', emissaoRodape(meta)),
+      margemTopoMm: 12,
+      margemRodapeMm: 16,
+    })
+    return reply
+      .header('Content-Type', 'application/pdf')
+      .header('Content-Disposition', `inline; filename="consistencia-${ano}.pdf"`)
+      .send(pdf)
+  })
 
   // ── Índices constitucionais — MDE 25% / ASPS 15% (função × fonte real) ──────
   async function indicesConstitucionais(req: FastifyRequest) {

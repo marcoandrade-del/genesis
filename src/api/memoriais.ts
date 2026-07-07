@@ -9,6 +9,7 @@ import { ValoresMensaisService } from '../services/valores-mensais.js'
 import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js'
 import { DclService } from '../services/dcl.js'
 import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
+import { ConsistenciaService } from '../services/consistencia.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -23,7 +24,7 @@ import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.9.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.10.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
@@ -49,6 +50,7 @@ export function descreverContrato() {
       { recurso: 'metas-fiscais', campos: ['temMetas', 'linhas'] },
       { recurso: 'dcl', campos: ['dividaPorCategoria', 'dividaTotal', 'deducoes', 'dcl', 'metaLdo', 'temDivida'] },
       { recurso: 'rgf-simplificado', campos: ['temOrcamento', 'rcl', 'rclRealizada', 'linhas', 'disponibilidade'] },
+      { recurso: 'consistencia', campos: ['verificacoes', 'selo'] },
     ],
   }
 }
@@ -74,6 +76,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const metasSvc = new MetasFiscaisService(app.prisma)
   const dclSvc = new DclService(app.prisma)
   const rgfSimplesSvc = new RgfSimplificadoService(app.prisma)
+  const consistenciaSvc = new ConsistenciaService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -167,6 +170,17 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const q = req.query.q === '1' ? 1 : req.query.q === '2' ? 2 : 3
     const r = await rgfSimplesSvc.calcular(p.entidadeId, p.ano, q)
     return reply.send(envelope('rgf-simplificado', r))
+  })
+
+  // SELO DE CONSISTÊNCIA — bateria de identidades contábeis (o OXY exibe o selo
+  // "N de M verificações" antes da análise de IA; divergência vem com Δ exposto).
+  app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/consistencia', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const ent = await app.prisma.entidade.findUnique({ where: { id: p.entidadeId }, select: { id: true } })
+    if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    const r = await consistenciaSvc.verificar(p.entidadeId, p.ano)
+    return reply.send(envelope('consistencia', r))
   })
 
   app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/saldo-fonte', async (req, reply) => {

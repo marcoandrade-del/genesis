@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn() }))
+vi.mock('../../services/consistencia.js', () => ({
+  ConsistenciaService: class {
+    verificar = m.consistencia
+  },
+}))
 vi.mock('../../services/dcl.js', () => ({
   DclService: class {
     calcular = m.dcl
@@ -104,11 +109,26 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.versao).toBe('1.9.0') // bump do épico RGF (aditivo → MINOR)
+    expect(body.versao).toBe('1.10.0') // 1.9.0 = épico RGF; 1.10.0 = selo de consistência (aditivos → MINOR)
     const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
     expect(recursos).toContain('rcl')
     expect(recursos).toContain('dcl')
     expect(recursos).toContain('rgf-simplificado')
+    expect(recursos).toContain('consistencia')
+  })
+
+  it('200 consistência em envelope: selo N/M e verificações com Δ', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1' })
+    m.consistencia.mockResolvedValue({
+      verificacoes: [{ codigo: 'V1_ARRECADACAO', titulo: 'Arrecadação', status: 'OK', esperado: 100, obtido: 100, delta: 0, detalhe: 'x' }],
+      selo: { aprovadas: 1, avaliadas: 1, total: 1 },
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/consistencia?entidadeId=e1&ano=2026', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.recurso).toBe('consistencia')
+    expect(body.dados.selo).toEqual({ aprovadas: 1, avaliadas: 1, total: 1 })
+    expect(m.consistencia).toHaveBeenCalledWith('e1', 2026)
   })
 
   it('200 DCL em envelope versionado', async () => {

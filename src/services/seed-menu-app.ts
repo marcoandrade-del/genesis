@@ -49,6 +49,7 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/relatorios/rgf/anexo4', nome: 'RGF Anexo 4 — Op. de Crédito', icone: 'bi-cash-coin', tipo: 'FUNCIONALIDADE', descricao: 'Operações de crédito (16% RCL + ARO 7%)' },
       { rota: '/app/orcamento/relatorios/rgf/anexo6', nome: 'RGF Anexo 6 — Simplificado', icone: 'bi-clipboard-data', tipo: 'FUNCIONALIDADE', descricao: 'Quadro-resumo dos limites do RGF' },
       { rota: '/app/orcamento/rgf/cadastros', nome: 'Cadastros do RGF', icone: 'bi-journal-bookmark', tipo: 'FUNCIONALIDADE', descricao: 'Dívida consolidada, garantias e operações de crédito' },
+      { rota: '/app/orcamento/relatorios/consistencia', nome: 'Selo de Consistência', icone: 'bi-patch-check', tipo: 'FUNCIONALIDADE', descricao: 'Identidades contábeis verificadas por máquina' },
       { rota: '/app/orcamento/relatorios/indices-constitucionais', nome: 'Índices constitucionais', icone: 'bi-mortarboard', tipo: 'FUNCIONALIDADE', descricao: 'MDE 25% e ASPS 15% — aplicação por fonte' },
       { rota: '/app/orcamento/relatorios/despesa-funcao-rreo', nome: 'Despesa por função (RREO)', icone: 'bi-columns-gap', tipo: 'FUNCIONALIDADE', descricao: 'Execução por função — empenhado e %' },
       { rota: '/app/orcamento/relatorios/disponibilidade-fonte', nome: 'Disponibilidade e RP', icone: 'bi-safe', tipo: 'FUNCIONALIDADE', descricao: 'RGF Anexo 5 — caixa − restos a pagar por fonte' },

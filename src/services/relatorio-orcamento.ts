@@ -926,6 +926,44 @@ export function montarRgfAnexo6(dados: DadosRgfAnexo6): string {
   )
 }
 
+export interface DadosConsistencia {
+  cabecalho: CabecalhoDemonstrativo
+  verificacoes: { codigo: string; titulo: string; status: string; esperado: number | null; obtido: number | null; delta: number | null; detalhe: string }[]
+  selo: { aprovadas: number; avaliadas: number; total: number }
+}
+
+const STATUS_TXT: Record<string, string> = { OK: '✓ Consistente', DIVERGENTE: '✗ Divergente', NAO_APLICAVEL: '— Não aplicável' }
+
+/** Selo de Consistência: bateria de identidades contábeis verificadas por
+ *  máquina (dois caminhos independentes até o mesmo número). Divergência mostra
+ *  o Δ — regra do resíduo: diferença explicada é diferença somada. */
+export function montarConsistencia(dados: DadosConsistencia): string {
+  const { cabecalho: c, verificacoes, selo } = dados
+  const linha = (v: DadosConsistencia['verificacoes'][number]) =>
+    `<tr>` +
+    `<td class="cod">${esc(v.codigo)}</td>` +
+    `<td>${esc(v.titulo)}<div class="dem-sub">${esc(v.detalhe)}</div></td>` +
+    `<td class="num">${v.esperado != null ? formatarReais(v.esperado) : '—'}</td>` +
+    `<td class="num">${v.obtido != null ? formatarReais(v.obtido) : '—'}</td>` +
+    `<td class="num"${v.delta ? neg(-Math.abs(v.delta)) : ''}>${v.delta != null ? formatarReais(v.delta) : '—'}</td>` +
+    `<td>${STATUS_TXT[v.status] ?? v.status}</td>` +
+    `</tr>`
+  const nota = selo.aprovadas === selo.avaliadas ? 'Todas as identidades verificadas fecharam.' : 'Há divergências — os Δ estão expostos; investigar antes de usar os números.'
+  return (
+    ESTILO +
+    `<div class="dem">` +
+    cabecalhoHtml(c, 'Selo de Consistência — Identidades Contábeis Verificadas') +
+    `<div class="dem-sub" style="font-size:.95rem"><strong>Selo: ${selo.aprovadas} de ${selo.avaliadas} verificações consistentes</strong>${selo.total > selo.avaliadas ? ` (${selo.total - selo.avaliadas} não aplicável)` : ''} · ${esc(nota)}</div>` +
+    `<table class="dem-tab">` +
+    `<thead><tr><th>#</th><th>Verificação</th><th class="num">Esperado (R$)</th><th class="num">Obtido (R$)</th><th class="num">Δ</th><th>Situação</th></tr></thead>` +
+    `<tbody>${verificacoes.map(linha).join('')}</tbody>` +
+    `</table>` +
+    `<div class="dem-sub">Cada verificação cruza dois caminhos independentes até o mesmo número (razão × materializado, composição × fonte, base × portal). Regra do resíduo: um Δ só está explicado quando a soma das causas nomeadas bate com ele.</div>` +
+    rodapeHtml(c) +
+    `</div>`
+  )
+}
+
 /** Embrulha um corpo de demonstrativo num documento HTML completo para o PDF. */
 export function documentoPdf(titulo: string, corpo: string): string {
   return (
