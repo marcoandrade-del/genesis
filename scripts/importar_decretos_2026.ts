@@ -88,6 +88,9 @@ async function main() {
   // "null/null" (sem número) entra como S/N-2026 na PRIMEIRA rodada; rodadas
   // seguintes conciliam resíduos num S/N datado próprio (ver montagem abaixo).
   const porDot = montarRegistrosPorDotacao(await carregarItens(), 'S/N-2026')
+  // atual/dims de TODAS as dotações movimentadas no portal (antes do filtro
+  // de pendentes) — insumo do alvo, da verificação e da conciliação por drift
+  const infoPorKf = new Map([...porDot].map(([kf, regs]) => [kf, { atual: regs[0]!.atual, dims: regs[0]!.dims, fonte: regs[0]!.fonte }]))
 
   // ── 2. Base LOA por dotação ───────────────────────────────────────────────
   const dots = await prisma.dotacaoDespesa.findMany({
@@ -124,6 +127,14 @@ async function main() {
 
   // ── 3. Solver por dotação (núcleo compartilhado) ─────────────────────────
   const { fechaStd, fechaFlip, ajustes } = resolverDeltasPendentes(porDot, baseAtual)
+  // Drift sem pendência numerada (ex.: item null/null NOVO depois do S/N já
+  // lançado — os sem-número são filtrados como "lançados"): a diferença
+  // banco × atual vira item de conciliação POR DIFERENÇA no S/N datado.
+  for (const [kf, info] of infoPorKf) {
+    if (porDot.has(kf)) continue
+    const residuo = info.atual - baseAtual(kf)
+    if (residuo !== 0) ajustes.push({ kf, dims: info.dims, fonte: info.fonte, residuo })
+  }
   console.log(`dotações movimentadas: ${porDot.size}`)
   console.log(`equação fecha no padrão: ${fechaStd} | com flips ini↔val: ${fechaFlip} | com item de conciliação no S/N: ${ajustes.length}`)
   if (ajustes.length) {
@@ -155,13 +166,13 @@ async function main() {
       (f) => [f.codigo, f.id],
     ),
   )
-  const novasDot = [...porDot.keys()].filter((kf) => !dotPorChave.has(kf))
+  const novasDot = [...new Set([...porDot.keys(), ...ajustes.map((a) => a.kf)])].filter((kf) => !dotPorChave.has(kf))
   const novasFontes = [...new Set(novasDot.map((kf) => kf.split('|')[1]!))].filter((f) => !fontesDb.has(f))
-  const alvoMovimentadas = [...porDot.values()].reduce((s, regs) => s + regs[0]!.atual, 0)
+  const alvoMovimentadas = [...infoPorKf.values()].reduce((s, i) => s + i.atual, 0)
   const loaNaoMov = dots.reduce((s, d) => {
     const a = d.acao.codigo
     const kf = `${d.unidadeOrcamentaria.codigo}.${d.funcao.codigo}.${d.subfuncao.codigo}.${d.programa.codigo}.${a[0]}.${a.slice(1)}.${d.contaDespesa.codigo}|${d.fonteRecurso.codigo}`
-    return porDot.has(kf) ? s : s + cent(Number(d.valorAutorizado))
+    return infoPorKf.has(kf) ? s : s + cent(Number(d.valorAutorizado))
   }, 0)
   const alvoTotal = alvoMovimentadas + loaNaoMov
   console.log(`fontes a criar: ${novasFontes.length} | dotações-fonte a criar: ${novasDot.length}`)
@@ -208,7 +219,7 @@ async function main() {
   const idPorKf = new Map<string, string>()
   for (const [kf, d] of dotPorChave) idPorKf.set(kf, d.id)
   for (const kf of novasDot) {
-    const { dims, fonte } = porDot.get(kf)![0]!
+    const { dims, fonte } = porDot.get(kf)?.[0] ?? infoPorKf.get(kf)!
     const faltas = [
       ['uo', uoId.get(dims.uo)],
       ['funcao', funcaoId.get(dims.funcao)],
@@ -280,10 +291,10 @@ async function main() {
     const kf = `${d.unidadeOrcamentaria.codigo}.${d.funcao.codigo}.${d.subfuncao.codigo}.${d.programa.codigo}.${a[0]}.${a.slice(1)}.${d.contaDespesa.codigo}|${d.fonteRecurso.codigo}`
     const v = cent(Number(d.valorAutorizado))
     somaFinal += v
-    const regs = porDot.get(kf)
-    if (regs && v !== regs[0]!.atual) {
+    const info = infoPorKf.get(kf)
+    if (info && v !== info.atual) {
       divergentes++
-      if (divergentes <= 5) console.log(`  ✗ ${kf}: banco ${brl(v)} ≠ portal ${brl(regs[0]!.atual)}`)
+      if (divergentes <= 5) console.log(`  ✗ ${kf}: banco ${brl(v)} ≠ portal ${brl(info.atual)}`)
     }
   }
   console.log(`\ndotações divergentes do portal: ${divergentes}`)
