@@ -15,6 +15,16 @@ export interface MemorialDespesaConsolidada {
   empenhadoConsolidado: number
 }
 
+export interface MemorialReceitaConsolidada {
+  municipio: string
+  estado: string
+  ano: number
+  entidades: { nome: string; arrecadado: number; intraArrecadado: number }[]
+  arrecadadoBruto: number
+  intraEliminada: number
+  arrecadadoConsolidado: number
+}
+
 export interface LinhaMemorial {
   codigo?: string
   rotulo: string
@@ -131,6 +141,25 @@ export class MemorialRclService {
       empenhadoBruto: n(cons.empenhadoBruto),
       intraEliminada: n(cons.intraEliminada),
       empenhadoConsolidado: n(cons.empenhadoConsolidado),
+    }
+  }
+
+  /** Receita consolidada do ENTE — soma das entidades − receita intra (cat 7/8). */
+  async receitaConsolidada(entidadeId: string, ano: number): Promise<MemorialReceitaConsolidada | null> {
+    const ent = await this.prisma.entidade.findUnique({
+      where: { id: entidadeId },
+      select: { municipioId: true, municipio: { select: { nome: true, estado: { select: { sigla: true } } } } },
+    })
+    if (!ent) return null
+    const cons = await new ConsolidacaoService(this.prisma).receita(ent.municipioId, ano)
+    return {
+      municipio: ent.municipio.nome,
+      estado: ent.municipio.estado.sigla,
+      ano,
+      entidades: cons.entidades.map((e) => ({ nome: e.nome, arrecadado: n(e.arrecadado), intraArrecadado: n(e.intraArrecadado) })),
+      arrecadadoBruto: n(cons.arrecadadoBruto),
+      intraEliminada: n(cons.intraEliminada),
+      arrecadadoConsolidado: n(cons.arrecadadoConsolidado),
     }
   }
 }

@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client'
-import { ehDespesaIntra } from './natureza-intra.js'
+import { ehDespesaIntra, ehReceitaIntra } from './natureza-intra.js'
 
 /**
  * Consolidação das contas do ENTE (Município) — soma das entidades com
@@ -74,4 +74,63 @@ export class ConsolidacaoService {
       empenhadoConsolidado: empenhadoBruto.minus(intraEliminada),
     }
   }
+
+  /**
+   * Receita consolidada do ENTE — soma das PrevisaoReceita arrecadadas das
+   * entidades, eliminando a receita INTRA-orçamentária (categoria 7/8). Espelho
+   * do lado despesa: a intra receita (ex.: contribuição patronal que o RPPS
+   * recebe da Prefeitura) é o mesmo fluxo da despesa modalidade 91 — ao
+   * consolidar o ente, some-se uma vez só. Base: arrecadado (execução).
+   */
+  async receita(municipioId: string, ano: number): Promise<ReceitaConsolidada> {
+    const municipio = await this.prisma.municipio.findUnique({
+      where: { id: municipioId },
+      select: { entidades: { where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } } },
+    })
+
+    const entidades: ReceitaEntidade[] = []
+    let arrecadadoBruto = D0()
+    let intraEliminada = D0()
+
+    for (const e of municipio?.entidades ?? []) {
+      const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId: e.id, ano } }, select: { id: true } })
+      let arrecadado = D0()
+      let intra = D0()
+      if (orcamento) {
+        const previsoes = await this.prisma.previsaoReceita.findMany({
+          where: { orcamentoId: orcamento.id },
+          select: { valorArrecadado: true, contaReceita: { select: { codigo: true } } },
+        })
+        for (const p of previsoes) {
+          const v = new Prisma.Decimal(p.valorArrecadado)
+          arrecadado = arrecadado.plus(v)
+          if (ehReceitaIntra(p.contaReceita.codigo)) intra = intra.plus(v)
+        }
+      }
+      entidades.push({ entidadeId: e.id, nome: e.nome, arrecadado, intraArrecadado: intra })
+      arrecadadoBruto = arrecadadoBruto.plus(arrecadado)
+      intraEliminada = intraEliminada.plus(intra)
+    }
+
+    return {
+      entidades,
+      arrecadadoBruto,
+      intraEliminada,
+      arrecadadoConsolidado: arrecadadoBruto.minus(intraEliminada),
+    }
+  }
+}
+
+export type ReceitaEntidade = {
+  entidadeId: string
+  nome: string
+  arrecadado: Prisma.Decimal
+  intraArrecadado: Prisma.Decimal // categoria 7/8 desta entidade
+}
+
+export type ReceitaConsolidada = {
+  entidades: ReceitaEntidade[]
+  arrecadadoBruto: Prisma.Decimal
+  intraEliminada: Prisma.Decimal
+  arrecadadoConsolidado: Prisma.Decimal
 }
