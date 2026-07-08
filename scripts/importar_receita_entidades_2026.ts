@@ -16,7 +16,10 @@
  * valorOrcadoAtualizado e valorArrecadado do período). Header `entidade`.
  * IDs do portal: 3=Previdência · 4=IAM · 9=AMR · 15=IPPLAM (Câmara 6 = 0, pulada).
  *
- * Grava PrevisaoReceita (valorPrevisto = orçado atualizado; valorArrecadado =
+ * Grava PrevisaoReceita (valorPrevisto = orçado INICIAL da LOA — `valorOrcado`
+ * do portal, mesma semântica da Prefeitura; o `valorOrcadoAtualizado` traz
+ * reestimativas ao longo do ano — ex. RPPS Fundo Financeiro 14,8→52,3mi ×2 —
+ * e quebraria o equilíbrio da Lei 4.320 que a V5 do selo verifica; valorArrecadado =
  * arrecadado acumulado do período) no Orcamento JÁ existente da entidade
  * (criado pelo import de despesa #213). Cria ContaReceitaEntidade ausentes
  * (desdobramentos, incl. a árvore cat-7 que não está no plano-modelo) e
@@ -100,7 +103,7 @@ async function getJson<T>(path: string, headers: Record<string, string>): Promis
 }
 
 type FonteDto = { receita: string }
-type DetalheDto = { receita: string; descricao: string; valorArrecadado: number; valorOrcadoAtualizado: number }
+type DetalheDto = { receita: string; descricao: string; valorArrecadado: number; valorOrcado: number; valorOrcadoAtualizado: number }
 type ArvoreDto = { receita: string; descricao: string }
 type DashDto = { valorArrecadado: number }
 
@@ -141,12 +144,12 @@ async function main() {
         // folha = ninguém a estende
         const folha = !codigos.some((c) => c !== d.receita && c.startsWith(d.receita) && c.length > d.receita.length)
         if (!folha) continue
-        if (!(d.valorArrecadado || d.valorOrcadoAtualizado)) continue
+        if (!(d.valorArrecadado || d.valorOrcado || d.valorOrcadoAtualizado)) continue
         const conta = pad12(d.receita)
         if (!descPorConta.has(conta)) descPorConta.set(conta, d.descricao)
         const k = `${conta}|${f.receita}`
         const cur = previsoes.get(k) ?? { previsto: 0, arrecadado: 0 }
-        cur.previsto += d.valorOrcadoAtualizado || 0
+        cur.previsto += d.valorOrcado || 0 // INICIAL da LOA — mesma semântica da Prefeitura (V5/equilíbrio)
         cur.arrecadado += d.valorArrecadado || 0
         previsoes.set(k, cur)
         fontesUsadas.add(f.receita)
