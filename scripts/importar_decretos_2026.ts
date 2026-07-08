@@ -26,6 +26,13 @@
  * dotação == saldoAtualizado do portal, e Σ == alvo global.
  * Idempotente: decretos já lançados (mesmo número) são pulados.
  *
+ * RETOMADA INCREMENTAL (aprendizado de 2026-07-08): decretos já lançados saem
+ * da EQUAÇÃO — o solver resolve só os pendentes contra o autorizado ATUAL do
+ * banco. Re-resolver a história completa podia redistribuir flips entre
+ * lançados e pendentes (mesma soma global, deltas individuais diferentes) e
+ * atribuir a um pendente o valor errado do par ambíguo. Consequência: cada
+ * rodada de conciliação sem número ganha um "S/N-<data>" próprio.
+ *
  * Rodar: npx tsx scripts/importar_decretos_2026.ts [--apply]
  */
 
@@ -142,21 +149,19 @@ async function main() {
     dotPorChave.set(`${despesa}|${d.fonteRecurso.codigo}`, d)
   }
 
-  // Base do solver = LOA ORIGINAL (autorizado atual − créditos já lançados),
-  // p/ retomada segura após aplicação parcial (idempotência por nº do decreto).
-  const aplicadoPorDot = new Map<string, number>()
-  const itensAplicados = await prisma.creditoAdicionalItem.findMany({
-    where: { credito: { orcamentoId: orcamento.id } },
-    select: { dotacaoDespesaId: true, operacao: true, valor: true },
-  })
-  for (const it of itensAplicados) {
-    const d = (it.operacao === 'REFORCO' ? 1 : -1) * cent(Number(it.valor))
-    aplicadoPorDot.set(it.dotacaoDespesaId, (aplicadoPorDot.get(it.dotacaoDespesaId) ?? 0) + d)
+  // RETOMADA INCREMENTAL: decretos já lançados saem da equação — o solver
+  // resolve só os PENDENTES contra o autorizado ATUAL do banco (ver header).
+  const jaLancados = new Set(
+    (await prisma.creditoAdicional.findMany({ where: { orcamentoId: orcamento.id }, select: { numero: true } })).map((c) => c.numero),
+  )
+  for (const [kf, regs] of porDot) {
+    const pend = regs.filter((r) => !jaLancados.has(r.dec))
+    if (pend.length) porDot.set(kf, pend)
+    else porDot.delete(kf)
   }
-  const baseOriginal = (kf: string) => {
+  const baseAtual = (kf: string) => {
     const d = dotPorChave.get(kf)
-    if (!d) return 0
-    return cent(Number(d.valorAutorizado)) - (aplicadoPorDot.get(d.id) ?? 0)
+    return d ? cent(Number(d.valorAutorizado)) : 0
   }
 
   // ── 3. Solver por dotação: Σ deltas = atual − base ────────────────────────
@@ -165,7 +170,7 @@ async function main() {
   const insoluveis: string[] = []
   const ajustes: { kf: string; dims: Reg['dims']; fonte: string; residuo: number }[] = []
   for (const [kf, regs] of porDot) {
-    const base = baseOriginal(kf)
+    const base = baseAtual(kf)
     const alvo = regs[0]!.atual - base
     const somaStd = regs.reduce((s, r) => s + r.std, 0)
     if (somaStd === alvo) {
@@ -244,11 +249,14 @@ async function main() {
       movPorDecreto.set(r.dec, l)
     }
   }
+  // conciliação de cada rodada ganha um S/N datado próprio (o S/N de uma
+  // rodada anterior já está lançado e não pode ser reaberto)
+  const SN = `S/N-${new Date().toISOString().slice(0, 10)}`
   for (const a of ajustes) {
     if (a.residuo === 0) continue
-    const l = movPorDecreto.get('S/N-2026') ?? []
+    const l = movPorDecreto.get(SN) ?? []
     l.push({ kf: a.kf, dims: a.dims, fonte: a.fonte, operacao: a.residuo > 0 ? 'REFORCO' : 'ANULACAO', valor: Math.abs(a.residuo) })
-    movPorDecreto.set('S/N-2026', l)
+    movPorDecreto.set(SN, l)
   }
   for (const [dec, movs] of movPorDecreto) {
     const porKf = new Map<string, Mov>()
@@ -264,12 +272,9 @@ async function main() {
     }
     movPorDecreto.set(dec, [...porKf.values()].filter((m) => m.valor > 0))
   }
-  const jaLancados = new Set(
-    (await prisma.creditoAdicional.findMany({ where: { orcamentoId: orcamento.id }, select: { numero: true } })).map((c) => c.numero),
-  )
   const pendentes = [...movPorDecreto.keys()]
     .filter((d) => !jaLancados.has(d))
-    .sort((a, b) => (a === 'S/N-2026' ? 1 : b === 'S/N-2026' ? -1 : parseInt(a) - parseInt(b))) // S/N-2026 por ÚLTIMO: concilia no estado final
+    .sort((a, b) => (a.startsWith('S/N') ? 1 : b.startsWith('S/N') ? -1 : parseInt(a) - parseInt(b))) // S/N por ÚLTIMO: concilia no estado final
 
   // ── 5. Simulação sequencial com reordenação por viabilidade ───────────────
   const saldoSim = new Map<string, number>()
@@ -405,7 +410,7 @@ async function main() {
       tipo: 'SUPLEMENTAR',
       numero: dec,
       data: hoje,
-      atoLegal: dec === 'S/N-2026' ? 'Movimentos sem número de decreto no portal (2026)' : `Decreto nº ${dec}`,
+      atoLegal: dec.startsWith('S/N') ? `Movimentos sem número de decreto no portal (conciliação de ${dec.slice(4)})` : `Decreto nº ${dec}`,
       justificativa: `Importado da API do Portal da Transparência em ${hoje}; a data oficial não é publicada pela API — ordem oficial pelo número do decreto.`,
       itens: itensCredito,
     })
