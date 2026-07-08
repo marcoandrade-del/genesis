@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client'
+import { SincronizacaoDecretosService } from './sincronizacao-decretos.js'
 
 /**
  * Sincronização automática com o Portal da Transparência (Elotech/OXY) —
@@ -462,6 +463,9 @@ export function agendarSincronizacaoPortal(prisma: PrismaClient, log: (msg: stri
       const agora = new Date()
       const ano = agora.getFullYear()
       const mes = agora.getMonth() + 1
+      // DECRETOS primeiro: autorizado fresco é peso E teto do rateio da despesa
+      const d0 = await new SincronizacaoDecretosService(prisma).sincronizar(ent.id, ano)
+      log(`[sync-portal] decretos ${ano}: ${d0.status} — ${d0.mensagem}`)
       // ordem do Marco: RECEITA sempre antes da DESPESA no ciclo
       const r1 = await svc.arrecadacaoMes(ent.id, ano, mes)
       log(`[sync-portal] arrecadação ${mes}/${ano}: ${r1.status} — ${r1.mensagem}`)
