@@ -82,6 +82,25 @@ describe('ConsistenciaService', () => {
     expect(v5.delta).toBe(120)
   })
 
+  it('V5 agrega TODAS as entidades do município (equilíbrio é do ente, não de cada entidade)', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({
+      municipioId: 'm1',
+      municipio: { estado: { sigla: 'PR', pessoalComposicao: null, modeloContabil: null } },
+    })
+    prisma.orcamento.findMany.mockResolvedValue([{ id: 'o1' }, { id: 'o2' }])
+    // Σ município: prevista 2000 = autorizado 2080 − créditos 80 (por entidade não fecharia)
+    prisma.previsaoReceita.aggregate.mockResolvedValue({ _sum: { valorArrecadado: dec(100), valorPrevisto: dec(2000) } })
+    prisma.dotacaoDespesa.aggregate.mockResolvedValue({ _sum: { valorAutorizado: dec(2080), valorEmpenhado: dec(450) } })
+    const r = await svc.verificar('e1', 2026)
+    const v5 = porCodigo(r, 'V5_EQUILIBRIO_CREDITOS')
+    expect(v5.status).toBe('OK')
+    expect(v5.detalhe).toContain('2 entidade(s)')
+    // agregação consultou os orçamentos do município, não só o da entidade
+    expect(prisma.orcamento.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ entidade: { is: { municipioId: 'm1', ativo: true } } }) }),
+    )
+  })
+
   it('V6 conta dotações estouradas', async () => {
     prisma.dotacaoDespesa.findMany.mockResolvedValue([
       { valorAutorizado: dec(100), valorEmpenhado: dec(90), valorReservado: dec(20) }, // estourada

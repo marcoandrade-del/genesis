@@ -107,20 +107,32 @@ export class ConsistenciaService {
         'Σ Empenho.valor deve igualar o Σ DotacaoDespesa.valorEmpenhado (saldo materializado por dotação).'))
     }
 
-    // V5 — Equilíbrio da LOA + créditos: autorizado − créditos líquidos = receita prevista
+    // V5 — Equilíbrio da LOA do MUNICÍPIO + créditos: a identidade da Lei
+    // 4.320 vale no ORÇAMENTO (Σ das entidades do ente), não em cada entidade
+    // isolada — a LOA oficial de Maringá mostra a Prefeitura sozinha
+    // desequilibrada (receita 3.170,2mi × QDD 2.842,7mi) e o TOTAL fechado
+    // (3.582,0 = 3.582,0, INCLUINDO as intra: o equilíbrio legal é bruto).
     {
+      const ent = await this.prisma.entidade.findUnique({ where: { id: entidadeId }, select: { municipioId: true } })
+      const orcs = ent?.municipioId
+        ? await this.prisma.orcamento.findMany({
+            where: { ano, entidade: { is: { municipioId: ent.municipioId, ativo: true } } },
+            select: { id: true },
+          })
+        : [{ id: orcamento.id }]
+      const ids = orcs.map((o) => o.id)
       const [dot, rec, itens] = await Promise.all([
-        this.prisma.dotacaoDespesa.aggregate({ where: { orcamentoId: orcamento.id }, _sum: { valorAutorizado: true } }),
-        this.prisma.previsaoReceita.aggregate({ where: { orcamentoId: orcamento.id }, _sum: { valorPrevisto: true } }),
+        this.prisma.dotacaoDespesa.aggregate({ where: { orcamentoId: { in: ids } }, _sum: { valorAutorizado: true } }),
+        this.prisma.previsaoReceita.aggregate({ where: { orcamentoId: { in: ids } }, _sum: { valorPrevisto: true } }),
         this.prisma.creditoAdicionalItem.findMany({
-          where: { credito: { orcamentoId: orcamento.id } },
+          where: { credito: { orcamentoId: { in: ids } } },
           select: { operacao: true, valor: true },
         }),
       ])
       const creditosLiquidos = r2(itens.reduce((a, i) => a + (i.operacao === 'REFORCO' ? 1 : -1) * n(i.valor), 0))
-      verificacoes.push(compara('V5_EQUILIBRIO_CREDITOS', 'Equilíbrio da LOA + créditos adicionais',
+      verificacoes.push(compara('V5_EQUILIBRIO_CREDITOS', 'Equilíbrio da LOA do município + créditos adicionais',
         r2(n(rec._sum.valorPrevisto)), r2(n(dot._sum.valorAutorizado) - creditosLiquidos),
-        `Σ despesa autorizada (${r2(n(dot._sum.valorAutorizado)).toLocaleString('pt-BR')}) − créditos líquidos (${creditosLiquidos.toLocaleString('pt-BR')}) deve voltar à despesa inicial da LOA = receita prevista (equilíbrio, Lei 4.320 art. 3º).`))
+        `Σ despesa autorizada das ${ids.length} entidade(s) do município (${r2(n(dot._sum.valorAutorizado)).toLocaleString('pt-BR')}) − créditos líquidos (${creditosLiquidos.toLocaleString('pt-BR')}) deve voltar à despesa inicial da LOA = receita prevista total (equilíbrio, Lei 4.320 art. 3º — identidade do orçamento do ente, não de cada entidade).`))
     }
 
     // V6 — Nenhuma dotação estourada (empenhado + reservado ≤ autorizado)
