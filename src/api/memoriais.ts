@@ -24,7 +24,7 @@ import { ConsistenciaService } from '../services/consistencia.js'
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.11.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.12.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
@@ -52,6 +52,7 @@ export function descreverContrato() {
       { recurso: 'rgf-simplificado', campos: ['temOrcamento', 'rcl', 'rclRealizada', 'linhas', 'disponibilidade'] },
       { recurso: 'consistencia', campos: ['verificacoes', 'selo'] },
       { recurso: 'despesa-consolidada', campos: ['municipio', 'estado', 'ano', 'entidades', 'empenhadoBruto', 'intraEliminada', 'empenhadoConsolidado'] },
+      { recurso: 'receita-consolidada', campos: ['municipio', 'estado', 'ano', 'entidades', 'arrecadadoBruto', 'intraEliminada', 'arrecadadoConsolidado'] },
     ],
   }
 }
@@ -117,6 +118,15 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const r = await svc.despesaConsolidada(p.entidadeId, p.ano)
     if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     return reply.send(envelope('despesa-consolidada', r))
+  })
+
+  // Receita consolidada do ENTE = soma das entidades − receita intra (cat 7/8).
+  app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/receita-consolidada', async (req, reply) => {
+    const p = params(req)
+    if (!p) return reply.code(400).send({ erro: 'entidadeId e ano são obrigatórios.' })
+    const r = await svc.receitaConsolidada(p.entidadeId, p.ano)
+    if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    return reply.send(envelope('receita-consolidada', r))
   })
 
   app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/guardiao', async (req, reply) => {

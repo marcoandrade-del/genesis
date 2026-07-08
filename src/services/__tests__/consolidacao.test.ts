@@ -66,3 +66,45 @@ describe('ConsolidacaoService.despesa', () => {
     expect(r.entidades).toEqual([])
   })
 })
+
+describe('ConsolidacaoService.receita', () => {
+  let prisma: PrismaMock
+  let svc: ConsolidacaoService
+  const prev = (valorArrecadado: number, codigo: string) => ({ valorArrecadado: D(valorArrecadado), contaReceita: { codigo } })
+
+  beforeEach(() => {
+    prisma = criarPrismaMock()
+    svc = new ConsolidacaoService(prisma as never)
+  })
+
+  it('elimina a receita intra (categoria 7): consolidado = bruto − intra', async () => {
+    prisma.municipio.findUnique.mockResolvedValue({
+      entidades: [
+        { id: 'pref', nome: 'Prefeitura' },
+        { id: 'rpps', nome: 'Previdência' },
+      ],
+    })
+    prisma.orcamento.findUnique.mockImplementation(({ where }: { where: { entidadeId_ano: { entidadeId: string } } }) =>
+      Promise.resolve({ id: `orc-${where.entidadeId_ano.entidadeId}` }),
+    )
+    prisma.previsaoReceita.findMany.mockImplementation(({ where }: { where: { orcamentoId: string } }) => {
+      if (where.orcamentoId === 'orc-pref') return Promise.resolve([prev(1000, '1.1.1.2.01.0.1.07')]) // imposto (corrente)
+      // RPPS: contribuição do servidor (cat 1) + contribuição patronal INTRA (cat 7)
+      return Promise.resolve([prev(300, '1.2.1.5.01.1.1.02.01'), prev(44, '7.2.1.5.02.1.1.02.01')])
+    })
+
+    const r = await svc.receita('mun', 2026)
+    expect(r.arrecadadoBruto.toNumber()).toBe(1344) // 1000+300+44
+    expect(r.intraEliminada.toNumber()).toBe(44) // só a cat 7
+    expect(r.arrecadadoConsolidado.toNumber()).toBe(1300) // repasse não conta 2×
+    expect(r.entidades[1]!.intraArrecadado.toNumber()).toBe(44)
+  })
+
+  it('entidade sem orçamento → contribui zero', async () => {
+    prisma.municipio.findUnique.mockResolvedValue({ entidades: [{ id: 'e1', nome: 'E1' }] })
+    prisma.orcamento.findUnique.mockResolvedValue(null)
+    const r = await svc.receita('mun', 2026)
+    expect(r.arrecadadoBruto.toNumber()).toBe(0)
+    expect(r.entidades[0]!.arrecadado.toNumber()).toBe(0)
+  })
+})
