@@ -26,7 +26,7 @@
   </nav>
 
   <h2 class="h4 fw-bold mb-1"><i class="bi bi-arrow-repeat me-1 text-primary"></i>Sincronização com o Portal da Transparência</h2>
-  <p class="text-muted small mb-3">Captura a arrecadação e a execução da despesa do mês corrente direto do portal (tempo real), sempre nesta ordem: <strong>receita antes da despesa</strong>. Cada execução é validada contra o painel oficial antes de gravar — divergência acima de 0,5% não grava nada e fica registrada no log.</p>
+  <p class="text-muted small mb-3">Captura os decretos de alteração orçamentária, a arrecadação e a execução da despesa do mês corrente direto do portal (tempo real), sempre nesta ordem: <strong>decretos, depois receita, depois despesa</strong>. Cada execução é validada contra o painel oficial antes de gravar — divergência não grava nada e fica registrada no log.</p>
 
   <% if (erro) { %><div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div><% } %>
   <% if (aviso) { %><div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i><%= aviso %></div><% } %>
@@ -43,13 +43,53 @@
       <% } else if (!podeEscrever) { %>
         Acesso somente leitura — o botão fica disponível para níveis Escrita e Admin.
       <% } else { %>
-        Roda a receita e a despesa do mês corrente. Leva alguns minutos.
+        Roda decretos, receita e despesa do mês corrente. Leva alguns minutos.
       <% } %>
     </div>
     <div class="ms-auto small text-muted">
       <i class="bi bi-clock-history me-1"></i>Agendamento diário (04h):
       <% if (agendado) { %><span class="badge text-bg-success">ligado</span><% } else { %><span class="badge text-bg-secondary">desligado</span><% } %>
     </div>
+  </div></div>
+
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-file-earmark-text me-1 text-primary"></i>Decretos baixados do portal</h6>
+    <div class="small mb-2">
+      <% if (ultimaDecretos) { %>
+        Última conferência com o portal em <strong><%= ultimaDecretos.criadoEm.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></strong>:
+        <span class="badge <%= BADGE[ultimaDecretos.status] || 'text-bg-secondary' %>"><%= ultimaDecretos.status %></span>
+        <span class="text-muted"><%= ultimaDecretos.mensagem || '' %></span>
+      <% } else { %>
+        <span class="text-muted">Ainda não houve conferência automática de decretos para esta entidade.</span>
+      <% } %>
+    </div>
+    <% if (!decretosBaixados.length) { %>
+      <div class="small text-muted">Nenhum decreto baixado do portal para o exercício.</div>
+    <% } else { %>
+      <div class="small text-muted mb-2"><strong><%= decretosBaixados.length %></strong> decreto(s) do portal no banco — confira abaixo quais entraram e quando.</div>
+      <div class="table-responsive" style="max-height:340px; overflow-y:auto"><table class="table table-sm align-middle mb-0">
+        <thead class="sticky-top bg-white"><tr class="small text-muted">
+          <th>Decreto</th><th>Ato legal</th><th>Origem</th><th class="text-end">Σ reforços (R$)</th><th>Baixado em</th>
+        </tr></thead>
+        <tbody>
+          <% for (const d of decretosBaixados) { %>
+            <tr class="small">
+              <td class="text-nowrap fw-semibold"><%= d.numero %></td>
+              <td class="text-muted"><%= d.atoLegal %></td>
+              <td>
+                <% if ((d.justificativa || '').startsWith('Sincronizado')) { %>
+                  <span class="badge text-bg-success-subtle text-success-emphasis border">Sincronização automática</span>
+                <% } else { %>
+                  <span class="badge text-bg-secondary-subtle text-secondary-emphasis border">Import manual</span>
+                <% } %>
+              </td>
+              <td class="text-end text-nowrap"><%= fmtValor(d.valorTotal) %></td>
+              <td class="text-nowrap"><%= d.criadoEm.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table></div>
+    <% } %>
   </div></div>
 
   <div class="card border-0 shadow-sm"><div class="card-body py-3">

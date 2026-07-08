@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ arrecadacaoMes: vi.fn(), despesaMes: vi.fn() }))
+const m = vi.hoisted(() => ({ arrecadacaoMes: vi.fn(), despesaMes: vi.fn(), sincronizarDecretos: vi.fn() }))
 vi.mock('../../services/sincronizacao-portal.js', () => ({
   SincronizacaoPortalService: class {
     arrecadacaoMes = m.arrecadacaoMes
     despesaMes = m.despesaMes
+  },
+}))
+vi.mock('../../services/sincronizacao-decretos.js', () => ({
+  SincronizacaoDecretosService: class {
+    sincronizar = m.sincronizarDecretos
   },
 }))
 
@@ -26,6 +31,7 @@ describe('appSincronizacaoRoutes', () => {
   beforeEach(async () => {
     m.arrecadacaoMes.mockReset().mockResolvedValue({ status: 'OK' })
     m.despesaMes.mockReset().mockResolvedValue({ status: 'OK' })
+    m.sincronizarDecretos.mockReset().mockResolvedValue({ status: 'OK' })
     ;({ app, prisma } = await montar())
     prisma.entidade.findUnique.mockResolvedValue(ENTIDADE)
   })
@@ -51,18 +57,49 @@ describe('appSincronizacaoRoutes', () => {
     expect(res.body).toContain('58 movimentos')
   })
 
-  it('POST dispara receita antes da despesa e avisa que iniciou', async () => {
+  it('POST dispara decretos → receita → despesa e avisa que iniciou', async () => {
     const ordem: string[] = []
+    m.sincronizarDecretos.mockImplementation(async () => { ordem.push('decretos'); return { status: 'OK' } })
     m.arrecadacaoMes.mockImplementation(async () => { ordem.push('receita'); return { status: 'OK' } })
     m.despesaMes.mockImplementation(async () => { ordem.push('despesa'); return { status: 'OK' } })
     const res = await app.inject(POST)
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('Sincronização de')
     expect(res.body).toContain('iniciada')
-    await vi.waitFor(() => expect(ordem).toEqual(['receita', 'despesa']))
+    await vi.waitFor(() => expect(ordem).toEqual(['decretos', 'receita', 'despesa']))
     const agora = new Date()
+    expect(m.sincronizarDecretos).toHaveBeenCalledWith('ent1', 2026)
     expect(m.arrecadacaoMes).toHaveBeenCalledWith('ent1', agora.getFullYear(), agora.getMonth() + 1)
     expect(m.despesaMes).toHaveBeenCalledWith('ent1', agora.getFullYear(), agora.getMonth() + 1)
+  })
+
+  it('GET lista os decretos baixados com origem, valor e data/hora, e a última conferência', async () => {
+    prisma.sincronizacaoPortal.findMany.mockImplementation(async (args: { where: { tipo?: string } }) =>
+      args.where.tipo === 'DECRETOS'
+        ? [{ tipo: 'DECRETOS', ano: 2026, mes: 7, status: 'OK', mensagem: 'Decretos em dia (229 lançados; 0 pendentes).', valorPortal: null, valorGravado: null, criadoEm: new Date('2026-07-08T04:00:00Z') }]
+        : [],
+    )
+    prisma.orcamento.findUnique.mockResolvedValue({ id: 'o1' })
+    prisma.creditoAdicional.findMany.mockResolvedValue([
+      { numero: '1229/2026', atoLegal: 'Decreto nº 1229/2026', valorTotal: 53600, criadoEm: new Date('2026-07-08T11:00:00Z'), justificativa: 'Sincronizado da API do Portal da Transparência em 2026-07-08…' },
+      { numero: 'S/N-2026-07-08', atoLegal: 'Movimentos sem número de decreto no portal', valorTotal: 0, criadoEm: new Date('2026-07-08T10:00:00Z'), justificativa: 'Importado da API do Portal da Transparência em 2026-07-08…' },
+    ])
+    const res = await app.inject({ method: 'GET', url: '/sincronizacao' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Decretos baixados do portal')
+    expect(res.body).toContain('Decretos em dia (229 lançados; 0 pendentes).')
+    expect(res.body).toContain('1229/2026')
+    expect(res.body).toContain('S/N-2026-07-08')
+    expect(res.body).toContain('Sincronização automática')
+    expect(res.body).toContain('Import manual')
+    expect(res.body).toContain('2</strong> decreto(s) do portal no banco')
+  })
+
+  it('GET sem orçamento no exercício não quebra (lista vazia)', async () => {
+    prisma.orcamento.findUnique.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/sincronizacao' })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('Nenhum decreto baixado do portal')
   })
 
   it('LEITURA não pode disparar (403)', async () => {

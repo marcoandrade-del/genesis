@@ -238,9 +238,11 @@ export class SincronizacaoDecretosService {
           valorGravado: somaDeltas / 100,
         })
       }
+      // os NÚMEROS lançados ficam no log — é o histórico que o usuário confere
+      const lista = ordem.length > 15 ? `${ordem.slice(0, 15).join(', ')} … (+${ordem.length - 15})` : ordem.join(', ')
       return registrar({
         status: 'OK',
-        mensagem: `${ordem.length} decreto(s) lançado(s) (Σ deltas R$ ${(somaDeltas / 100).toFixed(2)}); banco espelha o portal.`,
+        mensagem: `${ordem.length} decreto(s) lançado(s): ${lista} (Σ deltas R$ ${(somaDeltas / 100).toFixed(2)}); banco espelha o portal.`,
         valorPortal: somaPortal,
         valorGravado: somaDeltas / 100,
       })
