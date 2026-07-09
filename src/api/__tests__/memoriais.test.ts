@@ -1,9 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn(), msc: vi.fn() }))
 vi.mock('../../services/consistencia.js', () => ({
   ConsistenciaService: class {
     verificar = m.consistencia
+  },
+}))
+vi.mock('../../services/matriz-saldos-contabeis.js', () => ({
+  MatrizSaldosContabeisService: class {
+    emitir = m.msc
   },
 }))
 vi.mock('../../services/dcl.js', () => ({
@@ -84,6 +89,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.indices.mockReset()
     m.disponibilidade.mockReset()
     m.metas.mockReset()
+    m.msc.mockReset()
     process.env.GENESIS_API_TOKEN = TOKEN
     ;({ app, prisma } = await criarApp({ registrar: memoriaisApiRoutes, prefix: '/api' }))
   })
@@ -109,7 +115,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.versao).toBe('1.12.0') // 1.10 selo; 1.11 despesa-consolidada; 1.12 receita-consolidada (aditivos → MINOR)
+    expect(body.versao).toBe('1.13.0') // 1.10 selo; 1.11 despesa-consolidada; 1.12 receita-consolidada; 1.13 msc (aditivos → MINOR)
     const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
     expect(recursos).toContain('rcl')
     expect(recursos).toContain('dcl')
@@ -117,6 +123,21 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(recursos).toContain('consistencia')
     expect(recursos).toContain('despesa-consolidada')
     expect(recursos).toContain('receita-consolidada')
+    expect(recursos).toContain('msc')
+  })
+
+  it('200 MSC em envelope: mês repassado ao serviço; 400 sem mês válido', async () => {
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1' })
+    m.msc.mockResolvedValue({ entidade: { id: 'e1' }, ano: 2026, mes: 6, tipo: 'AGREGADA', linhas: [], verificacoes: [], selo: { aprovadas: 2, avaliadas: 2, total: 2 } })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/msc?entidadeId=e1&ano=2026&mes=6', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.recurso).toBe('msc')
+    expect(body.dados.mes).toBe(6)
+    expect(m.msc).toHaveBeenCalledWith('e1', 2026, 6)
+    // sem mês, ou mês fora de 1..12, é 400 (nem chega no serviço)
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/msc?entidadeId=e1&ano=2026', headers: auth })).statusCode).toBe(400)
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/msc?entidadeId=e1&ano=2026&mes=13', headers: auth })).statusCode).toBe(400)
   })
 
   it('200 consistência em envelope: selo N/M e verificações com Δ', async () => {

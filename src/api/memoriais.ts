@@ -10,6 +10,7 @@ import { SaldoBancarioMensalService } from '../services/saldo-bancario-mensal.js
 import { DclService } from '../services/dcl.js'
 import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
 import { ConsistenciaService } from '../services/consistencia.js'
+import { MatrizSaldosContabeisService } from '../services/matriz-saldos-contabeis.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -24,7 +25,7 @@ import { ConsistenciaService } from '../services/consistencia.js'
  * Ao mudar o cálculo/forma aqui, BUMP a versão abaixo (e o Oxy detecta).
  * Ver [[oxy-dashboards-integracao]].
  */
-export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.12.0' } as const
+export const CONTRATO_MEMORIAIS = { nome: 'memoriais-lrf', versao: '1.13.0' } as const
 
 /**
  * Contrato SEPARADO dos VALORES MENSAIS granulares (alimenta o painel do Oxy).
@@ -53,6 +54,7 @@ export function descreverContrato() {
       { recurso: 'consistencia', campos: ['verificacoes', 'selo'] },
       { recurso: 'despesa-consolidada', campos: ['municipio', 'estado', 'ano', 'entidades', 'empenhadoBruto', 'intraEliminada', 'empenhadoConsolidado'] },
       { recurso: 'receita-consolidada', campos: ['municipio', 'estado', 'ano', 'entidades', 'arrecadadoBruto', 'intraEliminada', 'arrecadadoConsolidado'] },
+      { recurso: 'msc', campos: ['entidade', 'ano', 'mes', 'tipo', 'metodologia', 'linhas', 'verificacoes', 'selo'] },
     ],
   }
 }
@@ -79,6 +81,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const dclSvc = new DclService(app.prisma)
   const rgfSimplesSvc = new RgfSimplificadoService(app.prisma)
   const consistenciaSvc = new ConsistenciaService(app.prisma)
+  const mscSvc = new MatrizSaldosContabeisService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -201,6 +204,20 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     if (!ent) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     const r = await consistenciaSvc.verificar(p.entidadeId, p.ano)
     return reply.send(envelope('consistencia', r))
+  })
+
+  // MATRIZ DE SALDOS CONTÁBEIS (MSC) — balancete analítico no leiaute da STN
+  // (Siconfi), mês a mês (SI/MD/MC/SF). Keystone do medidor de ICF; o razão
+  // único faz a MSC fechar por construção com RREO/RGF.
+  app.get<{ Querystring: { entidadeId?: string; ano?: string; mes?: string } }>('/memoriais/msc', async (req, reply) => {
+    const entidadeId = req.query.entidadeId
+    const ano = parseInt(String(req.query.ano ?? ''), 10)
+    const mes = parseInt(String(req.query.mes ?? ''), 10)
+    if (!entidadeId || !Number.isFinite(ano) || !Number.isFinite(mes) || mes < 1 || mes > 12)
+      return reply.code(400).send({ erro: 'entidadeId, ano e mes (1..12) são obrigatórios.' })
+    const r = await mscSvc.emitir(entidadeId, ano, mes)
+    if (!r) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
+    return reply.send(envelope('msc', r))
   })
 
   app.get<{ Querystring: { entidadeId?: string; ano?: string } }>('/memoriais/saldo-fonte', async (req, reply) => {
