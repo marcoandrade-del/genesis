@@ -41,6 +41,16 @@ PCASP.txt
 pcasp_*.xlsx
 pcasp_*.csv
 
+# Artefatos de compilação TS emitidos junto ao fonte (regeneráveis via tsc)
+scripts/*.js
+scripts/*.js.map
+scripts/*.d.ts
+scripts/*.d.ts.map
+prisma/seed.js
+prisma/seed.js.map
+prisma/seed.d.ts
+prisma/seed.d.ts.map
+
 # Fontes de dados para importação (planilhas/CSVs baixados localmente)
 /data/
 
