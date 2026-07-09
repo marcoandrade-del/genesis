@@ -5,6 +5,10 @@ coverage/
 # Environment
 .env
 
+# Config local de dev com SEGREDO (NÃO versionar)
+run-dev.sh
+*.local.sh
+
 # Prisma
 /generated/prisma
 
