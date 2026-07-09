@@ -1,6 +1,6 @@
 ---
 name: decretos-import-aprendizados
-description: "IMPORT DOS DECRETOS CONCLUÍDO (2026-07-03, PR #192): API decifrada (saldoAtualizado=atual; par {delta, atual−delta} em ordem AMBÍGUA), solver por dotação, 219 decretos lançados, 0 divergências × portal, Σ 3.325.289.298,63"
+description: "Decretos da API Elotech: par {delta, atual−delta} AMBÍGUO, solver por equação com retomada INCREMENTAL (#220); AUTOMATIZADO no sync diário (#222/#223, núcleo decretos-solver.ts) com histórico na tela (#224); 229 lançados, Δ 0,00 × portal"
 metadata:
   type: project
 ---
@@ -28,9 +28,20 @@ dotações-fonte criadas (superávit 2xxx, convênios 5xxxx).
    aplicado POR ÚLTIMO (concilia no estado final).
 5. Netting por dotação dentro de cada decreto (o service valida anulação
    contra o saldo PRÉ-documento).
-6. Retomada idempotente: pula números já lançados; base do solver = atual −
-   Σ créditos já lançados (aprendido na prática: 1ª aplicação parou em
-   214/219 e retomou limpa).
+6. Retomada idempotente: pula números já lançados. **⚠️ CORRIGIDO em
+   2026-07-08 (PR #220): a retomada resolve SÓ OS PENDENTES contra o
+   autorizado ATUAL do banco.** Re-resolver a história completa redistribuía
+   os flips entre lançados (imutáveis) e pendentes — mesma soma por dotação,
+   delta individual errado (decreto 1218/2026 recebeu anulação de 1.192.870,15
+   em vez de 12.650,74; o guard de saldo disponível barrou). Conciliação de
+   cada rodada ganha `S/N-<data>` próprio (o S/N antigo é imutável).
+7. **AUTOMATIZADO (2026-07-08, #222/#223): decretos entraram no sync diário**
+   (`SincronizacaoDecretosService`, antes de receita→despesa; núcleo puro em
+   `decretos-solver.ts`, compartilhado com o script). O sync só lança equação
+   exata; recusa (DIVERGENTE) conciliação/S-N/drift/ordem-inviável → aí sim
+   rodar o script manual. Item null/null NOVO pós-S/N: o script concilia POR
+   DIFERENÇA (atual − banco) num `S/N-<data>` (caso real: 53.600,00 em
+   08.010...3.3.90.93 f2303). Estado: 229 decretos, Δ 0,00 × portal.
 
 ## Armadilhas que custaram horas (não repetir)
 - Hipótese "ordem = nº do decreto" → 475 resíduos (falsa).

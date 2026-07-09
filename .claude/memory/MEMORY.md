@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Rematerializar conjunto ANTIGO ∪ NOVO](feedback-rematerializar-conjunto-antigo.md) — re-run que redistribui movimentos deixa fichas órfãs com materializado velho (bug do #217, fix #218 + reparo one-off)
+- [Consolidação por ente + intra-OFSS](consolidacao-ente-intra.md) — elimina mod 91/cat 7-8 DERIVADO dos códigos; despesa #216 + receita #219 consolidadas; equilíbrio LOA (V5) é do MUNICÍPIO e BRUTO, fechado Δ0 em #221 (previsto = orçado INICIAL, não atualizado); falta Fase 3 DCL/RGF
 - [Maringá: município completo](maringa-municipio-completo.md) — TODAS as entidades com LOA (QDD ao centavo) + execução jan–jun (guard 30/30); mapa órgão↔portal↔PIT; IPPLAM/IAM criadas via onboarding; #213
 - [Registrar frente ANTES de começar](feedback-registrar-frente-antes-de-comecar.md) — claim no quadro é a 1ª escrita da frente; colisão real de 2026-07-07 (saldos bancários em 2 sessões)
 - [OXY: manual de interpretação fiscal p/ IA](oxy-manual-interpretacao-fiscal.md) — HANDOFF: regras por indicador + ressalvas de auditor + requisitos p/ análises encaminháveis; Gênesis calcula/explica, OXY exibe/narra via contrato 1.9.0
@@ -15,7 +17,7 @@
 - [Alterações orçamentárias (decretos)](alteracoes-orcamentarias-dinamica.md) — autorizado é VIVO (créditos aplicam no valorAutorizado); meta fiscal fica FIXA na LOA inicial e o Δ mostra o desvio; importar decretos reais de Maringá = pendente
 - [Gemini: confirmar 2× com deep search](feedback-gemini-deep-search.md) — 1ª resposta mistura apurado/meta; deep search trouxe DCL inicial −137,51mi que fecha ao centavo; MCP gemini-cli MORTO no free tier (cota zero + Code Assist aposentado) → usar WebSearch/WebFetch nativos
 - [Sync automático + execução jan–jun](alteracoes-orcamentarias-dinamica.md) — job diário receita→despesa (#194/#195, env-gated, valida vs dashboard antes de gravar); receita 1.672,0mi e despesa 1.746,2mi capturadas ao centavo; Anexo 5 VIVO; falta: saldos bancários → nominal/DCL vivos
-- [Import decretos: CONCLUÍDO](decretos-import-aprendizados.md) — 219 decretos lançados (#192, 2026-07-03), 0 divergências × portal, Σ 3.325.289.298,63; API decifrada (par {delta, atual−delta} AMBÍGUO, solver por equação); armadilhas documentadas
+- [Decretos: import + SYNC AUTOMÁTICO](decretos-import-aprendizados.md) — API decifrada (par {delta, atual−delta} ambíguo, solver por equação INCREMENTAL #220); automatizado no job diário #222/#223 (núcleo em decretos-solver.ts; sync recusa conciliação/drift → script manual); histórico na tela #224; 229 decretos Δ 0,00 × portal
 - [Apurados TCE 2026](apurados-tce-2026.md) — gabaritos oficiais: receita até jun 1.732,2mi (banco: 1.461,2 jan–mai), despesa empenhada 1.746,4mi (alvo do import), primário +320,89, DCL −539,62; nominal 402,12 é APURADO não meta
 - [Portal Maringá: API de arquivos](portal-maringa-api-arquivos.md) — baixar publicações via /api/files/arquivo/{idArquivo}; LDO 2026: renúncia XLS baixada, Metas Anuais NÃO publicadas (slides 1118420 = melhor pista, baixar no navegador)
 - [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
