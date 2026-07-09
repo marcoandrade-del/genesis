@@ -18,6 +18,8 @@ A pasta do projeto foi movida para `~/claude/Projetos/genesis`; `~/claude/genesi
 
 **Pipeline:** `sync_memory.py` (PostToolUse em Write|Edit) copia todo arquivo escrito no dir canônico → in-repo. Logo, **toda edição de memória vira mudança no working tree do git** (incl. atualizações do `coordenacao-sessoes.md`) — commitar para "versionar de verdade".
 
+**⚠️ Sessões abertas da pasta-mãe (`~/claude/Projetos`) NÃO disparam o hook** (ele vive no `settings.local.json` do genesis) — a cópia in-repo defasa em silêncio (aconteceu em 2026-07-09: 2 sessões de trabalho sem sync). Ao fechar, sincronizar na mão: `cp <canônico>/*.md .claude/memory/` + commit `chore(memória)`.
+
 **Hooks** (em `.claude/settings.local.json`): SessionStart faz `cat …-home-marco-claude-genesis/memory/coordenacao-sessoes.md` (resolve via symlink → atual); PostToolUse roda `…/claude/genesis/.claude/sync_memory.py` (resolve via symlink). Não precisam ser editados graças aos symlinks.
 
 **How to apply:** ao salvar memória, escreva em `…-Projetos-genesis/memory/` e atualize `MEMORY.md`; depois commite `.claude/memory/` se quiser no remoto. Ver [[coordenacao-sessoes]] e [[salvar-erros-em-memoria]].
