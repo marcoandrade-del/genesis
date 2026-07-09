@@ -162,19 +162,33 @@ export class MotorEventosDespesa {
     const codigos = [...new Set(resolvidos.flatMap((r) => r.pares.flatMap((p) => [p.debito, p.credito])))]
     const idPorCodigo = await this.resolverContas(ctx, codigos, db)
 
+    // Fonte da dotação carimbada em cada perna (dimensão da MSC/RGF): sem ela, a
+    // fonte da despesa só sairia por join na dotação. O motor da receita já faz o
+    // análogo. Null-safe: dotação sem fonte resolvível ⇒ fonteCodigo null (comportamento anterior).
+    const fonteCodigo = await this.fonteDaDotacao(ctx.dotacaoDespesaId, db)
+
     const valor = new Prisma.Decimal(ctx.valor).toFixed(2)
     const dDeb: 'DEBITO' | 'CREDITO' = opts.estorno ? 'CREDITO' : 'DEBITO'
     const dCred: 'DEBITO' | 'CREDITO' = opts.estorno ? 'DEBITO' : 'CREDITO'
     const leg = (codigo: string, tipo: 'DEBITO' | 'CREDITO'): ItemDado => {
       const id = idPorCodigo.get(codigo)
       if (!id) throw new ErroNegocio('ENTIDADE_NAO_PROCESSAVEL', `Integração contábil indisponível: conta "${codigo}" não é folha no plano da entidade (exercício ${ctx.ano}).`)
-      return { contaId: id, tipo, valor, dotacaoDespesaId: ctx.dotacaoDespesaId }
+      return { contaId: id, tipo, valor, dotacaoDespesaId: ctx.dotacaoDespesaId, fonteCodigo }
     }
     return resolvidos.map((r) => ({
       eventoCodigo: r.codigo,
       descricaoEvento: r.descricao,
       itens: r.pares.flatMap((p) => [leg(p.debito, dDeb), leg(p.credito, dCred)]),
     }))
+  }
+
+  /** Fonte (código) da dotação, para carimbar o razão da despesa. Null-safe (dotação/fonte ausente ⇒ null). */
+  private async fonteDaDotacao(dotacaoDespesaId: string, db: Db): Promise<string | null> {
+    const dot = await db.dotacaoDespesa.findUnique({
+      where: { id: dotacaoDespesaId },
+      select: { fonteRecurso: { select: { codigo: true } } },
+    })
+    return dot?.fonteRecurso?.codigo ?? null
   }
 
   /** Resolve o de/para patrimonial (VPD/passivo) da natureza, por modelo. Null se não houver. */

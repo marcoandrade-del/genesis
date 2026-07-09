@@ -40,6 +40,20 @@ describe('MotorEventosDespesa (table-driven)', () => {
     expect(ev[0].itens.every((i) => i.dotacaoDespesaId === 'dot1' && i.valor === '1000.00')).toBe(true)
   })
 
+  it('carimba a fonte da dotação em todas as pernas (dimensão da MSC/RGF)', async () => {
+    mockContas()
+    prisma.dotacaoDespesa.findUnique.mockResolvedValue({ fonteRecurso: { codigo: '1500' } } as never)
+    const ev = await motor.resolverEmpenho(ctx)
+    expect(ev.flatMap((e) => e.itens).every((i) => i.fonteCodigo === '1500')).toBe(true)
+  })
+
+  it('fonte null quando a dotação não tem fonte resolvível (comportamento anterior preservado)', async () => {
+    mockContas()
+    // dotacaoDespesa.findUnique não mockado → undefined → fonteCodigo null
+    const ev = await motor.resolverEmpenho(ctx)
+    expect(ev.flatMap((e) => e.itens).every((i) => i.fonteCodigo == null)).toBe(true)
+  })
+
   it('liquidação COM de/para → 700/701 + 702 patrimonial (token @VPD/@PASSIVO resolvido)', async () => {
     comDePara()
     mockContas([VPD, PASSIVO])
