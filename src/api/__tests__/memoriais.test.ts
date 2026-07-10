@@ -115,7 +115,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.versao).toBe('1.13.0') // 1.10 selo; 1.11 despesa-consolidada; 1.12 receita-consolidada; 1.13 msc (aditivos → MINOR)
+    expect(body.versao).toBe('1.14.0') // 1.10 selo; 1.11 despesa-consolidada; 1.12 receita-consolidada; 1.13 msc; 1.14 msc por conta-corrente (aditivos → MINOR)
     const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
     expect(recursos).toContain('rcl')
     expect(recursos).toContain('dcl')
