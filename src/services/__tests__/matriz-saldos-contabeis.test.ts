@@ -143,21 +143,25 @@ describe('MatrizSaldosContabeisService', () => {
     expect(pd.delta).toBe(-30) // Σ MD (0) − Σ MC (30)
   })
 
-  it('resolve fonte e função da dotação na conta-corrente da despesa', async () => {
+  it('resolve fonte/função/subfunção/natureza da dotação e o atributo F do modelo', async () => {
     prisma.entidade.findUnique.mockResolvedValue({ id: 'e1', nome: 'P', municipio: { nome: 'M', estado: { sigla: 'PR' } } })
     prisma.contaContabilEntidade.findMany.mockResolvedValue([{ id: 'X', codigo: '6.2.2.1.01.00', modeloContaId: 'mX' }])
-    prisma.conta.findMany.mockResolvedValue([{ id: 'mX', naturezaSaldo: 'DEVEDORA' }])
+    prisma.conta.findMany.mockResolvedValue([{ id: 'mX', naturezaSaldo: 'DEVEDORA', superavitFinanceiro: 'FINANCEIRO' }])
     prisma.saldoInicialAno.findMany.mockResolvedValue([])
     prisma.lancamentoItem.groupBy
       .mockResolvedValueOnce([])
       .mockResolvedValueOnce([gi('X', 'DEBITO', 70, { dotacaoDespesaId: 'd1' })])
-    prisma.dotacaoDespesa.findMany.mockResolvedValue([{ id: 'd1', fonteRecurso: { codigo: '1500' }, funcao: { codigo: '12' } }])
+    prisma.dotacaoDespesa.findMany.mockResolvedValue([
+      { id: 'd1', fonteRecurso: { codigo: '1500' }, funcao: { codigo: '12' }, subfuncao: { codigo: '361' }, contaDespesa: { codigo: '3.3.90.30.00' } },
+    ])
     prisma.resumoMensalConta.findMany.mockResolvedValue([{ totalDebito: dec(70), totalCredito: dec(0) }])
 
     const msc = await svc.emitir('e1', 2026, 3)
     const l = msc!.linhas.find((l) => l.conta === '6.2.2.1.01.00')!
-    expect(l.contaCorrente).toMatchObject({ fonte: '1500', funcao: '12', dotacaoId: 'd1', naturezaReceita: null })
-    expect(l).toMatchObject({ movimentoDevedor: 70, saldoFinal: 70 })
+    expect(l.contaCorrente).toMatchObject({
+      fonte: '1500', funcao: '12', subfuncao: '361', naturezaDespesa: '3.3.90.30.00', dotacaoId: 'd1', naturezaReceita: null,
+    })
+    expect(l).toMatchObject({ superavitFinanceiro: 'FINANCEIRO', movimentoDevedor: 70, saldoFinal: 70 })
   })
 
   it('não gera linha para conta-corrente sem saldo e sem movimento', async () => {
