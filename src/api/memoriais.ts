@@ -11,6 +11,7 @@ import { DclService } from '../services/dcl.js'
 import { RgfSimplificadoService } from '../services/rgf-simplificado.js'
 import { ConsistenciaService } from '../services/consistencia.js'
 import { MatrizSaldosContabeisService } from '../services/matriz-saldos-contabeis.js'
+import { MunicipiosAtivosService } from '../services/municipios-ativos.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -36,6 +37,13 @@ export const CONTRATO_VALORES_MENSAIS = { nome: 'valores-mensais', versao: '1.0.
 
 /** Contrato do saldo bancário consolidado por mês (painel do Oxy). Versão própria. */
 export const CONTRATO_SALDO_BANCARIO = { nome: 'saldo-bancario', versao: '1.0.0' } as const
+
+/**
+ * Contrato do CATÁLOGO de municípios com base rodando (seletor do BI multi-município).
+ * Versão própria. O oxy-bi-jpa lista os municípios disponíveis e resolve o clienteId
+ * (UUID do município) → entidade PREFEITURA. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
+ */
+export const CONTRATO_MUNICIPIOS = { nome: 'municipios', versao: '1.0.0' } as const
 
 /** Descritor do contrato: o que o Oxy pode validar antes de consumir. */
 export function descreverContrato() {
@@ -82,6 +90,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const rgfSimplesSvc = new RgfSimplificadoService(app.prisma)
   const consistenciaSvc = new ConsistenciaService(app.prisma)
   const mscSvc = new MatrizSaldosContabeisService(app.prisma)
+  const municipiosAtivosSvc = new MunicipiosAtivosService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -246,5 +255,14 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const dados = await saldoBancarioSvc.consolidar(p.entidadeId, p.ano)
     if (!dados) return reply.code(404).send({ erro: 'Entidade não encontrada.' })
     return reply.send({ contrato: { ...CONTRATO_SALDO_BANCARIO, recurso: 'saldo-bancario' }, dados })
+  })
+
+  // Catálogo de municípios com base rodando p/ o seletor do BI multi-município
+  // (contrato próprio `municipios`). Sem params: devolve todos os municípios com
+  // ≥1 PREFEITURA ativa e plano contábil copiado. O oxy-bi-jpa resolve o clienteId
+  // (UUID do município) → entidade PREFEITURA a partir daqui.
+  app.get('/memoriais/municipios', async (_req, reply) => {
+    const dados = await municipiosAtivosSvc.listar()
+    return reply.send({ contrato: { ...CONTRATO_MUNICIPIOS, recurso: 'municipios' }, dados })
   })
 }
