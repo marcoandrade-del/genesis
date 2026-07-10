@@ -32,12 +32,15 @@ export interface ContaCorrenteMsc {
   naturezaReceita: string | null // natureza da receita (cc da classe 6 / VPA)
   dotacaoId: string | null // dotação da despesa — carrega a funcional-programática completa
   funcao: string | null // função da despesa, resolvida da dotação
+  subfuncao: string | null // subfunção da despesa, resolvida da dotação
+  naturezaDespesa: string | null // natureza da despesa (conta de despesa da dotação)
 }
 
 export interface LinhaMsc {
   conta: string // código PCASP estendido (conta analítica)
   contaCorrente: ContaCorrenteMsc
   naturezaSaldo: NaturezaSaldoMsc | null
+  superavitFinanceiro: string | null // atributo do PCASP (F/P/M/controles) — habilita os checks de atributo F
   // SI e SF vêm em "saldo devedor COM SINAL": positivo = devedor, negativo =
   // credor (o mesmo padrão do balancete em saldo-contabil).
   saldoInicial: number // SI — no início do mês
@@ -63,11 +66,12 @@ const TOLERANCIA = 0.01 // centavo
 
 const METODOLOGIA =
   'MSC por conta-corrente (Portaria STN/MF 642/2019): contas analíticas do PCASP ' +
-  'estendido quebradas por fonte/destinação, natureza da receita e dotação da despesa; ' +
-  'SI/MD/MC/SF do período em saldo devedor com sinal, agregados do razão (LancamentoItem) ' +
-  'e reconciliados contra o balancete materializado (ResumoMensalConta). A abertura ' +
-  'patrimonial transportada (SaldoInicialAno) entra sem conta-corrente. Poder/órgão entra ' +
-  'na próxima fase.'
+  'estendido quebradas por fonte/destinação, natureza da receita e dotação da despesa ' +
+  '(fonte, função, subfunção e natureza da despesa), com o atributo do superávit financeiro ' +
+  '(F) por linha; SI/MD/MC/SF do período em saldo devedor com sinal, agregados do razão ' +
+  '(LancamentoItem) e reconciliados contra o balancete materializado (ResumoMensalConta). A ' +
+  'abertura patrimonial transportada (SaldoInicialAno) entra sem conta-corrente. Poder/órgão ' +
+  'entra na próxima fase.'
 
 /** Chave de agregação conta×conta-corrente ( = separador que não ocorre em código). */
 const chaveCc = (contaId: string, fonte: string | null, natRec: string | null, dotId: string | null) =>
@@ -95,15 +99,20 @@ export class MatrizSaldosContabeisService {
       select: { id: true, codigo: true, modeloContaId: true },
     })
 
-    // Natureza do saldo vem do modelo padrão (ContaContabilEntidade não a guarda).
+    // Natureza do saldo e atributo do PCASP (F/P/M) vêm do modelo padrão
+    // (ContaContabilEntidade não os guarda).
     const modeloIds = [...new Set(contas.map((c) => c.modeloContaId).filter((x): x is string => !!x))]
     const modelos = modeloIds.length
-      ? await this.prisma.conta.findMany({ where: { id: { in: modeloIds } }, select: { id: true, naturezaSaldo: true } })
+      ? await this.prisma.conta.findMany({ where: { id: { in: modeloIds } }, select: { id: true, naturezaSaldo: true, superavitFinanceiro: true } })
       : []
     const natPorModelo = new Map(modelos.map((m) => [m.id, (m.naturezaSaldo as NaturezaSaldoMsc | null) ?? null]))
+    const superavitPorModelo = new Map(modelos.map((m) => [m.id, (m.superavitFinanceiro as string | null) ?? null]))
     const codigoPorConta = new Map(contas.map((c) => [c.id, c.codigo]))
     const natPorConta = new Map(
       contas.map((c) => [c.id, c.modeloContaId ? natPorModelo.get(c.modeloContaId) ?? null : null]),
+    )
+    const superavitPorConta = new Map(
+      contas.map((c) => [c.id, c.modeloContaId ? superavitPorModelo.get(c.modeloContaId) ?? null : null]),
     )
 
     const iniciais = await this.prisma.saldoInicialAno.findMany({
@@ -129,15 +138,32 @@ export class MatrizSaldosContabeisService {
       _sum: { valor: true },
     })
 
-    // Dotações referenciadas → fonte + função (dimensões da cc da despesa).
+    // Dotações referenciadas → fonte + função + subfunção + natureza da despesa
+    // (dimensões da cc da despesa).
     const dotIds = [...new Set([...antes, ...domes].map((g) => g.dotacaoDespesaId).filter((x): x is string => !!x))]
     const dots = dotIds.length
       ? await this.prisma.dotacaoDespesa.findMany({
           where: { id: { in: dotIds } },
-          select: { id: true, fonteRecurso: { select: { codigo: true } }, funcao: { select: { codigo: true } } },
+          select: {
+            id: true,
+            fonteRecurso: { select: { codigo: true } },
+            funcao: { select: { codigo: true } },
+            subfuncao: { select: { codigo: true } },
+            contaDespesa: { select: { codigo: true } },
+          },
         })
       : []
-    const dotInfo = new Map(dots.map((d) => [d.id, { fonte: d.fonteRecurso?.codigo ?? null, funcao: d.funcao?.codigo ?? null }]))
+    const dotInfo = new Map(
+      dots.map((d) => [
+        d.id,
+        {
+          fonte: d.fonteRecurso?.codigo ?? null,
+          funcao: d.funcao?.codigo ?? null,
+          subfuncao: d.subfuncao?.codigo ?? null,
+          naturezaDespesa: d.contaDespesa?.codigo ?? null,
+        },
+      ]),
+    )
 
     type Bucket = { contaId: string; fonte: string | null; natRec: string | null; dotId: string | null; si: number; md: number; mc: number }
     const buckets = new Map<string, Bucket>()
@@ -190,11 +216,14 @@ export class MatrizSaldosContabeisService {
         naturezaReceita: b.natRec,
         dotacaoId: b.dotId,
         funcao: dinfo?.funcao ?? null,
+        subfuncao: dinfo?.subfuncao ?? null,
+        naturezaDespesa: dinfo?.naturezaDespesa ?? null,
       }
       linhas.push({
         conta: codigo,
         contaCorrente,
         naturezaSaldo: natPorConta.get(b.contaId) ?? null,
+        superavitFinanceiro: superavitPorConta.get(b.contaId) ?? null,
         saldoInicial: si,
         movimentoDevedor: md,
         movimentoCredor: mc,
