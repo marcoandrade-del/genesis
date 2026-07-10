@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn(), msc: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn(), msc: vi.fn(), municipios: vi.fn() }))
 vi.mock('../../services/consistencia.js', () => ({
   ConsistenciaService: class {
     verificar = m.consistencia
@@ -9,6 +9,11 @@ vi.mock('../../services/consistencia.js', () => ({
 vi.mock('../../services/matriz-saldos-contabeis.js', () => ({
   MatrizSaldosContabeisService: class {
     emitir = m.msc
+  },
+}))
+vi.mock('../../services/municipios-ativos.js', () => ({
+  MunicipiosAtivosService: class {
+    listar = m.municipios
   },
 }))
 vi.mock('../../services/dcl.js', () => ({
@@ -67,7 +72,7 @@ vi.mock('../../services/indice-constitucional.js', async (importOriginal) => ({
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
 import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
-import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO } from '../memoriais.js'
+import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO, CONTRATO_MUNICIPIOS } from '../memoriais.js'
 import type { FastifyInstance } from 'fastify'
 
 const TOKEN = 'segredo-de-teste'
@@ -339,5 +344,25 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     m.saldoBanc.mockResolvedValue(null)
     const res = await app.inject({ method: 'GET', url: '/api/memoriais/saldo-bancario?entidadeId=x&ano=2026', headers: auth })
     expect(res.statusCode).toBe(404)
+  })
+
+  it('200 catálogo de municípios — contrato próprio municipios (sem params)', async () => {
+    m.municipios.mockResolvedValue({
+      municipios: [
+        { id: 'mun-1', nome: 'Maringá', estado: 'PR', prefeitura: { id: 'ent-1', nome: 'Prefeitura', cnpj: '76.282.656/0001-06', anosComOrcamento: [2026] } },
+      ],
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/municipios', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.nome).toBe(CONTRATO_MUNICIPIOS.nome)
+    expect(body.contrato.versao).toBe(CONTRATO_MUNICIPIOS.versao)
+    expect(body.contrato.recurso).toBe('municipios')
+    expect(body.dados.municipios[0].nome).toBe('Maringá')
+    expect(body.dados.municipios[0].prefeitura.anosComOrcamento).toEqual([2026])
+  })
+
+  it('401 catálogo de municípios sem token (herda o hook de auth)', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/municipios' })).statusCode).toBe(401)
   })
 })
