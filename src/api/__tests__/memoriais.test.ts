@@ -120,7 +120,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(res.statusCode).toBe(200)
     const body = res.json()
     expect(body.versao).toBe(CONTRATO_MEMORIAIS.versao)
-    expect(body.versao).toBe('1.15.0') // 1.10 selo; 1.11 despesa-consolidada; 1.12 receita-consolidada; 1.13 msc; 1.14 msc por conta-corrente; 1.15 msc +atributo F/natureza-despesa/subfunção (aditivos → MINOR)
+    expect(body.versao).toBe('1.16.0') // 1.13 msc; 1.14 msc por conta-corrente; 1.15 msc +atributo F/natureza-despesa/subfunção; 1.16 msc-validacao (aditivos → MINOR)
     const recursos = body.recursos.map((r: { recurso: string }) => r.recurso)
     expect(recursos).toContain('rcl')
     expect(recursos).toContain('dcl')
@@ -129,6 +129,7 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     expect(recursos).toContain('despesa-consolidada')
     expect(recursos).toContain('receita-consolidada')
     expect(recursos).toContain('msc')
+    expect(recursos).toContain('msc-validacao')
   })
 
   it('200 MSC em envelope: mês repassado ao serviço; 400 sem mês válido', async () => {
@@ -143,6 +144,17 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
     // sem mês, ou mês fora de 1..12, é 400 (nem chega no serviço)
     expect((await app.inject({ method: 'GET', url: '/api/memoriais/msc?entidadeId=e1&ano=2026', headers: auth })).statusCode).toBe(400)
     expect((await app.inject({ method: 'GET', url: '/api/memoriais/msc?entidadeId=e1&ano=2026&mes=13', headers: auth })).statusCode).toBe(400)
+  })
+
+  it('200 validação estrutural da MSC (Dim I) em envelope; 400 sem mês válido', async () => {
+    m.msc.mockResolvedValue({ entidade: { id: 'e1', nome: 'Prefeitura', municipio: 'Maringá', estado: 'PR' }, ano: 2026, mes: 6, tipo: 'AGREGADA', metodologia: '', linhas: [], verificacoes: [], selo: { aprovadas: 0, avaliadas: 0, total: 0 } })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/msc-validacao?entidadeId=e1&ano=2026&mes=6', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.recurso).toBe('msc-validacao')
+    expect(body.dados.selo).toHaveProperty('total')
+    expect(m.msc).toHaveBeenCalledWith('e1', 2026, 6)
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/msc-validacao?entidadeId=e1&ano=2026&mes=13', headers: auth })).statusCode).toBe(400)
   })
 
   it('200 consistência em envelope: selo N/M e verificações com Δ', async () => {
