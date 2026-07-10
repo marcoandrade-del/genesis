@@ -37,5 +37,15 @@ Interface comum do conector: `listarEntidades / lerReceita / lerDespesa / lerArr
 - **Mesmo fabricante** → um arquivo de CONFIG (IBGE, URL, entidades). Minutos.
 - **Fabricante novo** → UM conector (cru→normalizado). Núcleo/reconciliação/writers já existem.
 
-## Estado / próximo passo
-PR #229 = POC bespoke do Paranaguá (IPM). **Refactor pendente:** extrair scripts `*paranagua*` → `fabricantes/ipm/` + `nucleo/`; e os do Maringá → `fabricantes/elotech/`. Decisão do Marco: fazer o refactor agora ou depois (ele também pediu p/ pesquisar a natureza jurídica da CAGEPAR — economia mista, sem QDD no portal).
+## Estado / RETOMADA (2026-07-10)
+- **PR #229** = POC bespoke do Paranaguá (IPM) — scripts `*paranagua*`, 5 entidades ao centavo.
+- **PR #232** = ✅ FUNDAÇÃO do conversor construída e TESTADA (7 testes verdes):
+  - `src/conversor/nucleo/tipos.ts` (contratos + interfaces `ConectorFabricante`/`FonteExecucao`)
+  - `src/conversor/nucleo/{pcasp,de-para-fonte}.ts` (helpers + de/para fonte por descrição)
+  - `src/conversor/fabricantes/ipm/codigo.ts` (decodificação IPM→PCASP)
+- **PRÓXIMOS (tarefas #8–#11, sessão nova rende mais):**
+  1. `nucleo/` **writers** (o maior): `garantirEntidade` (onboarding), `escreverPrevisoes`, `escreverDotacoes` (resolve dimensões UO/função/programa/ação/conta/fonte + upsert), `reconciliar` (usa `casarFontesPorDescricao`), `setarArrecadado`. EXTRAIR de `scripts/importar_*paranagua*` e `reconciliar_execucao_loa_paranagua`.
+  2. `fabricantes/ipm/` **parsers**: `lerReceita` (staircase CSV), `lerDespesa` (QDD CSV), `lerArrecadacao` (balanço .xls→xlsx via libreoffice) → `LinhaReceita`/`LinhaDespesa` normalizadas (usam `codigo.ts`).
+  3. `tce/pr/` **PIT**: baixar+parsear `Empenho.xml` → `LinhaDespesa` de execução (implementa `FonteExecucao`).
+  4. `municipios/paranagua-pr.ts` (config) + `importar(municipio)` orquestrador. **VALIDAR:** re-rodar Paranaguá pela nova arquitetura, conferir que bate ao centavo com o import bespoke (os totais estão em [[import-paranagua-ipm]]).
+  5. Depois: `fabricantes/elotech/` extraído do Maringá ([[maringa-municipio-completo]]).
