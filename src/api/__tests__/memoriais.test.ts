@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn(), msc: vi.fn(), municipios: vi.fn() }))
+const m = vi.hoisted(() => ({ rcl: vi.fn(), rclConsolidada: vi.fn(), guardiao: vi.fn(), saldoFonte: vi.fn(), valRec: vi.fn(), valDesp: vi.fn(), saldoBanc: vi.fn(), indices: vi.fn(), disponibilidade: vi.fn(), metas: vi.fn(), dcl: vi.fn(), rgfSimples: vi.fn(), consistencia: vi.fn(), msc: vi.fn(), municipios: vi.fn(), acessos: vi.fn() }))
 vi.mock('../../services/consistencia.js', () => ({
   ConsistenciaService: class {
     verificar = m.consistencia
@@ -14,6 +14,11 @@ vi.mock('../../services/matriz-saldos-contabeis.js', () => ({
 vi.mock('../../services/municipios-ativos.js', () => ({
   MunicipiosAtivosService: class {
     listar = m.municipios
+  },
+}))
+vi.mock('../../services/acessos-usuario.js', () => ({
+  AcessosUsuarioService: class {
+    municipiosPermitidos = m.acessos
   },
 }))
 vi.mock('../../services/dcl.js', () => ({
@@ -72,7 +77,7 @@ vi.mock('../../services/indice-constitucional.js', async (importOriginal) => ({
 
 import { criarApp } from '../../routes/__tests__/helpers/criarApp.js'
 import type { PrismaMock } from '../../services/__tests__/helpers/prisma-mock.js'
-import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO, CONTRATO_MUNICIPIOS } from '../memoriais.js'
+import { memoriaisApiRoutes, CONTRATO_MEMORIAIS, CONTRATO_VALORES_MENSAIS, CONTRATO_SALDO_BANCARIO, CONTRATO_MUNICIPIOS, CONTRATO_ACESSOS_USUARIO } from '../memoriais.js'
 import type { FastifyInstance } from 'fastify'
 
 const TOKEN = 'segredo-de-teste'
@@ -376,5 +381,34 @@ describe('memoriaisApiRoutes (data API versionada)', () => {
 
   it('401 catálogo de municípios sem token (herda o hook de auth)', async () => {
     expect((await app.inject({ method: 'GET', url: '/api/memoriais/municipios' })).statusCode).toBe(401)
+  })
+
+  it('200 acessos por usuário — contrato próprio acessos-usuario', async () => {
+    m.acessos.mockResolvedValue({
+      email: 'gestor@maringa.pr.gov.br',
+      municipios: [{ id: 'mun-1', nome: 'Maringá', estado: 'PR', nivel: 'ADMIN' }],
+    })
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/acessos?email=gestor@maringa.pr.gov.br', headers: auth })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.contrato.nome).toBe(CONTRATO_ACESSOS_USUARIO.nome)
+    expect(body.contrato.versao).toBe(CONTRATO_ACESSOS_USUARIO.versao)
+    expect(body.contrato.recurso).toBe('acessos-usuario')
+    expect(body.dados.municipios[0].nivel).toBe('ADMIN')
+    expect(m.acessos).toHaveBeenCalledWith('gestor@maringa.pr.gov.br')
+  })
+
+  it('400 acessos sem email', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/acessos', headers: auth })).statusCode).toBe(400)
+  })
+
+  it('404 acessos quando o e-mail não existe', async () => {
+    m.acessos.mockResolvedValue(null)
+    const res = await app.inject({ method: 'GET', url: '/api/memoriais/acessos?email=fantasma@x.gov.br', headers: auth })
+    expect(res.statusCode).toBe(404)
+  })
+
+  it('401 acessos sem token (herda o hook de auth)', async () => {
+    expect((await app.inject({ method: 'GET', url: '/api/memoriais/acessos?email=x@y.z' })).statusCode).toBe(401)
   })
 })

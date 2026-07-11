@@ -13,6 +13,7 @@ import { ConsistenciaService } from '../services/consistencia.js'
 import { MatrizSaldosContabeisService } from '../services/matriz-saldos-contabeis.js'
 import { ValidadorMscService } from '../services/validador-msc.js'
 import { MunicipiosAtivosService } from '../services/municipios-ativos.js'
+import { AcessosUsuarioService } from '../services/acessos-usuario.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -45,6 +46,13 @@ export const CONTRATO_SALDO_BANCARIO = { nome: 'saldo-bancario', versao: '1.0.0'
  * (UUID do município) → entidade PREFEITURA. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
  */
 export const CONTRATO_MUNICIPIOS = { nome: 'municipios', versao: '1.0.0' } as const
+
+/**
+ * Contrato dos ACESSOS por usuário (multitenancy por identidade do BI). Dado um
+ * e-mail, os municípios que o usuário pode ver (via AcessoEntidade→PREFEITURA).
+ * Versão própria. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
+ */
+export const CONTRATO_ACESSOS_USUARIO = { nome: 'acessos-usuario', versao: '1.0.0' } as const
 
 /** Descritor do contrato: o que o Oxy pode validar antes de consumir. */
 export function descreverContrato() {
@@ -94,6 +102,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const mscSvc = new MatrizSaldosContabeisService(app.prisma)
   const validadorMscSvc = new ValidadorMscService(app.prisma, mscSvc)
   const municipiosAtivosSvc = new MunicipiosAtivosService(app.prisma)
+  const acessosUsuarioSvc = new AcessosUsuarioService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -280,5 +289,16 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   app.get('/memoriais/municipios', async (_req, reply) => {
     const dados = await municipiosAtivosSvc.listar()
     return reply.send({ contrato: { ...CONTRATO_MUNICIPIOS, recurso: 'municipios' }, dados })
+  })
+
+  // Municípios que um usuário pode ver no BI (multitenancy por identidade). Dado o
+  // e-mail, devolve os municípios acessíveis via AcessoEntidade→PREFEITURA. É a fonte
+  // da lista que o oxy-bi-jpa usa para o claim `clientes_permitidos` e o filtro do catálogo.
+  app.get<{ Querystring: { email?: string } }>('/memoriais/acessos', async (req, reply) => {
+    const email = req.query.email?.trim()
+    if (!email) return reply.code(400).send({ erro: 'email é obrigatório.' })
+    const dados = await acessosUsuarioSvc.municipiosPermitidos(email)
+    if (!dados) return reply.code(404).send({ erro: 'Usuário não encontrado.' })
+    return reply.send({ contrato: { ...CONTRATO_ACESSOS_USUARIO, recurso: 'acessos-usuario' }, dados })
   })
 }
