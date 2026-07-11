@@ -28,7 +28,7 @@ const mscCoerente = (): LinhaMsc[] => [
   linha('3.1.1.1.01.00', 'DEVEDORA', 80), // VPD
   linha('4.1.1.1.01.00', 'CREDORA', -80), // VPA
   linha('5.2.1.1.01.00', 'DEVEDORA', 1000), // previsão orçamentária
-  linha('6.2.1.1.01.00', 'CREDORA', -1000), // execução orçamentária
+  linha('6.2.1.2.01.00', 'CREDORA', -1000, { naturezaReceita: '1.7.1.8.03.1.1', fonte: '1500' }), // receita realizada (6.2.1, com natureza+fonte)
   linha('7.1.1.1.01.00', 'DEVEDORA', 10), // controle devedor
   linha('8.1.1.1.01.00', 'CREDORA', -10), // controle credor
 ]
@@ -37,12 +37,12 @@ type Vs = ReturnType<typeof validarEstruturaMsc>
 const acha = (vs: Vs, codigo: string) => vs.find((v) => v.codigo === codigo)!
 
 describe('validarEstruturaMsc (Dim I do ICF)', () => {
-  it('MSC coerente: 12 checks ativos OK e 6 stubs NAO_APLICAVEL', () => {
+  it('MSC coerente: 14 checks ativos OK e 4 stubs NAO_APLICAVEL', () => {
     const vs = validarEstruturaMsc(mscCoerente())
     const ativas = vs.filter((v) => v.status !== 'NAO_APLICAVEL')
-    expect(ativas).toHaveLength(12)
+    expect(ativas).toHaveLength(14)
     expect(ativas.every((v) => v.status === 'OK')).toBe(true)
-    expect(vs.filter((v) => v.status === 'NAO_APLICAVEL')).toHaveLength(6)
+    expect(vs.filter((v) => v.status === 'NAO_APLICAVEL')).toHaveLength(4)
     expect(vs).toHaveLength(18)
   })
 
@@ -109,6 +109,15 @@ describe('validarEstruturaMsc (Dim I do ICF)', () => {
     expect(acha(vs, 'MSC_DIM1_DESPESA_SEM_FUNCAO').status).toBe('DIVERGENTE')
   })
 
+  it('receita orçamentária (6.2.1) sem natureza/fonte é sinalizada; fora de 6.2.1 não entra', () => {
+    const semNat = linha('6.2.1.2.01.00', 'CREDORA', -100, { fonte: '1500' }) // natureza null
+    const semFonte = linha('6.2.1.1.01.00', 'MISTA', 100, { naturezaReceita: '1.7.1' }) // fonte null
+    const patrimonial = linha('1.1.1.1.01.00', 'DEVEDORA', 100) // não é 6.2.1
+    const vs = validarEstruturaMsc([semNat, semFonte, patrimonial])
+    expect(acha(vs, 'MSC_DIM1_RECEITA_SEM_NATUREZA').obtido).toBe(1)
+    expect(acha(vs, 'MSC_DIM1_RECEITA_SEM_FONTE').obtido).toBe(1)
+  })
+
   it('todo stub carrega o id da verificação do catálogo STN no detalhe', () => {
     const stubs = validarEstruturaMsc(mscCoerente()).filter((v) => v.status === 'NAO_APLICAVEL')
     expect(stubs.every((v) => /D1_\d{5}/.test(v.detalhe))).toBe(true)
@@ -131,7 +140,7 @@ describe('ValidadorMscService', () => {
     const msc = { emitir: async () => matrizFake(mscCoerente()) } as any
     const r = await new ValidadorMscService({} as any, msc).validar('e1', 2026, 6)
     expect(r).not.toBeNull()
-    expect(r!.selo).toEqual({ aprovadas: 12, avaliadas: 12, total: 18 })
+    expect(r!.selo).toEqual({ aprovadas: 14, avaliadas: 14, total: 18 })
     expect(r!.entidade.nome).toBe('Prefeitura')
   })
 
