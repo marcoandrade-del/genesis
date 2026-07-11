@@ -92,6 +92,21 @@ function templateDeEventos(eventos: LancamentoEvento[], codigoPorId: Map<string,
   }
 }
 
+/**
+ * Mantém só os eventos ORÇAMENTÁRIO/CONTROLE (contas de classe 5-8). O patrimonial
+ * (classes 1-4) é da Dim II — depende do ciclo de competência completo (de/para +
+ * constituição), fora do escopo deste backfill (Dim IV). Incluí-lo plantaria baixas
+ * sem constituição (ex.: E560 credita um crédito a receber nunca lançado → recebível
+ * negativo). Classifica pela CONTA (robusto), não por código de evento.
+ */
+function soOrcamentarias(eventos: LancamentoEvento[], codigoPorId: Map<string, string>): LancamentoEvento[] {
+  const ehPatrimonial = (contaId: string) => {
+    const c = (codigoPorId.get(contaId) ?? '').charAt(0)
+    return c === '1' || c === '2' || c === '3' || c === '4'
+  }
+  return eventos.filter((ev) => !ev.itens.some((it) => ehPatrimonial(it.contaId)))
+}
+
 async function main() {
   console.log(`\nBackfill contábil da execução — modo: ${APPLY ? 'APPLY (VAI GRAVAR)' : 'DRY-RUN (não grava)'} · ano ${ANO}\n`)
 
@@ -139,7 +154,7 @@ async function main() {
     if (!tpl) {
       try {
         const eventos = await motorReceita.resolver({ entidadeId: entidade.id, ano: ANO, naturezaCodigo: natureza, fonteCodigo: fonte, fonteVinculada: vinculada, valor: 1 }, { estorno })
-        tpl = templateDeEventos(eventos, codigoPorId)
+        tpl = templateDeEventos(soOrcamentarias(eventos, codigoPorId), codigoPorId)
       } catch (e) {
         tpl = { erro: msgErro(e) }
       }
@@ -174,7 +189,7 @@ async function main() {
           gatilho === 'EMPENHO' ? await motorDespesa.resolverEmpenho(ctx, { estorno })
           : gatilho === 'LIQUIDACAO' ? await motorDespesa.resolverLiquidacao(ctx, { estorno })
           : await motorDespesa.resolverPagamento(ctx, { estorno })
-        tpl = templateDeEventos(eventos, codigoPorId)
+        tpl = templateDeEventos(soOrcamentarias(eventos, codigoPorId), codigoPorId)
       } catch (e) {
         tpl = { erro: msgErro(e) }
       }
@@ -189,7 +204,7 @@ async function main() {
   }
 
   if (APPLY) {
-    await aplicar(entidade.id, arrecadacoes, movimentos)
+    await aplicar(entidade.id, arrecadacoes, movimentos, codigoPorId)
     return
   }
 
@@ -291,7 +306,7 @@ function carregarMovimentos(entidadeId: string) {
   })
 }
 
-async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movimentos: MovimentoRow[]) {
+async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movimentos: MovimentoRow[], codigoPorId: Map<string, string>) {
   console.log('APPLY — persistindo o razão (idempotente por origemTipo+origemId)...\n')
   // Pré-carrega os pares origem já lançados (uma query) — evita um count por linha.
   const jaFeitos = new Set<string>()
@@ -306,10 +321,13 @@ async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movim
   for (const a of arrecadacoes) {
     if (jaFeitos.has(`ARRECADACAO|${a.id}`)) { recPulados++; continue }
     await prisma.$transaction(async (tx) => {
-      const eventos = await motorReceita.resolver(
-        { entidadeId, ano: ANO, naturezaCodigo: a.previsao.contaReceita.codigo, fonteCodigo: a.previsao.fonteRecurso.codigo, fonteVinculada: a.previsao.fonteRecurso.vinculada, valor: a.valor },
-        { estorno: a.tipo === 'ESTORNO' },
-        tx,
+      const eventos = soOrcamentarias(
+        await motorReceita.resolver(
+          { entidadeId, ano: ANO, naturezaCodigo: a.previsao.contaReceita.codigo, fonteCodigo: a.previsao.fonteRecurso.codigo, fonteVinculada: a.previsao.fonteRecurso.vinculada, valor: a.valor },
+          { estorno: a.tipo === 'ESTORNO' },
+          tx,
+        ),
+        codigoPorId,
       )
       for (const ev of eventos) {
         await lancamentos.criar({ entidadeId, data: isoData(a.data), historico: `${ev.descricaoEvento} — backfill execução`, itens: ev.itens, criadoPorId: CRIADO_POR, origemTipo: 'ARRECADACAO', origemId: a.id, eventoCodigo: ev.eventoCodigo }, tx)
@@ -328,10 +346,12 @@ async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movim
     if (jaFeitos.has(`${origemTipo}|${m.id}`)) { despPulados++; continue }
     await prisma.$transaction(async (tx) => {
       const ctx = { entidadeId, ano: ANO, dotacaoDespesaId: m.empenho.dotacaoDespesaId, naturezaCodigo: m.empenho.dotacaoDespesa.contaDespesa.codigo, valor: m.valor }
-      const eventos =
+      const eventos = soOrcamentarias(
         gatilho === 'EMPENHO' ? await motorDespesa.resolverEmpenho(ctx, { estorno }, tx)
         : gatilho === 'LIQUIDACAO' ? await motorDespesa.resolverLiquidacao(ctx, { estorno }, tx)
-        : await motorDespesa.resolverPagamento(ctx, { estorno }, tx)
+        : await motorDespesa.resolverPagamento(ctx, { estorno }, tx),
+        codigoPorId,
+      )
       for (const ev of eventos) {
         await lancamentos.criar({ entidadeId, data: isoData(m.data), historico: `${ev.descricaoEvento} — backfill execução`, itens: ev.itens, criadoPorId: CRIADO_POR, origemTipo, origemId: m.id, eventoCodigo: ev.eventoCodigo }, tx)
       }
