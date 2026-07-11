@@ -70,7 +70,7 @@ describe('MotorEventosReceita', () => {
     }
   })
 
-  it('E100: D Receita Realizada / C Receita a Realizar, conta-corrente = natureza', async () => {
+  it('E100: D Receita Realizada / C Receita a Realizar, conta-corrente = natureza + fonte', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([])
     const [e100] = await motor(mock).resolver(baseCtx)
@@ -79,7 +79,8 @@ describe('MotorEventosReceita', () => {
     expect(deb.contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
     expect(cred.contaId).toBe(`id:${CONTAS_EVENTO.receitaARealizar}`)
     expect(deb.naturezaReceitaCodigo).toBe(baseCtx.naturezaCodigo)
-    expect(deb.fonteCodigo).toBeNull()
+    // fonte carimbada na linha 6.2.1 (dimensão da MSC/RGF) — antes era null
+    expect(deb.fonteCodigo).toBe('1000')
   })
 
   it('E200: débito é Recursos Ordinários quando a fonte não é vinculada; cc = fonte', async () => {
