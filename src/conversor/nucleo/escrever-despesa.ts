@@ -66,8 +66,10 @@ export async function escreverDespesa(
       if (novas.fo.size) await tx.fonteRecursoEntidade.createMany({ data: [...novas.fo].map(([codigo, nome]) => ({ entidadeId, ano, codigo, nomenclatura: nome || `Fonte ${codigo}`, vinculada: codigo !== '01000' && codigo !== '000', origem: 'DESDOBRAMENTO' as const })) })
       for (const f of await tx.fonteRecursoEntidade.findMany({ where: { entidadeId, ano }, select: { codigo: true, id: true } })) fontesDb.set(f.codigo.trim(), f.id)
 
-      // idempotência: limpa o ledger de captura anterior desta entidade
-      await tx.movimentoEmpenho.deleteMany({ where: { entidadeId, historico } })
+      // idempotência: limpa o ledger de captura anterior desta entidade. Apaga os
+      // movimentos pelos empenhos CAP-* (marcador exclusivo da captura), NÃO pelo
+      // histórico — assim é robusto mesmo se um import anterior usou outro histórico.
+      await tx.movimentoEmpenho.deleteMany({ where: { empenho: { entidadeId, numero: { startsWith: 'CAP-' } } } })
       await tx.empenho.deleteMany({ where: { entidadeId, numero: { startsWith: 'CAP-' } } })
 
       const movRows: { entidadeId: string; empenhoId: string; tipo: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO'; valor: string; data: Date; criadoPorId: string; historico: string }[] = []
