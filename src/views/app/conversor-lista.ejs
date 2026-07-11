@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor · Municípios</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<div class="container py-4" style="max-width:1000px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/conversor" class="text-decoration-none">Conversão</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Municípios</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+    <h2 class="h4 fw-bold mb-0"><i class="bi bi-buildings me-1 text-primary"></i>Conversor · Municípios</h2>
+  </div>
+  <p class="text-muted small mb-3">Cadastre um município, envie os arquivos exportados do portal do fabricante e rode a conversão (orçamentário + execução do TCE).</p>
+
+  <% if (aviso) { %><div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i><%= aviso %></div><% } %>
+  <% if (erro) { %><div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div><% } %>
+
+  <!-- LISTA -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-list-ul me-1 text-primary"></i>Municípios cadastrados (<%= lista.length %>)</h6>
+    <% if (!lista.length) { %>
+      <div class="small text-muted">Nenhum município cadastrado ainda. Use o formulário abaixo.</div>
+    <% } else { %>
+      <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+        <thead><tr class="small text-muted">
+          <th>Município</th><th>IBGE</th><th>Fabricante</th><th>TCE</th><th class="text-center">Entidades</th><th></th>
+        </tr></thead>
+        <tbody>
+          <% for (const m of lista) { %>
+            <tr>
+              <td><span class="fw-semibold small"><%= m.nome %></span>/<%= m.uf %> <span class="text-muted small">· <%= m.ano %></span></td>
+              <td class="small text-muted"><%= m.ibge %></td>
+              <td class="small"><%= m.fabricante %></td>
+              <td class="small text-uppercase"><%= m.tce %></td>
+              <td class="text-center small"><%= m._count.entidades %></td>
+              <td class="text-end"><a href="/app/conversor/config/<%= m.id %>" class="btn btn-sm btn-outline-primary py-0">Abrir <i class="bi bi-chevron-right"></i></a></td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table></div>
+    <% } %>
+  </div></div>
+
+  <!-- NOVO -->
+  <% if (podeEscrever) { %>
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-3"><i class="bi bi-plus-circle me-1 text-primary"></i>Cadastrar município</h6>
+    <form method="post" action="/app/conversor/config" class="row g-2">
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-1">Nome</label>
+        <input name="nome" class="form-control form-control-sm" placeholder="Paranaguá" required>
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-label small mb-1">Código IBGE</label>
+        <input name="ibge" class="form-control form-control-sm" placeholder="411820" required>
+      </div>
+      <div class="col-3 col-md-1">
+        <label class="form-label small mb-1">UF</label>
+        <input name="uf" class="form-control form-control-sm text-uppercase" maxlength="2" placeholder="PR" required>
+      </div>
+      <div class="col-3 col-md-2">
+        <label class="form-label small mb-1">Ano</label>
+        <input name="ano" type="number" class="form-control form-control-sm" value="<%= new Date().getFullYear() %>" required>
+      </div>
+      <div class="col-6 col-md-4">
+        <label class="form-label small mb-1">Fabricante</label>
+        <select name="fabricante" class="form-select form-select-sm" required>
+          <% for (const f of fabricantes) { %><option value="<%= f.chave %>"><%= f.nome %></option><% } %>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">TCE (execução)</label>
+        <select name="tce" class="form-select form-select-sm" required>
+          <% for (const t of tces) { %><option value="<%= t %>"><%= t.toUpperCase() %></option><% } %>
+        </select>
+      </div>
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-1">URL do portal <span class="text-muted">(opcional)</span></label>
+        <input name="portalUrl" class="form-control form-control-sm" placeholder="https://…atende.net/transparencia/">
+      </div>
+      <div class="col-12">
+        <button class="btn btn-sm btn-primary mt-1"><i class="bi bi-plus-lg me-1"></i>Cadastrar</button>
+      </div>
+    </form>
+  </div></div>
+  <% } %>
+
+</div>
+</body>
+</html>
