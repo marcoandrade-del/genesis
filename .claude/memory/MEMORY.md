@@ -1,6 +1,6 @@
 # Memory Index
 
-- [ICF / Ranking Siconfi como alvo](icf-ranking-siconfi.md) — Portaria 1.833/2026 só divulga o ranking; metodologia de 185 verificações (nota A–E); gap-list p/ "medidor de ICF" no Gênesis, keystone = emitir MSC (razão único faz Dim IV passar por construção)
+- [ICF / Ranking Siconfi como alvo](icf-ranking-siconfi.md) — Portaria 1.833/2026 só divulga o ranking; metodologia de 185 verificações (nota A–E); gap-list p/ "medidor de ICF". Keystone MSC: backbone MERGEADO (#225 matriz-saldos-contabeis.ts + #226 fonte no razão); quebra por conta-corrente = fase 2 com OUTRA sessão. Papel da frente ICF = consumir a MSC + validador estrutural Dim I. Sessão pausada `50efd566`
 - [Rematerializar conjunto ANTIGO ∪ NOVO](feedback-rematerializar-conjunto-antigo.md) — re-run que redistribui movimentos deixa fichas órfãs com materializado velho (bug do #217, fix #218 + reparo one-off)
 - [Consolidação por ente + intra-OFSS](consolidacao-ente-intra.md) — elimina mod 91/cat 7-8 DERIVADO dos códigos; despesa #216 + receita #219 consolidadas; equilíbrio LOA (V5) é do MUNICÍPIO e BRUTO, fechado Δ0 em #221 (previsto = orçado INICIAL, não atualizado); falta Fase 3 DCL/RGF
 - [Maringá: município completo](maringa-municipio-completo.md) — TODAS as entidades com LOA (QDD ao centavo) + execução jan–jun (guard 30/30); mapa órgão↔portal↔PIT; IPPLAM/IAM criadas via onboarding; #213
