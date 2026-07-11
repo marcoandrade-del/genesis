@@ -7,10 +7,11 @@ const linha = (
   naturezaSaldo: NaturezaSaldoMsc | null,
   saldoFinal: number,
   cc: Partial<LinhaMsc['contaCorrente']> = {},
+  superavitFinanceiro: string | null = null,
 ): LinhaMsc => ({
   conta,
   naturezaSaldo,
-  superavitFinanceiro: null,
+  superavitFinanceiro,
   contaCorrente: { fonte: null, naturezaReceita: null, dotacaoId: null, funcao: null, subfuncao: null, naturezaDespesa: null, ...cc },
   saldoInicial: 0,
   movimentoDevedor: 0,
@@ -36,12 +37,12 @@ type Vs = ReturnType<typeof validarEstruturaMsc>
 const acha = (vs: Vs, codigo: string) => vs.find((v) => v.codigo === codigo)!
 
 describe('validarEstruturaMsc (Dim I do ICF)', () => {
-  it('MSC coerente: 8 checks ativos OK e 10 stubs NAO_APLICAVEL', () => {
+  it('MSC coerente: 12 checks ativos OK e 6 stubs NAO_APLICAVEL', () => {
     const vs = validarEstruturaMsc(mscCoerente())
     const ativas = vs.filter((v) => v.status !== 'NAO_APLICAVEL')
-    expect(ativas).toHaveLength(8)
+    expect(ativas).toHaveLength(12)
     expect(ativas.every((v) => v.status === 'OK')).toBe(true)
-    expect(vs.filter((v) => v.status === 'NAO_APLICAVEL')).toHaveLength(10)
+    expect(vs.filter((v) => v.status === 'NAO_APLICAVEL')).toHaveLength(6)
     expect(vs).toHaveLength(18)
   })
 
@@ -89,6 +90,25 @@ describe('validarEstruturaMsc (Dim I do ICF)', () => {
     expect(acha(validarEstruturaMsc(linhas), 'MSC_DIM1_VPA_VPD_ENCERRAMENTO').status).toBe('NAO_APLICAVEL')
   })
 
+  it('atributo F (financeiro) sem fonte é sinalizado; com fonte passa', () => {
+    const semFonte = linha('1.1.1.1.01.00', 'DEVEDORA', 100, {}, 'FINANCEIRO')
+    const comFonte = linha('1.1.1.2.01.00', 'DEVEDORA', 100, { fonte: '1500' }, 'FINANCEIRO')
+    const v = acha(validarEstruturaMsc([semFonte, comFonte]), 'MSC_DIM1_ATRIBUTO_F_SEM_FONTE')
+    expect(v.status).toBe('DIVERGENTE')
+    expect(v.obtido).toBe(1)
+  })
+
+  it('despesa (marcada por dotacaoId) sem função/natureza/fonte é sinalizada; patrimonial não entra', () => {
+    const completa = linha('6.2.2.1.01.00', 'DEVEDORA', 50, { dotacaoId: 'd1', funcao: '10', subfuncao: '301', naturezaDespesa: '3.3.90.30', fonte: '1500' })
+    const semTudo = linha('6.2.2.1.02.00', 'DEVEDORA', 50, { dotacaoId: 'd2' })
+    const patrimonial = linha('1.1.1.1.01.00', 'DEVEDORA', 50) // sem dotacaoId → não é despesa
+    const vs = validarEstruturaMsc([completa, semTudo, patrimonial])
+    expect(acha(vs, 'MSC_DIM1_DESPESA_SEM_FUNCAO').obtido).toBe(1)
+    expect(acha(vs, 'MSC_DIM1_DESPESA_SEM_NATUREZA').obtido).toBe(1)
+    expect(acha(vs, 'MSC_DIM1_DESPESA_SEM_FONTE').obtido).toBe(1)
+    expect(acha(vs, 'MSC_DIM1_DESPESA_SEM_FUNCAO').status).toBe('DIVERGENTE')
+  })
+
   it('todo stub carrega o id da verificação do catálogo STN no detalhe', () => {
     const stubs = validarEstruturaMsc(mscCoerente()).filter((v) => v.status === 'NAO_APLICAVEL')
     expect(stubs.every((v) => /D1_\d{5}/.test(v.detalhe))).toBe(true)
@@ -111,7 +131,7 @@ describe('ValidadorMscService', () => {
     const msc = { emitir: async () => matrizFake(mscCoerente()) } as any
     const r = await new ValidadorMscService({} as any, msc).validar('e1', 2026, 6)
     expect(r).not.toBeNull()
-    expect(r!.selo).toEqual({ aprovadas: 8, avaliadas: 8, total: 18 })
+    expect(r!.selo).toEqual({ aprovadas: 12, avaliadas: 12, total: 18 })
     expect(r!.entidade.nome).toBe('Prefeitura')
   })
 

@@ -12,12 +12,12 @@ import type { LinhaMsc } from './matriz-saldos-contabeis.js'
  * (`Verificacao[]` + selo) — consumível pelo Oxy pelo contrato memoriais-lrf.
  *
  * ATIVOS aqui: saldo invertido por natureza (por classe), presença das três
- * classes de contas, fonte de dígito 9 (recursos condicionados) e — no
- * encerramento — o zeramento de VPA/VPD. Os checks de DETALHAMENTO que exigem
- * distinguir a linha de receita/despesa orçamentária por prefixo PCASP
- * (D1_00027/00029–00033) ficam registrados como `NAO_APLICAVEL` até serem
- * ativados com validação sobre MSC real (a conta-corrente já existe em `LinhaMsc`
- * desde a fase 2 / #228). Poder/órgão (D1_00019), CO e AI dependem de dimensões
+ * classes de contas, fonte de dígito 9 (recursos condicionados); atributo F
+ * (financeiro) sem fonte (via `superavitFinanceiro`, #230) e detalhamento da
+ * despesa — sem natureza/função/fonte — marcada por `contaCorrente.dotacaoId`
+ * (#228). No encerramento, o zeramento de VPA/VPD. Ainda em STUB (`NAO_APLICAVEL`):
+ * receita sem natureza/fonte (D1_00029/00030, exige distinguir a linha de receita
+ * por prefixo PCASP), poder/órgão (D1_00019), CO e AI — dependem de dimensões
  * ainda não emitidas.
  */
 
@@ -150,14 +150,54 @@ function vpaVpdEncerramento(linhas: LinhaMsc[], encerramento: boolean): Verifica
   }
 }
 
-/** Checks da Dim I ainda em STUB: dependem de distinguir a linha por prefixo PCASP ou de dimensões não emitidas. */
+/** D1_00027 — contas com atributo F (financeiro) exigem detalhamento de fonte/destinação. */
+function atributoFsemFonte(linhas: LinhaMsc[]): Verificacao {
+  const fin = linhas.filter((l) => l.superavitFinanceiro === 'FINANCEIRO')
+  const semFonte = fin.filter((l) => (l.contaCorrente.fonte ?? '') === '')
+  const amostra = semFonte.slice(0, 5).map((l) => l.conta).join(', ')
+  return {
+    codigo: 'MSC_DIM1_ATRIBUTO_F_SEM_FONTE',
+    titulo: 'Contas com atributo F (financeiro) com detalhamento de fonte',
+    status: semFonte.length === 0 ? 'OK' : 'DIVERGENTE',
+    esperado: 0,
+    obtido: semFonte.length,
+    delta: semFonte.length,
+    detalhe:
+      'D1_00027. ' +
+      (semFonte.length === 0
+        ? `Todas as ${fin.length} conta(s) financeira(s) têm fonte de recursos.`
+        : `${semFonte.length} de ${fin.length} conta(s) financeira(s) sem fonte: ${amostra}${semFonte.length > 5 ? '…' : ''}.`),
+  }
+}
+
+/**
+ * Checks de detalhamento da despesa orçamentária. A linha de despesa é marcada
+ * por `contaCorrente.dotacaoId` (a dotação viaja no razão desde a fase 2/#228);
+ * entre essas, sinaliza as que não resolveram o campo exigido pelo Siconfi.
+ */
+function despesaSemCampo(codigo: string, titulo: string, ref: string, linhas: LinhaMsc[], falta: (cc: LinhaMsc['contaCorrente']) => boolean): Verificacao {
+  const desp = linhas.filter((l) => l.contaCorrente.dotacaoId != null)
+  const sem = desp.filter((l) => falta(l.contaCorrente))
+  const amostra = sem.slice(0, 5).map((l) => l.conta).join(', ')
+  return {
+    codigo,
+    titulo,
+    status: sem.length === 0 ? 'OK' : 'DIVERGENTE',
+    esperado: 0,
+    obtido: sem.length,
+    delta: sem.length,
+    detalhe:
+      `${ref}. ` +
+      (sem.length === 0
+        ? `${desp.length} linha(s) de despesa avaliada(s): detalhamento presente.`
+        : `${sem.length} de ${desp.length} linha(s) de despesa sem o detalhamento: ${amostra}${sem.length > 5 ? '…' : ''}.`),
+  }
+}
+
+/** Checks da Dim I ainda em STUB: receita (precisa distinguir a linha por prefixo PCASP) e dimensões não emitidas. */
 const STUBS: Array<[string, string, string]> = [
-  ['MSC_DIM1_ATRIBUTO_F_SEM_FONTE', 'Contas com atributo F (financeiro) com detalhamento de fonte', 'D1_00027 — atributo F já exposto na MSC (superavitFinanceiro, #230); ativação no follow-up com MSC real.'],
   ['MSC_DIM1_RECEITA_SEM_FONTE', 'Receita orçamentária/deduções com fonte de recursos', 'D1_00029 — conta-corrente disponível (#228); ativação requer identificar a linha de receita orçamentária por prefixo PCASP. Follow-up.'],
   ['MSC_DIM1_RECEITA_SEM_NATUREZA', 'Receita orçamentária/deduções com natureza de receita', 'D1_00030 — conta-corrente disponível (#228); ativação requer identificar a linha de receita por prefixo PCASP. Follow-up.'],
-  ['MSC_DIM1_DESPESA_SEM_NATUREZA', 'Despesa orçamentária com natureza de despesa', 'D1_00031 — conta-corrente disponível (#228); ativação requer identificar a linha de despesa por prefixo PCASP. Follow-up.'],
-  ['MSC_DIM1_DESPESA_SEM_FUNCAO', 'Despesa orçamentária com função/subfunção', 'D1_00032 — conta-corrente disponível (#228); ativação requer identificar a linha de despesa por prefixo PCASP. Follow-up.'],
-  ['MSC_DIM1_DESPESA_SEM_FONTE', 'Despesa orçamentária com fonte de recursos', 'D1_00033 — conta-corrente disponível (#228); ativação requer identificar a linha de despesa por prefixo PCASP. Follow-up.'],
   ['MSC_DIM1_PODER_ORGAO', 'Códigos de poder/órgão válidos', 'D1_00019 — requer a dimensão poder/órgão (fase 2b do emissor).'],
   ['MSC_DIM1_CO_SAUDE_EDUC_FUNDEB', 'Acompanhamento (CO) de saúde/educação/Fundeb detalhado', 'D1_00041/D1_00042/D1_00043 — requer a dimensão CO (não modelada).'],
   ['MSC_DIM1_AI_RESTOS_A_PAGAR', 'Informação complementar AI (ano de inscrição de restos a pagar)', 'D1_00044 — requer a dimensão AI (não modelada).'],
@@ -177,6 +217,10 @@ export function validarEstruturaMsc(linhas: LinhaMsc[], opts: OpcoesValidacao = 
     grupoInvertidas('MSC_DIM1_ORCAMENTARIA_INVERTIDA', 'Previsão/execução orçamentária (classes 5-6) sem saldo invertido', 'D1_00038', linhas, (c) => c.charAt(0) === '5' || c.charAt(0) === '6'),
     classesCompletas(linhas),
     fonteDigito9(linhas),
+    atributoFsemFonte(linhas),
+    despesaSemCampo('MSC_DIM1_DESPESA_SEM_NATUREZA', 'Despesa orçamentária com natureza de despesa', 'D1_00031', linhas, (cc) => cc.naturezaDespesa == null),
+    despesaSemCampo('MSC_DIM1_DESPESA_SEM_FUNCAO', 'Despesa orçamentária com função/subfunção', 'D1_00032', linhas, (cc) => cc.funcao == null || cc.subfuncao == null),
+    despesaSemCampo('MSC_DIM1_DESPESA_SEM_FONTE', 'Despesa orçamentária com fonte de recursos', 'D1_00033', linhas, (cc) => cc.fonte == null),
     vpaVpdEncerramento(linhas, opts.encerramento ?? false),
   ]
   for (const [codigo, titulo, detalhe] of STUBS) verificacoes.push(na(codigo, titulo, detalhe))
