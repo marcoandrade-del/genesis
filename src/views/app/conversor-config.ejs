@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversor · <%= municipio.nome %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  const base = (s) => (s ? String(s).split('/').pop() : null)
+  const pm = municipio.params || {}
+  const camposEntidadeTexto = camposEntidade.filter((c) => c.tipo === 'texto')
+  const camposEntidadeArquivo = camposEntidade.filter((c) => c.tipo === 'arquivo')
+  const rotuloTipo = (t) => (t === 'PREFEITURA' ? 'Prefeitura' : t === 'CAMARA' ? 'Câmara' : 'Adm. indireta')
+%>
+
+<div class="container py-4" style="max-width:1000px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item"><a href="/app/conversor" class="text-decoration-none">Conversão</a></li>
+      <li class="breadcrumb-item"><a href="/app/conversor/config" class="text-decoration-none">Municípios</a></li>
+      <li class="breadcrumb-item active" aria-current="page"><%= municipio.nome %></li>
+    </ol>
+  </nav>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+    <h2 class="h4 fw-bold mb-0"><i class="bi bi-buildings me-1 text-primary"></i><%= municipio.nome %>/<%= municipio.uf %></h2>
+    <span class="badge text-bg-secondary"><%= municipio.ano %></span>
+    <span class="badge text-bg-light border"><%= fabricante ? fabricante.nome : municipio.fabricante %></span>
+    <span class="badge text-bg-light border text-uppercase">TCE-<%= municipio.tce %></span>
+  </div>
+  <p class="text-muted small mb-3">IBGE <%= municipio.ibge %><% if (municipio.portalUrl) { %> · <a href="<%= municipio.portalUrl %>" target="_blank" rel="noopener">portal <i class="bi bi-box-arrow-up-right"></i></a><% } %></p>
+
+  <% if (aviso) { %><div class="alert alert-success py-2 small"><i class="bi bi-check-circle me-1"></i><%= aviso %></div><% } %>
+  <% if (erro) { %><div class="alert alert-danger py-2 small"><i class="bi bi-exclamation-triangle me-1"></i><%= erro %></div><% } %>
+
+  <% if (!fabricante) { %>
+    <div class="alert alert-warning py-2 small"><i class="bi bi-exclamation-triangle me-1"></i>Fabricante "<%= municipio.fabricante %>" sem conector/descritor de campos registrado — a conversão não vai rodar.</div>
+  <% } %>
+
+  <!-- ARQUIVOS COMPARTILHADOS (MUNICÍPIO) -->
+  <% if (camposMunicipio.length) { %>
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-1"><i class="bi bi-folder2-open me-1 text-primary"></i>Arquivos compartilhados</h6>
+    <p class="text-muted small mb-2">Valem para todas as entidades (cada uma é separada pelo identificador informado nela).</p>
+    <% for (const c of camposMunicipio) { %>
+      <% const atual = base(pm[c.chave]) %>
+      <div class="border rounded p-2 mb-2">
+        <div class="small fw-semibold"><%= c.label %>
+          <% if (atual) { %><span class="badge text-bg-success ms-1"><i class="bi bi-check"></i> <%= atual %></span><% } else { %><span class="badge text-bg-light border ms-1">não enviado</span><% } %>
+        </div>
+        <% if (c.ajuda) { %><div class="text-muted" style="font-size:.72rem"><%= c.ajuda %></div><% } %>
+        <% if (podeEscrever) { %>
+        <form method="post" action="/app/conversor/config/<%= municipio.id %>/upload" enctype="multipart/form-data" class="d-flex gap-2 mt-1">
+          <input type="hidden" name="escopo" value="municipio">
+          <input type="hidden" name="chave" value="<%= c.chave %>">
+          <input type="file" name="arquivo" class="form-control form-control-sm" <% if (c.accept) { %>accept="<%= c.accept %>"<% } %> required>
+          <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-upload"></i></button>
+        </form>
+        <% } %>
+      </div>
+    <% } %>
+  </div></div>
+  <% } %>
+
+  <!-- ENTIDADES -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-diagram-3 me-1 text-primary"></i>Entidades (<%= municipio.entidades.length %>)</h6>
+    <% if (!municipio.entidades.length) { %>
+      <div class="small text-muted mb-2">Nenhuma entidade — adicione ao menos uma para converter.</div>
+    <% } %>
+
+    <% for (const e of municipio.entidades) { %>
+      <% const ep = e.params || {} %>
+      <div class="border rounded p-3 mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+          <div class="fw-semibold small"><%= e.nome %> <span class="text-muted">· <%= rotuloTipo(e.tipo) %></span></div>
+          <% if (podeEscrever) { %>
+          <form method="post" action="/app/conversor/config/<%= municipio.id %>/entidade/<%= e.id %>/remover" onsubmit="return confirm('Remover a entidade <%= e.nome %>?')">
+            <button class="btn btn-sm btn-outline-danger py-0" title="Remover"><i class="bi bi-trash"></i></button>
+          </form>
+          <% } %>
+        </div>
+
+        <% if (podeEscrever) { %>
+        <!-- Editar dados/identificadores da entidade -->
+        <form method="post" action="/app/conversor/config/<%= municipio.id %>/entidade/<%= e.id %>" class="row g-2 mb-2">
+          <div class="col-12 col-md-4">
+            <label class="form-label small mb-0">Nome</label>
+            <input name="nome" class="form-control form-control-sm" value="<%= e.nome %>" required>
+          </div>
+          <div class="col-6 col-md-3">
+            <label class="form-label small mb-0">Tipo</label>
+            <select name="tipo" class="form-select form-select-sm">
+              <% for (const t of tiposEntidade) { %><option value="<%= t.valor %>" <%= e.tipo === t.valor ? 'selected' : '' %>><%= t.label %></option><% } %>
+            </select>
+          </div>
+          <div class="col-6 col-md-2">
+            <label class="form-label small mb-0">Match TCE</label>
+            <input name="matchPit" class="form-control form-control-sm" value="<%= e.matchPit || '' %>" title="substring que casa a entidade no PIT">
+          </div>
+          <% for (const c of camposEntidadeTexto) { %>
+          <div class="col-6 col-md-3">
+            <label class="form-label small mb-0"><%= c.label %></label>
+            <input name="<%= c.chave %>" class="form-control form-control-sm" value="<%= ep[c.chave] || '' %>" <% if (c.ajuda) { %>title="<%= c.ajuda %>"<% } %>>
+          </div>
+          <% } %>
+          <div class="col-12"><button class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-save me-1"></i>Salvar</button></div>
+        </form>
+        <% } %>
+
+        <!-- Uploads por entidade -->
+        <div class="row g-2">
+          <% for (const c of camposEntidadeArquivo) { %>
+            <% const atual = base(ep[c.chave]) %>
+            <div class="col-12 col-md-6">
+              <div class="small"><%= c.label %>
+                <% if (atual) { %><span class="badge text-bg-success ms-1"><i class="bi bi-check"></i> <%= atual %></span><% } else { %><span class="badge text-bg-light border ms-1">não enviado</span><% } %>
+              </div>
+              <% if (podeEscrever) { %>
+              <form method="post" action="/app/conversor/config/<%= municipio.id %>/upload" enctype="multipart/form-data" class="d-flex gap-2 mt-1">
+                <input type="hidden" name="escopo" value="entidade">
+                <input type="hidden" name="entidadeId" value="<%= e.id %>">
+                <input type="hidden" name="chave" value="<%= c.chave %>">
+                <input type="file" name="arquivo" class="form-control form-control-sm" <% if (c.accept) { %>accept="<%= c.accept %>"<% } %> required>
+                <button class="btn btn-sm btn-outline-primary text-nowrap"><i class="bi bi-upload"></i></button>
+              </form>
+              <% } %>
+            </div>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
+
+    <!-- Adicionar entidade -->
+    <% if (podeEscrever) { %>
+    <form method="post" action="/app/conversor/config/<%= municipio.id %>/entidade" class="row g-2 border-top pt-3 mt-2">
+      <div class="col-12"><span class="small fw-semibold text-muted"><i class="bi bi-plus-circle me-1"></i>Adicionar entidade</span></div>
+      <div class="col-12 col-md-4">
+        <input name="nome" class="form-control form-control-sm" placeholder="Prefeitura Municipal de…" required>
+      </div>
+      <div class="col-6 col-md-3">
+        <select name="tipo" class="form-select form-select-sm">
+          <% for (const t of tiposEntidade) { %><option value="<%= t.valor %>"><%= t.label %></option><% } %>
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <input name="matchPit" class="form-control form-control-sm" placeholder="Match TCE">
+      </div>
+      <% for (const c of camposEntidadeTexto) { %>
+      <div class="col-6 col-md-3"><input name="<%= c.chave %>" class="form-control form-control-sm" placeholder="<%= c.label %>"></div>
+      <% } %>
+      <div class="col-12"><button class="btn btn-sm btn-primary py-0"><i class="bi bi-plus-lg me-1"></i>Adicionar</button></div>
+    </form>
+    <% } %>
+  </div></div>
+
+  <!-- CONVERTER -->
+  <div class="card border-0 shadow-sm mb-3 border-start border-primary border-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-1"><i class="bi bi-play-circle me-1 text-primary"></i>Converter</h6>
+    <p class="text-muted small mb-2">Lê os arquivos + a execução do TCE e <strong>escreve na base</strong> o orçamentário (previsão/dotação) e a execução reconciliada. Idempotente por entidade.</p>
+    <% if (rodando) { %>
+      <div class="alert alert-info py-2 small mb-2"><span class="spinner-border spinner-border-sm me-1"></span>Conversão em andamento — atualize a página para ver o resultado.</div>
+    <% } else if (podeEscrever) { %>
+      <form method="post" action="/app/conversor/config/<%= municipio.id %>/converter" onsubmit="return confirm('Converter <%= municipio.nome %> agora? Isso escreve o orçamentário e a execução na base.')">
+        <button class="btn btn-sm btn-primary" <%= municipio.entidades.length ? '' : 'disabled' %>><i class="bi bi-play-fill me-1"></i>Converter agora</button>
+      </form>
+    <% } %>
+
+    <% if (ultimoLog) { %>
+      <div class="mt-3">
+        <div class="small text-muted">Última conversão: <%= ultimoLog.quando.toLocaleString('pt-BR') %></div>
+        <% if (ultimoLog.erro) { %>
+          <div class="alert alert-danger py-2 small mt-1 mb-1"><i class="bi bi-x-circle me-1"></i><%= ultimoLog.erro %></div>
+        <% } %>
+        <% if (ultimoLog.linhas.length) { %>
+          <pre class="bg-light border rounded p-2 small mb-0" style="white-space:pre-wrap"><% for (const l of ultimoLog.linhas) { %><%= l %>
+<% } %></pre>
+        <% } %>
+      </div>
+    <% } %>
+  </div></div>
+
+</div>
+</body>
+</html>

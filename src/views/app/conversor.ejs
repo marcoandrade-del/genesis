@@ -27,6 +27,7 @@
   <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
     <h2 class="h4 fw-bold mb-0"><i class="bi bi-diagram-3 me-1 text-primary"></i>Conversão · <%= selo.municipio %>/<%= selo.uf %></h2>
     <span class="badge <%= notaBom ? 'text-bg-success' : 'text-bg-warning' %> ms-1">Selo <%= selo.nota.ok %>/<%= selo.nota.total %></span>
+    <a href="/app/conversor/config" class="btn btn-sm btn-outline-primary ms-auto py-0"><i class="bi bi-buildings me-1"></i>Cadastrar / converter municípios</a>
   </div>
   <p class="text-muted small mb-3">O que foi convertido do município para o exercício <%= selo.ano %>, de onde veio, o que confere e o que ainda falta.</p>
 
