@@ -66,6 +66,19 @@ export const fabricantesConversor: Record<string, FabricanteInfo> = {
       },
     ],
   },
+  elotech: {
+    chave: 'elotech',
+    nome: 'Elotech (Portal da Transparência)',
+    campos: [
+      {
+        chave: 'idPortal',
+        label: 'ID da entidade no portal',
+        tipo: 'texto',
+        escopo: 'entidade',
+        ajuda: 'Identificador da entidade na API do portal (ex. 1 = Prefeitura, 6 = Câmara). A URL base da API vai no campo "portal" do município (…/portaltransparencia-api).',
+      },
+    ],
+  },
 }
 
 /** Tipos de entidade oferecidos no cadastro (rótulos amigáveis). */
