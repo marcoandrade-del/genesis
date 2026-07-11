@@ -4,6 +4,7 @@ import prismaPlugin from './plugins/prisma.js'
 import jwtPlugin from './plugins/jwt.js'
 import cookiePlugin from './plugins/cookie.js'
 import formbodyPlugin from './plugins/formbody.js'
+import multipartPlugin from './plugins/multipart.js'
 import viewPlugin from './plugins/view.js'
 import { adminRoutes } from './admin/index.js'
 import { appRoutes } from './app/index.js'
@@ -32,6 +33,7 @@ app.register(prismaPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
 app.register(formbodyPlugin)
+app.register(multipartPlugin)
 app.register(viewPlugin)
 app.register(rateLimitPlugin, { global: false })
 

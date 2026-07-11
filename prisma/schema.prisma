@@ -2249,3 +2249,46 @@ model SincronizacaoPortal {
   @@index([entidadeId, tipo, ano, mes])
   @@map("sincronizacoes_portal")
 }
+
+/// CONVERSOR — config-as-data de um município a converter. Cada registro vira um
+/// `MunicipioConfig` (src/conversor) consumido por `importarMunicipio`: o conector
+/// do FABRICANTE lê o orçamentário e a fonte do TCE lê a execução. Antes esta
+/// config vivia em .ts (municipios/*.ts); agora é cadastrável pela tela /app/conversor.
+/// `params` de escopo MUNICÍPIO guarda o que é compartilhado entre as entidades
+/// (ex. o export único da receita, separado por `matchArquivo` em cada entidade).
+model ConversorMunicipio {
+  id           String              @id @default(uuid())
+  nome         String // "Paranaguá"
+  ibge         String // código IBGE de 7 dígitos, ex. "411820"
+  uf           String              @db.Char(2)
+  ano          Int
+  fabricante   String // chave do conector, ex. "ipm"
+  tce          String // fonte da execução, ex. "pr"
+  portalUrl    String?
+  params       Json                @default("{}") // params de escopo município (ex. { receitaCsv })
+  criadoEm     DateTime            @default(now())
+  atualizadoEm DateTime            @updatedAt
+  entidades    ConversorEntidade[]
+
+  @@unique([ibge, ano])
+  @@map("conversor_municipios")
+}
+
+/// Uma entidade (Prefeitura/Câmara/autarquia) de um município a converter — como
+/// localizá-la em cada fonte. `params` guarda o específico do conector (caminhos
+/// dos arquivos exportados + o `matchArquivo` que a distingue nos arquivos multi-
+/// entidade). `matchPit` é a substring que casa a entidade nos dados do TCE.
+model ConversorEntidade {
+  id           String             @id @default(uuid())
+  municipioId  String
+  nome         String
+  tipo         TipoEntidade
+  matchPit     String? // substring que casa nmEntidade no PIT
+  params       Json               @default("{}") // { matchArquivo, arrecadacaoXlsx, despesaQdd, ... }
+  ordem        Int                @default(0)
+  criadoEm     DateTime           @default(now())
+  atualizadoEm DateTime           @updatedAt
+  municipio    ConversorMunicipio @relation(fields: [municipioId], references: [id], onDelete: Cascade)
+
+  @@map("conversor_entidades")
+}
