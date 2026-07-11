@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversão · <%= selo.municipio %></title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <%- include('../layouts/_theme') %>
+</head>
+<body class="bg-light">
+<%- include('_navbar') %>
+
+<%
+  const brl = (c) => (c == null || c === 0) ? '—' : (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const notaBom = selo.nota.ok === selo.nota.total
+%>
+
+<div class="container py-4" style="max-width:1000px">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="/app" class="text-decoration-none">Painel</a></li>
+      <li class="breadcrumb-item active" aria-current="page">Conversão</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+    <h2 class="h4 fw-bold mb-0"><i class="bi bi-diagram-3 me-1 text-primary"></i>Conversão · <%= selo.municipio %>/<%= selo.uf %></h2>
+    <span class="badge <%= notaBom ? 'text-bg-success' : 'text-bg-warning' %> ms-1">Selo <%= selo.nota.ok %>/<%= selo.nota.total %></span>
+  </div>
+  <p class="text-muted small mb-3">O que foi convertido do município para o exercício <%= selo.ano %>, de onde veio, o que confere e o que ainda falta.</p>
+
+  <!-- SELO: conferências (o que bate / não bate) -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-patch-check me-1 text-primary"></i>Selo de Conversão</h6>
+    <div class="row g-2">
+      <% for (const c of selo.conferencias) { %>
+        <div class="col-12 col-md-6 d-flex align-items-start gap-2 small">
+          <% if (c.ok) { %><i class="bi bi-check-circle-fill text-success mt-1"></i><% } else { %><i class="bi bi-exclamation-triangle-fill text-warning mt-1"></i><% } %>
+          <span><strong><%= c.nome %></strong><br><span class="text-muted"><%= c.detalhe %></span></span>
+        </div>
+      <% } %>
+    </div>
+  </div></div>
+
+  <!-- O QUE FOI CONVERTIDO -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-table me-1 text-primary"></i>O que foi convertido</h6>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+      <thead><tr class="small text-muted">
+        <th>Entidade</th>
+        <th class="text-end">Receita prevista</th>
+        <th class="text-end">Arrecadada</th>
+        <th class="text-end">Despesa orçada</th>
+        <th class="text-end">Empenhado</th>
+      </tr></thead>
+      <tbody>
+        <% for (const e of selo.entidades) { %>
+          <tr>
+            <td>
+              <div class="fw-semibold small"><%= e.nome %></div>
+              <div class="text-muted" style="font-size:.72rem"><%= e.tipo === 'PREFEITURA' ? 'Prefeitura' : e.tipo === 'CAMARA' ? 'Câmara' : 'Adm. indireta' %></div>
+            </td>
+            <td class="text-end small"><%= brl(e.receita.previsto) %><% if (e.receita.nPrevisoes) { %><br><span class="text-muted" style="font-size:.7rem"><%= e.receita.nPrevisoes %> contas</span><% } %></td>
+            <td class="text-end small"><%= brl(e.receita.arrecadado) %></td>
+            <td class="text-end small"><%= brl(e.despesa.autorizado) %><% if (e.despesa.nDotacoes) { %><br><span class="text-muted" style="font-size:.7rem"><%= e.despesa.nDotacoes %> dotações</span><% } %></td>
+            <td class="text-end small"><%= brl(e.despesa.empenhado) %></td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table></div>
+    <div class="small text-muted mt-2">
+      <i class="bi bi-info-circle me-1"></i>Origem: orçamentário do fabricante (exports do portal) · execução do TCE (PIT). Valores em R$.
+    </div>
+  </div></div>
+
+  <!-- RESSALVAS: o que não bate -->
+  <% if (selo.ressalvas.length) { %>
+  <div class="card border-0 shadow-sm mb-3 border-start border-warning border-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>O que não bate / ressalvas (<%= selo.ressalvas.length %>)</h6>
+    <ul class="list-unstyled small mb-0">
+      <% for (const r of selo.ressalvas) { %>
+        <li class="mb-1 d-flex justify-content-between gap-3">
+          <span><strong><%= r.titulo %></strong> — <span class="text-muted"><%= r.detalhe %></span></span>
+          <% if (r.valor) { %><span class="text-nowrap fw-semibold text-secondary"><%= brl(r.valor) %></span><% } %>
+        </li>
+      <% } %>
+    </ul>
+    <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Execução fora da LOA = empenho em fonte que não casou com a dotação inicial (crédito adicional ou de/para de fonte pendente).</div>
+  </div></div>
+  <% } %>
+
+  <!-- O QUE FALTA -->
+  <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-clipboard-check me-1 text-primary"></i>O que falta (<%= selo.faltas.length %>)</h6>
+    <% if (!selo.faltas.length) { %>
+      <div class="small text-success"><i class="bi bi-check-circle me-1"></i>Conversão completa — nada pendente.</div>
+    <% } else { %>
+      <ul class="small mb-0 ps-3">
+        <% for (const f of selo.faltas) { %><li><%= f %></li><% } %>
+      </ul>
+    <% } %>
+  </div></div>
+
+</div>
+</body>
+</html>
