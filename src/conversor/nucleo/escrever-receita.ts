@@ -65,10 +65,11 @@ export async function escreverReceita(
         return id
       }
 
+      const escritas: string[] = []
       for (const l of linhas) {
         const contaId = await garantirConta(l.naturezaPcasp, l.redutora ? `(-) ${l.fonte.descricao || 'Dedução'}` : l.fonte.descricao || `Receita ${l.naturezaPcasp}`)
         const fonteId = await garantirFonte(l.fonte.codigo, l.fonte.descricao)
-        await tx.previsaoReceita.upsert({
+        const pv = await tx.previsaoReceita.upsert({
           where: { previsao_unica: { orcamentoId, contaReceitaEntidadeId: contaId, fonteRecursoEntidadeId: fonteId } },
           create: {
             orcamentoId,
@@ -81,9 +82,15 @@ export async function escreverReceita(
             ...(l.previsto !== undefined ? { valorPrevisto: cent(l.previsto) } : {}),
             ...(l.arrecadado !== undefined ? { valorArrecadado: cent(l.arrecadado) } : {}),
           },
+          select: { id: true },
         })
+        escritas.push(pv.id)
         previsoes++
       }
+      // idempotência: remove as previsões deste orçamento que NÃO fazem parte da
+      // escrita atual — órfãs de uma conversão anterior com outro conjunto de
+      // chaves (natureza/fonte que sumiu). Sem isso o total inflava no re-import.
+      if (escritas.length) await tx.previsaoReceita.deleteMany({ where: { orcamentoId, id: { notIn: escritas } } })
     },
     { timeout: 120_000 },
   )
