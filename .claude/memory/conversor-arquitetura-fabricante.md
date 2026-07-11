@@ -37,15 +37,12 @@ Interface comum do conector: `listarEntidades / lerReceita / lerDespesa / lerArr
 - **Mesmo fabricante** → um arquivo de CONFIG (IBGE, URL, entidades). Minutos.
 - **Fabricante novo** → UM conector (cru→normalizado). Núcleo/reconciliação/writers já existem.
 
-## Estado / RETOMADA (2026-07-10)
-- **PR #229** = POC bespoke do Paranaguá (IPM) — scripts `*paranagua*`, 5 entidades ao centavo.
-- **PR #232** = ✅ FUNDAÇÃO do conversor construída e TESTADA (7 testes verdes):
-  - `src/conversor/nucleo/tipos.ts` (contratos + interfaces `ConectorFabricante`/`FonteExecucao`)
-  - `src/conversor/nucleo/{pcasp,de-para-fonte}.ts` (helpers + de/para fonte por descrição)
-  - `src/conversor/fabricantes/ipm/codigo.ts` (decodificação IPM→PCASP)
-- **PRÓXIMOS (tarefas #8–#11, sessão nova rende mais):**
-  1. `nucleo/` **writers** (o maior): `garantirEntidade` (onboarding), `escreverPrevisoes`, `escreverDotacoes` (resolve dimensões UO/função/programa/ação/conta/fonte + upsert), `reconciliar` (usa `casarFontesPorDescricao`), `setarArrecadado`. EXTRAIR de `scripts/importar_*paranagua*` e `reconciliar_execucao_loa_paranagua`.
-  2. `fabricantes/ipm/` **parsers**: `lerReceita` (staircase CSV), `lerDespesa` (QDD CSV), `lerArrecadacao` (balanço .xls→xlsx via libreoffice) → `LinhaReceita`/`LinhaDespesa` normalizadas (usam `codigo.ts`).
-  3. `tce/pr/` **PIT**: baixar+parsear `Empenho.xml` → `LinhaDespesa` de execução (implementa `FonteExecucao`).
-  4. `municipios/paranagua-pr.ts` (config) + `importar(municipio)` orquestrador. **VALIDAR:** re-rodar Paranaguá pela nova arquitetura, conferir que bate ao centavo com o import bespoke (os totais estão em [[import-paranagua-ipm]]).
-  5. Depois: `fabricantes/elotech/` extraído do Maringá ([[maringa-municipio-completo]]).
+## Estado (2026-07-11) — CONVERSOR COMPLETO E VALIDADO ✅
+- **PR #229** = POC bespoke do Paranaguá (IPM) — scripts `*paranagua*`.
+- **PR #232** = ✅ CONVERSOR COMPLETO (`src/conversor/`, 10 testes verdes):
+  - `nucleo/`: tipos+interfaces, pcasp, de-para-fonte, **onboarding**, **escrever-receita** (cria conta/fonte sob demanda), **escrever-despesa** (resolve dimensões + ledger CAP-*/MovimentoEmpenho), **reconciliar** (funde orçado LOA × empenhado TCE por descrição).
+  - `fabricantes/ipm/`: `codigo` (decode→PCASP) + `layouts` (receita escada, despesa QDD, balanço arrecadação .xlsx) + `conector`.
+  - `tce/pr/pit.ts`: execução do PIT (agnóstico de fabricante).
+  - `importar.ts` (orquestrador via registries) + `municipios/paranagua-pr.ts` (config).
+- **VALIDADO dry**: o pipeline reproduz Paranaguá AO CENTAVO — Pref orçado 1.105.490.611,74 / empenhado 474.671.976,49 / previsão 1.350.900.754,72; Prev/Fundação idem. **Um município novo do MESMO fabricante = só um arquivo de config.**
+- **Follow-ups:** (1) `fabricantes/elotech/` extraído do Maringá ([[maringa-municipio-completo]], [[portal-maringa-api-arquivos]]) → primeiro fabricante com portal-API; (2) layout "despesa por elemento" no IPM (Câmara — dimensão única, sem QDD-com-fonte); (3) dedução FUNDEB no núcleo (hoje receita sai BRUTA; o líquido/redutora é o `deducao_fundeb_paranagua`); (4) runner `scripts/converter-municipio.ts` + persistir (o `importarMunicipio` grava; a validação foi dry pra não mexer no bespoke).
