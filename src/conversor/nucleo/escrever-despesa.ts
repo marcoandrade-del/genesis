@@ -73,6 +73,7 @@ export async function escreverDespesa(
       await tx.empenho.deleteMany({ where: { entidadeId, numero: { startsWith: 'CAP-' } } })
 
       const movRows: { entidadeId: string; empenhoId: string; tipo: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO'; valor: string; data: Date; criadoPorId: string; historico: string }[] = []
+      const escritas: string[] = [] // ids das dotações escritas nesta conversão
       for (const l of linhas) {
         const contaId = resolverConta(l.naturezaPcasp)
         if (!contaId) continue
@@ -92,6 +93,7 @@ export async function escreverDespesa(
           update: { valorAutorizado: cent(l.autorizado ?? 0), valorEmpenhado: cent(l.empenhado ?? 0) },
           select: { id: true },
         })
+        escritas.push(dot.id)
         if (l.empenhado) {
           const numero = `CAP-${dot.id.slice(0, 8)}`
           const emp = await tx.empenho.upsert({
@@ -107,6 +109,16 @@ export async function escreverDespesa(
         }
       }
       await tx.movimentoEmpenho.createMany({ data: movRows })
+
+      // idempotência: remove as dotações órfãs deste orçamento (chave que sumiu numa
+      // reconversão). Só as SEM dependentes bloqueantes — as CAP-* já foram apagadas
+      // acima, então a dotação de conversor fica livre; qualquer dotação com empenho/
+      // reserva/lançamento REAIS é preservada (não é artefato do conversor).
+      if (escritas.length) {
+        await tx.dotacaoDespesa.deleteMany({
+          where: { orcamentoId, id: { notIn: escritas }, empenhos: { none: {} }, reservas: { none: {} }, lancamentoItens: { none: {} } },
+        })
+      }
     },
     { timeout: 300_000 },
   )
