@@ -8,9 +8,12 @@ export type SeloEntidade = {
   nome: string
   tipo: string
   receita: { previsto: number; arrecadado: number; nPrevisoes: number }
-  despesa: { autorizado: number; empenhado: number; nDotacoes: number; comOrcadoEmpenho: number; soOrcado: number; soEmpenho: number }
+  despesa: { autorizado: number; empenhado: number; nDotacoes: number; comOrcadoEmpenho: number; soOrcado: number; soEmpenho: number; valorSemLoa: number }
   faltas: string[]
 }
+
+/** Uma ressalva do drill-down "o que não bate". */
+export type Ressalva = { titulo: string; detalhe: string; valor?: number }
 
 /** O selo completo de um município (a fonte de dados do Painel de Conversão). */
 export type SeloConversao = {
@@ -19,6 +22,7 @@ export type SeloConversao = {
   ano: number
   entidades: SeloEntidade[]
   conferencias: Conferencia[]
+  ressalvas: Ressalva[]
   faltas: string[]
   nota: { ok: number; total: number }
 }
@@ -42,7 +46,8 @@ export async function calcularSelo(prisma: PrismaClient, municipio: string, ano:
     const desp = orc ? await prisma.dotacaoDespesa.aggregate({ where: { orcamentoId: orc.id }, _sum: { valorAutorizado: true, valorEmpenhado: true }, _count: true }) : null
     const comAmbos = orc ? await prisma.dotacaoDespesa.count({ where: { orcamentoId: orc.id, valorAutorizado: { gt: 0 }, valorEmpenhado: { gt: 0 } } }) : 0
     const soOrc = orc ? await prisma.dotacaoDespesa.count({ where: { orcamentoId: orc.id, valorAutorizado: { gt: 0 }, valorEmpenhado: 0 } }) : 0
-    const soEmp = orc ? await prisma.dotacaoDespesa.count({ where: { orcamentoId: orc.id, valorAutorizado: 0, valorEmpenhado: { gt: 0 } } }) : 0
+    const semLoa = orc ? await prisma.dotacaoDespesa.aggregate({ where: { orcamentoId: orc.id, valorAutorizado: 0, valorEmpenhado: { gt: 0 } }, _sum: { valorEmpenhado: true }, _count: true }) : null
+    const soEmp = semLoa?._count ?? 0
 
     const previsto = num(rec?._sum.valorPrevisto)
     const arrecadado = num(rec?._sum.valorArrecadado)
@@ -57,7 +62,7 @@ export async function calcularSelo(prisma: PrismaClient, municipio: string, ano:
       nome: e.nome,
       tipo: e.tipo,
       receita: { previsto, arrecadado, nPrevisoes: rec?._count ?? 0 },
-      despesa: { autorizado, empenhado, nDotacoes: desp?._count ?? 0, comOrcadoEmpenho: comAmbos, soOrcado: soOrc, soEmpenho: soEmp },
+      despesa: { autorizado, empenhado, nDotacoes: desp?._count ?? 0, comOrcadoEmpenho: comAmbos, soOrcado: soOrc, soEmpenho: soEmp, valorSemLoa: num(semLoa?._sum.valorEmpenhado) },
       faltas,
     })
   }
@@ -77,7 +82,19 @@ export async function calcularSelo(prisma: PrismaClient, municipio: string, ano:
     { nome: 'Reconciliação orçado×empenhado', ok: empCasado > 0, detalhe: `${empCasado} dotações com orçado+empenhado · ${empSemLoa} só empenho (execução fora da LOA)` },
   ]
 
+  // ressalvas (drill-down "o que não bate")
+  const ressalvas: Ressalva[] = []
+  const totSemLoa = entidades.reduce((a, e) => a + e.despesa.valorSemLoa, 0)
+  if (totSemLoa > 0) {
+    const nEnt = entidades.filter((e) => e.despesa.soEmpenho > 0).length
+    ressalvas.push({ titulo: 'Execução fora da LOA', detalhe: `empenho sem dotação inicial (fonte fora do de/para ou crédito adicional) em ${nEnt} entidade(s)`, valor: totSemLoa })
+  }
+  for (const e of entidades) {
+    if (e.despesa.autorizado === 0 && e.despesa.empenhado > 0) ressalvas.push({ titulo: `${e.nome}`, detalhe: 'sem dotação orçada — só execução (o portal não trouxe o QDD desta entidade)', valor: e.despesa.empenhado })
+    if (e.tipo !== 'CAMARA' && e.receita.previsto === 0 && e.despesa.empenhado > 0) ressalvas.push({ titulo: `${e.nome}`, detalhe: 'sem receita importada' })
+  }
+
   const faltas = entidades.flatMap((e) => e.faltas.map((f) => `${e.nome}: ${f}`))
   const ok = conferencias.filter((c) => c.ok).length
-  return { municipio, uf: mun.estado.sigla, ano, entidades, conferencias, faltas, nota: { ok, total: conferencias.length } }
+  return { municipio, uf: mun.estado.sigla, ano, entidades, conferencias, ressalvas, faltas, nota: { ok, total: conferencias.length } }
 }

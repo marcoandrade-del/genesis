@@ -74,6 +74,22 @@
     </div>
   </div></div>
 
+  <!-- RESSALVAS: o que não bate -->
+  <% if (selo.ressalvas.length) { %>
+  <div class="card border-0 shadow-sm mb-3 border-start border-warning border-3"><div class="card-body py-3">
+    <h6 class="fw-semibold mb-2"><i class="bi bi-exclamation-triangle me-1 text-warning"></i>O que não bate / ressalvas (<%= selo.ressalvas.length %>)</h6>
+    <ul class="list-unstyled small mb-0">
+      <% for (const r of selo.ressalvas) { %>
+        <li class="mb-1 d-flex justify-content-between gap-3">
+          <span><strong><%= r.titulo %></strong> — <span class="text-muted"><%= r.detalhe %></span></span>
+          <% if (r.valor) { %><span class="text-nowrap fw-semibold text-secondary"><%= brl(r.valor) %></span><% } %>
+        </li>
+      <% } %>
+    </ul>
+    <div class="small text-muted mt-2"><i class="bi bi-info-circle me-1"></i>Execução fora da LOA = empenho em fonte que não casou com a dotação inicial (crédito adicional ou de/para de fonte pendente).</div>
+  </div></div>
+  <% } %>
+
   <!-- O QUE FALTA -->
   <div class="card border-0 shadow-sm mb-3"><div class="card-body py-3">
     <h6 class="fw-semibold mb-2"><i class="bi bi-clipboard-check me-1 text-primary"></i>O que falta (<%= selo.faltas.length %>)</h6>
