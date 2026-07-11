@@ -47,7 +47,8 @@ function patrimonialArrecadacao(parametro: ParametroRow | null, naturezaCodigo: 
  * automáticos (partida dobrada), nos três aspectos da CASP:
  *
  *  - E100 Orçamentário (sempre): D Receita Realizada / C Receita a Realizar
- *    (reduz o "a realizar" que a previsão creditou). conta-corrente = natureza.
+ *    (reduz o "a realizar" que a previsão creditou). cc = natureza + fonte (a
+ *    fonte é dimensão da MSC/RGF na linha 6.2.1, como o #226 fez na despesa).
  *  - E200 Controle DDR (sempre): D Controle da Disponibilidade / C Disponibilidade
  *    por Destinação. conta-corrente = fonte (classe 8). O débito é Recursos
  *    Ordinários ou Vinculados conforme a fonte.
@@ -204,7 +205,9 @@ export class MotorEventosReceita {
           `Integração contábil indisponível: conta "${r.codigo}" não existe como folha no plano da entidade (exercício ${ctx.ano}).`,
         )
       }
-      return { contaId: id, tipo, valor, naturezaReceitaCodigo: r.cc === 'natureza' ? ctx.naturezaCodigo : null, fonteCodigo: r.cc === 'fonte' ? fonte : null }
+      // Fonte carimbada em TODA perna (dimensão da MSC/RGF): a linha 6.2.1 da
+      // execução da receita precisa da fonte — o motor da despesa já faz o análogo (#226).
+      return { contaId: id, tipo, valor, naturezaReceitaCodigo: r.cc === 'natureza' ? ctx.naturezaCodigo : null, fonteCodigo: fonte }
     }
 
     return resolvidos.map((e) => ({
