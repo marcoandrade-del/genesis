@@ -15,10 +15,10 @@ import type { LinhaMsc } from './matriz-saldos-contabeis.js'
  * classes de contas, fonte de dígito 9 (recursos condicionados); atributo F
  * (financeiro) sem fonte (via `superavitFinanceiro`, #230) e detalhamento da
  * despesa — sem natureza/função/fonte — marcada por `contaCorrente.dotacaoId`
- * (#228). No encerramento, o zeramento de VPA/VPD. Ainda em STUB (`NAO_APLICAVEL`):
- * receita sem natureza/fonte (D1_00029/00030, exige distinguir a linha de receita
- * por prefixo PCASP), poder/órgão (D1_00019), CO e AI — dependem de dimensões
- * ainda não emitidas.
+ * (#228); e detalhamento da receita orçamentária (grupo PCASP 6.2.1) — sem
+ * natureza/fonte. No encerramento, o zeramento de VPA/VPD. Ainda em STUB
+ * (`NAO_APLICAVEL`): poder/órgão (D1_00019), CO e AI — dependem de dimensões
+ * que o emissor ainda não produz.
  */
 
 const TOLERANCIA = 0.01 // centavo
@@ -194,10 +194,34 @@ function despesaSemCampo(codigo: string, titulo: string, ref: string, linhas: Li
   }
 }
 
-/** Checks da Dim I ainda em STUB: receita (precisa distinguir a linha por prefixo PCASP) e dimensões não emitidas. */
+/**
+ * Checks de detalhamento da receita orçamentária. A linha de receita é o grupo
+ * 6.2.1 do PCASP — "Execução da Receita": receita a realizar (6.2.1.1), realizada
+ * (6.2.1.2) e (-) deduções da receita orçamentária (6.2.1.3). Identificada pelo
+ * PREFIXO (não pela presença da natureza — senão a linha "sem natureza" ficaria
+ * invisível).
+ */
+function receitaSemCampo(codigo: string, titulo: string, ref: string, linhas: LinhaMsc[], falta: (l: LinhaMsc) => boolean): Verificacao {
+  const rec = linhas.filter((l) => l.conta.startsWith('6.2.1'))
+  const sem = rec.filter(falta)
+  const amostra = sem.slice(0, 5).map((l) => l.conta).join(', ')
+  return {
+    codigo,
+    titulo,
+    status: sem.length === 0 ? 'OK' : 'DIVERGENTE',
+    esperado: 0,
+    obtido: sem.length,
+    delta: sem.length,
+    detalhe:
+      `${ref}. ` +
+      (sem.length === 0
+        ? `${rec.length} linha(s) de receita orçamentária avaliada(s): detalhamento presente.`
+        : `${sem.length} de ${rec.length} linha(s) de receita orçamentária sem o detalhamento: ${amostra}${sem.length > 5 ? '…' : ''}.`),
+  }
+}
+
+/** Checks da Dim I ainda em STUB: dependem de dimensões que o emissor ainda não produz. */
 const STUBS: Array<[string, string, string]> = [
-  ['MSC_DIM1_RECEITA_SEM_FONTE', 'Receita orçamentária/deduções com fonte de recursos', 'D1_00029 — conta-corrente disponível (#228); ativação requer identificar a linha de receita orçamentária por prefixo PCASP. Follow-up.'],
-  ['MSC_DIM1_RECEITA_SEM_NATUREZA', 'Receita orçamentária/deduções com natureza de receita', 'D1_00030 — conta-corrente disponível (#228); ativação requer identificar a linha de receita por prefixo PCASP. Follow-up.'],
   ['MSC_DIM1_PODER_ORGAO', 'Códigos de poder/órgão válidos', 'D1_00019 — requer a dimensão poder/órgão (fase 2b do emissor).'],
   ['MSC_DIM1_CO_SAUDE_EDUC_FUNDEB', 'Acompanhamento (CO) de saúde/educação/Fundeb detalhado', 'D1_00041/D1_00042/D1_00043 — requer a dimensão CO (não modelada).'],
   ['MSC_DIM1_AI_RESTOS_A_PAGAR', 'Informação complementar AI (ano de inscrição de restos a pagar)', 'D1_00044 — requer a dimensão AI (não modelada).'],
@@ -221,6 +245,8 @@ export function validarEstruturaMsc(linhas: LinhaMsc[], opts: OpcoesValidacao = 
     despesaSemCampo('MSC_DIM1_DESPESA_SEM_NATUREZA', 'Despesa orçamentária com natureza de despesa', 'D1_00031', linhas, (cc) => cc.naturezaDespesa == null),
     despesaSemCampo('MSC_DIM1_DESPESA_SEM_FUNCAO', 'Despesa orçamentária com função/subfunção', 'D1_00032', linhas, (cc) => cc.funcao == null || cc.subfuncao == null),
     despesaSemCampo('MSC_DIM1_DESPESA_SEM_FONTE', 'Despesa orçamentária com fonte de recursos', 'D1_00033', linhas, (cc) => cc.fonte == null),
+    receitaSemCampo('MSC_DIM1_RECEITA_SEM_NATUREZA', 'Receita orçamentária/deduções com natureza de receita', 'D1_00030', linhas, (l) => l.contaCorrente.naturezaReceita == null),
+    receitaSemCampo('MSC_DIM1_RECEITA_SEM_FONTE', 'Receita orçamentária/deduções com fonte de recursos', 'D1_00029', linhas, (l) => (l.contaCorrente.fonte ?? '') === ''),
     vpaVpdEncerramento(linhas, opts.encerramento ?? false),
   ]
   for (const [codigo, titulo, detalhe] of STUBS) verificacoes.push(na(codigo, titulo, detalhe))
