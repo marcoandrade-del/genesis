@@ -5,12 +5,12 @@ import { SaldoContabilService } from './saldo-contabil.js'
 
 /**
  * Contas de controle (folhas fixas do PCASP) usadas na abertura do orçamentário.
- * Direção derivada do motor da execução (E100 credita "a realizar"; E600 debita
+ * Direção derivada do motor da execução (E100 debita "a realizar"; E600 debita
  * "disponível") para que abertura + execução zerem ao fim do exercício.
  */
 export const CONTAS_ABERTURA = {
-  receitaARealizar: '6.2.1.1.0.00.00.00.00.00.00.00', // D na previsão
-  previsaoInicialReceita: '5.2.1.1.1.00.00.00.00.00.00.00', // C na previsão
+  receitaARealizar: '6.2.1.1.0.00.00.00.00.00.00.00', // C na previsão
+  previsaoInicialReceita: '5.2.1.1.1.00.00.00.00.00.00.00', // D na previsão
   creditoInicial: '5.2.2.1.1.01.00.00.00.00.00.00', // D na fixação
   creditoDisponivel: '6.2.2.1.1.00.00.00.00.00.00.00', // C na fixação
 } as const
@@ -39,7 +39,7 @@ const dec = (v: Prisma.Decimal.Value = 0) => new Prisma.Decimal(v)
  * gera, por entidade, os lançamentos de abertura — em uma transação:
  *
  *  - Parte A (orçamentário, a partir da LOA aprovada):
- *      Previsão da receita  → D 6.2.1.1.0 (a realizar) / C 5.2.1.1.1 (previsão inicial), cc natureza+fonte.
+ *      Previsão da receita  → D 5.2.1.1.1 (previsão inicial) / C 6.2.1.1.0 (a realizar), cc natureza+fonte.
  *      Fixação da despesa   → D 5.2.2.1.1.01 (crédito inicial) / C 6.2.2.1.1 (crédito disponível), cc fonte.
  *  - Parte B (transporte de saldos patrimoniais do ano anterior):
  *      SaldoInicialAno[ano] = |saldo final[ano−1]| para as folhas do balanço (classes 1 e 2).
@@ -103,8 +103,8 @@ export class AberturaContabilService {
       if (dec(p.valorPrevisto).lessThanOrEqualTo(0)) continue
       const cc = { naturezaReceitaCodigo: p.contaReceita.codigo, fonteCodigo: p.fonteRecurso.codigo }
       const valor = dec(p.valorPrevisto).toFixed(2)
-      itensPrevisao.push({ contaId: contas.receitaARealizar, tipo: 'DEBITO', valor, ...cc })
-      itensPrevisao.push({ contaId: contas.previsaoInicialReceita, tipo: 'CREDITO', valor, ...cc })
+      itensPrevisao.push({ contaId: contas.previsaoInicialReceita, tipo: 'DEBITO', valor, ...cc })
+      itensPrevisao.push({ contaId: contas.receitaARealizar, tipo: 'CREDITO', valor, ...cc })
       totalPrevisto = totalPrevisto.plus(p.valorPrevisto)
     }
 

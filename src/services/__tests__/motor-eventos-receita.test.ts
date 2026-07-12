@@ -70,14 +70,14 @@ describe('MotorEventosReceita', () => {
     }
   })
 
-  it('E100: D Receita Realizada / C Receita a Realizar, conta-corrente = natureza + fonte', async () => {
+  it('E100: D Receita a Realizar / C Receita Realizada, conta-corrente = natureza + fonte', async () => {
     comFolhas(mock)
     mock.parametroReceita.findMany.mockResolvedValue([])
     const [e100] = await motor(mock).resolver(baseCtx)
     const deb = e100.itens.find((i) => i.tipo === 'DEBITO')!
     const cred = e100.itens.find((i) => i.tipo === 'CREDITO')!
-    expect(deb.contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
-    expect(cred.contaId).toBe(`id:${CONTAS_EVENTO.receitaARealizar}`)
+    expect(deb.contaId).toBe(`id:${CONTAS_EVENTO.receitaARealizar}`)
+    expect(cred.contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
     expect(deb.naturezaReceitaCodigo).toBe(baseCtx.naturezaCodigo)
     // fonte carimbada na linha 6.2.1 (dimensão da MSC/RGF) — antes era null
     expect(deb.fonteCodigo).toBe('1000')
@@ -143,9 +143,9 @@ describe('MotorEventosReceita', () => {
     ])
     const eventos = await motor(mock).resolver(baseCtx, { estorno: true })
     const e100 = eventos.find((e) => e.eventoCodigo === '100')!
-    // sem estorno o débito é Receita Realizada; no estorno ela vira crédito
+    // sem estorno o crédito é Receita Realizada; no estorno ela vira débito
     const realizada = e100.itens.find((i) => i.contaId === `id:${CONTAS_EVENTO.receitaRealizada}`)!
-    expect(realizada.tipo).toBe('CREDITO')
+    expect(realizada.tipo).toBe('DEBITO')
   })
 
   it('prefixo mais longo vence no de/para', async () => {

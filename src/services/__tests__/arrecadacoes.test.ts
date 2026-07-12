@@ -94,8 +94,8 @@ describe('ArrecadacoesService.criar', () => {
     const itensE100 = prisma.lancamentoItem.createMany.mock.calls[0][0].data
     expect(itensE100).toHaveLength(2)
     expect(itensE100.every((i: any) => i.naturezaReceitaCodigo === '1.3.2.1.01.1.1.05.00.00.00.00')).toBe(true)
-    // E100 debita Receita Realizada
-    expect(itensE100.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${CONTAS_EVENTO.receitaRealizada}`)
+    // E100 debita Receita a Realizar (credita Receita Realizada)
+    expect(itensE100.find((i: any) => i.tipo === 'DEBITO').contaId).toBe(`id:${CONTAS_EVENTO.receitaARealizar}`)
   })
 
   it('com conta bancária: grava a conta e o E300 debita a folha de caixa dela', async () => {
