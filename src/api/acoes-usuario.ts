@@ -7,13 +7,15 @@ import { tratarErro } from '../errors.js'
  * acesso a um município (via SolicitacaoAcessoEntidade → PREFEITURA). Ver
  * `oxy-repo/INTEGRACAO-GENESIS.md`.
  */
-export const CONTRATO_SOLICITACOES_ACESSO = { nome: 'solicitacoes-acesso', versao: '1.0.0' } as const
+export const CONTRATO_SOLICITACOES_ACESSO = { nome: 'solicitacoes-acesso', versao: '1.1.0' } as const
 
 /**
  * Data API de ESCRITA do usuário do BI (OXY Dashboards), separada do `memoriais.ts`
  * (read-only) de propósito. Autenticada pelo token de SERVIÇO (GENESIS_API_TOKEN): o
  * oxy-bi-jpa é o BFF e a identidade do usuário vem no corpo/query como e-mail, não em JWT
- * de usuário. A APROVAÇÃO das solicitações segue no admin do Gênesis (aqui só o lado do usuário).
+ * de usuário. Dois lados: o do USUÁRIO (solicitar/listar/cancelar) e o do ADMIN do município
+ * (pendentes/aprovar/rejeitar) — a autorização do aprovador é conferida no bridge (ADMIN da
+ * prefeitura), não confia só no BFF. Contrato 1.1.0 (aprovação adicionada).
  */
 export async function acoesUsuarioApiRoutes(app: FastifyInstance) {
   const svc = new SolicitacoesAcessoBiService(app.prisma)
@@ -66,6 +68,54 @@ export async function acoesUsuarioApiRoutes(app: FastifyInstance) {
         const email = (req.body?.email ?? '').trim()
         if (!email) return reply.code(400).send({ erro: 'email é obrigatório.' })
         const dados = await svc.cancelar(email, req.params.id)
+        return reply.send(envelope(dados))
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
+
+  // ADMIN do município: solicitações PENDENTES da prefeitura (o aprovador vai no query).
+  app.get<{ Querystring: { email?: string; municipioId?: string } }>(
+    '/acoes/solicitacoes-acesso/pendentes',
+    async (req, reply) => {
+      try {
+        const email = (req.query.email ?? '').trim()
+        const municipioId = (req.query.municipioId ?? '').trim()
+        if (!email || !municipioId) return reply.code(400).send({ erro: 'email e municipioId são obrigatórios.' })
+        const dados = await svc.listarPendentes(email, municipioId)
+        return reply.send(envelope(dados))
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
+
+  // ADMIN aprova uma solicitação pendente (aprovador + município no corpo).
+  app.post<{ Params: { id: string }; Body: { email?: string; municipioId?: string } }>(
+    '/acoes/solicitacoes-acesso/:id/aprovar',
+    async (req, reply) => {
+      try {
+        const email = (req.body?.email ?? '').trim()
+        const municipioId = (req.body?.municipioId ?? '').trim()
+        if (!email || !municipioId) return reply.code(400).send({ erro: 'email e municipioId são obrigatórios.' })
+        const dados = await svc.aprovar(email, municipioId, req.params.id)
+        return reply.send(envelope(dados))
+      } catch (e) {
+        return tratarErro(e, reply)
+      }
+    },
+  )
+
+  // ADMIN rejeita uma solicitação pendente.
+  app.post<{ Params: { id: string }; Body: { email?: string; municipioId?: string } }>(
+    '/acoes/solicitacoes-acesso/:id/rejeitar',
+    async (req, reply) => {
+      try {
+        const email = (req.body?.email ?? '').trim()
+        const municipioId = (req.body?.municipioId ?? '').trim()
+        if (!email || !municipioId) return reply.code(400).send({ erro: 'email e municipioId são obrigatórios.' })
+        const dados = await svc.rejeitar(email, municipioId, req.params.id)
         return reply.send(envelope(dados))
       } catch (e) {
         return tratarErro(e, reply)
