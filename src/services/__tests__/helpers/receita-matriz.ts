@@ -3,7 +3,7 @@ import type { PrismaMock } from './prisma-mock.js'
 
 /** Matriz de eventos da arrecadação (espelha o seed): D/C por evento, com tokens. */
 export const MATRIZ_RECEITA = [
-  { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária', lancamentos: [{ ordem: 1, contaDebitoMascara: C.receitaRealizada, contaCreditoMascara: C.receitaARealizar }] },
+  { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária', lancamentos: [{ ordem: 1, contaDebitoMascara: C.receitaARealizar, contaCreditoMascara: C.receitaRealizada }] },
   { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por destinação de recursos (DDR)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.DDR_CONTROLE, contaCreditoMascara: C.ddrDisponibilidade }] },
   { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação patrimonial aumentativa (receita efetiva)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (passivo)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },

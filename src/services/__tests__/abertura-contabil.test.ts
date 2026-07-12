@@ -62,7 +62,7 @@ describe('AberturaContabilService', () => {
       })
     })
 
-    it('gera previsão (D 6.2.1.1.0 / C 5.2.1.1.1, cc natureza+fonte) e fixação (D 5.2.2.1.1.01 / C 6.2.2.1.1, cc fonte)', async () => {
+    it('gera previsão (D 5.2.1.1.1 / C 6.2.1.1.0, cc natureza+fonte) e fixação (D 5.2.2.1.1.01 / C 6.2.2.1.1, cc fonte)', async () => {
       mockContas() // greenfield
       const r = await service.contabilizar('ent1', 2026, 'u1')
 
@@ -70,8 +70,8 @@ describe('AberturaContabilService', () => {
       const prev = m.criar.mock.calls[0]![0]
       expect(prev).toMatchObject({ origemTipo: 'ABERTURA', origemId: 'orc1', eventoCodigo: '001', data: '2026-01-01' })
       expect(prev.itens).toEqual([
-        { contaId: 'cRealizar', tipo: 'DEBITO', valor: '1000.00', naturezaReceitaCodigo: '1.1.1.3.01', fonteCodigo: '1500' },
-        { contaId: 'cPrevisao', tipo: 'CREDITO', valor: '1000.00', naturezaReceitaCodigo: '1.1.1.3.01', fonteCodigo: '1500' },
+        { contaId: 'cPrevisao', tipo: 'DEBITO', valor: '1000.00', naturezaReceitaCodigo: '1.1.1.3.01', fonteCodigo: '1500' },
+        { contaId: 'cRealizar', tipo: 'CREDITO', valor: '1000.00', naturezaReceitaCodigo: '1.1.1.3.01', fonteCodigo: '1500' },
       ])
       const fix = m.criar.mock.calls[1]![0]
       expect(fix).toMatchObject({ eventoCodigo: '002' })
@@ -130,8 +130,8 @@ describe('AberturaContabilService', () => {
       prisma.lancamento.count.mockResolvedValue(0)
       prisma.lancamento.findMany.mockResolvedValue([
         { id: 'l1', data: new Date(Date.UTC(2026, 0, 1)), itens: [
-          { contaId: 'cRealizar', tipo: 'DEBITO', valor: dec(1000) },
-          { contaId: 'cPrevisao', tipo: 'CREDITO', valor: dec(1000) },
+          { contaId: 'cPrevisao', tipo: 'DEBITO', valor: dec(1000) },
+          { contaId: 'cRealizar', tipo: 'CREDITO', valor: dec(1000) },
         ] },
       ])
       await service.estornar('ent1', 2026, 'u1')

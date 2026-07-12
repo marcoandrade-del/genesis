@@ -126,7 +126,7 @@ describe('appArrecadacaoRoutes', () => {
         contaBancaria: null,
       },
       eventos: [
-        { eventoCodigo: '100', historico: 'E100', itens: [{ tipo: 'DEBITO', valor: '100', naturezaReceitaCodigo: '1.7', fonteCodigo: null, conta: { codigo: '6.2.1.2', descricao: 'Realizada' } }] },
+        { eventoCodigo: '100', historico: 'E100', itens: [{ tipo: 'CREDITO', valor: '100', naturezaReceitaCodigo: '1.7', fonteCodigo: null, conta: { codigo: '6.2.1.2', descricao: 'Realizada' } }] },
       ],
     })
     const res = await app.inject({ method: 'GET', url: '/orcamento/arrecadacao/a1/lancamentos' })
