@@ -6,10 +6,38 @@
  * `parametroPara` do MotorEventosReceita. Sem banco — 100% testável.
  */
 
+import type { CategoriaDespesa } from '@prisma/client'
+
 export type ParametroDespesaLido = {
   naturezaCodigo: string
   contaVpdCodigo: string
   contaPassivoCodigo: string
+  categoria?: CategoriaDespesa | null
+}
+
+/** Classe do PCASP (1º dígito) que a conta a DEBITAR deve ter, por categoria. */
+const CLASSE_DEBITO_POR_CATEGORIA: Record<CategoriaDespesa, string> = {
+  CUSTEIO: '3', // VPD
+  PESSOAL: '3', // VPD
+  JUROS: '3', // VPD financeira (3.4)
+  CAPITAL: '1', // Ativo (imobilizado)
+  AMORTIZACAO: '2', // Dívida (passivo permanente)
+}
+
+/**
+ * Valida a coerência de um de/para: a classe da conta a DEBITAR na liquidação
+ * tem de bater com a categoria (custeio/pessoal/juros→VPD 3, capital→ativo 1,
+ * amortização→dívida 2). Retorna a mensagem do erro, ou `null` se ok (ou sem
+ * categoria). Pega mapeamento trocado no seed antes de gravar.
+ */
+export function validarCategoriaDebito(categoria: CategoriaDespesa | null | undefined, contaDebitoCodigo: string): string | null {
+  if (!categoria) return null
+  const esperada = CLASSE_DEBITO_POR_CATEGORIA[categoria]
+  const classe = contaDebitoCodigo.trim().charAt(0)
+  if (classe !== esperada) {
+    return `Categoria ${categoria} espera conta débito da classe ${esperada}, mas "${contaDebitoCodigo}" é da classe ${classe || '(vazia)'}.`
+  }
+  return null
 }
 
 /** Casa a natureza por igualdade ou prefixo em fronteira de segmento. */
