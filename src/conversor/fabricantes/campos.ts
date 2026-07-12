@@ -79,6 +79,33 @@ export const fabricantesConversor: Record<string, FabricanteInfo> = {
       },
     ],
   },
+  betha: {
+    chave: 'betha',
+    nome: 'Betha (Transparência Cloud)',
+    campos: [
+      {
+        chave: 'dadosAbertosUrl',
+        label: 'URL base do dados-abertos',
+        tipo: 'texto',
+        escopo: 'municipio',
+        ajuda: 'Base do dados-abertos do portal (valor de "urlDadosAbertos", host dados.transparencia.betha.cloud/…). A leitura é por API aberta, sem token — sem upload de arquivos.',
+      },
+      {
+        chave: 'consultaReceita',
+        label: 'ID da consulta de Receita',
+        tipo: 'texto',
+        escopo: 'entidade',
+        ajuda: 'Id do dataset de receita orçamentária no dados-abertos desta entidade (usado em /api/consulta/{id}?formato=json).',
+      },
+      {
+        chave: 'consultaDespesa',
+        label: 'ID da consulta de Despesa',
+        tipo: 'texto',
+        escopo: 'entidade',
+        ajuda: 'Id do dataset de despesa orçamentária / QDD no dados-abertos desta entidade.',
+      },
+    ],
+  },
 }
 
 /** Tipos de entidade oferecidos no cadastro (rótulos amigáveis). */
