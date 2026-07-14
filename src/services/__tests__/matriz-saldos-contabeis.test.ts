@@ -179,4 +179,43 @@ describe('MatrizSaldosContabeisService', () => {
     prisma.entidade.findUnique.mockResolvedValue(null)
     expect(await svc.emitir('inexistente', 2026, 3)).toBeNull()
   })
+
+  it('abertura com detalhe por fonte (SaldoInicialCc) sai em linhas conta×fonte e substitui o agregado', async () => {
+    cenarioCc(prisma)
+    // Conta A ganha detalhe: 100 = 60 (fonte 1500) + 40 (sem fonte). O agregado
+    // de SaldoInicialAno (100) segue lá, mas NÃO pode contar em dobro.
+    prisma.saldoInicialCc.findMany.mockResolvedValue([
+      { contaId: 'A', fonteCodigo: '1500', valor: dec(60) },
+      { contaId: 'A', fonteCodigo: '', valor: dec(40) },
+    ])
+    const msc = await svc.emitir('e1', 2026, 3)
+
+    const linhasA = msc!.linhas.filter((l) => l.conta === '1.1.1.1.01.00')
+    // fonte 1500: abertura detalhada 60 + movimento (SI 50 do mês 2, MC 20 no mês 3)
+    expect(linhasA.find((l) => l.contaCorrente.fonte === '1500')).toMatchObject({
+      saldoInicial: 110, movimentoCredor: 20, saldoFinal: 90,
+    })
+    // sem fonte: só os 40 do detalhe (o agregado de 100 foi substituído)
+    expect(linhasA.find((l) => l.contaCorrente.fonte === null)).toMatchObject({
+      saldoInicial: 40, saldoFinal: 40,
+    })
+    // rollup da conta preservado: SI 100 (abertura) + 50 (mês 2) = 150
+    expect(linhasA.reduce((s, l) => s + l.saldoInicial, 0)).toBe(150)
+
+    // Conta B sem detalhe: comportamento antigo (agregado −100 sem cc) intacto.
+    const linhasB = msc!.linhas.filter((l) => l.conta === '2.1.1.1.01.00')
+    expect(linhasB.find((l) => l.contaCorrente.fonte === null)).toMatchObject({ saldoInicial: -100 })
+  })
+
+  it('detalhe de conta CREDORA entra negativo em débito com sinal', async () => {
+    cenarioCc(prisma)
+    prisma.saldoInicialCc.findMany.mockResolvedValue([
+      { contaId: 'B', fonteCodigo: '1500', valor: dec(100) }, // credora: −100 devedor
+    ])
+    const msc = await svc.emitir('e1', 2026, 3)
+    const linhasB = msc!.linhas.filter((l) => l.conta === '2.1.1.1.01.00')
+    // detalhe (−100) na fonte 1500 SOMA com o movimento da mesma fonte (SI −50) = −150
+    expect(linhasB.find((l) => l.contaCorrente.fonte === '1500')).toMatchObject({ saldoInicial: -150 })
+    expect(linhasB.some((l) => l.contaCorrente.fonte === null)).toBe(false)
+  })
 })

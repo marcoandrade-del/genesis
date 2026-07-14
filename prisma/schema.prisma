@@ -580,6 +580,25 @@ model SaldoInicialAno {
   @@map("saldos_iniciais_ano")
 }
 
+/// Detalhe da abertura patrimonial por conta-corrente (fonte de recursos):
+/// quebra o SaldoInicialAno da conta por fonte, para a MSC emitir a abertura
+/// em linhas conta×fonte (atributo F com fonte, leiaute Siconfi). O AGREGADO
+/// por conta segue em SaldoInicialAno (Σ detalhe = agregado, por contrato do
+/// import) — os consumidores existentes (balancete, transporte) não mudam.
+/// `valor` é magnitude na natureza da conta (negativo = saldo contrário).
+model SaldoInicialCc {
+  entidadeId  String
+  contaId     String
+  ano         Int
+  fonteCodigo String                @default("") // "" = sem fonte (contas permanentes)
+  valor       Decimal               @default(0) @db.Decimal(18, 2)
+  entidade    Entidade              @relation(fields: [entidadeId], references: [id])
+  conta       ContaContabilEntidade @relation(fields: [contaId], references: [id])
+
+  @@id([entidadeId, contaId, ano, fonteCodigo])
+  @@map("saldos_iniciais_cc")
+}
+
 // Agregado DIÁRIO por (entidade × conta-da-entidade × dia). Materializa o
 // movimento de cada dia (mesmo lugar de manutenção do ResumoMensalConta), para
 // dar o "acumulado diário" (saldo corrido dia a dia) sem re-somar todos os
@@ -853,6 +872,7 @@ model Entidade {
   lancamentos              Lancamento[]
   resumos                  ResumoMensalConta[]
   saldosIniciais           SaldoInicialAno[]
+  saldosIniciaisCc         SaldoInicialCc[]
   movimentosDiarios        MovimentoDiarioConta[]
   planosContratacao        PlanoContratacaoAnual[]
   documentosDemanda        DocumentoDemanda[]
@@ -971,6 +991,7 @@ model ContaContabilEntidade {
   lancamentoItens   LancamentoItem[]
   resumos           ResumoMensalConta[]
   saldosIniciais    SaldoInicialAno[]
+  saldosIniciaisCc  SaldoInicialCc[]
   movimentosDiarios MovimentoDiarioConta[]
 
   @@unique([entidadeId, ano, codigo])
