@@ -24,8 +24,8 @@ export type NaturezaSaldoMsc = 'DEVEDORA' | 'CREDORA' | 'MISTA'
  * Conta-corrente (sub-razão) de uma linha da MSC: as DIMENSÕES que viajam no
  * LancamentoItem além da conta PCASP. É o detalhamento que o Siconfi exige para
  * fonte/destinação, natureza da receita e a funcional-programática da despesa.
- * Tudo `null` = linha sem conta-corrente (ex.: abertura patrimonial transportada,
- * que mora em SaldoInicialAno sem dimensão).
+ * Tudo `null` = linha sem conta-corrente (ex.: abertura patrimonial agregada de
+ * SaldoInicialAno; com detalhe em SaldoInicialCc a abertura sai por fonte).
  */
 export interface ContaCorrenteMsc {
   fonte: string | null // fonte de recursos (item.fonteCodigo, ou a fonte da dotação na despesa)
@@ -70,8 +70,9 @@ const METODOLOGIA =
   '(fonte, função, subfunção e natureza da despesa), com o atributo do superávit financeiro ' +
   '(F) por linha; SI/MD/MC/SF do período em saldo devedor com sinal, agregados do razão ' +
   '(LancamentoItem) e reconciliados contra o balancete materializado (ResumoMensalConta). A ' +
-  'abertura patrimonial transportada (SaldoInicialAno) entra sem conta-corrente. Poder/órgão ' +
-  'entra na próxima fase.'
+  'abertura patrimonial entra por conta×fonte quando há detalhe (SaldoInicialCc, ex.: import ' +
+  'da MSC oficial do Siconfi); sem detalhe, entra sem conta-corrente (SaldoInicialAno). ' +
+  'Poder/órgão entra na próxima fase.'
 
 /** Chave de agregação conta×conta-corrente ( = separador que não ocorre em código). */
 const chaveCc = (contaId: string, fonte: string | null, natRec: string | null, dotId: string | null) =>
@@ -120,6 +121,20 @@ export class MatrizSaldosContabeisService {
       select: { contaId: true, valor: true },
     })
     const inicialPorConta = new Map(iniciais.map((s) => [s.contaId, n(s.valor)]))
+
+    // Detalhe da abertura por conta-corrente (fonte) — quando existe para a
+    // conta, tem PRECEDÊNCIA sobre o agregado (que é a Σ do detalhe, por
+    // contrato do import): a abertura sai em linhas conta×fonte.
+    const iniciaisCc = await this.prisma.saldoInicialCc.findMany({
+      where: { entidadeId, ano },
+      select: { contaId: true, fonteCodigo: true, valor: true },
+    })
+    const inicialCcPorConta = new Map<string, { fonte: string | null; valor: number }[]>()
+    for (const s of iniciaisCc) {
+      const lista = inicialCcPorConta.get(s.contaId) ?? []
+      lista.push({ fonte: s.fonteCodigo || null, valor: n(s.valor) })
+      inicialCcPorConta.set(s.contaId, lista)
+    }
 
     // Movimentos saem do RAZÃO por conta-corrente. Recortes por data (o mês vem
     // de lancamento.data — o mesmo UTCMonth que alimenta o ResumoMensalConta):
@@ -191,9 +206,19 @@ export class MatrizSaldosContabeisService {
       if (g.tipo === 'DEBITO') b.md += v
       else b.mc += v
     }
-    // Abertura transportada (SaldoInicialAno, sem cc) → bucket sem conta-corrente
-    // da conta, já em débito com sinal (conta credora entra negativa).
+    // Abertura: contas COM detalhe por conta-corrente (SaldoInicialCc) entram em
+    // buckets por fonte; as demais caem no bucket sem cc (SaldoInicialAno). Ambas
+    // em débito com sinal (conta credora entra negativa).
     for (const c of contas) {
+      const detalhe = inicialCcPorConta.get(c.id)
+      if (detalhe?.length) {
+        for (const d of detalhe) {
+          if (d.valor === 0) continue
+          const devedor = natPorConta.get(c.id) === 'CREDORA' ? -d.valor : d.valor
+          bucket(c.id, d.fonte, null, null).si += devedor
+        }
+        continue // o detalhe substitui o agregado da conta (Σ detalhe = agregado)
+      }
       const abertura = inicialPorConta.get(c.id) ?? 0
       if (abertura === 0) continue
       const aberturaDevedor = natPorConta.get(c.id) === 'CREDORA' ? -abertura : abertura
