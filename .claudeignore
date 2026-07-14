@@ -1,0 +1,26 @@
+# Segredos e credenciais — o Claude Code não deve ler nem indexar estes arquivos.
+# Espelha a seção de segredos do .gitignore. É VERSIONADO (viaja com o repo),
+# ao contrário do permissions.deny em .claude/settings.local.json, que é local
+# a este checkout.
+
+# Variáveis de ambiente (contêm ANTHROPIC_API_KEY, JWT_SECRET, DATABASE_URL, etc.)
+.env
+.env.*
+!.env.example
+
+# Chaves, certificados e keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.*
+secrets/
+
+# Config local de dev com segredo
+run-dev.sh
+*.local.sh
+
+# Config local do Claude (pode conter segredos inline em comandos)
+.claude/settings.local.json

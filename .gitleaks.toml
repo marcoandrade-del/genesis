@@ -1,0 +1,17 @@
+# Config do gitleaks para o Gênesis.
+# Mantém TODAS as regras padrão e apenas libera valores de teste/dev já verificados
+# manualmente (varredura de segredos 2026-07-14) — não são segredos de produção.
+# Uso: `gitleaks git .` (histórico) e `gitleaks dir .` (working tree) — carregado automaticamente.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Valores descartáveis de CI/dev confirmados como não-produção"
+regexTarget = "secret"
+regexes = [
+  # JWT_SECRET usado só no job de e2e do CI (.github/workflows/ci.yml)
+  '''ci-e2e-secret-nao-usar-em-producao''',
+  # GENESIS_API_TOKEN de desenvolvimento citado no quadro de coordenação (.claude/memory/)
+  '''token-dev-oxy''',
+]
