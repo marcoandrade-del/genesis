@@ -40,7 +40,7 @@ const dec = (v: Prisma.Decimal.Value = 0) => new Prisma.Decimal(v)
  *
  *  - Parte A (orçamentário, a partir da LOA aprovada):
  *      Previsão da receita  → D 5.2.1.1.1 (previsão inicial) / C 6.2.1.1.0 (a realizar), cc natureza+fonte.
- *      Fixação da despesa   → D 5.2.2.1.1.01 (crédito inicial) / C 6.2.2.1.1 (crédito disponível), cc fonte.
+ *      Fixação da despesa   → D 5.2.2.1.1.01 (crédito inicial) / C 6.2.2.1.1 (crédito disponível), cc dotação+fonte.
  *  - Parte B (transporte de saldos patrimoniais do ano anterior):
  *      SaldoInicialAno[ano] = |saldo final[ano−1]| para as folhas do balanço (classes 1 e 2).
  *      As contas de resultado (3 VPD / 4 VPA) encerram no PL e começam zeradas.
@@ -112,7 +112,10 @@ export class AberturaContabilService {
     let totalFixado = dec(0)
     for (const d of orcamento.dotacoes) {
       if (dec(d.valorAutorizado).lessThanOrEqualTo(0)) continue
-      const cc = { fonteCodigo: d.fonteRecurso.codigo }
+      // cc = dotação (funcional-programática completa) + fonte — a mesma dimensão que o
+      // motor da despesa carimba na execução; sem ela, a linha 6.2.2.1.1×dotação da MSC
+      // só recebe os débitos do empenho e aparece invertida (credora com saldo devedor).
+      const cc = { fonteCodigo: d.fonteRecurso.codigo, dotacaoDespesaId: d.id }
       const valor = dec(d.valorAutorizado).toFixed(2)
       itensFixacao.push({ contaId: contas.creditoInicial, tipo: 'DEBITO', valor, ...cc })
       itensFixacao.push({ contaId: contas.creditoDisponivel, tipo: 'CREDITO', valor, ...cc })

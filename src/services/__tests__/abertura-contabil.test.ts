@@ -58,11 +58,11 @@ describe('AberturaContabilService', () => {
       prisma.orcamento.findUnique.mockResolvedValue({
         id: 'orc1', status: 'PUBLICADO',
         previsoes: [{ valorPrevisto: '1000', contaReceita: { codigo: '1.1.1.3.01' }, fonteRecurso: { codigo: '1500' } }],
-        dotacoes: [{ valorAutorizado: '800', fonteRecurso: { codigo: '1500' } }],
+        dotacoes: [{ id: 'd1', valorAutorizado: '800', fonteRecurso: { codigo: '1500' } }],
       })
     })
 
-    it('gera previsão (D 5.2.1.1.1 / C 6.2.1.1.0, cc natureza+fonte) e fixação (D 5.2.2.1.1.01 / C 6.2.2.1.1, cc fonte)', async () => {
+    it('gera previsão (D 5.2.1.1.1 / C 6.2.1.1.0, cc natureza+fonte) e fixação (D 5.2.2.1.1.01 / C 6.2.2.1.1, cc dotação+fonte)', async () => {
       mockContas() // greenfield
       const r = await service.contabilizar('ent1', 2026, 'u1')
 
@@ -76,8 +76,8 @@ describe('AberturaContabilService', () => {
       const fix = m.criar.mock.calls[1]![0]
       expect(fix).toMatchObject({ eventoCodigo: '002' })
       expect(fix.itens).toEqual([
-        { contaId: 'cInicial', tipo: 'DEBITO', valor: '800.00', fonteCodigo: '1500' },
-        { contaId: 'cDisponivel', tipo: 'CREDITO', valor: '800.00', fonteCodigo: '1500' },
+        { contaId: 'cInicial', tipo: 'DEBITO', valor: '800.00', fonteCodigo: '1500', dotacaoDespesaId: 'd1' },
+        { contaId: 'cDisponivel', tipo: 'CREDITO', valor: '800.00', fonteCodigo: '1500', dotacaoDespesaId: 'd1' },
       ])
       expect(prisma.orcamento.update).toHaveBeenCalledWith({ where: { id: 'orc1' }, data: { status: 'EM_EXECUCAO' } })
       expect(r).toMatchObject({ previsoes: 1, dotacoes: 1, totalPrevisto: '1000.00', totalFixado: '800.00', contasTransportadas: 0 })
