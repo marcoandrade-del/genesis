@@ -2,8 +2,20 @@ node_modules
 dist/
 coverage/
 
-# Environment
+# Environment (segredos — NUNCA versionar; .env.example é o template público)
 .env
+.env.*
+!.env.example
+
+# Chaves, certificados e keystores
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa
+id_rsa.*
+secrets/
 
 # Config local de dev com SEGREDO (NÃO versionar)
 run-dev.sh
@@ -12,9 +24,10 @@ run-dev.sh
 # Prisma
 /generated/prisma
 
-# Claude Code — configurações locais ficam fora; memória é versionada
+# Claude Code — configurações LOCAIS ficam fora; memória e o deny compartilhado são versionados
 .claude/*
 !.claude/memory/
+!.claude/settings.json
 claude.md.bkp
 
 # Documentos de requisitos / melhorias (fora do versionamento)
