@@ -1363,6 +1363,13 @@ model PrevisaoReceita {
   valorArrecadado        Decimal                @default(0) @db.Decimal(18, 2)
   /// Materializado: soma dos movimentos DEDUCAO (realizada bruta = arrecadado + deduzido).
   valorDeduzido          Decimal                @default(0) @db.Decimal(18, 2)
+  /// Fonte no padrão STN/Siconfi correspondente a esta previsão (ex.: "1500").
+  /// O catálogo local (QDD/TCE-PR, spec antiga) NÃO converte 1:1 por fonte — a
+  /// correspondência oficial é (fonte × aplicação) → STN, então ela vive AQUI,
+  /// na granularidade natureza×fonte. Preenchida pelo resolvedor
+  /// (scripts/resolver_fonte_stn_previsoes.ts) e usada no casamento com a MSC
+  /// oficial (deduções, gabarito) e na futura emissão ao Siconfi.
+  fonteStnCodigo         String?
   criadoEm               DateTime               @default(now())
   atualizadoEm           DateTime               @updatedAt
   orcamento              Orcamento              @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
