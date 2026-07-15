@@ -1,8 +1,10 @@
 ---
 name: portal-maringa-api-arquivos
 description: "Como baixar QUALQUER arquivo do Portal da Transparência de Maringá (Elotech/OXY): endpoint /api/files/arquivo/{idArquivo}; publicações via /api/publicacoes?entidade=1&exercicio=YYYY"
-metadata:
+metadata: 
+  node_type: memory
   type: reference
+  originSessionId: 689c5fca-4b0c-4a9d-802f-cbb7328d48f3
 ---
 
 # Portal da Transparência de Maringá — API de arquivos
@@ -105,3 +107,19 @@ tce.pr.gov.br/layout-sim-am), STN gov.br/tesouronacional, Câmara cmm.pr.gov.br.
 RREO/RGF), listar via `/api/publicacoes` e baixar via `/api/files/arquivo/{id}`
 — não perder tempo com o site www3 nem leismunicipais (403, sem anexos). Ver
 [[lrf-despesa-epico-plano]] (metas fiscais aguardam os 5 valores da LDO).
+
+## Censo contábil das publicações 2025/2026 (varredura completa 2026-07-14)
+149 grupos raiz por exercício. **O que TEM (contábil/fiscal):** balancetes da
+despesa/receita mensais (Execução Orçamentária; 2026 até mai); IN 89/2013:
+relações mensais empenhadas/liquidadas/pagas/a-pagar/ingressos + **exec.
+EXTRA-orçamentária (inscrições/pagas = restos!)**; Financeiro: saldos bancários
++ **EXTRATOS mensais** (2025 e 2026); anexos 4320 completos (XIV BP, XVI/XVII
+dívidas fundada/flutuante, XVIII DFC, Resumo Balanço Geral); RREO 13 / RGF 6;
+BI-Contabilidade (2026: 24 painéis — dívida, RP, precatórios, RPV);
+**Plano de Contas** (idArquivo 1094608, 195 p.: reduzido Elotech ↔ conta PCASP ↔
+natureza D/C, SEM saldos — salvo em `data/abertura-2026/plano_de_contas_elotech_2025_id1094608.pdf`;
+o REDUZIDO é a chave dos relatórios Elotech). **O que NÃO TEM:** balancete de
+VERIFICAÇÃO contábil (PCASP com saldos) e MSC — a abertura patrimonial conta-a-conta
+segue gated no export interno da Elotech (módulo Contábil → Balancete de
+Verificação, dez/2025, analítico, CSV se possível). PCA ao TCE só tem
+circunstanciado/acórdãos (narrativos).

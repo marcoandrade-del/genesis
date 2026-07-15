@@ -16,8 +16,8 @@ Descoberto com WebSearch/WebFetch nativos + download real (protocolo: achar → 
 - Consulta por município/ano: `https://pit.tce.pr.gov.br/Dados/DadosConsulta/Consulta`
   (POST `/Dados/DadosConsulta/Pesquisa` com `cdMunicipio=<id-interno>&nrAno=<ano>`; Maringá = **15200**)
 - **Download direto (sem POST!):** `https://pit.tce.pr.gov.br/Arquivos/{ano}/{ano}_{ibge6}_{Tema}.zip`
-  — Maringá = ibge6 **411520**. Temas: `Despesa`, `Licitacao`, `Contrato`, `Convenio`, `Obra`, `Combustivel`, `Diarias`, `Relacionamentos`. **NÃO há tema Receita** (arrecadação continua vindo do relatório TCE-PR, ver [[arrecadacao-maringa-importada]]).
-- **Consolidado estadual (399 municípios):** `https://pit.tce.pr.gov.br/Arquivos/{ano}_PIT_TodosArquivos.zip`, anos 2013–2026.
+  — Maringá = ibge6 **411520**. Temas: `Despesa`, `Licitacao`, `Contrato`, `Convenio`, `Obra`, `Combustivel`, `Diarias`, `Relacionamentos`. ⚠️ ATUALIZAÇÃO 2026-07-14: no consolidado 2025 **EXISTE tema `Receita`** (`ReceitasConsolidado.xml` + `ReceitasEntidade.xml`) — mas é AGREGADO por item de sumário (dsItem, mensal, previsão inicial/atualizada × realizado mês/acumulado/bimestre…), NÃO nível natureza×fonte → serve de CONFERÊNCIA mensal, não de import (arrecadação por fonte continua vindo do relatório TCE-PR, ver [[arrecadacao-maringa-importada]]).
+- **Consolidado estadual (399 municípios):** `https://pit.tce.pr.gov.br/Arquivos/{ano}_PIT_TodosArquivos.zip`, anos 2013–2026. ✅ **2025 BAIXADO (pelo Marco, 2026-07-14): `data/pit/2025_PIT_TodosArquivos.zip`** (1,4GB, 3.591 zips internos = 399 municípios × ~9 temas; gerado 10/07/2026; íntegro).
 - Periodicidade: gerado 1×/semana a partir das remessas FECHADAS do SIM-AM (amostra de 06/07 foi gerada em 28/06, dados até competência 2026/05-06).
 
 ## O que tem dentro (Despesa.zip de Maringá 2026, verificado)
