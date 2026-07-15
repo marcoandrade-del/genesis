@@ -17,6 +17,7 @@ const TODAS_FOLHAS = [
   CONTAS_EVENTO.ddrControleOrdinario,
   CONTAS_EVENTO.ddrControleVinculado,
   CONTAS_EVENTO.ddrDisponibilidade,
+  CONTAS_EVENTO.receitaDeducaoFundeb,
   VPA_APLIC,
 ]
 
@@ -317,5 +318,22 @@ describe('MotorEventosReceita — controle de baixa (saldo a receber)', () => {
       { naturezaCodigo: '1.3.2.1', tipoMutacao: 'EFETIVA', indicadorReconhecimento: 'CAIXA', contaContrapartidaCodigo: 'x', contaAtivoCodigo: null },
     ])
     await expect(motor(mock).validarBaixaArrecadacao(ENT, ANO, '1.3.2.1.01', '9999')).resolves.toBeUndefined()
+  })
+  it('resolverDeducao gera o evento 150 com 2 pares (completa a bruta + registra a dedução)', async () => {
+    comFolhas(mock)
+    const eventos = await motor(mock).resolverDeducao({ ...baseCtx, valor: '200.00' })
+
+    expect(eventos).toHaveLength(1)
+    const ev = eventos[0]!
+    expect(ev.eventoCodigo).toBe('150')
+    expect(ev.itens).toHaveLength(4)
+    // par 1: D a-realizar / C realizada (complemento até a bruta)
+    expect(ev.itens[0]).toMatchObject({ contaId: `id:${CONTAS_EVENTO.receitaARealizar}`, tipo: 'DEBITO', valor: '200.00' })
+    expect(ev.itens[1]).toMatchObject({ contaId: `id:${CONTAS_EVENTO.receitaRealizada}`, tipo: 'CREDITO', valor: '200.00' })
+    // par 2: D dedução FUNDEB / C a-realizar
+    expect(ev.itens[2]).toMatchObject({ contaId: `id:${CONTAS_EVENTO.receitaDeducaoFundeb}`, tipo: 'DEBITO', valor: '200.00' })
+    expect(ev.itens[3]).toMatchObject({ contaId: `id:${CONTAS_EVENTO.receitaARealizar}`, tipo: 'CREDITO', valor: '200.00' })
+    // cc: natureza+fonte carimbadas em toda perna
+    for (const i of ev.itens) expect(i).toMatchObject({ naturezaReceitaCodigo: baseCtx.naturezaCodigo, fonteCodigo: '1000' })
   })
 })

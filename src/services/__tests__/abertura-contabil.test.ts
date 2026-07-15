@@ -14,6 +14,7 @@ const CONTROLE = [
   { id: 'cPrevisao', codigo: CONTAS_ABERTURA.previsaoInicialReceita },
   { id: 'cInicial', codigo: CONTAS_ABERTURA.creditoInicial },
   { id: 'cDisponivel', codigo: CONTAS_ABERTURA.creditoDisponivel },
+  { id: 'cDeducao', codigo: CONTAS_ABERTURA.deducaoFundebPrevisao },
 ]
 
 describe('AberturaContabilService', () => {
@@ -115,6 +116,39 @@ describe('AberturaContabilService', () => {
         { entidadeId: 'ent1', contaId: 'n1', ano: 2026, valor: dec(500) },
         { entidadeId: 'ent1', contaId: 'n2', ano: 2026, valor: dec(300) }, // |−300|
       ])
+    })
+
+    it('previsão com dedução prevista sobe pela BRUTA e gera o par de dedução (D 6.2.1.1 / C 5.2.1.1.2.01.01)', async () => {
+      mockContas()
+      prisma.orcamento.findUnique.mockResolvedValue({
+        id: 'orc1', status: 'PUBLICADO',
+        previsoes: [{ valorPrevisto: '800', valorDeducaoPrevisto: '200', contaReceita: { codigo: '1.7.1.1.51' }, fonteRecurso: { codigo: '1500' } }],
+        dotacoes: [],
+      })
+      const r = await service.contabilizar('ent1', 2026, 'u1')
+
+      const prev = m.criar.mock.calls[0]![0]
+      expect(prev.itens).toEqual([
+        // bruta = líquido 800 + dedução 200
+        { contaId: 'cPrevisao', tipo: 'DEBITO', valor: '1000.00', naturezaReceitaCodigo: '1.7.1.1.51', fonteCodigo: '1500' },
+        { contaId: 'cRealizar', tipo: 'CREDITO', valor: '1000.00', naturezaReceitaCodigo: '1.7.1.1.51', fonteCodigo: '1500' },
+        // dedução prevista (FUNDEB)
+        { contaId: 'cRealizar', tipo: 'DEBITO', valor: '200.00', naturezaReceitaCodigo: '1.7.1.1.51', fonteCodigo: '1500' },
+        { contaId: 'cDeducao', tipo: 'CREDITO', valor: '200.00', naturezaReceitaCodigo: '1.7.1.1.51', fonteCodigo: '1500' },
+      ])
+      expect(r).toMatchObject({ totalPrevisto: '1000.00' }) // reporta a BRUTA
+    })
+
+    it('falha claro se há dedução prevista mas a conta 5.2.1.1.2.01.01 não é folha no plano', async () => {
+      prisma.contaContabilEntidade.findMany.mockImplementation((args: { where: { codigo?: unknown } }) =>
+        Promise.resolve(args.where.codigo ? CONTROLE.filter((c) => c.id !== 'cDeducao') : []),
+      )
+      prisma.orcamento.findUnique.mockResolvedValue({
+        id: 'orc1', status: 'PUBLICADO',
+        previsoes: [{ valorPrevisto: '800', valorDeducaoPrevisto: '200', contaReceita: { codigo: '1.7.1.1.51' }, fonteRecurso: { codigo: '1500' } }],
+        dotacoes: [],
+      })
+      await expect(service.contabilizar('ent1', 2026, 'u1')).rejects.toThrow(/dedução prevista/i)
     })
   })
 

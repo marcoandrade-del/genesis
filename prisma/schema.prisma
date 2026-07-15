@@ -1169,6 +1169,7 @@ model EventoContabil {
 // os eventos por gatilho, não pelo código — códigos podem ter qualquer convenção.
 enum GatilhoEvento {
   ARRECADACAO
+  DEDUCAO
   LANCAMENTO_TRIBUTARIO
   INSCRICAO_DIVIDA_ATIVA
   EMPENHO
@@ -1353,8 +1354,15 @@ model PrevisaoReceita {
   contaReceitaEntidadeId String
   fonteRecursoEntidadeId String
   valorPrevisto          Decimal                @db.Decimal(18, 2)
+  /// Dedução PREVISTA (ex.: FUNDEB) por trás do valorPrevisto (que é LÍQUIDO):
+  /// bruta prevista = valorPrevisto + valorDeducaoPrevisto. A abertura lança a
+  /// bruta na 5.2.1.1.1 e a dedução na 5.2.1.1.2.01.01.
+  valorDeducaoPrevisto   Decimal                @default(0) @db.Decimal(18, 2)
   /// Materializado: soma das arrecadações − estornos (atualizado na mesma transação do movimento).
+  /// É o LÍQUIDO recebido (movimentos DEDUCAO não o alteram).
   valorArrecadado        Decimal                @default(0) @db.Decimal(18, 2)
+  /// Materializado: soma dos movimentos DEDUCAO (realizada bruta = arrecadado + deduzido).
+  valorDeduzido          Decimal                @default(0) @db.Decimal(18, 2)
   criadoEm               DateTime               @default(now())
   atualizadoEm           DateTime               @updatedAt
   orcamento              Orcamento              @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
@@ -1415,6 +1423,7 @@ model Arrecadacao {
 enum ArrecadacaoTipo {
   ARRECADACAO
   ESTORNO
+  DEDUCAO // parcela deduzida na origem (ex.: FUNDEB) — completa a bruta no razão; não altera o líquido
 }
 
 // De onde veio um movimento do extrato bancário (conciliação).

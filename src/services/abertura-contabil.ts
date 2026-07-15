@@ -13,6 +13,9 @@ export const CONTAS_ABERTURA = {
   previsaoInicialReceita: '5.2.1.1.1.00.00.00.00.00.00.00', // D na previsão
   creditoInicial: '5.2.2.1.1.01.00.00.00.00.00.00', // D na fixação
   creditoDisponivel: '6.2.2.1.1.00.00.00.00.00.00.00', // C na fixação
+  // Só entra no lançamento quando alguma previsão tem dedução prevista (FUNDEB):
+  // a previsão inicial sobe pela BRUTA e a dedução credita aqui (D 6.2.1.1 / C esta).
+  deducaoFundebPrevisao: '5.2.1.1.2.01.01.00.00.00.00.00', // C na dedução prevista
 } as const
 
 export type StatusAbertura = {
@@ -39,7 +42,8 @@ const dec = (v: Prisma.Decimal.Value = 0) => new Prisma.Decimal(v)
  * gera, por entidade, os lançamentos de abertura — em uma transação:
  *
  *  - Parte A (orçamentário, a partir da LOA aprovada):
- *      Previsão da receita  → D 5.2.1.1.1 (previsão inicial) / C 6.2.1.1.0 (a realizar), cc natureza+fonte.
+ *      Previsão da receita  → D 5.2.1.1.1 (previsão inicial) / C 6.2.1.1.0 (a realizar) pela BRUTA,
+ *                             cc natureza+fonte; dedução prevista (FUNDEB) → D 6.2.1.1.0 / C 5.2.1.1.2.01.01.
  *      Fixação da despesa   → D 5.2.2.1.1.01 (crédito inicial) / C 6.2.2.1.1 (crédito disponível), cc dotação+fonte.
  *  - Parte B (transporte de saldos patrimoniais do ano anterior):
  *      SaldoInicialAno[ano] = |saldo final[ano−1]| para as folhas do balanço (classes 1 e 2).
@@ -96,16 +100,29 @@ export class AberturaContabilService {
     const contas = await this.resolverContasControle(entidadeId, ano)
     const data = `${ano}-01-01`
 
-    // Parte A — itens da previsão e da fixação.
+    // Parte A — itens da previsão e da fixação. A previsão inicial sobe pela
+    // BRUTA (líquido + dedução prevista); a dedução (FUNDEB) ganha o par
+    // D 6.2.1.1 / C 5.2.1.1.2.01.01 — padrão STN, espelha a MSC oficial.
     const itensPrevisao: ItemDado[] = []
     let totalPrevisto = dec(0)
     for (const p of orcamento.previsoes) {
-      if (dec(p.valorPrevisto).lessThanOrEqualTo(0)) continue
+      const deducao = dec(p.valorDeducaoPrevisto ?? 0)
+      const bruta = dec(p.valorPrevisto).plus(deducao)
+      if (bruta.lessThanOrEqualTo(0)) continue
       const cc = { naturezaReceitaCodigo: p.contaReceita.codigo, fonteCodigo: p.fonteRecurso.codigo }
-      const valor = dec(p.valorPrevisto).toFixed(2)
-      itensPrevisao.push({ contaId: contas.previsaoInicialReceita, tipo: 'DEBITO', valor, ...cc })
-      itensPrevisao.push({ contaId: contas.receitaARealizar, tipo: 'CREDITO', valor, ...cc })
-      totalPrevisto = totalPrevisto.plus(p.valorPrevisto)
+      itensPrevisao.push({ contaId: contas.previsaoInicialReceita, tipo: 'DEBITO', valor: bruta.toFixed(2), ...cc })
+      itensPrevisao.push({ contaId: contas.receitaARealizar, tipo: 'CREDITO', valor: bruta.toFixed(2), ...cc })
+      if (deducao.greaterThan(0)) {
+        if (!contas.deducaoFundebPrevisao) {
+          throw new ErroNegocio(
+            'ENTIDADE_NAO_PROCESSAVEL',
+            `Há dedução prevista, mas a conta "${CONTAS_ABERTURA.deducaoFundebPrevisao}" não é folha no plano da entidade (exercício ${ano}).`,
+          )
+        }
+        itensPrevisao.push({ contaId: contas.receitaARealizar, tipo: 'DEBITO', valor: deducao.toFixed(2), ...cc })
+        itensPrevisao.push({ contaId: contas.deducaoFundebPrevisao, tipo: 'CREDITO', valor: deducao.toFixed(2), ...cc })
+      }
+      totalPrevisto = totalPrevisto.plus(bruta)
     }
 
     const itensFixacao: ItemDado[] = []
@@ -233,6 +250,8 @@ export class AberturaContabilService {
       previsaoInicialReceita: pegar(CONTAS_ABERTURA.previsaoInicialReceita),
       creditoInicial: pegar(CONTAS_ABERTURA.creditoInicial),
       creditoDisponivel: pegar(CONTAS_ABERTURA.creditoDisponivel),
+      // Opcional: só é exigida quando alguma previsão tem dedução prevista.
+      deducaoFundebPrevisao: porCodigo.get(CONTAS_ABERTURA.deducaoFundebPrevisao) ?? null,
     }
   }
 

@@ -58,9 +58,12 @@ const PARAMETROS: Array<{
 // tokens). O motor seleciona em código QUAL evento patrimonial dispara (300/400/
 // 500/560) conforme a parametrização; as CONTAS vêm daqui. E550/E570 são fluxos à
 // parte (lançamento tributário / dívida ativa) — seguem code-driven, sem gatilho.
-type GatilhoReceita = 'ARRECADACAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA'
+type GatilhoReceita = 'ARRECADACAO' | 'DEDUCAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA'
 const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoReceita; linhas?: Array<[string, string]> }> = [
   { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada]] },
+  // Dedução na origem (FUNDEB): 2 linhas — completa a realizada até a BRUTA e
+  // registra a dedução (as capturas guardam o LÍQUIDO recebido).
+  { codigo: '150', gatilho: 'DEDUCAO', descricao: 'Dedução da receita na origem — FUNDEB (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada], [CE.receitaDeducaoFundeb, CE.receitaARealizar]] },
   { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por Destinação (DDR) (cc: fonte)', linhas: [[TR.DDR_CONTROLE, CE.ddrDisponibilidade]] },
   { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação Patrimonial Aumentativa (receita efetiva)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (não-efetiva, passivo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
