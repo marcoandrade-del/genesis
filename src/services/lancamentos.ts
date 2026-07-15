@@ -13,6 +13,10 @@ export type ItemDado = {
   fonteCodigo?: string | null
   // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
   dotacaoDespesaId?: string | null
+  // Despesa SEM dotação (Restos a Pagar): cc crua (função/subfunção/natureza).
+  funcaoCodigo?: string | null
+  subfuncaoCodigo?: string | null
+  naturezaDespesaCodigo?: string | null
 }
 
 export type DadosCriarLancamento = {
@@ -163,6 +167,9 @@ export class LancamentosService {
           naturezaReceitaCodigo: i.naturezaReceitaCodigo ?? null,
           fonteCodigo: i.fonteCodigo ?? null,
           dotacaoDespesaId: i.dotacaoDespesaId ?? null,
+          funcaoCodigo: i.funcaoCodigo ?? null,
+          subfuncaoCodigo: i.subfuncaoCodigo ?? null,
+          naturezaDespesaCodigo: i.naturezaDespesaCodigo ?? null,
         })),
       })
 

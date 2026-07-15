@@ -75,8 +75,16 @@ const METODOLOGIA =
   'Poder/órgão entra na próxima fase.'
 
 /** Chave de agregação conta×conta-corrente ( = separador que não ocorre em código). */
-const chaveCc = (contaId: string, fonte: string | null, natRec: string | null, dotId: string | null) =>
-  `${contaId}${fonte ?? ''}${natRec ?? ''}${dotId ?? ''}`
+const chaveCc = (
+  contaId: string,
+  fonte: string | null,
+  natRec: string | null,
+  dotId: string | null,
+  funcao: string | null = null,
+  subfuncao: string | null = null,
+  natDesp: string | null = null,
+) =>
+  `${contaId}|${fonte ?? ''}|${natRec ?? ''}|${dotId ?? ''}|${funcao ?? ''}|${subfuncao ?? ''}|${natDesp ?? ''}`
 
 /** Ordem estável da conta-corrente dentro de uma conta. */
 const ordemCc = (cc: ContaCorrenteMsc) =>
@@ -143,12 +151,12 @@ export class MatrizSaldosContabeisService {
     const inicioMes = new Date(Date.UTC(ano, mes - 1, 1))
     const inicioProx = new Date(Date.UTC(ano, mes, 1))
     const antes = await this.prisma.lancamentoItem.groupBy({
-      by: ['contaId', 'tipo', 'fonteCodigo', 'naturezaReceitaCodigo', 'dotacaoDespesaId'],
+      by: ['contaId', 'tipo', 'fonteCodigo', 'naturezaReceitaCodigo', 'dotacaoDespesaId', 'funcaoCodigo', 'subfuncaoCodigo', 'naturezaDespesaCodigo'],
       where: { lancamento: { entidadeId, data: { gte: inicioAno, lt: inicioMes } } },
       _sum: { valor: true },
     })
     const domes = await this.prisma.lancamentoItem.groupBy({
-      by: ['contaId', 'tipo', 'fonteCodigo', 'naturezaReceitaCodigo', 'dotacaoDespesaId'],
+      by: ['contaId', 'tipo', 'fonteCodigo', 'naturezaReceitaCodigo', 'dotacaoDespesaId', 'funcaoCodigo', 'subfuncaoCodigo', 'naturezaDespesaCodigo'],
       where: { lancamento: { entidadeId, data: { gte: inicioMes, lt: inicioProx } } },
       _sum: { valor: true },
     })
@@ -180,13 +188,14 @@ export class MatrizSaldosContabeisService {
       ]),
     )
 
-    type Bucket = { contaId: string; fonte: string | null; natRec: string | null; dotId: string | null; si: number; md: number; mc: number }
+    // cc CRUA da despesa (Restos a Pagar, sem dotação) viaja no próprio bucket.
+    type Bucket = { contaId: string; fonte: string | null; natRec: string | null; dotId: string | null; funcao: string | null; subfuncao: string | null; natDesp: string | null; si: number; md: number; mc: number }
     const buckets = new Map<string, Bucket>()
-    const bucket = (contaId: string, fonte: string | null, natRec: string | null, dotId: string | null): Bucket => {
-      const k = chaveCc(contaId, fonte, natRec, dotId)
+    const bucket = (contaId: string, fonte: string | null, natRec: string | null, dotId: string | null, funcao: string | null = null, subfuncao: string | null = null, natDesp: string | null = null): Bucket => {
+      const k = chaveCc(contaId, fonte, natRec, dotId, funcao, subfuncao, natDesp)
       let b = buckets.get(k)
       if (!b) {
-        b = { contaId, fonte, natRec, dotId, si: 0, md: 0, mc: 0 }
+        b = { contaId, fonte, natRec, dotId, funcao, subfuncao, natDesp, si: 0, md: 0, mc: 0 }
         buckets.set(k, b)
       }
       return b
@@ -194,14 +203,14 @@ export class MatrizSaldosContabeisService {
 
     // Movimento anterior ao mês → SI em débito com sinal (débito soma, crédito subtrai).
     for (const g of antes) {
-      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId)
+      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
       const v = n(g._sum.valor)
       if (g.tipo === 'DEBITO') b.si += v
       else b.si -= v
     }
     // Movimento do mês → MD/MC.
     for (const g of domes) {
-      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId)
+      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
       const v = n(g._sum.valor)
       if (g.tipo === 'DEBITO') b.md += v
       else b.mc += v
@@ -236,13 +245,14 @@ export class MatrizSaldosContabeisService {
       // Conta-corrente sem saldo e sem movimento no período não gera linha.
       if (si === 0 && md === 0 && mc === 0 && sf === 0) continue
       const dinfo = b.dotId ? dotInfo.get(b.dotId) : null
+      // cc da despesa: da dotação quando há; senão da cc crua (Restos a Pagar).
       const contaCorrente: ContaCorrenteMsc = {
         fonte: b.fonte ?? dinfo?.fonte ?? null,
         naturezaReceita: b.natRec,
         dotacaoId: b.dotId,
-        funcao: dinfo?.funcao ?? null,
-        subfuncao: dinfo?.subfuncao ?? null,
-        naturezaDespesa: dinfo?.naturezaDespesa ?? null,
+        funcao: dinfo?.funcao ?? b.funcao ?? null,
+        subfuncao: dinfo?.subfuncao ?? b.subfuncao ?? null,
+        naturezaDespesa: dinfo?.naturezaDespesa ?? b.natDesp ?? null,
       }
       linhas.push({
         conta: codigo,
