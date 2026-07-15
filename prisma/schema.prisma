@@ -543,6 +543,12 @@ model LancamentoItem {
   fonteCodigo           String? // ex.: "1500" (cc da classe 8 / disponibilidade)
   // Despesa: conta-corrente = dotação (carrega a funcional-programática completa).
   dotacaoDespesaId      String?
+  // cc de despesa CRUA (sem dotação): usada por Restos a Pagar (carregados de 2025,
+  // não têm dotação no orçamento do ano). O emissor da MSC usa estes quando
+  // `dotacaoDespesaId` é nulo; caso contrário, deriva da dotação.
+  funcaoCodigo          String? // ex.: "15" (função da despesa)
+  subfuncaoCodigo       String? // ex.: "452" (subfunção da despesa)
+  naturezaDespesaCodigo String? // ex.: "3.3.90.30" (natureza da despesa)
   lancamento            Lancamento            @relation(fields: [lancamentoId], references: [id], onDelete: Cascade)
   conta                 ContaContabilEntidade @relation(fields: [contaId], references: [id])
   dotacaoDespesa        DotacaoDespesa?       @relation(fields: [dotacaoDespesaId], references: [id])
@@ -630,6 +636,7 @@ enum OrigemLancamento {
   INSCRICAO_DIVIDA_ATIVA
   ABERTURA
   CREDITO_ADICIONAL
+  RESTOS_A_PAGAR
   EMPENHO
   LIQUIDACAO
   PAGAMENTO
