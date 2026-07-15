@@ -45,13 +45,16 @@ const r2 = (x: number) => Math.round(x * 100) / 100
 const nat8 = (codigo12seg: string) => codigo12seg.split('.').slice(0, 7).join('')
 
 async function main() {
-  // Previsões da Prefeitura indexadas por natureza(8díg)×fonte
+  // Previsões da Prefeitura indexadas por natureza(8díg)×FONTE STN — a chave
+  // oficial da MSC. fonteStnCodigo é gravado pelo resolvedor
+  // (scripts/resolver_fonte_stn_previsoes.ts); previsões sem ele não casam.
   const previsoes = await prisma.previsaoReceita.findMany({
     where: { orcamento: { entidadeId: E, ano: 2026 } },
-    select: { id: true, valorPrevisto: true, valorDeducaoPrevisto: true, contaReceita: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } },
+    select: { id: true, valorPrevisto: true, valorDeducaoPrevisto: true, fonteStnCodigo: true, contaReceita: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } },
   })
-  const porChave = new Map(previsoes.map((p) => [`${nat8(p.contaReceita.codigo)}|${p.fonteRecurso.codigo}`, p]))
-  console.log(`previsões da Prefeitura: ${previsoes.length}`)
+  const porChave = new Map(previsoes.filter((p) => p.fonteStnCodigo).map((p) => [`${nat8(p.contaReceita.codigo)}|${p.fonteStnCodigo}`, p]))
+  const semStn = previsoes.filter((p) => !p.fonteStnCodigo).length
+  console.log(`previsões da Prefeitura: ${previsoes.length} · com fonte STN: ${previsoes.length - semStn} · sem: ${semStn}`)
 
   // ── 1. dedução PREVISTA (eb jan, 5.2.1.1.2.01.01 = "521120101")
   const bb = JSON.parse(readFileSync(`${DIR}/mscc_2026-01_eb_classe5.json`, 'utf-8'))
