@@ -14,6 +14,7 @@ import { MatrizSaldosContabeisService } from '../services/matriz-saldos-contabei
 import { ValidadorMscService } from '../services/validador-msc.js'
 import { MunicipiosAtivosService } from '../services/municipios-ativos.js'
 import { AcessosUsuarioService } from '../services/acessos-usuario.js'
+import { EntidadesCatalogoService } from '../services/entidades-catalogo.js'
 
 /**
  * CONTRATO de dados dos memoriais (LRF) — versionado em SemVer.
@@ -53,6 +54,15 @@ export const CONTRATO_MUNICIPIOS = { nome: 'municipios', versao: '1.0.0' } as co
  * Versão própria. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
  */
 export const CONTRATO_ACESSOS_USUARIO = { nome: 'acessos-usuario', versao: '1.0.0' } as const
+
+/**
+ * Contrato do CATÁLOGO de ENTIDADES para importação no BI. No OXY cada entidade
+ * (prefeitura, câmara, adm. indireta) é uma unidade de BI que o usuário leva para
+ * o seu catálogo (tela ImportarEntidades). Produtor de `fonte.entidades()`; difere
+ * do `municipios` (município→prefeitura) por ser entidade-a-entidade, todos os tipos.
+ * Versão própria. Ver `oxy-repo/INTEGRACAO-GENESIS.md`.
+ */
+export const CONTRATO_ENTIDADES = { nome: 'entidades', versao: '1.0.0' } as const
 
 /** Descritor do contrato: o que o Oxy pode validar antes de consumir. */
 export function descreverContrato() {
@@ -103,6 +113,7 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
   const validadorMscSvc = new ValidadorMscService(app.prisma, mscSvc)
   const municipiosAtivosSvc = new MunicipiosAtivosService(app.prisma)
   const acessosUsuarioSvc = new AcessosUsuarioService(app.prisma)
+  const entidadesCatalogoSvc = new EntidadesCatalogoService(app.prisma)
 
   app.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     const token = process.env.GENESIS_API_TOKEN
@@ -300,5 +311,15 @@ export async function memoriaisApiRoutes(app: FastifyInstance) {
     const dados = await acessosUsuarioSvc.municipiosPermitidos(email)
     if (!dados) return reply.code(404).send({ erro: 'Usuário não encontrado.' })
     return reply.send({ contrato: { ...CONTRATO_ACESSOS_USUARIO, recurso: 'acessos-usuario' }, dados })
+  })
+
+  // Catálogo de ENTIDADES p/ o usuário do BI importar (contrato próprio `entidades`).
+  // No OXY cada entidade é uma unidade de BI; devolve toda entidade ativa com plano
+  // contábil copiado (prefeitura, câmara, adm. indireta), agrupável por município no
+  // front. É o produtor de `fonte.entidades()` (PR-C) — descoberta real de todas as
+  // entidades, substituindo o fake "1 prefeitura por município".
+  app.get('/memoriais/entidades', async (_req, reply) => {
+    const dados = await entidadesCatalogoSvc.listar()
+    return reply.send({ contrato: { ...CONTRATO_ENTIDADES, recurso: 'entidades' }, dados })
   })
 }
