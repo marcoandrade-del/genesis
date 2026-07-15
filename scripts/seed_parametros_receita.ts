@@ -64,6 +64,8 @@ const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoRecei
   // Dedução na origem (FUNDEB): 2 linhas — completa a realizada até a BRUTA e
   // registra a dedução (as capturas guardam o LÍQUIDO recebido).
   { codigo: '150', gatilho: 'DEDUCAO', descricao: 'Dedução da receita na origem — FUNDEB (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada], [CE.receitaDeducaoFundeb, CE.receitaARealizar]] },
+  { codigo: '151', gatilho: 'DEDUCAO', descricao: 'Dedução da receita — renúncia (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada], [CE.receitaDeducaoRenuncia, CE.receitaARealizar]] },
+  { codigo: '152', gatilho: 'DEDUCAO', descricao: 'Dedução da receita — outras (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada], [CE.receitaDeducaoOutras, CE.receitaARealizar]] },
   { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por Destinação (DDR) (cc: fonte)', linhas: [[TR.DDR_CONTROLE, CE.ddrDisponibilidade]] },
   { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação Patrimonial Aumentativa (receita efetiva)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (não-efetiva, passivo)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },

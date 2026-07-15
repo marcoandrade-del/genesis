@@ -18,6 +18,8 @@ const TODAS_FOLHAS = [
   CONTAS_EVENTO.ddrControleVinculado,
   CONTAS_EVENTO.ddrDisponibilidade,
   CONTAS_EVENTO.receitaDeducaoFundeb,
+  CONTAS_EVENTO.receitaDeducaoRenuncia,
+  CONTAS_EVENTO.receitaDeducaoOutras,
   VPA_APLIC,
 ]
 
@@ -321,7 +323,7 @@ describe('MotorEventosReceita — controle de baixa (saldo a receber)', () => {
   })
   it('resolverDeducao gera o evento 150 com 2 pares (completa a bruta + registra a dedução)', async () => {
     comFolhas(mock)
-    const eventos = await motor(mock).resolverDeducao({ ...baseCtx, valor: '200.00' })
+    const eventos = await motor(mock).resolverDeducao({ ...baseCtx, valor: '200.00' }, '150')
 
     expect(eventos).toHaveLength(1)
     const ev = eventos[0]!
@@ -335,5 +337,15 @@ describe('MotorEventosReceita — controle de baixa (saldo a receber)', () => {
     expect(ev.itens[3]).toMatchObject({ contaId: `id:${CONTAS_EVENTO.receitaARealizar}`, tipo: 'CREDITO', valor: '200.00' })
     // cc: natureza+fonte carimbadas em toda perna
     for (const i of ev.itens) expect(i).toMatchObject({ naturezaReceitaCodigo: baseCtx.naturezaCodigo, fonteCodigo: '1000' })
+  })
+  it('resolverDeducao com código 151/152 dispara SÓ o evento pedido, na conta do tipo', async () => {
+    comFolhas(mock)
+    const r151 = await motor(mock).resolverDeducao({ ...baseCtx, valor: '10.00' }, '151')
+    expect(r151).toHaveLength(1)
+    expect(r151[0]!.eventoCodigo).toBe('151')
+    expect(r151[0]!.itens.some((i) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoRenuncia}`)).toBe(true)
+    const r152 = await motor(mock).resolverDeducao({ ...baseCtx, valor: '10.00' }, '152')
+    expect(r152[0]!.eventoCodigo).toBe('152')
+    expect(r152[0]!.itens.some((i) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoOutras}`)).toBe(true)
   })
 })

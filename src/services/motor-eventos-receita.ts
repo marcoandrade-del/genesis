@@ -70,6 +70,8 @@ export const CONTAS_EVENTO = {
   receitaARealizar: '6.2.1.1.0.00.00.00.00.00.00.00',
   receitaRealizada: '6.2.1.2.0.00.00.00.00.00.00.00',
   receitaDeducaoFundeb: '6.2.1.3.1.01.00.00.00.00.00.00', // (-) FUNDEB — dedução da receita realizada
+  receitaDeducaoRenuncia: '6.2.1.3.2.00.00.00.00.00.00.00', // (-) RENÚNCIA — dedução da receita realizada
+  receitaDeducaoOutras: '6.2.1.3.9.00.00.00.00.00.00.00', // (-) OUTRAS deduções da receita realizada
   ddrControleOrdinario: '7.2.1.1.1.00.00.00.00.00.00.00', // RECURSOS ORDINÁRIOS
   ddrControleVinculado: '7.2.1.1.2.00.00.00.00.00.00.00', // RECURSOS VINCULADOS
   ddrDisponibilidade: '8.2.1.1.1.01.00.00.00.00.00.00', // RECURSOS DISPONÍVEIS PARA O EXERCÍCIO
@@ -151,22 +153,26 @@ export class MotorEventosReceita {
   }
 
   /**
-   * Resolve o movimento de DEDUÇÃO da receita (ex.: FUNDEB retido na origem).
-   * Como as capturas registram o LÍQUIDO recebido, o evento tem DUAS linhas que
+   * Resolve o movimento de DEDUÇÃO da receita (retida na origem). Como as
+   * capturas registram o LÍQUIDO recebido, o evento tem DUAS linhas que
    * completam o quadro bruto do razão (padrão STN, confirmado na MSC oficial):
    *   1. D 6.2.1.1 / C 6.2.1.2 — complementa a realizada até a BRUTA
-   *   2. D 6.2.1.3.1.01 / C 6.2.1.1 — a dedução em si (consome o a-realizar)
+   *   2. D 6.2.1.3.x / C 6.2.1.1 — a dedução em si (consome o a-realizar)
    * Efeito líquido: realizada bruta, dedução exposta, a-realizar zera ao fim.
    * Sem DDR nem patrimonial: o valor deduzido nunca entra no caixa.
+   *
+   * `codigo` seleciona QUAL dedução (150 FUNDEB · 151 renúncia · 152 outras) —
+   * o gatilho DEDUCAO tem os três na tabela; sem o filtro dispararia todos.
    */
   async resolverDeducao(
     ctx: ContextoArrecadacao,
+    codigo: '150' | '151' | '152',
     opts: { estorno?: boolean } = {},
     tx?: Prisma.TransactionClient,
   ): Promise<LancamentoEvento[]> {
     const db = tx ?? this.prisma
     const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
-    return this.montarEventos(ctx, modeloId, 'DEDUCAO', null, () => null, opts, db)
+    return this.montarEventos(ctx, modeloId, 'DEDUCAO', [codigo], () => null, opts, db)
   }
 
   /**

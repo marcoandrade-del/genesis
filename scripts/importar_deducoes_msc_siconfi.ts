@@ -9,8 +9,8 @@
  *     period_change dos meses → movimentos DEDUCAO via ArrecadacoesService
  *     (dispara o evento 150 e materializa valorDeduzido, tudo rastreável).
  *
- * Escopo cut 1: só FUNDEB (6.2.1.3.1.01). Renúncia (6.2.1.3.2) e outras
- * (6.2.1.3.9) ficam para eventos próprios — o script REPORTA o que ficou fora.
+ * Cobre FUNDEB (6.2.1.3.1.01 → evento 150), RENÚNCIA (6.2.1.3.2 → 151) e
+ * OUTRAS (6.2.1.3.9 → 152). Redutor FPM/aplicação financeira ficam fora (reportados).
  *
  * Idempotente: (1) é update por chave; (2) apaga os movimentos DEDUCAO
  * anteriores deste lote (histórico marcador) e reaplica.
@@ -34,7 +34,7 @@ const MESES = (() => {
 const E = 'b186d24e-5f2a-4378-831f-c0092b626384' // Prefeitura do Município (Maringá)
 const PODER = '10131'
 const DIR = 'data/abertura-2026/msc_siconfi'
-const HIST = (mes: number) => `Dedução FUNDEB — MSC oficial Siconfi ${String(mes).padStart(2, '0')}/2026`
+const HIST = (tipo: string, mes: number) => `Dedução ${tipo} — MSC oficial Siconfi ${String(mes).padStart(2, '0')}/2026`
 
 const prisma = new PrismaClient({ adapter: new PrismaPg(new Pool({ connectionString: process.env.DATABASE_URL })) })
 const fmt = (x: number) => x.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -74,30 +74,39 @@ async function main() {
   for (const s of prevSem.slice(0, 8)) console.log(`   sem match: ${s}`)
 
   // ── 2. dedução REALIZADA mensal (pc, 6.2.1.3.1.01 = "621310100")
-  type Mov = { mes: number; chave: string; valor: number }
+  // conta oficial → tipo de dedução (evento): FUNDEB 150 · RENÚNCIA 151 · OUTRAS 152.
+  // 62133 (redutor FPM) e 62138 (aplicação financeira a compensar) seguem fora.
+  const CONTA_TIPO: Record<string, string> = { '621310100': 'FUNDEB', '621320000': 'RENUNCIA', '621390000': 'OUTRAS' }
+  type Mov = { mes: number; chave: string; valor: number; tipo: string }
   const movs: Mov[] = []
-  const foraEscopo = new Map<string, number>() // renúncia/outras
+  const foraEscopo = new Map<string, number>()
   for (const mes of MESES) {
     const pc = JSON.parse(readFileSync(`${DIR}/mscc_2026-${String(mes).padStart(2, '0')}_pc_classe6.json`, 'utf-8'))
     const porChaveMes = new Map<string, number>()
     for (const i of pc.items) {
       if (i.poder_orgao !== PODER) continue
-      if (i.conta_contabil.startsWith('62132') || i.conta_contabil.startsWith('62139') || i.conta_contabil.startsWith('62133') || i.conta_contabil.startsWith('62138')) {
-        foraEscopo.set(i.conta_contabil, r2((foraEscopo.get(i.conta_contabil) ?? 0) + i.valor * (i.natureza_conta === 'D' ? 1 : -1)))
+      const tipo = CONTA_TIPO[i.conta_contabil]
+      if (!tipo) {
+        if (i.conta_contabil.startsWith('62133') || i.conta_contabil.startsWith('62138')) {
+          foraEscopo.set(i.conta_contabil, r2((foraEscopo.get(i.conta_contabil) ?? 0) + i.valor * (i.natureza_conta === 'D' ? 1 : -1)))
+        }
         continue
       }
-      if (i.conta_contabil !== '621310100') continue
-      const k = `${i.natureza_receita ?? ''}|${i.fonte_recursos ?? ''}`
+      const k = `${tipo}|${i.natureza_receita ?? ''}|${i.fonte_recursos ?? ''}`
       porChaveMes.set(k, r2((porChaveMes.get(k) ?? 0) + i.valor * (i.natureza_conta === 'D' ? 1 : -1)))
     }
-    for (const [chave, valor] of porChaveMes) if (valor > 0) movs.push({ mes, chave, valor })
+    for (const [tk, valor] of porChaveMes) {
+      if (valor <= 0) continue
+      const [tipo, ...resto] = tk.split('|')
+      movs.push({ mes, chave: resto.join('|'), valor, tipo })
+    }
   }
   const movsOk = movs.filter((m) => porChave.has(m.chave))
   const movsSem = movs.filter((m) => !porChave.has(m.chave))
-  console.log(`\n[2] dedução REALIZADA (621310100) meses ${MESES.join(',')}: ${movs.length} chaves-mês · casadas ${movsOk.length} (Σ ${fmt(movsOk.reduce((s, m) => s + m.valor, 0))}) · sem previsão ${movsSem.length} (Σ ${fmt(movsSem.reduce((s, m) => s + m.valor, 0))})`)
+  console.log(`\n[2] deduções REALIZADAS (FUNDEB+RENUNCIA+OUTRAS) meses ${MESES.join(',')}: ${movs.length} chaves-mês · casadas ${movsOk.length} (Σ ${fmt(movsOk.reduce((s, m) => s + m.valor, 0))}) · sem previsão ${movsSem.length} (Σ ${fmt(movsSem.reduce((s, m) => s + m.valor, 0))})`)
   for (const m of movsSem.slice(0, 8)) console.log(`   sem match: mês ${m.mes} ${m.chave} (${fmt(m.valor)})`)
   if (foraEscopo.size) {
-    console.log(`   FORA DO ESCOPO (renúncia/outras — eventos próprios pendentes):`)
+    console.log(`   FORA DO ESCOPO (redutor FPM / aplic. financeira):`)
     for (const [c, v] of foraEscopo) console.log(`     ${c}: Σ pc ${fmt(v)}`)
   }
 
@@ -114,7 +123,7 @@ async function main() {
   // apply 2: movimentos DEDUCAO (substituição por lote: apaga os deste marcador e reaplica)
   const lancamentos = new LancamentosService(prisma)
   const antigos = await prisma.arrecadacao.findMany({
-    where: { previsao: { orcamento: { entidadeId: E, ano: 2026 } }, tipo: 'DEDUCAO', historico: { startsWith: 'Dedução FUNDEB — MSC oficial Siconfi' } },
+    where: { previsao: { orcamento: { entidadeId: E, ano: 2026 } }, tipo: 'DEDUCAO', historico: { contains: '— MSC oficial Siconfi' } },
     select: { id: true, previsaoId: true, valor: true },
   })
   for (const a of antigos) {
@@ -137,14 +146,15 @@ async function main() {
     await svc.criar(orc.id, {
       previsaoId: p.id,
       tipo: 'DEDUCAO',
+      deducaoTipo: m.tipo,
       data: `2026-${String(m.mes).padStart(2, '0')}-${ULTIMO_DIA[m.mes - 1]}`,
       valor: String(m.valor),
-      historico: HIST(m.mes),
+      historico: HIST(m.tipo, m.mes),
       criadoPorId: 'IMPORT_DEDUCAO_MSC',
     })
     criados++
   }
-  console.log(`APPLY[2]: ${criados} movimentos DEDUCAO criados (evento 150 disparado em cada)`)
+  console.log(`APPLY[2]: ${criados} movimentos DEDUCAO criados (eventos 150/151/152 por tipo)`)
   await prisma.$disconnect()
 }
 main().catch((e) => { console.error(e); process.exit(1) })
