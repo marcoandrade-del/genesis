@@ -148,6 +148,23 @@ describe('ArrecadacoesService.criar', () => {
     expect(prisma.arrecadacao.create.mock.calls[0][0].data.historico).toBeNull()
   })
 
+  it('DEDUCAO materializa valorDeduzido (não o arrecadado) e dispara o evento 150 com 2 pares', async () => {
+    await service.criar('o1', baseDados({ tipo: 'DEDUCAO', valor: '50' }))
+    // materialização: só o valorDeduzido
+    const upd = prisma.previsaoReceita.update.mock.calls[0][0]
+    expect(upd.data.valorDeduzido.increment.toString()).toBe('50')
+    expect(upd.data.valorArrecadado).toBeUndefined()
+    // um único lançamento (evento 150), 4 itens (2 pares), origem rastreável
+    expect(prisma.lancamento.create).toHaveBeenCalledTimes(1)
+    const l = prisma.lancamento.create.mock.calls[0][0].data
+    expect(l.eventoCodigo).toBe('150')
+    expect(l.origemTipo).toBe('ARRECADACAO')
+    const itens = prisma.lancamentoItem.createMany.mock.calls[0][0].data
+    expect(itens).toHaveLength(4)
+    expect(itens.filter((i: { tipo: string }) => i.tipo === 'DEBITO')).toHaveLength(2)
+    expect(itens.some((i: { contaId: string }) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoFundeb}`)).toBe(true)
+  })
+
   it('rejeita orçamento em rascunho / inexistente', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ ...ORC, status: 'RASCUNHO' })
     await expect(service.criar('o1', baseDados())).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })

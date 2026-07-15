@@ -52,7 +52,7 @@ export interface ResumoArrecadacao {
   metodologiaFonte: string
 }
 
-const TIPOS_VALIDOS = ['ARRECADACAO', 'ESTORNO']
+const TIPOS_VALIDOS = ['ARRECADACAO', 'ESTORNO', 'DEDUCAO']
 
 /** Arredonda para centavos, evitando deriva de ponto flutuante na soma. */
 function r2(n: number): number {
@@ -116,7 +116,9 @@ export class ArrecadacoesService {
     }
 
     const ano = Number(dados.data.slice(0, 4))
-    const histBase = dados.historico?.trim() || (dados.tipo === 'ESTORNO' ? 'Estorno de arrecadação' : 'Arrecadação da receita')
+    const histBase =
+      dados.historico?.trim() ||
+      (dados.tipo === 'ESTORNO' ? 'Estorno de arrecadação' : dados.tipo === 'DEDUCAO' ? 'Dedução da receita na origem (FUNDEB)' : 'Arrecadação da receita')
 
     // Conta bancária (opcional): a receita entra por ela e dela vem a folha de
     // caixa do E300. A conta tem de ser da MESMA fonte da previsão.
@@ -151,7 +153,12 @@ export class ArrecadacoesService {
       })
       await tx.previsaoReceita.update({
         where: { id: previsao.id },
-        data: { valorArrecadado: dados.tipo === 'ARRECADACAO' ? { increment: valor } : { decrement: valor } },
+        // valorArrecadado é o LÍQUIDO (ARRECADACAO − ESTORNO); a DEDUCAO
+        // materializa à parte (realizada bruta = arrecadado + deduzido).
+        data:
+          dados.tipo === 'DEDUCAO'
+            ? { valorDeduzido: { increment: valor } }
+            : { valorArrecadado: dados.tipo === 'ARRECADACAO' ? { increment: valor } : { decrement: valor } },
       })
 
       // Baixa parcial controlada: arrecadação de tributária (competência) não pode
@@ -162,20 +169,22 @@ export class ArrecadacoesService {
 
       // Integração contábil (Tabela de Eventos): a arrecadação dispara os
       // lançamentos automáticos no plano de contas, na mesma transação. O estorno
-      // gera os lançamentos invertidos. Rastreabilidade mão-dupla via origem*.
-      const eventos = await this.motor.resolver(
-        {
-          entidadeId: orcamento.entidadeId,
-          ano,
-          naturezaCodigo: previsao.contaReceita.codigo,
-          fonteCodigo: previsao.fonteRecurso.codigo,
-          fonteVinculada: previsao.fonteRecurso.vinculada,
-          valor,
-          caixaCodigo,
-        },
-        { estorno: dados.tipo === 'ESTORNO' },
-        tx,
-      )
+      // gera os lançamentos invertidos; a DEDUCAO dispara o evento próprio (150,
+      // 2 linhas: completa a realizada bruta + registra a dedução — sem DDR nem
+      // patrimonial, o valor deduzido nunca entra no caixa).
+      const ctxMotor = {
+        entidadeId: orcamento.entidadeId,
+        ano,
+        naturezaCodigo: previsao.contaReceita.codigo,
+        fonteCodigo: previsao.fonteRecurso.codigo,
+        fonteVinculada: previsao.fonteRecurso.vinculada,
+        valor,
+        caixaCodigo,
+      }
+      const eventos =
+        dados.tipo === 'DEDUCAO'
+          ? await this.motor.resolverDeducao(ctxMotor, {}, tx)
+          : await this.motor.resolver(ctxMotor, { estorno: dados.tipo === 'ESTORNO' }, tx)
       for (const ev of eventos) {
         await this.lancamentos.criar(
           {
