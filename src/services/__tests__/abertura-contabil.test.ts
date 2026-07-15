@@ -60,6 +60,7 @@ describe('AberturaContabilService', () => {
         id: 'orc1', status: 'PUBLICADO',
         previsoes: [{ valorPrevisto: '1000', contaReceita: { codigo: '1.1.1.3.01' }, fonteRecurso: { codigo: '1500' } }],
         dotacoes: [{ id: 'd1', valorAutorizado: '800', fonteRecurso: { codigo: '1500' } }],
+        creditos: [],
       })
     })
 
@@ -84,6 +85,39 @@ describe('AberturaContabilService', () => {
       expect(r).toMatchObject({ previsoes: 1, dotacoes: 1, totalPrevisto: '1000.00', totalFixado: '800.00', contasTransportadas: 0 })
     })
 
+    it('fixa o valorINICIAL (autorizado − reforço + anulação), não o autorizado vivo', async () => {
+      mockContas()
+      prisma.orcamento.findUnique.mockResolvedValue({
+        id: 'orc1', status: 'PUBLICADO',
+        previsoes: [],
+        dotacoes: [{ id: 'd1', valorAutorizado: '1000', fonteRecurso: { codigo: '1500' } }],
+        // d1 recebeu +250 de reforço e −50 de anulação ⇒ inicial = 1000 − 250 + 50 = 800
+        creditos: [{ itens: [
+          { dotacaoDespesaId: 'd1', operacao: 'REFORCO', valor: '250' },
+          { dotacaoDespesaId: 'd1', operacao: 'ANULACAO', valor: '50' },
+        ] }],
+      })
+      const r = await service.contabilizar('ent1', 2026, 'u1')
+      const fix = m.criar.mock.calls[0]![0]
+      expect(fix.itens).toEqual([
+        { contaId: 'cInicial', tipo: 'DEBITO', valor: '800.00', fonteCodigo: '1500', dotacaoDespesaId: 'd1' },
+        { contaId: 'cDisponivel', tipo: 'CREDITO', valor: '800.00', fonteCodigo: '1500', dotacaoDespesaId: 'd1' },
+      ])
+      expect(r).toMatchObject({ totalFixado: '800.00' })
+    })
+
+    it('pula a fixação de dotação criada só por crédito (inicial ≤ 0)', async () => {
+      mockContas()
+      prisma.orcamento.findUnique.mockResolvedValue({
+        id: 'orc1', status: 'PUBLICADO', previsoes: [],
+        dotacoes: [{ id: 'd1', valorAutorizado: '300', fonteRecurso: { codigo: '1500' } }],
+        creditos: [{ itens: [{ dotacaoDespesaId: 'd1', operacao: 'REFORCO', valor: '300' }] }], // inicial = 0
+      })
+      const r = await service.contabilizar('ent1', 2026, 'u1')
+      expect(m.criar).not.toHaveBeenCalled() // nada a fixar (nem previsão)
+      expect(r).toMatchObject({ dotacoes: 0, totalFixado: '0.00' })
+    })
+
     it('falha se uma conta de controle não é folha no plano da entidade', async () => {
       prisma.contaContabilEntidade.findMany.mockImplementation((args: { where: { codigo?: unknown } }) =>
         Promise.resolve(args.where.codigo ? CONTROLE.slice(0, 3) : []),
@@ -92,7 +126,7 @@ describe('AberturaContabilService', () => {
     })
 
     it('transporta só o balanço (classes 1 e 2), em magnitude, mapeando código→ano novo', async () => {
-      prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1', status: 'PUBLICADO', previsoes: [], dotacoes: [] })
+      prisma.orcamento.findUnique.mockResolvedValue({ id: 'orc1', status: 'PUBLICADO', previsoes: [], dotacoes: [], creditos: [] })
       mockContas({
         anoAnterior: [
           { id: 'a1', codigo: '1.1.1.1.1.01.00.00.00.00.00.00' }, // ativo +500
@@ -124,6 +158,7 @@ describe('AberturaContabilService', () => {
         id: 'orc1', status: 'PUBLICADO',
         previsoes: [{ valorPrevisto: '800', valorDeducaoPrevisto: '200', contaReceita: { codigo: '1.7.1.1.51' }, fonteRecurso: { codigo: '1500' } }],
         dotacoes: [],
+        creditos: [],
       })
       const r = await service.contabilizar('ent1', 2026, 'u1')
 
@@ -147,6 +182,7 @@ describe('AberturaContabilService', () => {
         id: 'orc1', status: 'PUBLICADO',
         previsoes: [{ valorPrevisto: '800', valorDeducaoPrevisto: '200', contaReceita: { codigo: '1.7.1.1.51' }, fonteRecurso: { codigo: '1500' } }],
         dotacoes: [],
+        creditos: [],
       })
       await expect(service.contabilizar('ent1', 2026, 'u1')).rejects.toThrow(/dedução prevista/i)
     })
