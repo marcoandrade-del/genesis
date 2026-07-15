@@ -1413,6 +1413,9 @@ model Arrecadacao {
   id                String             @id @default(uuid())
   previsaoId        String
   tipo              ArrecadacaoTipo
+  /// Só para tipo=DEDUCAO: qual dedução (decide o evento contábil: FUNDEB→150,
+  /// RENUNCIA→151, OUTRAS→152). null em movimentos DEDUCAO legados = FUNDEB.
+  deducaoTipo       DeducaoTipo?
   data              DateTime           @db.Date
   valor             Decimal            @db.Decimal(18, 2)
   historico         String?
@@ -1431,6 +1434,14 @@ enum ArrecadacaoTipo {
   ARRECADACAO
   ESTORNO
   DEDUCAO // parcela deduzida na origem (ex.: FUNDEB) — completa a bruta no razão; não altera o líquido
+}
+
+/// Tipo da dedução da receita (movimentos DEDUCAO) — espelha as contas 6.2.1.3.x
+/// do PCASP TCE-PR e decide o evento contábil disparado.
+enum DeducaoTipo {
+  FUNDEB // 6.2.1.3.1.01 (evento 150)
+  RENUNCIA // 6.2.1.3.2   (evento 151)
+  OUTRAS // 6.2.1.3.9     (evento 152)
 }
 
 // De onde veio um movimento do extrato bancário (conciliação).

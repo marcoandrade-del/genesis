@@ -14,7 +14,9 @@ import {
 
 export interface DadosArrecadacao {
   previsaoId: string
-  tipo: string // 'ARRECADACAO' | 'ESTORNO'
+  tipo: string // 'ARRECADACAO' | 'ESTORNO' | 'DEDUCAO'
+  /** Só p/ tipo DEDUCAO: qual dedução (default FUNDEB) — decide o evento 150/151/152. */
+  deducaoTipo?: string
   data: string // yyyy-mm-dd
   valor: string
   historico?: string
@@ -53,6 +55,9 @@ export interface ResumoArrecadacao {
 }
 
 const TIPOS_VALIDOS = ['ARRECADACAO', 'ESTORNO', 'DEDUCAO']
+/** Tipo da dedução → evento contábil da Tabela de Eventos (contas 6.2.1.3.x). */
+const EVENTO_DEDUCAO = { FUNDEB: '150', RENUNCIA: '151', OUTRAS: '152' } as const
+type TipoDeducao = keyof typeof EVENTO_DEDUCAO
 
 /** Arredonda para centavos, evitando deriva de ponto flutuante na soma. */
 function r2(n: number): number {
@@ -93,6 +98,10 @@ export class ArrecadacoesService {
 
     if (!dados.previsaoId?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Selecione a previsão (conta × fonte).')
     if (!TIPOS_VALIDOS.includes(dados.tipo)) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Tipo de movimento inválido.')
+    const deducaoTipo = (dados.deducaoTipo?.trim() || 'FUNDEB') as TipoDeducao
+    if (dados.tipo === 'DEDUCAO' && !(deducaoTipo in EVENTO_DEDUCAO)) {
+      throw new ErroNegocio('REQUISICAO_INVALIDA', 'Tipo de dedução inválido (FUNDEB, RENUNCIA ou OUTRAS).')
+    }
     if (!dados.data?.trim() || Number.isNaN(Date.parse(dados.data))) {
       throw new ErroNegocio('REQUISICAO_INVALIDA', 'Informe uma data válida.')
     }
@@ -145,6 +154,7 @@ export class ArrecadacoesService {
         data: {
           previsaoId: previsao.id,
           tipo: dados.tipo as ArrecadacaoTipo,
+          deducaoTipo: dados.tipo === 'DEDUCAO' ? deducaoTipo : null,
           data: new Date(dados.data),
           valor,
           historico: dados.historico?.trim() || null,
@@ -169,9 +179,9 @@ export class ArrecadacoesService {
 
       // Integração contábil (Tabela de Eventos): a arrecadação dispara os
       // lançamentos automáticos no plano de contas, na mesma transação. O estorno
-      // gera os lançamentos invertidos; a DEDUCAO dispara o evento próprio (150,
-      // 2 linhas: completa a realizada bruta + registra a dedução — sem DDR nem
-      // patrimonial, o valor deduzido nunca entra no caixa).
+      // gera os lançamentos invertidos; a DEDUCAO dispara o evento do seu TIPO
+      // (150 FUNDEB · 151 renúncia · 152 outras; 2 linhas: completa a realizada
+      // bruta + registra a dedução — sem DDR nem patrimonial).
       const ctxMotor = {
         entidadeId: orcamento.entidadeId,
         ano,
@@ -183,7 +193,7 @@ export class ArrecadacoesService {
       }
       const eventos =
         dados.tipo === 'DEDUCAO'
-          ? await this.motor.resolverDeducao(ctxMotor, {}, tx)
+          ? await this.motor.resolverDeducao(ctxMotor, EVENTO_DEDUCAO[deducaoTipo], {}, tx)
           : await this.motor.resolver(ctxMotor, { estorno: dados.tipo === 'ESTORNO' }, tx)
       for (const ev of eventos) {
         await this.lancamentos.criar(

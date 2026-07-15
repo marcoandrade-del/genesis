@@ -8,6 +8,14 @@ export const MATRIZ_RECEITA = [
     { ordem: 1, contaDebitoMascara: C.receitaARealizar, contaCreditoMascara: C.receitaRealizada },
     { ordem: 2, contaDebitoMascara: C.receitaDeducaoFundeb, contaCreditoMascara: C.receitaARealizar },
   ] },
+  { codigo: '151', gatilho: 'DEDUCAO', descricao: 'Dedução da receita — renúncia', lancamentos: [
+    { ordem: 1, contaDebitoMascara: C.receitaARealizar, contaCreditoMascara: C.receitaRealizada },
+    { ordem: 2, contaDebitoMascara: C.receitaDeducaoRenuncia, contaCreditoMascara: C.receitaARealizar },
+  ] },
+  { codigo: '152', gatilho: 'DEDUCAO', descricao: 'Dedução da receita — outras', lancamentos: [
+    { ordem: 1, contaDebitoMascara: C.receitaARealizar, contaCreditoMascara: C.receitaRealizada },
+    { ordem: 2, contaDebitoMascara: C.receitaDeducaoOutras, contaCreditoMascara: C.receitaARealizar },
+  ] },
   { codigo: '200', gatilho: 'ARRECADACAO', descricao: 'Disponibilidade por destinação de recursos (DDR)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.DDR_CONTROLE, contaCreditoMascara: C.ddrDisponibilidade }] },
   { codigo: '300', gatilho: 'ARRECADACAO', descricao: 'Variação patrimonial aumentativa (receita efetiva)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },
   { codigo: '400', gatilho: 'ARRECADACAO', descricao: 'Mutação por operação de crédito (passivo)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.CONTRAPARTIDA }] },

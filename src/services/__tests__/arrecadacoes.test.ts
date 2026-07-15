@@ -165,6 +165,19 @@ describe('ArrecadacoesService.criar', () => {
     expect(itens.some((i: { contaId: string }) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoFundeb}`)).toBe(true)
   })
 
+  it('DEDUCAO com deducaoTipo RENUNCIA dispara o evento 151 e grava o tipo no movimento', async () => {
+    await service.criar('o1', baseDados({ tipo: 'DEDUCAO', deducaoTipo: 'RENUNCIA', valor: '30' }))
+    expect(prisma.arrecadacao.create.mock.calls[0][0].data.deducaoTipo).toBe('RENUNCIA')
+    const l = prisma.lancamento.create.mock.calls[0][0].data
+    expect(l.eventoCodigo).toBe('151')
+    const itens151 = prisma.lancamentoItem.createMany.mock.calls[0][0].data
+    expect(itens151.some((i: { contaId: string }) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoRenuncia}`)).toBe(true)
+  })
+
+  it('DEDUCAO com deducaoTipo inválido é rejeitada', async () => {
+    await expect(service.criar('o1', baseDados({ tipo: 'DEDUCAO', deducaoTipo: 'XYZ', valor: '30' }))).rejects.toMatchObject({ code: 'REQUISICAO_INVALIDA' })
+  })
+
   it('rejeita orçamento em rascunho / inexistente', async () => {
     prisma.orcamento.findUnique.mockResolvedValue({ ...ORC, status: 'RASCUNHO' })
     await expect(service.criar('o1', baseDados())).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
