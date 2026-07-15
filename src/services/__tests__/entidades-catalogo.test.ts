@@ -16,6 +16,8 @@ describe('EntidadesCatalogoService', () => {
     const arg = prisma.entidade.findMany.mock.calls[0]![0]
     expect(arg.where).toEqual({ ativo: true, contasContabil: { some: {} } })
     expect(arg.orderBy).toEqual([{ municipio: { nome: 'asc' } }, { tipo: 'asc' }, { nome: 'asc' }])
+    expect(arg.select.cnpj).toBe(true)
+    expect(arg.select.ativo).toBe(true)
     expect(arg.select.municipio).toEqual({ select: { id: true, nome: true, estado: { select: { sigla: true } } } })
     expect(arg.select.orcamentos).toEqual({ select: { ano: true } })
   })
@@ -26,6 +28,8 @@ describe('EntidadesCatalogoService', () => {
         id: 'ent-1',
         nome: 'Prefeitura do Município de Maringá',
         tipo: 'PREFEITURA',
+        cnpj: '76.282.656/0001-06',
+        ativo: true,
         municipio: { id: 'mun-1', nome: 'Maringá', estado: { sigla: 'PR' } },
         orcamentos: [{ ano: 2026 }, { ano: 2025 }, { ano: 2026 }],
       },
@@ -33,6 +37,8 @@ describe('EntidadesCatalogoService', () => {
         id: 'ent-2',
         nome: 'Maringá Previdência',
         tipo: 'ADM_INDIRETA',
+        cnpj: null,
+        ativo: true,
         municipio: { id: 'mun-1', nome: 'Maringá', estado: { sigla: 'PR' } },
         orcamentos: [{ ano: 2026 }],
       },
@@ -43,24 +49,29 @@ describe('EntidadesCatalogoService', () => {
         id: 'ent-1',
         nome: 'Prefeitura do Município de Maringá',
         tipo: 'PREFEITURA',
-        municipio: { id: 'mun-1', nome: 'Maringá', uf: 'PR' },
+        cnpj: '76.282.656/0001-06',
+        ativo: true,
         anosComOrcamento: [2025, 2026],
+        municipio: { id: 'mun-1', nome: 'Maringá', uf: 'PR' },
       },
       {
         id: 'ent-2',
         nome: 'Maringá Previdência',
         tipo: 'ADM_INDIRETA',
-        municipio: { id: 'mun-1', nome: 'Maringá', uf: 'PR' },
+        cnpj: null,
+        ativo: true,
         anosComOrcamento: [2026],
+        municipio: { id: 'mun-1', nome: 'Maringá', uf: 'PR' },
       },
     ])
   })
 
-  it('entidade sem orçamento vira lista de anos vazia', async () => {
+  it('entidade sem orçamento vira lista de anos vazia; cnpj nulo preservado', async () => {
     prisma.entidade.findMany.mockResolvedValue([
-      { id: 'e3', nome: 'Câmara de Beta', tipo: 'CAMARA', municipio: { id: 'm2', nome: 'Beta', estado: { sigla: 'PR' } }, orcamentos: [] },
+      { id: 'e3', nome: 'Câmara de Beta', tipo: 'CAMARA', cnpj: null, ativo: true, municipio: { id: 'm2', nome: 'Beta', estado: { sigla: 'PR' } }, orcamentos: [] },
     ])
     const { entidades } = await svc.listar()
     expect(entidades[0]!.anosComOrcamento).toEqual([])
+    expect(entidades[0]!.cnpj).toBeNull()
   })
 })

@@ -4,8 +4,10 @@ export type EntidadeCatalogo = {
   id: string
   nome: string
   tipo: string // PREFEITURA | CAMARA | ADM_INDIRETA (rótulo curto na UI do OXY)
-  municipio: { id: string; nome: string; uf: string }
+  cnpj: string | null // metadado (o front ignora hoje; parte do contrato acordado c/ o OXY)
+  ativo: boolean // sempre true pelo filtro; incluído pra casar o contrato `entidades`
   anosComOrcamento: number[]
+  municipio: { id: string; nome: string; uf: string }
 }
 
 /**
@@ -39,6 +41,8 @@ export class EntidadesCatalogoService {
         id: true,
         nome: true,
         tipo: true,
+        cnpj: true,
+        ativo: true,
         municipio: { select: { id: true, nome: true, estado: { select: { sigla: true } } } },
         orcamentos: { select: { ano: true } },
       },
@@ -49,8 +53,10 @@ export class EntidadesCatalogoService {
         id: e.id,
         nome: e.nome,
         tipo: e.tipo,
-        municipio: { id: e.municipio.id, nome: e.municipio.nome, uf: e.municipio.estado.sigla },
+        cnpj: e.cnpj,
+        ativo: e.ativo,
         anosComOrcamento: [...new Set(e.orcamentos.map((o) => o.ano))].sort((a, b) => a - b),
+        municipio: { id: e.municipio.id, nome: e.municipio.nome, uf: e.municipio.estado.sigla },
       })),
     }
   }
