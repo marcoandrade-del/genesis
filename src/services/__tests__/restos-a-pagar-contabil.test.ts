@@ -49,6 +49,16 @@ describe('RestosAPagarContabilService', () => {
     expect(r).toMatchObject({ lancamentos: 1, itens: 3, totalDebito: '334.00', totalCredito: '334.00' })
   })
 
+  it('contabiliza vários movimentos e pula só os já feitos (execução mensal)', async () => {
+    prisma.lancamento.findMany.mockResolvedValue([{ origemId: 'rp-abertura-2026' }]) // abertura já feita
+    const exec1: MovimentoRp = { ...abertura, origemId: 'rp-exec-2026-01', data: '2026-01-31' }
+    const exec2: MovimentoRp = { ...abertura, origemId: 'rp-exec-2026-02', data: '2026-02-28' }
+    const r = await service.contabilizar('ent1', 2026, [abertura, exec1, exec2], 'u1')
+    expect(m.criar).toHaveBeenCalledTimes(2) // abertura pulada; exec1 e exec2 gravados
+    expect(m.criar.mock.calls.map((c) => c[0].origemId)).toEqual(['rp-exec-2026-01', 'rp-exec-2026-02'])
+    expect(r).toMatchObject({ lancamentos: 2 })
+  })
+
   it('recusa movimento que não fecha (Σ D ≠ Σ C)', async () => {
     const torto: MovimentoRp = { ...abertura, origemId: 'rp-torto', linhas: [
       { contaCodigo: '5.3.1.1.0.00.00.00.00.00.00.00', tipo: 'DEBITO', valor: '300' },
