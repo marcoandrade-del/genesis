@@ -85,6 +85,7 @@ export class AberturaContabilService {
       include: {
         previsoes: { include: { contaReceita: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true } } } },
         dotacoes: { include: { fonteRecurso: { select: { codigo: true } } } },
+        creditos: { include: { itens: { select: { dotacaoDespesaId: true, operacao: true, valor: true } } } },
       },
     })
     if (!orcamento) {
@@ -125,18 +126,31 @@ export class AberturaContabilService {
       totalPrevisto = totalPrevisto.plus(bruta)
     }
 
+    // Fixação pelo valorINICIAL (não o autorizado vivo): o autorizado = inicial +
+    // reforços − anulações; os créditos adicionais entram DEPOIS, segregados por tipo
+    // (CreditoContabilService). Reconstrói o inicial de cada dotação abatendo o crédito
+    // líquido já aplicado nela. Sem créditos, inicial = autorizado (fluxo greenfield).
+    const creditoLiquido = new Map<string, Prisma.Decimal>()
+    for (const c of orcamento.creditos) {
+      for (const it of c.itens) {
+        const atual = creditoLiquido.get(it.dotacaoDespesaId) ?? dec(0)
+        creditoLiquido.set(it.dotacaoDespesaId, it.operacao === 'REFORCO' ? atual.plus(it.valor) : atual.minus(it.valor))
+      }
+    }
+
     const itensFixacao: ItemDado[] = []
     let totalFixado = dec(0)
     for (const d of orcamento.dotacoes) {
-      if (dec(d.valorAutorizado).lessThanOrEqualTo(0)) continue
+      const inicial = dec(d.valorAutorizado).minus(creditoLiquido.get(d.id) ?? 0)
+      if (inicial.lessThanOrEqualTo(0)) continue // dotação criada só por crédito (ex.: especial): não tem inicial a fixar
       // cc = dotação (funcional-programática completa) + fonte — a mesma dimensão que o
       // motor da despesa carimba na execução; sem ela, a linha 6.2.2.1.1×dotação da MSC
       // só recebe os débitos do empenho e aparece invertida (credora com saldo devedor).
       const cc = { fonteCodigo: d.fonteRecurso.codigo, dotacaoDespesaId: d.id }
-      const valor = dec(d.valorAutorizado).toFixed(2)
+      const valor = inicial.toFixed(2)
       itensFixacao.push({ contaId: contas.creditoInicial, tipo: 'DEBITO', valor, ...cc })
       itensFixacao.push({ contaId: contas.creditoDisponivel, tipo: 'CREDITO', valor, ...cc })
-      totalFixado = totalFixado.plus(d.valorAutorizado)
+      totalFixado = totalFixado.plus(inicial)
     }
 
     // Parte B — transporte dos saldos patrimoniais (só se houver ano anterior).
