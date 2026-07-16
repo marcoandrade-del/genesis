@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { MunicipioConfig, EntidadeConfig } from '../../../nucleo/tipos.js'
 
-// Mocka o transporte de rede (dados-abertos) — os testes validam o MAPEAMENTO
-// coluna→PCASP e o comportamento "falha alto", sem tocar a rede.
+// RECEITA: API real (busca-textual). Mocka só o transporte `lerConsulta`; mantém
+// as puras `entidadeDoId`/`mesDoId` reais (importActual).
+const lerBusca = vi.fn()
+vi.mock('../api.js', async (orig) => ({ ...(await orig<Record<string, unknown>>()), lerConsulta: (...a: unknown[]) => lerBusca(...a) }))
+
+// DESPESA (legado, a migrar): mocka o transporte antigo do dados-abertos.
 const lerConsulta = vi.fn()
 vi.mock('../dados-abertos.js', () => ({ lerConsulta: (...a: unknown[]) => lerConsulta(...a) }))
 
@@ -11,26 +15,53 @@ const { conectorBetha } = await import('../conector.js')
 const cfg = { portalUrl: 'https://dados.x/base', ano: 2026 } as MunicipioConfig
 const ent = (params: Record<string, string>): EntidadeConfig => ({ nome: 'Prefeitura', tipo: 'PREFEITURA', params })
 
-beforeEach(() => lerConsulta.mockReset())
+beforeEach(() => {
+  lerBusca.mockReset()
+  lerConsulta.mockReset()
+})
 
-describe('betha · conector (mapeamento dados-abertos → PCASP)', () => {
-  it('mapeia a receita (natureza+fonte+valores) e ignora linhas zeradas', async () => {
-    lerConsulta.mockResolvedValue([
-      { naturezaReceita: '1.7.1.8.01.1.1', fonteRecurso: '1500', descricaoFonteRecurso: 'Recursos Ordinários', valorPrevisto: '1.234.567,89', valorArrecadado: 100.5 },
-      { naturezaReceita: '1.1.1.0', fonteRecurso: '1500', descricaoFonteRecurso: 'Recursos Ordinários', valorPrevisto: 0, valorArrecadado: 0 },
+describe('betha · receita (busca-textual → PCASP)', () => {
+  it('agrega por entidade×natureza somando os meses (orçado e arrecadado), filtrando a entidade', async () => {
+    lerBusca.mockResolvedValue([
+      { id: '26:184:receita_orcamentaria_2026_01_1984_17180111', campos: { rubricaNatureza: '17180111', valorOrcadoAtualizado: 1000, valorArrecadadoNoMes: 100 } },
+      { id: '26:184:receita_orcamentaria_2026_02_1984_17180111', campos: { rubricaNatureza: '17180111', valorOrcadoAtualizado: 1200, valorArrecadadoNoMes: 50 } },
+      // outra entidade (29) — filtrada fora por entidadeBetha=184
+      { id: '26:29:receita_orcamentaria_2026_01_29_17180111', campos: { rubricaNatureza: '17180111', valorOrcadoAtualizado: 999, valorArrecadadoNoMes: 999 } },
     ])
-    const linhas = await conectorBetha.lerReceita(cfg, ent({ consultaReceita: '10' }))
-    expect(lerConsulta).toHaveBeenCalledWith('https://dados.x/base', '10')
+    const linhas = await conectorBetha.lerReceita(cfg, ent({ portalHash: 'HASH', consultaReceita: '34858', entidadeBetha: '184' }))
+    expect(lerBusca).toHaveBeenCalledWith({ consultaId: '34858', portalHash: 'HASH', filtros: { ano: ['2026'] } })
     expect(linhas).toEqual([
       {
         naturezaPcasp: '1.7.1.8.01.1.1.00.00.00.00.00',
-        fonte: { codigo: '1500', descricao: 'Recursos Ordinários' },
-        previsto: 123456789,
-        arrecadado: 10050,
+        fonte: { codigo: '9999', descricao: 'Fonte não discriminada (dados-abertos Betha)' },
+        previsto: 220000, // 1000 + 1200 (soma dos meses, como o portal totaliza)
+        arrecadado: 15000, // 100 + 50
       },
     ])
   })
 
+  it('dropa o indicador da rubrica quando a categoria fica válida (413… → 1.3.2.5…)', async () => {
+    lerBusca.mockResolvedValue([
+      { id: '26:184:receita_orcamentaria_2026_01_1984_413250124000000', campos: { rubricaNatureza: '413250124000000', valorArrecadadoNoMes: 860.94 } },
+    ])
+    const [linha] = await conectorBetha.lerReceita(cfg, ent({ portalHash: 'H', consultaReceita: '34858' }))
+    expect(linha!.naturezaPcasp).toBe('1.3.2.5.01.2.4.00.00.00.00.00')
+    expect(linha!.arrecadado).toBe(86094)
+  })
+
+  it('FALHA ALTO listando as colunas quando falta a natureza', async () => {
+    lerBusca.mockResolvedValue([{ id: '26:184:receita_orcamentaria_2026_01_1984_x', campos: { valorArrecadadoNoMes: 10 } }])
+    await expect(conectorBetha.lerReceita(cfg, ent({ portalHash: 'H', consultaReceita: '10' }))).rejects.toThrow(/Colunas disponíveis: valorArrecadadoNoMes/)
+  })
+
+  it('não busca a rede sem portalHash/consultaReceita', async () => {
+    expect(await conectorBetha.lerReceita(cfg, ent({}))).toEqual([])
+    expect(await conectorBetha.lerReceita(cfg, ent({ portalHash: 'H' }))).toEqual([])
+    expect(lerBusca).not.toHaveBeenCalled()
+  })
+})
+
+describe('betha · despesa (legado dados-abertos — a migrar)', () => {
   it('mapeia a despesa (dimensões + natureza no elemento + fonte)', async () => {
     lerConsulta.mockResolvedValue([
       {
@@ -56,13 +87,7 @@ describe('betha · conector (mapeamento dados-abertos → PCASP)', () => {
     ])
   })
 
-  it('FALHA ALTO listando as colunas quando falta uma coluna obrigatória', async () => {
-    lerConsulta.mockResolvedValue([{ codigoDaReceita: '1.1', valorPrevisto: 10 }])
-    await expect(conectorBetha.lerReceita(cfg, ent({ consultaReceita: '10' }))).rejects.toThrow(/Colunas disponíveis: codigoDaReceita, valorPrevisto/)
-  })
-
-  it('não busca a rede sem consultaId/base configurados', async () => {
-    expect(await conectorBetha.lerReceita(cfg, ent({}))).toEqual([])
+  it('não busca a rede sem consultaId/base', async () => {
     expect(await conectorBetha.lerDespesa(cfg, ent({}))).toEqual([])
     expect(lerConsulta).not.toHaveBeenCalled()
   })
