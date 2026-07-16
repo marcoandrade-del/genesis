@@ -1,5 +1,5 @@
 import type { FonteExecucao, MunicipioConfig, EntidadeConfig, LinhaDespesa } from '../nucleo/tipos.js'
-import { baixarMsc, ultimoMes, type LinhaMsc } from '../siconfi/api.js'
+import { baixarMsc, ultimoMes, naturezaDespesaMsc, type LinhaMsc, type NivelDespesa } from '../siconfi/api.js'
 
 export type { LinhaMsc }
 
@@ -24,22 +24,17 @@ export type { LinhaMsc }
  */
 const cent = (v: number | string): number => Math.round(Number(v || 0) * 100)
 
-/** natureza da despesa MSC (8 díg, até subelemento) → PCASP no nível ELEMENTO. */
-const naturezaElemento = (nd: string): string => {
-  const d = String(nd || '').padStart(8, '0')
-  return `${d[0]}.${d[1]}.${d.slice(2, 4)}.${d.slice(4, 6)}.00.00`
-}
-
 const chave = (l: LinhaDespesa): string =>
   `${l.orgao.codigo}|${l.funcao}|${l.subfuncao}|${l.naturezaPcasp}|${l.fonte.codigo}`
 
 /**
  * Agrega as linhas cruas da MSC classe 6 em `LinhaDespesa` por
- * poder_orgao×função×subfunção×natureza(elemento)×fonte, decompondo a subárvore
- * do crédito empenhado (6.2.2.1.3.0X) em empenhado/liquidado/pago. Puro (sem
- * rede) p/ ser testável. `poder` filtra por poder_orgao (ausente = consolidado).
+ * poder_orgao×função×subfunção×natureza×fonte, decompondo a subárvore do crédito
+ * empenhado (6.2.2.1.3.0X) em empenhado/liquidado/pago. Puro (sem rede) p/ ser
+ * testável. `poder` filtra por poder_orgao (ausente = consolidado). `nivel` define
+ * a natureza (elemento default; modalidade p/ casar com a dotação no standalone).
  */
-export function agregarExecucao(linhas: LinhaMsc[], poder?: string): LinhaDespesa[] {
+export function agregarExecucao(linhas: LinhaMsc[], poder?: string, nivel: NivelDespesa = 'elemento'): LinhaDespesa[] {
   const agg = new Map<string, LinhaDespesa>()
   for (const l of linhas) {
     const cc = String(l.conta_contabil)
@@ -52,7 +47,7 @@ export function agregarExecucao(linhas: LinhaMsc[], poder?: string): LinhaDespes
       subfuncao: l.subfuncao ?? '',
       programa: { codigo: '0000' }, // MSC não expõe programa
       acao: { codigo: '0000' }, //     nem ação
-      naturezaPcasp: naturezaElemento(l.natureza_despesa ?? ''),
+      naturezaPcasp: naturezaDespesaMsc(l.natureza_despesa, nivel),
       fonte: { codigo: l.fonte_recursos, descricao: `Fonte ${l.fonte_recursos}` },
       empenhado: 0,
       liquidado: 0,
@@ -72,7 +67,8 @@ export const siconfiExecucao: FonteExecucao = {
   nome: 'SICONFI/MSC',
   async lerExecucao(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaDespesa[]> {
     const mes = ent.params?.mesSiconfi ? Number(ent.params.mesSiconfi) : await ultimoMes(cfg.ibge, cfg.ano)
+    const nivel: NivelDespesa = ent.params?.nivelDespesa === 'modalidade' ? 'modalidade' : 'elemento'
     const linhas = await baixarMsc({ ibge: cfg.ibge, ano: cfg.ano, mes, classe: '6' })
-    return agregarExecucao(linhas, ent.matchSiconfi)
+    return agregarExecucao(linhas, ent.matchSiconfi, nivel)
   },
 }

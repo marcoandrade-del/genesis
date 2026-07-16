@@ -36,6 +36,11 @@ describe('agregarExecucao (MSC classe 6 → LinhaDespesa)', () => {
     expect(d!.naturezaPcasp).toBe('3.1.90.01.00.00')
   })
 
+  it('nivel modalidade zera o elemento (casa a dotação no standalone)', () => {
+    const [d] = agregarExecucao([l({ natureza_despesa: '31900101', valor: 1 })], undefined, 'modalidade')
+    expect(d!.naturezaPcasp).toBe('3.1.90.00.00.00')
+  })
+
   it('agrega subelementos distintos no mesmo elemento', () => {
     const linhas = [
       l({ conta_contabil: '622130100', natureza_despesa: '31900101', valor: 100 }),

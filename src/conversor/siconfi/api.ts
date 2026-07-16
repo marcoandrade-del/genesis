@@ -9,6 +9,21 @@
  */
 const BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/msc_orcamentaria'
 
+/** Nível de agregação da natureza da despesa. */
+export type NivelDespesa = 'elemento' | 'modalidade'
+
+/**
+ * natureza da despesa da MSC (8 díg, até subelemento) → PCASP pontuada.
+ * `elemento` = "3.3.90.30.00.00" (subitem zerado, como os fabricantes); `modalidade`
+ * = "3.3.90.00.00.00" (elemento zerado — nível em que a LOA fixa a dotação). O
+ * modalidade casa o autorizado (fixação, sempre em modalidade na MSC) com o empenho.
+ */
+export function naturezaDespesaMsc(nd: string | null, nivel: NivelDespesa = 'elemento'): string {
+  const d = String(nd ?? '').padStart(8, '0')
+  const elem = nivel === 'modalidade' ? '00' : d.slice(4, 6)
+  return `${d[0]}.${d[1]}.${d.slice(2, 4)}.${elem}.00.00`
+}
+
 /** Linha crua da MSC orçamentária (campos comuns às classes 5 e 6). */
 export type LinhaMsc = {
   conta_contabil: string
