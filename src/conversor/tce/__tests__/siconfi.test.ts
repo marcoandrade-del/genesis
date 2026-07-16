@@ -9,6 +9,8 @@ const l = (over: Partial<LinhaMsc>): LinhaMsc => ({
   funcao: '10',
   subfuncao: '301',
   natureza_despesa: '31900101',
+  natureza_receita: null,
+  natureza_conta: 'C',
   valor: 0,
   ...over,
 })

@@ -42,3 +42,31 @@ export function ancestrais(codigo: string): string[] {
   for (let k = 1; k <= nivel; k++) out.push(segs.map((s, i) => (i < k ? s : '0'.repeat(s.length))).join('.'))
   return out
 }
+
+/** Larguras dos 12 grupos da natureza da receita PCASP (padrão nacional; soma 18 dígitos). */
+const GRUPOS_RECEITA = [1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2, 2] as const
+
+/**
+ * Natureza da receita (pontuada OU dígitos crus) → PCASP pontuada de 12 grupos.
+ * Padrão NACIONAL, agnóstico de fabricante/fonte. Ex.: "13210111" →
+ * "1.3.2.1.01.1.1.00.00.00.00.00"; "1.7.1.8" → completado com zeros.
+ * (O Betha tem uma cópia própria em `fabricantes/betha/codigo.ts` — dedup futuro.)
+ */
+export function naturezaReceita(raw: string): string {
+  const s = (raw || '').trim()
+  const grupos = (p: string[]): string => {
+    const q = [...p]
+    for (let i = q.length; i < GRUPOS_RECEITA.length; i++) q.push('0'.repeat(GRUPOS_RECEITA[i]!))
+    return q.join('.')
+  }
+  if (s.includes('.')) return grupos(s.replace(/\.+$/, '').split('.'))
+  const d = s.replace(/\D/g, '')
+  const partes: string[] = []
+  let i = 0
+  for (const g of GRUPOS_RECEITA) {
+    if (i >= d.length) break
+    partes.push(d.slice(i, i + g))
+    i += g
+  }
+  return grupos(partes)
+}
