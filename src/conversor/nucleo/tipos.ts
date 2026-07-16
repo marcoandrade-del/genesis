@@ -60,6 +60,8 @@ export type EntidadeConfig = {
   tipo: TipoEntidade
   /** substring que casa `nmEntidade` no PIT (ex. "MUNICÍPIO", "CENTRAL"). */
   matchPit?: string
+  /** poder_orgao que isola esta entidade na MSC do SICONFI (ex. "10131" executivo, "20231" legislativo); ausente = ente consolidado. */
+  matchSiconfi?: string
   /** parâmetros específicos do conector do fabricante (ex. caminho do CSV desta entidade). */
   params?: Record<string, string>
 }
