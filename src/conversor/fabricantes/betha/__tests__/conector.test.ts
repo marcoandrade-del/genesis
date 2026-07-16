@@ -1,24 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { MunicipioConfig, EntidadeConfig } from '../../../nucleo/tipos.js'
 
-// RECEITA: API real (busca-textual). Mocka só o transporte `lerConsulta`; mantém
-// as puras `entidadeDoId`/`mesDoId` reais (importActual).
+// API real (busca-textual). Mocka só o transporte `lerConsulta`; mantém as puras
+// `entidadeDoId`/`mesDoId` reais (importActual).
 const lerBusca = vi.fn()
 vi.mock('../api.js', async (orig) => ({ ...(await orig<Record<string, unknown>>()), lerConsulta: (...a: unknown[]) => lerBusca(...a) }))
-
-// DESPESA (legado, a migrar): mocka o transporte antigo do dados-abertos.
-const lerConsulta = vi.fn()
-vi.mock('../dados-abertos.js', () => ({ lerConsulta: (...a: unknown[]) => lerConsulta(...a) }))
 
 const { conectorBetha } = await import('../conector.js')
 
 const cfg = { portalUrl: 'https://dados.x/base', ano: 2026 } as MunicipioConfig
 const ent = (params: Record<string, string>): EntidadeConfig => ({ nome: 'Prefeitura', tipo: 'PREFEITURA', params })
 
-beforeEach(() => {
-  lerBusca.mockReset()
-  lerConsulta.mockReset()
-})
+beforeEach(() => lerBusca.mockReset())
 
 describe('betha · receita (busca-textual → PCASP)', () => {
   it('agrega por entidade×natureza somando os meses (orçado e arrecadado), filtrando a entidade', async () => {
@@ -61,34 +54,49 @@ describe('betha · receita (busca-textual → PCASP)', () => {
   })
 })
 
-describe('betha · despesa (legado dados-abertos — a migrar)', () => {
-  it('mapeia a despesa (dimensões + natureza no elemento + fonte)', async () => {
-    lerConsulta.mockResolvedValue([
+describe('betha · despesa/execução (174485 busca-textual → PCASP)', () => {
+  it('agrega empenhos por órgão×unidade×função×subfunção×natureza×fonte (programa/ação placeholder)', async () => {
+    lerBusca.mockResolvedValue([
       {
-        codigoOrgao: '02', nomeOrgao: 'Executivo',
-        codigoUnidade: '010', nomeUnidade: 'Gabinete',
-        funcao: '4', subfuncao: '122', programa: '2', codigoAcao: '2001', nomeAcao: 'Manutenção',
-        naturezaDespesa: '3.3.90.30.01', fonteRecurso: '1500', valorFixado: '5.000,00',
+        id: '26:184:despesa_orcamentaria_1984_1',
+        campos: {
+          descricaoOrgao: '02 - EXECUTIVO', descricaoUnidade: '02.001 - Gabinete',
+          descricaoFuncao: '04 - Administração', descricaoSubfuncao: '122 - Administração Geral',
+          mascaraElemento: '3.3.90.30.00.00', descricaoRecurso: '1500 - Recursos Ordinários',
+          valorEmpenho: 1000, valorLiquidadoEmpenho: 800, valorPagoEmpenho: 500,
+        },
+      },
+      {
+        id: '26:184:despesa_orcamentaria_1984_2',
+        campos: {
+          descricaoOrgao: '02 - EXECUTIVO', descricaoUnidade: '02.001 - Gabinete',
+          descricaoFuncao: '04 - Administração', descricaoSubfuncao: '122 - Administração Geral',
+          mascaraElemento: '3.3.90.30.00.00', descricaoRecurso: '1500 - Recursos Ordinários',
+          valorEmpenho: 500, valorLiquidadoEmpenho: 200, valorPagoEmpenho: 100,
+        },
       },
     ])
-    const linhas = await conectorBetha.lerDespesa(cfg, ent({ consultaDespesa: '20' }))
+    const linhas = await conectorBetha.lerDespesa(cfg, ent({ portalHash: 'H', consultaDespesa: '174485' }))
+    expect(lerBusca).toHaveBeenCalledWith({ consultaId: '174485', portalHash: 'H', filtros: { ano: ['2026'] } })
     expect(linhas).toEqual([
       {
-        orgao: { codigo: '02', nome: 'Executivo' },
-        unidade: { codigo: '010', nome: 'Gabinete' },
+        orgao: { codigo: '02', nome: 'EXECUTIVO' },
+        unidade: { codigo: '02.001', nome: 'Gabinete' },
         funcao: '04',
         subfuncao: '122',
-        programa: { codigo: '0002' },
-        acao: { codigo: '2001', nome: 'Manutenção' },
+        programa: { codigo: '0000' },
+        acao: { codigo: '0000' },
         naturezaPcasp: '3.3.90.30.00.00',
-        fonte: { codigo: '1500', descricao: '1500' },
-        autorizado: 500000,
+        fonte: { codigo: '1500', descricao: 'Recursos Ordinários' },
+        empenhado: 150000, // 1000 + 500
+        liquidado: 100000, // 800 + 200
+        pago: 60000, // 500 + 100
       },
     ])
   })
 
-  it('não busca a rede sem consultaId/base', async () => {
+  it('não busca a rede sem portalHash/consultaDespesa', async () => {
     expect(await conectorBetha.lerDespesa(cfg, ent({}))).toEqual([])
-    expect(lerConsulta).not.toHaveBeenCalled()
+    expect(lerBusca).not.toHaveBeenCalled()
   })
 })

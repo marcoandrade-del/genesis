@@ -5,27 +5,23 @@ import type {
   LinhaReceita,
   LinhaDespesa,
 } from '../../nucleo/tipos.js'
-import { lerConsulta, type LinhaConsulta } from './dados-abertos.js' // legado: só a DESPESA (a migrar)
-import { lerConsulta as lerBusca, entidadeDoId } from './api.js' // RECEITA: API real (busca-textual)
-import { naturezaReceitaBetha, naturezaDespesaElemento, funcao2, subfuncao3, programa4 } from './codigo.js'
+import { lerConsulta as lerBusca, entidadeDoId } from './api.js' // API real (busca-textual)
+import { naturezaReceitaBetha, naturezaDespesaElemento, funcao2, subfuncao3 } from './codigo.js'
 
 /**
- * Conector do FABRICANTE BETHA (Transparência Cloud). Lê o ORÇAMENTÁRIO pelo
- * motor de DADOS ABERTOS (INDA) — `GET {base}/api/consulta/{consultaId}?formato=json`,
- * SEM token — e devolve linhas já normalizadas em PCASP.
+ * Conector do FABRICANTE BETHA (Transparência Cloud). Lê o ORÇAMENTÁRIO pela API
+ * REAL do portal (busca-textual — ver `api.ts`) e devolve linhas normalizadas em
+ * PCASP. Config (em `ent.params`, com o que é do MUNICÍPIO mesclado sob a entidade):
+ *   portalHash       → hash do portal na URL do município (contexto p/ a API)
+ *   consultaReceita  → id do dataset "Receitas Orçamentárias" (previsão+arrecadação)
+ *   consultaDespesa  → id do dataset "Despesas por Classificação" (execução/empenho)
+ *   entidadeBetha    → (opc.) código da entidade p/ filtrar; ausente = todas
  *
- * Config (em `ent.params`, com o que é do MUNICÍPIO mesclado sob a entidade):
- *   dadosAbertosUrl   → base do dados-abertos (default: cfg.portalUrl)
- *   consultaReceita   → id do dataset "receita orçamentária" do município
- *   consultaDespesa   → id do dataset "despesa orçamentária / QDD" do município
- *
- * ⚠️ VALIDAÇÃO (deixado p/ um município Betha real, ver [[conversor-arquitetura-fabricante]]):
- * os NOMES DAS COLUNAS do dados-abertos variam por município. O resolvedor abaixo
- * tenta os nomes mais comuns (case/acento-insensível) e, se não achar uma coluna
- * OBRIGATÓRIA, FALHA ALTO listando as colunas disponíveis — assim o primeiro run
- * contra um ente real revela o layout exato em vez de gerar dado silenciosamente
- * errado. O que muda por município é o nome da coluna aqui; a estrutura (natureza
- * PCASP, dimensões) é nacional.
+ * O resolvedor de coluna (`leitor`) tenta os nomes mais comuns (case/acento-
+ * insensível) e FALHA ALTO listando as colunas disponíveis se faltar uma
+ * obrigatória — assim o 1º run contra um ente real revela o layout exato. A
+ * RECEITA está validada ao centavo (Criciúma 2026); a DESPESA está construída com
+ * a validação ao centavo dos totais PENDENTE (ES do Betha instável na construção).
  */
 
 const norm = (s: string): string =>
@@ -53,7 +49,7 @@ function centavos(v: unknown): number {
  * Leitor de colunas de um dataset: indexa as chaves da 1ª linha (todas as linhas
  * compartilham o schema) e resolve por candidatos normalizados. `req` falha alto.
  */
-function leitor(linhas: LinhaConsulta[], contexto: string) {
+function leitor(linhas: Record<string, unknown>[], contexto: string) {
   const idx = new Map<string, string>() // chave normalizada → chave original
   for (const k of Object.keys(linhas[0] ?? {})) idx.set(norm(k), k)
   const achar = (candidatos: string[]): string | undefined => {
@@ -65,17 +61,17 @@ function leitor(linhas: LinhaConsulta[], contexto: string) {
   }
   return {
     /** valor cru da 1ª coluna presente (para valores monetários opcionais). */
-    raw: (row: LinhaConsulta, candidatos: string[]): unknown => {
+    raw: (row: Record<string, unknown>, candidatos: string[]): unknown => {
       const k = achar(candidatos)
       return k === undefined ? undefined : row[k]
     },
     /** coluna de texto opcional: '' quando ausente. */
-    opt: (row: LinhaConsulta, candidatos: string[]): string => {
+    opt: (row: Record<string, unknown>, candidatos: string[]): string => {
       const k = achar(candidatos)
       return k === undefined ? '' : String(row[k] ?? '')
     },
     /** coluna de texto obrigatória: FALHA ALTO listando as colunas disponíveis. */
-    req: (row: LinhaConsulta, candidatos: string[]): string => {
+    req: (row: Record<string, unknown>, candidatos: string[]): string => {
       const k = achar(candidatos)
       if (k === undefined) {
         throw new Error(
@@ -91,11 +87,17 @@ function leitor(linhas: LinhaConsulta[], contexto: string) {
 
 const FONTE_PLACEHOLDER = { codigo: '9999', descricao: 'Fonte não discriminada (dados-abertos Betha)' }
 
-const baseDe = (cfg: MunicipioConfig, ent: EntidadeConfig): string | undefined =>
-  ent.params?.dadosAbertosUrl ?? cfg.portalUrl
-
-const COL_FONTE = ['fonteRecurso', 'codigoFonteRecurso', 'fonte', 'codigoFonte', 'recurso']
-const COL_FONTE_DESC = ['descricaoFonteRecurso', 'nomeFonteRecurso', 'descricaoFonte', 'fonteRecursoDescricao']
+/**
+ * As dimensões da despesa no busca-textual do Betha vêm como DESCRIÇÃO combinada
+ * "código - nome" (ex. "02 - EXECUTIVO", "04 - Administração", "1500 - Recursos
+ * Ordinários"). Extrai o código (dígitos/pontos à frente) e o nome. Sem código à
+ * frente → código vazio (o chamador decide se falha ou usa placeholder).
+ */
+function codigoNome(descricao: string): { codigo: string; nome: string } {
+  const m = descricao.match(/^\s*([\d.]+)\s*[-–—]\s*(.*)$/)
+  if (m) return { codigo: m[1]!, nome: m[2]!.trim() }
+  return { codigo: '', nome: descricao.trim() }
+}
 
 export const conectorBetha: ConectorFabricante = {
   nome: 'Betha (Transparência Cloud)',
@@ -155,32 +157,75 @@ export const conectorBetha: ConectorFabricante = {
     return out
   },
 
+  /**
+   * DESPESA (EXECUÇÃO) via API real do Betha — consulta "Despesas por
+   * Classificação Orçamentária" (`consultaDespesa`, ex. 174485). É nível EMPENHO
+   * (o Betha, em SC, cobre também a execução — que no modelo do conversor viria do
+   * TCE): alimenta empenhado/liquidado/pago da `LinhaDespesa`, NÃO a dotação.
+   * Agrega por órgão×unidade×função×subfunção×natureza×fonte, somando os empenhos.
+   * A consulta NÃO expõe programa/ação nas linhas → placeholder "0000" (o núcleo
+   * cria a dimensão genérica). ⚠️ Validação ao centavo dos totais (empenhado/
+   * liquidado/pago) PENDENTE (ES do Betha estava fora na construção) — ver memória
+   * `betha-transparencia-api-decifrada`.
+   *
+   * `ent.params`: `portalHash`, `consultaDespesa`, opc. `entidadeBetha`.
+   */
   async lerDespesa(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaDespesa[]> {
-    const url = baseDe(cfg, ent)
+    const portalHash = ent.params?.portalHash
     const consulta = ent.params?.consultaDespesa
-    if (!url || !consulta) return []
-    const linhas = await lerConsulta(url, consulta)
+    if (!portalHash || !consulta) return []
+    const entidadeBetha = ent.params?.entidadeBetha
+    const todas = await lerBusca({ consultaId: consulta, portalHash, filtros: { ano: [String(cfg.ano)] } })
+    const linhas = entidadeBetha ? todas.filter((l) => entidadeDoId(l.id) === entidadeBetha) : todas
     if (!linhas.length) return []
 
-    const L = leitor(linhas, 'despesa')
+    const L = leitor(
+      linhas.map((l) => l.campos),
+      'despesa',
+    )
+    type Grupo = {
+      orgao: { codigo: string; nome: string }
+      unidade: { codigo: string; nome: string }
+      funcao: string
+      subfuncao: string
+      natureza: string
+      fonte: { codigo: string; descricao: string }
+      empenhado: number
+      liquidado: number
+      pago: number
+    }
+    const grupos = new Map<string, Grupo>()
+    for (const l of linhas) {
+      const orgao = codigoNome(L.req(l.campos, ['descricaoOrgao', 'orgao', 'nomeOrgao', 'codigoOrgao']))
+      const unidade = codigoNome(L.req(l.campos, ['descricaoUnidade', 'unidade', 'nomeUnidade', 'codigoUnidade']))
+      const funcao = funcao2(codigoNome(L.req(l.campos, ['descricaoFuncao', 'funcao', 'codigoFuncao'])).codigo)
+      const subfuncao = subfuncao3(codigoNome(L.req(l.campos, ['descricaoSubfuncao', 'subfuncao', 'codigoSubfuncao'])).codigo)
+      const natureza = naturezaDespesaElemento(L.req(l.campos, ['mascaraElemento', 'descricaoElemento', 'naturezaDespesa', 'elementoDespesa']))
+      const recurso = codigoNome(L.opt(l.campos, ['descricaoRecurso', 'fonteRecurso', 'recurso', 'fonte']))
+      const fonte = recurso.codigo ? { codigo: recurso.codigo, descricao: recurso.nome || recurso.codigo } : { ...FONTE_PLACEHOLDER }
+      const chave = `${entidadeDoId(l.id)}|${orgao.codigo}.${unidade.codigo}|${funcao}|${subfuncao}|${natureza}|${fonte.codigo}`
+      const g = grupos.get(chave) ?? { orgao, unidade, funcao, subfuncao, natureza, fonte, empenhado: 0, liquidado: 0, pago: 0 }
+      g.empenhado += centavos(L.raw(l.campos, ['valorEmpenho', 'valorEmpenhado', 'empenhado']))
+      g.liquidado += centavos(L.raw(l.campos, ['valorLiquidadoEmpenho', 'valorLiquidado', 'liquidado']))
+      g.pago += centavos(L.raw(l.campos, ['valorPagoEmpenho', 'valorPago', 'pago']))
+      grupos.set(chave, g)
+    }
+
     const out: LinhaDespesa[] = []
-    for (const row of linhas) {
-      const valor = centavos(L.raw(row, ['valorFixado', 'fixado', 'valorDotacaoInicial', 'dotacaoInicial', 'valorOrcado', 'valorAtualizado', 'valorDotacao', 'dotacao', 'valorPrevisto']))
-      if (valor <= 0) continue
-      const fonteCod = L.opt(row, COL_FONTE)
-      const fonteDesc = L.opt(row, COL_FONTE_DESC)
-      const programaNome = L.opt(row, ['nomePrograma', 'descricaoPrograma'])
-      const acaoNome = L.opt(row, ['nomeAcao', 'descricaoAcao'])
+    for (const g of grupos.values()) {
+      if (!g.empenhado && !g.liquidado && !g.pago) continue
       out.push({
-        orgao: { codigo: L.req(row, ['codigoOrgao', 'orgao', 'codOrgao']), nome: L.opt(row, ['nomeOrgao', 'descricaoOrgao', 'orgaoNome']) },
-        unidade: { codigo: L.req(row, ['codigoUnidade', 'unidade', 'codUnidade', 'unidadeOrcamentaria']), nome: L.opt(row, ['nomeUnidade', 'descricaoUnidade', 'unidadeNome']) },
-        funcao: funcao2(L.req(row, ['funcao', 'codigoFuncao', 'codFuncao'])),
-        subfuncao: subfuncao3(L.req(row, ['subfuncao', 'subFuncao', 'codigoSubfuncao', 'codigoSubFuncao'])),
-        programa: { codigo: programa4(L.req(row, ['programa', 'codigoPrograma', 'codPrograma'])), ...(programaNome ? { nome: programaNome } : {}) },
-        acao: { codigo: L.req(row, ['acao', 'codigoAcao', 'projetoAtividade', 'codAcao']), ...(acaoNome ? { nome: acaoNome } : {}) },
-        naturezaPcasp: naturezaDespesaElemento(L.req(row, ['naturezaDespesa', 'codigoNaturezaDespesa', 'naturezaOrcamentaria', 'elementoDespesa', 'despesa'])),
-        fonte: fonteCod ? { codigo: fonteCod, descricao: fonteDesc || fonteCod } : { ...FONTE_PLACEHOLDER },
-        autorizado: valor,
+        orgao: g.orgao,
+        unidade: g.unidade,
+        funcao: g.funcao,
+        subfuncao: g.subfuncao,
+        programa: { codigo: '0000' }, // 174485 não expõe programa/ação nas linhas
+        acao: { codigo: '0000' },
+        naturezaPcasp: g.natureza,
+        fonte: g.fonte,
+        ...(g.empenhado ? { empenhado: g.empenhado } : {}),
+        ...(g.liquidado ? { liquidado: g.liquidado } : {}),
+        ...(g.pago ? { pago: g.pago } : {}),
       })
     }
     return out
