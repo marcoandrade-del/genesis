@@ -5,8 +5,9 @@ import type {
   LinhaReceita,
   LinhaDespesa,
 } from '../../nucleo/tipos.js'
-import { lerConsulta, type LinhaConsulta } from './dados-abertos.js'
-import { naturezaReceita, naturezaDespesaElemento, funcao2, subfuncao3, programa4 } from './codigo.js'
+import { lerConsulta, type LinhaConsulta } from './dados-abertos.js' // legado: só a DESPESA (a migrar)
+import { lerConsulta as lerBusca, entidadeDoId } from './api.js' // RECEITA: API real (busca-textual)
+import { naturezaReceitaBetha, naturezaDespesaElemento, funcao2, subfuncao3, programa4 } from './codigo.js'
 
 /**
  * Conector do FABRICANTE BETHA (Transparência Cloud). Lê o ORÇAMENTÁRIO pelo
@@ -99,27 +100,55 @@ const COL_FONTE_DESC = ['descricaoFonteRecurso', 'nomeFonteRecurso', 'descricaoF
 export const conectorBetha: ConectorFabricante = {
   nome: 'Betha (Transparência Cloud)',
 
+  /**
+   * RECEITA via API REAL do Betha (busca-textual): token anônimo + header
+   * `app-context` + `POST /api/busca-textual/{consultaReceita}` filtrado por ano.
+   * Agrega por ENTIDADE×natureza: previsão = MAIOR orçado atualizado do ano;
+   * arrecadado = Σ `valorArrecadadoNoMes` (cada linha é um mês da natureza) —
+   * arrecadado validado AO CENTAVO em Criciúma 2026. A consulta
+   * "Receitas Orçamentárias" do Betha NÃO traz fonte → fonte = placeholder.
+   *
+   * `ent.params`: `portalHash` (hash do portal na URL do município),
+   * `consultaReceita` (id do dataset) e, opcional, `entidadeBetha` (código p/
+   * filtrar a entidade; ausente = todas as entidades do portal).
+   */
   async lerReceita(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaReceita[]> {
-    const url = baseDe(cfg, ent)
+    const portalHash = ent.params?.portalHash
     const consulta = ent.params?.consultaReceita
-    if (!url || !consulta) return []
-    const linhas = await lerConsulta(url, consulta)
+    if (!portalHash || !consulta) return []
+    const entidadeBetha = ent.params?.entidadeBetha
+    const todas = await lerBusca({ consultaId: consulta, portalHash, filtros: { ano: [String(cfg.ano)] } })
+    const linhas = entidadeBetha ? todas.filter((l) => entidadeDoId(l.id) === entidadeBetha) : todas
     if (!linhas.length) return []
 
-    const L = leitor(linhas, 'receita')
+    const L = leitor(
+      linhas.map((l) => l.campos),
+      'receita',
+    )
+    // Agrega por ENTIDADE×natureza: a mesma natureza aparece em várias entidades,
+    // e a previsão (orçado) não pode ser deduplicada entre elas. Cada linha = um
+    // mês; previsão = MAIOR orçado do ano, arrecadado = Σ dos meses.
+    const grupos = new Map<string, { natureza: string; previsto: number; arrecadado: number }>()
+    for (const l of linhas) {
+      const natureza = L.req(l.campos, ['rubricaNatureza', 'naturezaReceita', 'codigoReceita', 'codigoNaturezaReceita', 'receita', 'codigo'])
+      const chave = `${entidadeDoId(l.id)}|${natureza}`
+      const g = grupos.get(chave) ?? { natureza, previsto: 0, arrecadado: 0 }
+      // arrecadado do ano = soma dos meses; previsão = MAIOR orçado do ano (o
+      // orçado se repete/atualiza por mês e vem 0 em meses ainda não carregados,
+      // então pegar o máximo é robusto a mês zerado).
+      g.arrecadado += centavos(L.raw(l.campos, ['valorArrecadadoNoMes', 'arrecadadoNoMes', 'valorArrecadado', 'arrecadado']))
+      g.previsto = Math.max(g.previsto, centavos(L.raw(l.campos, ['valorOrcadoAtualizado', 'valorOrcado', 'previsto', 'orcado', 'valorPrevisto'])))
+      grupos.set(chave, g)
+    }
+
     const out: LinhaReceita[] = []
-    for (const row of linhas) {
-      const previsto = centavos(L.raw(row, ['valorPrevisto', 'previsto', 'valorOrcado', 'orcado', 'valorPrevisaoInicial', 'previsaoInicial', 'valorPrevisaoAtualizada']))
-      const arrecadado = centavos(L.raw(row, ['valorArrecadado', 'arrecadado', 'valorRealizado', 'realizado', 'valorReceitaRealizada']))
-      if (previsto === 0 && arrecadado === 0) continue
-      const natBruta = L.req(row, ['naturezaReceita', 'codigoReceita', 'codigoNaturezaReceita', 'naturezaOrcamentaria', 'receita', 'codigo'])
-      const fonteCod = L.opt(row, COL_FONTE)
-      const fonteDesc = L.opt(row, COL_FONTE_DESC)
+    for (const g of grupos.values()) {
+      if (g.previsto === 0 && g.arrecadado === 0) continue
       out.push({
-        naturezaPcasp: naturezaReceita(natBruta),
-        fonte: fonteCod ? { codigo: fonteCod, descricao: fonteDesc || fonteCod } : { ...FONTE_PLACEHOLDER },
-        ...(previsto ? { previsto } : {}),
-        ...(arrecadado ? { arrecadado } : {}),
+        naturezaPcasp: naturezaReceitaBetha(g.natureza),
+        fonte: { ...FONTE_PLACEHOLDER },
+        ...(g.previsto ? { previsto: g.previsto } : {}),
+        ...(g.arrecadado ? { arrecadado: g.arrecadado } : {}),
       })
     }
     return out

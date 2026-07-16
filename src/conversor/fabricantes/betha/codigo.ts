@@ -43,6 +43,23 @@ export function naturezaReceita(raw: string): string {
 }
 
 /**
+ * Natureza da receita como vem no `rubricaNatureza` do busca-textual do Betha:
+ * um INDICADOR na frente + a natureza (a máscara da consulta é "I1.1.1.2.02.…").
+ * No dado o indicador é um dígito (ex. "413250124000000" = indicador 4 +
+ * 1.3.2.5.01.2.4 → "Remun. Dep. Banc."). Dropa o indicador quando, sem ele, a
+ * categoria fica válida (1/2/7/8/9) e com ele não; senão usa como está. Já
+ * pontuado passa direto.
+ * ⚠️ Validado no formato do Criciúma; conferir ao centavo por município novo.
+ */
+export function naturezaReceitaBetha(rubrica: string): string {
+  const s = (rubrica || '').trim()
+  if (s.includes('.')) return naturezaReceita(s)
+  const d = soDigitos(s)
+  const dropar = '12789'.includes(d[1] ?? '') && !'12789'.includes(d[0] ?? '')
+  return naturezaReceita(dropar ? d.slice(1) : d)
+}
+
+/**
  * Natureza da despesa no nível ELEMENTO (pontuada OU crua) → "3.1.90.11.00.00".
  * Trunca no elemento (subitem zerado) como os demais fabricantes fazem, para
  * casar o parâmetro da despesa por prefixo. Ex.: "3.3.90.30.01" → "3.3.90.30.00.00".
