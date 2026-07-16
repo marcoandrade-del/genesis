@@ -1,6 +1,6 @@
 import type { ConectorFabricante, MunicipioConfig, EntidadeConfig, LinhaReceita, LinhaDespesa } from '../../nucleo/tipos.js'
 import { naturezaReceita } from '../../nucleo/pcasp.js'
-import { baixarMsc, ultimoMes, type LinhaMsc } from '../../siconfi/api.js'
+import { baixarMsc, ultimoMes, naturezaDespesaMsc, type LinhaMsc } from '../../siconfi/api.js'
 
 /**
  * Conector-fabricante SICONFI: lê o ORÇAMENTÁRIO da RECEITA direto da MSC do
@@ -45,6 +45,42 @@ export function agregarReceita(prev: LinhaMsc[], real: LinhaMsc[], poder?: strin
   return [...agg.values()]
 }
 
+const chaveDespesa = (l: LinhaDespesa): string =>
+  `${l.orgao.codigo}|${l.funcao}|${l.subfuncao}|${l.naturezaPcasp}|${l.fonte.codigo}`
+
+/**
+ * Agrega a FIXAÇÃO da despesa (classe 5) numa `LinhaDespesa` com o AUTORIZADO
+ * (dotação atualizada) por função×subfunção×natureza(modalidade)×fonte×poder.
+ *   autorizado = 5.2.2.1.1 (inicial) + 5.2.2.1.2 (créditos) − 5.2.2.1.9 (cancel.)
+ * Provado igual a disponível+pré-empenho+empenhado (6.2.2.1.1+.2+.3) ao centavo.
+ * A fixação vem em MODALIDADE na MSC — mesmo nível do empenho no standalone, então
+ * reconciliam. UO/programa/ação são placeholders (a MSC não os expõe). Puro/testável.
+ */
+export function agregarDespesa(fixacao: LinhaMsc[], poder?: string): LinhaDespesa[] {
+  const agg = new Map<string, LinhaDespesa>()
+  for (const l of fixacao) {
+    const cc = String(l.conta_contabil)
+    const sinal = cc.startsWith('52211') || cc.startsWith('52212') ? 1 : cc.startsWith('52219') ? -1 : 0
+    if (!sinal) continue // ignora 5.2.2.1.3 (remanejamento interno, soma-zero no autorizado)
+    if (poder && l.poder_orgao !== poder) continue
+    const linha: LinhaDespesa = {
+      orgao: { codigo: l.poder_orgao, nome: `Poder/Órgão ${l.poder_orgao}` },
+      unidade: { codigo: '0', nome: 'Consolidado SICONFI' },
+      funcao: l.funcao ?? '',
+      subfuncao: l.subfuncao ?? '',
+      programa: { codigo: '0000' },
+      acao: { codigo: '0000' },
+      naturezaPcasp: naturezaDespesaMsc(l.natureza_despesa, 'modalidade'),
+      fonte: { codigo: l.fonte_recursos, descricao: `Fonte ${l.fonte_recursos}` },
+      autorizado: 0,
+    }
+    const k = chaveDespesa(linha)
+    const g = agg.get(k) ?? (agg.set(k, linha), linha)
+    g.autorizado = (g.autorizado ?? 0) + sinal * cent(l.valor)
+  }
+  return [...agg.values()]
+}
+
 export const siconfiConector: ConectorFabricante = {
   nome: 'SICONFI/MSC',
   async lerReceita(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaReceita[]> {
@@ -55,9 +91,9 @@ export const siconfiConector: ConectorFabricante = {
     ])
     return agregarReceita(c5, c6, ent.matchSiconfi)
   },
-  // A dotação/fixação da despesa (5.2.2.x) entra na fiação do caminho standalone;
-  // hoje a despesa vem da FonteExecucao SICONFI (empenho) na reconciliação.
-  async lerDespesa(): Promise<LinhaDespesa[]> {
-    return []
+  async lerDespesa(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaDespesa[]> {
+    const mes = ent.params?.mesSiconfi ? Number(ent.params.mesSiconfi) : await ultimoMes(cfg.ibge, cfg.ano)
+    const c5 = await baixarMsc({ ibge: cfg.ibge, ano: cfg.ano, mes, classe: '5' })
+    return agregarDespesa(c5, ent.matchSiconfi)
   },
 }

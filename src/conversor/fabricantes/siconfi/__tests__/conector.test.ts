@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agregarReceita } from '../conector.js'
+import { agregarReceita, agregarDespesa } from '../conector.js'
 import { naturezaReceita } from '../../../nucleo/pcasp.js'
 import type { LinhaMsc } from '../../../siconfi/api.js'
 
@@ -78,5 +78,49 @@ describe('agregarReceita (MSC 5.2.1.1.1 + 6.2.1.2 → LinhaReceita)', () => {
     const so = agregarReceita([], real, '20231')
     expect(so).toHaveLength(1)
     expect(so[0]!.arrecadado).toBe(40_00)
+  })
+})
+
+/** Linha crua da fixação da despesa (classe 5). */
+const d = (over: Partial<LinhaMsc>): LinhaMsc => ({
+  conta_contabil: '522110100',
+  poder_orgao: '10131',
+  fonte_recursos: '1500',
+  funcao: '10',
+  subfuncao: '301',
+  natureza_despesa: '33900000',
+  natureza_receita: null,
+  natureza_conta: 'D',
+  valor: 0,
+  ...over,
+})
+
+describe('agregarDespesa (fixação MSC → autorizado)', () => {
+  it('autorizado = inicial(5.2.2.1.1) + créditos(5.2.2.1.2) − cancelam.(5.2.2.1.9)', () => {
+    const fix = [
+      d({ conta_contabil: '522110100', valor: 1000 }), // inicial
+      d({ conta_contabil: '522120100', valor: 200 }), //  crédito suplementar
+      d({ conta_contabil: '522139900', valor: 999 }), //  5.2.2.1.3 — IGNORADO
+      d({ conta_contabil: '522190209', natureza_conta: 'C', valor: 150 }), // cancelamento
+    ]
+    const m = agregarDespesa(fix)
+    expect(m).toHaveLength(1)
+    expect(m[0]!.autorizado).toBe(1050_00) // 1000 + 200 − 150
+  })
+
+  it('natureza sai em MODALIDADE (elemento zerado) p/ casar o empenho', () => {
+    const [x] = agregarDespesa([d({ natureza_despesa: '33903001', valor: 1 })])
+    expect(x!.naturezaPcasp).toBe('3.3.90.00.00.00')
+  })
+
+  it('separa por função×subfunção×natureza×fonte e filtra por poder', () => {
+    const fix = [
+      d({ poder_orgao: '10131', valor: 100 }),
+      d({ poder_orgao: '20231', valor: 40 }),
+    ]
+    expect(agregarDespesa(fix)).toHaveLength(2)
+    const so = agregarDespesa(fix, '20231')
+    expect(so).toHaveLength(1)
+    expect(so[0]!.autorizado).toBe(40_00)
   })
 })
