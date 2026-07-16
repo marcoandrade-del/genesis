@@ -21,7 +21,7 @@ beforeEach(() => {
 })
 
 describe('betha · receita (busca-textual → PCASP)', () => {
-  it('agrega por natureza: previsão do maior mês + arrecadado somado, filtrando a entidade', async () => {
+  it('agrega por entidade×natureza somando os meses (orçado e arrecadado), filtrando a entidade', async () => {
     lerBusca.mockResolvedValue([
       { id: '26:184:receita_orcamentaria_2026_01_1984_17180111', campos: { rubricaNatureza: '17180111', valorOrcadoAtualizado: 1000, valorArrecadadoNoMes: 100 } },
       { id: '26:184:receita_orcamentaria_2026_02_1984_17180111', campos: { rubricaNatureza: '17180111', valorOrcadoAtualizado: 1200, valorArrecadadoNoMes: 50 } },
@@ -34,7 +34,7 @@ describe('betha · receita (busca-textual → PCASP)', () => {
       {
         naturezaPcasp: '1.7.1.8.01.1.1.00.00.00.00.00',
         fonte: { codigo: '9999', descricao: 'Fonte não discriminada (dados-abertos Betha)' },
-        previsto: 120000, // orçado atualizado do maior mês (02) = 1200
+        previsto: 220000, // 1000 + 1200 (soma dos meses, como o portal totaliza)
         arrecadado: 15000, // 100 + 50
       },
     ])

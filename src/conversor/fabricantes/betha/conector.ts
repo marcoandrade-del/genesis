@@ -103,9 +103,10 @@ export const conectorBetha: ConectorFabricante = {
   /**
    * RECEITA via API REAL do Betha (busca-textual): token anônimo + header
    * `app-context` + `POST /api/busca-textual/{consultaReceita}` filtrado por ano.
-   * Agrega por ENTIDADE×natureza: previsão = MAIOR orçado atualizado do ano;
-   * arrecadado = Σ `valorArrecadadoNoMes` (cada linha é um mês da natureza) —
-   * arrecadado validado AO CENTAVO em Criciúma 2026. A consulta
+   * Agrega por ENTIDADE×natureza somando os meses (previsão = Σ orçado,
+   * arrecadado = Σ arrecadado no mês) — é como o portal totaliza. Validado AO
+   * CENTAVO em Criciúma 2026 (orçado 2.127.975.634,05 · arrecadado
+   * 708.247.979,27, Δ 0). A consulta
    * "Receitas Orçamentárias" do Betha NÃO traz fonte → fonte = placeholder.
    *
    * `ent.params`: `portalHash` (hash do portal na URL do município),
@@ -125,19 +126,19 @@ export const conectorBetha: ConectorFabricante = {
       linhas.map((l) => l.campos),
       'receita',
     )
-    // Agrega por ENTIDADE×natureza: a mesma natureza aparece em várias entidades,
-    // e a previsão (orçado) não pode ser deduplicada entre elas. Cada linha = um
-    // mês; previsão = MAIOR orçado do ano, arrecadado = Σ dos meses.
+    // Agrega por ENTIDADE×natureza. Cada linha do busca-textual é um mês da
+    // natureza; tanto o orçado quanto o arrecadado são somados sobre os meses —
+    // é assim que o próprio portal totaliza (os totalizadores de "Receitas
+    // Orçamentárias" e de "Receita Prevista x Realizada" batem com a Σ; validado
+    // AO CENTAVO em Criciúma 2026: orçado 2.127.975.634,05 · arrecadado
+    // 708.247.979,27).
     const grupos = new Map<string, { natureza: string; previsto: number; arrecadado: number }>()
     for (const l of linhas) {
       const natureza = L.req(l.campos, ['rubricaNatureza', 'naturezaReceita', 'codigoReceita', 'codigoNaturezaReceita', 'receita', 'codigo'])
       const chave = `${entidadeDoId(l.id)}|${natureza}`
       const g = grupos.get(chave) ?? { natureza, previsto: 0, arrecadado: 0 }
-      // arrecadado do ano = soma dos meses; previsão = MAIOR orçado do ano (o
-      // orçado se repete/atualiza por mês e vem 0 em meses ainda não carregados,
-      // então pegar o máximo é robusto a mês zerado).
+      g.previsto += centavos(L.raw(l.campos, ['valorOrcadoAtualizado', 'valorOrcado', 'previsto', 'orcado', 'valorPrevisto']))
       g.arrecadado += centavos(L.raw(l.campos, ['valorArrecadadoNoMes', 'arrecadadoNoMes', 'valorArrecadado', 'arrecadado']))
-      g.previsto = Math.max(g.previsto, centavos(L.raw(l.campos, ['valorOrcadoAtualizado', 'valorOrcado', 'previsto', 'orcado', 'valorPrevisto'])))
       grupos.set(chave, g)
     }
 
