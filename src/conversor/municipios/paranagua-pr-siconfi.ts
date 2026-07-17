@@ -12,7 +12,7 @@ import type { MunicipioConfig } from '../nucleo/tipos.js'
  * `nivelDespesa='modalidade'` casa o autorizado com o empenho.
  */
 export const paranaguaSiconfi: MunicipioConfig = {
-  nome: 'Paranaguá',
+  nome: 'Paranaguá (SICONFI)', // nome DISTINTO do IPM ("Paranaguá") p/ coexistirem no dev e serem comparáveis
   ibge: '4118204',
   uf: 'PR',
   ano: 2026,
