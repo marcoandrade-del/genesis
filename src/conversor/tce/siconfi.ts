@@ -1,5 +1,5 @@
 import type { FonteExecucao, MunicipioConfig, EntidadeConfig, LinhaDespesa } from '../nucleo/tipos.js'
-import { baixarMsc, ultimoMes, naturezaDespesaMsc, type LinhaMsc, type NivelDespesa } from '../siconfi/api.js'
+import { baixarMsc, ultimoMes, naturezaDespesaMsc, fonteMsc, type LinhaMsc, type NivelDespesa } from '../siconfi/api.js'
 
 export type { LinhaMsc }
 
@@ -48,7 +48,7 @@ export function agregarExecucao(linhas: LinhaMsc[], poder?: string, nivel: Nivel
       programa: { codigo: '0000' }, // MSC não expõe programa
       acao: { codigo: '0000' }, //     nem ação
       naturezaPcasp: naturezaDespesaMsc(l.natureza_despesa, nivel),
-      fonte: { codigo: l.fonte_recursos, descricao: `Fonte ${l.fonte_recursos}` },
+      fonte: { codigo: fonteMsc(l.fonte_recursos), descricao: `Fonte ${fonteMsc(l.fonte_recursos)}` },
       empenhado: 0,
       liquidado: 0,
       pago: 0,

@@ -1,6 +1,6 @@
 import type { ConectorFabricante, MunicipioConfig, EntidadeConfig, LinhaReceita, LinhaDespesa } from '../../nucleo/tipos.js'
 import { naturezaReceita } from '../../nucleo/pcasp.js'
-import { baixarMsc, ultimoMes, naturezaDespesaMsc, type LinhaMsc } from '../../siconfi/api.js'
+import { baixarMsc, ultimoMes, naturezaDespesaMsc, fonteMsc, type LinhaMsc } from '../../siconfi/api.js'
 
 /**
  * Conector-fabricante SICONFI: lê o ORÇAMENTÁRIO da RECEITA direto da MSC do
@@ -32,7 +32,7 @@ export function agregarReceita(prev: LinhaMsc[], real: LinhaMsc[], poder?: strin
       if (!String(l.conta_contabil).startsWith(prefixo)) continue
       if (poder && l.poder_orgao !== poder) continue
       const natureza = naturezaReceita(String(l.natureza_receita ?? ''))
-      const fonteCod = l.fonte_recursos
+      const fonteCod = fonteMsc(l.fonte_recursos)
       const k = chave(natureza, fonteCod)
       const linha =
         agg.get(k) ??
@@ -71,7 +71,7 @@ export function agregarDespesa(fixacao: LinhaMsc[], poder?: string): LinhaDespes
       programa: { codigo: '0000' },
       acao: { codigo: '0000' },
       naturezaPcasp: naturezaDespesaMsc(l.natureza_despesa, 'modalidade'),
-      fonte: { codigo: l.fonte_recursos, descricao: `Fonte ${l.fonte_recursos}` },
+      fonte: { codigo: fonteMsc(l.fonte_recursos), descricao: `Fonte ${fonteMsc(l.fonte_recursos)}` },
       autorizado: 0,
     }
     const k = chaveDespesa(linha)
