@@ -12,6 +12,10 @@ const BASE = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/msc_orcamentari
 /** Nível de agregação da natureza da despesa. */
 export type NivelDespesa = 'elemento' | 'modalidade'
 
+/** Fonte de recurso da MSC: a MSC pode trazer `fonte_recursos` null (receita/despesa
+ * sem classificação de fonte); vira um balde "0" (não informada) em vez de quebrar. */
+export const fonteMsc = (f: string | null): string => f ?? '0'
+
 /**
  * natureza da despesa da MSC (8 díg, até subelemento) → PCASP pontuada.
  * `elemento` = "3.3.90.30.00.00" (subitem zerado, como os fabricantes); `modalidade`
@@ -28,7 +32,7 @@ export function naturezaDespesaMsc(nd: string | null, nivel: NivelDespesa = 'ele
 export type LinhaMsc = {
   conta_contabil: string
   poder_orgao: string
-  fonte_recursos: string
+  fonte_recursos: string | null
   funcao: string | null
   subfuncao: string | null
   natureza_despesa: string | null

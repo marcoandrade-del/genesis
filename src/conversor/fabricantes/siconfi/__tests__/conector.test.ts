@@ -39,6 +39,13 @@ describe('agregarReceita (MSC 5.2.1.1.1 + 6.2.1.2 → LinhaReceita)', () => {
     expect(m[0]!.arrecadado).toBe(300_00)
   })
 
+  it('fonte_recursos null vira balde "0" (não quebra o writer)', () => {
+    const real = [l({ conta_contabil: '621200000', fonte_recursos: null, natureza_conta: 'C', valor: 25325.52 })]
+    const [d] = agregarReceita([], real)
+    expect(d!.fonte.codigo).toBe('0')
+    expect(d!.arrecadado).toBe(25325_52)
+  })
+
   it('previsto sem realizada e vice-versa coexistem', () => {
     const prev = [l({ conta_contabil: '521110000', natureza_receita: '11110000', valor: 500 })]
     const real = [l({ conta_contabil: '621200000', natureza_receita: '13210111', natureza_conta: 'C', valor: 200 })]
