@@ -39,6 +39,9 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 const prisma = new PrismaClient({ adapter: new PrismaPg(pool) })
 const cent = (s: string | undefined): number => Math.round(parseFloat((s || '0').trim() || '0') * 100)
 const reais = (c: number): string => (c / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+// tipos p/ provisionar dimensões da execução-sem-LOA (mesma regra do importar_execucao_pit)
+const tipoPrograma = (c: string): 'FINALISTICO' | 'GESTAO' | 'OPERACOES_ESPECIAIS' => (c === '0000' || c === '9999' ? 'OPERACOES_ESPECIAIS' : 'FINALISTICO')
+const tipoAcao = (c: string): 'PROJETO' | 'ATIVIDADE' | 'OPERACAO_ESPECIAL' => (c.startsWith('1') ? 'PROJETO' : c.startsWith('2') ? 'ATIVIDADE' : 'OPERACAO_ESPECIAL')
 
 async function obterXml(): Promise<string> {
   const cache = join(tmpdir(), `pit_${ANO}_${IBGE6}_Despesa.zip`)
@@ -55,7 +58,7 @@ async function obterXml(): Promise<string> {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
 }
 
-type Ag = { emp: number; liq: number; pag: number; uoCod: string; funcao: string; subfuncao: string; programa: string; acao: string; natureza: string; fonteLoa: string; semLoa: boolean }
+type Ag = { emp: number; liq: number; pag: number; uoCod: string; funcao: string; subfuncao: string; programa: string; acao: string; natureza: string; fonteLoa: string; semLoa: boolean; programaNome: string; acaoNome: string }
 
 function agregar(xml: string): Map<string, Ag> {
   const dots = new Map<string, Ag>()
@@ -74,7 +77,7 @@ function agregar(xml: string): Map<string, Ag> {
     const fonteLoa = DEPARA_FONTE[pitFonte] ?? pitFonte // sem par → mantém código PIT
     const chave = `${uoCod}|${funcao}|${subfuncao}|${programa}|${acao}|${natureza}|${fonteLoa}`
     let d = dots.get(chave)
-    if (!d) dots.set(chave, (d = { emp: 0, liq: 0, pag: 0, uoCod, funcao, subfuncao, programa, acao, natureza, fonteLoa, semLoa: !DEPARA_FONTE[pitFonte] && pitFonte !== '000' }))
+    if (!d) dots.set(chave, (d = { emp: 0, liq: 0, pag: 0, uoCod, funcao, subfuncao, programa, acao, natureza, fonteLoa, semLoa: !DEPARA_FONTE[pitFonte] && pitFonte !== '000', programaNome: (a.dsPrograma || '').trim(), acaoNome: (a.dsProjetoAtividade || '').trim() }))
     d.emp += cent(a.vlEmpenho); d.liq += cent(a.vlLiquidacao); d.pag += cent(a.vlPagamento)
   }
   return dots
@@ -129,6 +132,32 @@ async function main() {
     await tx.empenho.deleteMany({ where: { entidadeId: ent.id, numero: { startsWith: 'CAP-' } } })
     await tx.dotacaoDespesa.deleteMany({ where: { id: { in: ids } } })
     console.log(`  [apply] execução paralela removida: ${ids.length} dotações`)
+
+    // 1b) PROVISIONA as dimensões da execução-SEM-LOA que o PIT-avançado trouxe
+    // (programa '0000'/OPERAÇÕES ESPECIAIS, ações e fontes que não estão na LOA) —
+    // senão o create da dotação-sem-LOA recebe acaoId/fonteId undefined e fura.
+    const progNovos = new Map<string, string>()
+    const acaoNovas = new Map<string, string>()
+    const fonteNovas = new Map<string, string>()
+    for (const d of dots.values()) {
+      if (!programasDb.has(d.programa) && !progNovos.has(d.programa)) progNovos.set(d.programa, d.programaNome || `Programa ${d.programa}`)
+      const ak = `${d.programa}|${d.acao}`
+      if (!acoesDb.has(ak) && !acaoNovas.has(ak)) acaoNovas.set(ak, d.acaoNome || `Ação ${d.acao}`)
+      if (!fontesDb.has(d.fonteLoa) && !fonteNovas.has(d.fonteLoa)) fonteNovas.set(d.fonteLoa, `Fonte ${d.fonteLoa} (execução PIT sem LOA)`)
+    }
+    if (progNovos.size) {
+      await tx.programa.createMany({ data: [...progNovos].map(([codigo, nome]) => ({ entidadeId: ent.id, ano: ANO, codigo, nome, tipo: tipoPrograma(codigo) })) })
+      for (const p of await tx.programa.findMany({ where: { entidadeId: ent.id, ano: ANO }, select: { codigo: true, id: true } })) programasDb.set(p.codigo, p.id)
+    }
+    if (acaoNovas.size) {
+      await tx.acao.createMany({ data: [...acaoNovas].map(([chave, nome]) => { const [prog, cod] = chave.split('|') as [string, string]; return { programaId: programasDb.get(prog)!, codigo: cod, nome, tipo: tipoAcao(cod) } }) })
+      for (const a of await tx.acao.findMany({ where: { programa: { entidadeId: ent.id, ano: ANO } }, select: { codigo: true, id: true, programa: { select: { codigo: true } } } })) acoesDb.set(`${a.programa.codigo}|${a.codigo}`, a.id)
+    }
+    if (fonteNovas.size) {
+      await tx.fonteRecursoEntidade.createMany({ data: [...fonteNovas].map(([codigo, nomenclatura]) => ({ entidadeId: ent.id, ano: ANO, codigo, nomenclatura, vinculada: codigo !== '000' && codigo !== '500', origem: 'DESDOBRAMENTO' as const })) })
+      for (const f of await tx.fonteRecursoEntidade.findMany({ where: { entidadeId: ent.id, ano: ANO }, select: { codigo: true, id: true } })) fontesDb.set(f.codigo.trim(), f.id)
+    }
+    console.log(`  [apply] dimensões provisionadas (execução-sem-LOA): ${progNovos.size} programas · ${acaoNovas.size} ações · ${fonteNovas.size} fontes`)
 
     // 2) re-grava empenhado sobre as dotações da LOA (ou cria execução-sem-LOA)
     const movRows: { entidadeId: string; empenhoId: string; tipo: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO'; valor: string; data: Date; criadoPorId: string; historico: string }[] = []

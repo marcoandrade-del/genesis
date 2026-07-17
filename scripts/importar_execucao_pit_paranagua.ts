@@ -206,7 +206,7 @@ async function processarEntidade(pitNome: string, dots: Map<string, Dotacao>, nL
   const entidade = await prisma.entidade.findFirst({
     where: {
       tipo: dp.tipo,
-      municipio: { is: { nome: { contains: 'Paranagu', mode: 'insensitive' }, estado: { is: { sigla: 'PR' } } } },
+      municipio: { is: { nome: 'Paranaguá', estado: { is: { sigla: 'PR' } } } }, // EXATO: não casar "Paranaguá (SICONFI)" (outra sessão)
     },
     select: { id: true, nome: true },
   })
