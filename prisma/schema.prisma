@@ -1063,6 +1063,11 @@ model FonteRecursoEntidade {
   especificacao String?
   vinculada     Boolean           @default(true)
   grupo         String?
+  /// Código da fonte no leiaute STN/Siconfi (de/para local→STN). A fonte local do
+  /// QDD/Elotech (grupo+spec TCE antiga) não é a STN; o emissor da MSC converte
+  /// por aqui na saída (a MSC do Siconfi é em fonte STN). null = sem de/para
+  /// (o emissor mantém o código local). Ver resolver_fonte_stn_previsoes.ts.
+  fonteStnCodigo String?
   origem        OrigemConta       @default(MODELO)
   modeloFonteId String?
   criadoEm      DateTime          @default(now())

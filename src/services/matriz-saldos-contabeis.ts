@@ -124,6 +124,18 @@ export class MatrizSaldosContabeisService {
       contas.map((c) => [c.id, c.modeloContaId ? superavitPorModelo.get(c.modeloContaId) ?? null : null]),
     )
 
+    // De/para de FONTE local→STN: a MSC do Siconfi é em fonte STN, mas o razão
+    // guarda a fonte LOCAL do QDD/Elotech (o modelo do estado, ex.: PR, não é a
+    // STN). Converte-se na SAÍDA (aqui), mantendo o razão no modelo local. Sem
+    // de/para cadastrado a fonte passa direto (fontes já-STN de imports, ou entes
+    // sem o de/para carregado). Ver [B] em coordenacao-sessoes / resolver_fonte_stn.
+    const fontesEnt = await this.prisma.fonteRecursoEntidade.findMany({
+      where: { entidadeId, ano, fonteStnCodigo: { not: null } },
+      select: { codigo: true, fonteStnCodigo: true },
+    })
+    const mapaStn = new Map(fontesEnt.map((f) => [f.codigo, f.fonteStnCodigo!]))
+    const stn = (f: string | null): string | null => (f == null ? null : mapaStn.get(f) ?? f)
+
     const iniciais = await this.prisma.saldoInicialAno.findMany({
       where: { entidadeId, ano },
       select: { contaId: true, valor: true },
@@ -180,7 +192,7 @@ export class MatrizSaldosContabeisService {
       dots.map((d) => [
         d.id,
         {
-          fonte: d.fonteRecurso?.codigo ?? null,
+          fonte: stn(d.fonteRecurso?.codigo ?? null),
           funcao: d.funcao?.codigo ?? null,
           subfuncao: d.subfuncao?.codigo ?? null,
           naturezaDespesa: d.contaDespesa?.codigo ?? null,
@@ -203,14 +215,14 @@ export class MatrizSaldosContabeisService {
 
     // Movimento anterior ao mês → SI em débito com sinal (débito soma, crédito subtrai).
     for (const g of antes) {
-      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
+      const b = bucket(g.contaId, stn(g.fonteCodigo), g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
       const v = n(g._sum.valor)
       if (g.tipo === 'DEBITO') b.si += v
       else b.si -= v
     }
     // Movimento do mês → MD/MC.
     for (const g of domes) {
-      const b = bucket(g.contaId, g.fonteCodigo, g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
+      const b = bucket(g.contaId, stn(g.fonteCodigo), g.naturezaReceitaCodigo, g.dotacaoDespesaId, g.funcaoCodigo, g.subfuncaoCodigo, g.naturezaDespesaCodigo)
       const v = n(g._sum.valor)
       if (g.tipo === 'DEBITO') b.md += v
       else b.mc += v
@@ -224,7 +236,7 @@ export class MatrizSaldosContabeisService {
         for (const d of detalhe) {
           if (d.valor === 0) continue
           const devedor = natPorConta.get(c.id) === 'CREDORA' ? -d.valor : d.valor
-          bucket(c.id, d.fonte, null, null).si += devedor
+          bucket(c.id, stn(d.fonte), null, null).si += devedor
         }
         continue // o detalhe substitui o agregado da conta (Σ detalhe = agregado)
       }

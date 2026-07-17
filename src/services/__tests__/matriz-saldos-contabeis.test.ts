@@ -218,4 +218,40 @@ describe('MatrizSaldosContabeisService', () => {
     expect(linhasB.find((l) => l.contaCorrente.fonte === '1500')).toMatchObject({ saldoInicial: -150 })
     expect(linhasB.some((l) => l.contaCorrente.fonte === null)).toBe(false)
   })
+
+  it('converte a fonte local→STN na saída (fonteStnCodigo) e funde locais que mapeiam para a mesma STN', async () => {
+    // A MSC do Siconfi é em fonte STN; o razão guarda a fonte LOCAL (modelo do
+    // estado). O emissor converte na saída pelo de/para FonteRecursoEntidade.
+    prisma.entidade.findUnique.mockResolvedValue({ id: 'e1', nome: 'P', municipio: { nome: 'M', estado: { sigla: 'PR' } } })
+    prisma.contaContabilEntidade.findMany.mockResolvedValue([{ id: 'A', codigo: '6.2.1.2.00', modeloContaId: 'mA' }])
+    prisma.conta.findMany.mockResolvedValue([{ id: 'mA', naturezaSaldo: 'CREDORA' }])
+    prisma.saldoInicialAno.findMany.mockResolvedValue([])
+    prisma.fonteRecursoEntidade.findMany.mockResolvedValue([
+      { codigo: '1000', fonteStnCodigo: '1500' },
+      { codigo: '1003', fonteStnCodigo: '1501' },
+      { codigo: '1004', fonteStnCodigo: '1501' }, // 1003 e 1004 → a MESMA STN 1501
+    ])
+    // mês 3: crédito 30 em 1000; 20 em 1003 + 10 em 1004 (locais distintos → 1501).
+    prisma.lancamentoItem.groupBy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        gi('A', 'CREDITO', 30, { fonteCodigo: '1000' }),
+        gi('A', 'CREDITO', 20, { fonteCodigo: '1003' }),
+        gi('A', 'CREDITO', 10, { fonteCodigo: '1004' }),
+      ])
+    prisma.resumoMensalConta.findMany.mockResolvedValue([{ totalDebito: dec(0), totalCredito: dec(60) }])
+
+    const msc = await svc.emitir('e1', 2026, 3)
+    const linhas = msc!.linhas.filter((l) => l.conta === '6.2.1.2.00')
+    // 1000 → 1500
+    expect(linhas.find((l) => l.contaCorrente.fonte === '1500')).toMatchObject({ movimentoCredor: 30, saldoFinal: -30 })
+    // 1003 + 1004 → 1501 FUNDIDAS numa única linha (20 + 10 = 30)
+    const l1501 = linhas.filter((l) => l.contaCorrente.fonte === '1501')
+    expect(l1501).toHaveLength(1)
+    expect(l1501[0]).toMatchObject({ movimentoCredor: 30, saldoFinal: -30 })
+    // nenhuma linha sai com fonte LOCAL
+    expect(linhas.some((l) => ['1000', '1003', '1004'].includes(l.contaCorrente.fonte ?? ''))).toBe(false)
+    // reconciliação intacta (a conversão é fonte-agnóstica no total)
+    expect(msc!.verificacoes.find((v) => v.codigo === 'MSC_RECONCILIA_MC')!.status).toBe('OK')
+  })
 })
