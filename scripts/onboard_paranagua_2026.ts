@@ -19,6 +19,9 @@ const ENTIDADES: { nome: string; tipo: TipoEntidade }[] = [
   { nome: 'Prefeitura Municipal de Paranaguá', tipo: 'PREFEITURA' },
   { nome: 'Câmara Municipal de Paranaguá', tipo: 'CAMARA' },
   { nome: 'Paranaguá Previdência', tipo: 'ADM_INDIRETA' },
+  // CAGEPAR: autarquia reguladora de água/esgoto (LC 181/2015). No PIT aparece como
+  // "CENTRAL DE ÁGUA, ESGOTO E SERVIÇOS CONCEDIDOS DO LITORAL DO PARANÁ".
+  { nome: 'CAGEPAR - Central de Água, Esgoto e Serviços Concedidos do Litoral do Paraná', tipo: 'ADM_INDIRETA' },
 ]
 
 const pool = new Pool({ connectionString: process.env['DATABASE_URL'] })
