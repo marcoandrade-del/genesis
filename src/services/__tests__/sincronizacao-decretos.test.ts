@@ -47,6 +47,13 @@ describe('SincronizacaoDecretosService', () => {
     )
   })
 
+  it('config-driven: usa portalUrl + entidadePortal passados (reuso p/ qualquer município Elotech)', async () => {
+    const svc2 = new SincronizacaoDecretosService(prisma as never, { portalUrl: 'https://x.test/api', entidadePortal: '9' })
+    stubPortal([]) // portal vazio → OK (0 pendentes); só interessa a URL chamada
+    await svc2.sincronizar('e1', 2026)
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('https://x.test/api/api/creditosadicionais?entidade=9'))
+  })
+
   it('decreto pendente com equação exata → lança e materializa autorizado', async () => {
     // banco 900 → portal 1000: decreto 2/2026 reforça 100 (std fecha)
     stubPortal([{ despesa: DESPESA, valorInicial: 900, valor: 100, saldoAtualizado: 1000, decreto: '2/2026', natureza: 'Suplementar', fonteRecurso: 1000, sequencia: 1 }])

@@ -37,5 +37,13 @@ export async function importarMunicipio(
     const d = merged.length ? await escreverDespesa(prisma, orcamentoId, entidadeId, cfg.ano, merged) : { dotacoes: 0, comEmpenho: 0, semConta: [] as string[] }
 
     log(`  ${ent.nome}: previsões ${receita.length} · dotações ${merged.length} (com empenho ${d.comEmpenho})${d.semConta.length ? ` · SEM conta ${d.semConta.length}` : ''}`)
+
+    // FASE 2 (opcional): créditos adicionais (decretos) do portal → autorizado.
+    // Só fabricantes com API de decretos (ex.: Elotech) implementam; a LOA (fase 1)
+    // já está gravada acima.
+    if (conector.sincronizarCreditos) {
+      const rc = await conector.sincronizarCreditos(prisma, cfg, ent, entidadeId)
+      log(`    créditos (decretos): ${rc.status} — ${rc.mensagem}`)
+    }
   }
 }

@@ -38,7 +38,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out
 }
 
-type PortalFonte = { receita: string; descricao: string; valorOrcado: number | null }
+type PortalFonte = { receita: string; descricao: string; valorOrcado: number | null; valorArrecadado: number | null }
 type PortalReceitaDetalhe = { receita: string; valorOrcado: number | null; valorArrecadado: number | null }
 type PortalDespesa = { programatica: string; descricao: string; nivel: number; valorPrevisto: number }
 
@@ -50,7 +50,9 @@ type PortalDespesa = { programatica: string; descricao: string; nivel: number; v
 export async function lerReceita(baseUrl: string, ano: number, idPortal: string): Promise<LinhaReceita[]> {
   const q = `entidade=${idPortal}&exercicio=${ano}`
   const fontes = await getJson<PortalFonte[]>(baseUrl, `/api/receitas/fonte-recursos?${q}`)
-  const comValor = fontes.filter((f) => (f.valorOrcado ?? 0) !== 0)
+  // Inclui fontes SÓ com arrecadação (orçado 0): autarquias/fundos têm receita
+  // própria não-orçada (ex. taxas, remuneração) — o filtro só-orçado a perdia.
+  const comValor = fontes.filter((f) => (f.valorOrcado ?? 0) !== 0 || (f.valorArrecadado ?? 0) !== 0)
 
   // uma fonte = um fetch de detalhe; são dezenas → busca em paralelo (limitado).
   const detalhes = await mapLimit(comValor, 8, async (fonte) => ({
