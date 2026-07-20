@@ -1,5 +1,7 @@
 # Memory Index
 
+- [Épico turn-key: 100% dados pelo PORTAL da entidade](conversor-turn-key-tracker.md) — meta: sem SICONFI, sem download manual; quadro proveniência×dificuldade por entidade, ticando um a um; Elotech BAIXA (API), Betha MÉDIA, IPM ALTA (anti-bot). ✅ Câmara Paranaguá duodécimo via /ged/r/ (#273)
+
 - [De/para fontes local↔STN: 100% (cauda fechada)](msc-siconfi-fonte-oficial.md) — fonte local = grupo+spec TCE ANTIGA; conversão = Nota 008-2021 (data/nota_008...pdf) + prova vs MSC oficial; NÃO é 1:1 (fonte×APLICAÇÃO→STN) → `PrevisaoReceita.fonteStnCodigo` por previsão (#256). **Cauda das 11 fontes fechada por RESIDUAL (2026-07-15): 72/72 fontes, 403/403 previsões, 0 NULL, 29/31 STN ao centavo; único Δ = ±6,17mi 1501/1752 = split de aplicação da previsão 19111401 da 1097. op.crédito→1754, convênios cap→1701, 1003/1004/1097→1501.** deduções FUNDEB aplicadas (5/5 previstas + 25/25 realizadas AO CENTAVO; abertura regenerada pela BRUTA 3.301.053.997,00 = oficial). FILA restante: Δ captura líquida ~46,3mi (SYNC), eventos 151/152 já feitos (#257)
 - [rm só do que EU criei](feedback-rm-so-do-que-criei.md) — apaguei _demo_pdf.ts de outra frente (untracked, irrecuperável); conferir rm contra o git status do INÍCIO da sessão; árvore principal = zona vermelha
 - [Conferir o dev antes de importar](feedback-conferir-dev-antes-de-importar.md) — import é idempotente e SOBRESCREVE por nome de entidade; "sem runner commitado" ≠ "não está no dev"; sobrescrevi Paranaguá IPM sem querer (revert = re-importar a fonte anterior)
