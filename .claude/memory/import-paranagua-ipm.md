@@ -90,6 +90,14 @@ O clobber tinha zerado a despesa das 3 (0 dotações). Re-importado dos mesmos a
 - **Câmara:** `importar_camara_paranagua.ts` (`Relatorio (4).csv` por elemento + PIT `CÂMARA`) → 31 dot · Σ orçado **53.900.000,00** · empenhado **12.361.531,16** (era 10,37mi). ⚠️ **FIX commitado:** a Câmara não tinha as dims ÚNICAS (UO 01.001/prog 0001/ação 2000/fonte 001) pós-clobber e o script fazia `findFirstOrThrow`→crash; agora **auto-provisiona** dentro da transação (nomes reais do PIT: ação "Aprimoramento e Gestão do Processo Legislativo Municipal", fonte 001 "Recursos do Tesouro (Descentralizados)").
 - **Fundação:** script genérico da Previdência `--csv "Relatorio (6).csv" --nome "Fundação de Assistência à Saúde de Paranaguá" --pit-match "FUNDAÇÃO DE ASSISTÊNCIA"` → 8 dot · Σ orçado **21.282.068,89** · SEM execução no PIT (correto).
 - **TOTAL despesa município IPM: Σ orçado 1.354.099.680,63 · Σ empenhado 625.459.945,87** (4 entidades). Tudo ao centavo vs LOA/PIT.
-- ⚠️ **GAP: a CAGEPAR (5ª entidade) SUMIU no clobber** — o dev IPM hoje tem só 4 entidades (Prefeitura/Câmara/Previdência/Fundação). Restaurá-la = re-onboardar (`_onb_cagepar` inline) + execução via genérico `--pit-match CENTRAL --csv /dev/null` (orçado/receita dela seguem pendentes do QDD, que o Marco não achou no portal). Deferido — decisão do Marco.
+### CAGEPAR RESTAURADA (5ª entidade) — 2026-07-20 ✅
+O `_onb_cagepar` inline nunca tinha sido commitado (por isso sumiu no clobber). **Agora versionada:** adicionada à lista `ENTIDADES` de `onboard_paranagua_2026.ts` (ADM_INDIRETA, nome banco **"CAGEPAR - Central de Água, Esgoto e Serviços Concedidos do Litoral do Paraná"**). Onboard idempotente criou a entidade + orçamento + plano. Execução via genérico: `importar_previdencia_paranagua.ts --nome "CAGEPAR - ..." --pit-match "CENTRAL DE ÁGUA" --csv /dev/null --apply` → **16 dotações (só empenho) · Σ empenhado 2.186.091,54** (PIT atual; era 1,25mi). ⚠️ `--pit-match "CENTRAL DE ÁGUA"` isola do CISLIPA (consórcio, "CENTRAL" não bate). **Orçado/receita da CAGEPAR seguem pendentes** (QDD dela não está no portal IPM — Marco não achou).
+
+**ESTADO FINAL do município "Paranaguá" IPM (`d80c2dd7`): 5 entidades, receita+despesa ao centavo.**
+- Prefeitura: receita prev 1.282.085.954,72 / arrec 624.757.427,09 · despesa 1.105.490.611,74 / 587.365.948,90
+- Previdência: receita 140.347.000,00 / 130.261.237,24 · despesa 173.427.000,00 / 25.732.465,81
+- Câmara: despesa 53.900.000,00 / 12.361.531,16 (sem receita no portal)
+- Fundação: receita 11.452.268,60 / 17.426.123,55 · despesa 21.282.068,89 / — (fora do PIT)
+- CAGEPAR: despesa —/2.186.091,54 (só execução PIT; orçado/receita pendentes do QDD)
 
 Relaciona: [[tce-pr-pit-dados-abertos]], [[maringa-municipio-completo]], [[coordenacao-sessoes]], [[portal-maringa-api-arquivos]] (contraste: Elotech tem API aberta; IPM é captcha-walled).
