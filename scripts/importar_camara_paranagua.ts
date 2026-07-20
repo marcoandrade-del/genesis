@@ -97,19 +97,23 @@ async function main() {
 
   const cam = await prisma.entidade.findFirstOrThrow({ where: { tipo: 'CAMARA', municipio: { is: { nome: 'Paranaguá', estado: { is: { sigla: 'PR' } } } } }, select: { id: true, nome: true } })
   const orc = await prisma.orcamento.findUniqueOrThrow({ where: { entidadeId_ano: { entidadeId: cam.id, ano: ANO } }, select: { id: true } })
-  // dimensões únicas da Câmara (já existem)
-  const uo = (await prisma.unidadeOrcamentaria.findFirstOrThrow({ where: { entidadeId: cam.id }, select: { id: true } })).id
+  // função/subfunção são globais; as demais dimensões da Câmara são ÚNICAS e
+  // provisionadas se ausentes (pós-onboarding/clobber elas não existem).
   const func = (await prisma.funcao.findFirstOrThrow({ where: { codigo: '01' }, select: { id: true } })).id
   const subf = (await prisma.subfuncao.findFirstOrThrow({ where: { codigo: '031' }, select: { id: true } })).id
-  const prog = (await prisma.programa.findFirstOrThrow({ where: { entidadeId: cam.id, ano: ANO }, select: { id: true } })).id
-  const acao = (await prisma.acao.findFirstOrThrow({ where: { programa: { entidadeId: cam.id, ano: ANO } }, select: { id: true } })).id
-  const fonte = (await prisma.fonteRecursoEntidade.findFirstOrThrow({ where: { entidadeId: cam.id, ano: ANO, codigo: '001' }, select: { id: true } })).id
   const contasDb = new Map((await prisma.contaDespesaEntidade.findMany({ where: { entidadeId: cam.id, ano: ANO }, select: { codigo: true, id: true } })).map((c) => [c.codigo, c.id]))
   const resolverConta = (nat: string): string | null => contasDb.get(nat) ?? contasDb.get(`${nat.split('.').slice(0, 4).join('.')}.00.00`) ?? null
 
   const naturezas = new Set([...loa.keys(), ...exec.keys()])
   const semConta = [...naturezas].filter((n) => !resolverConta(n))
   console.log(`naturezas (união LOA+exec): ${naturezas.size}${semConta.length ? ` · SEM conta: ${semConta.join(' ')}` : ' · todas resolvem'}`)
+  const faltam = [
+    !(await prisma.unidadeOrcamentaria.findFirst({ where: { entidadeId: cam.id, codigo: '01.001' } })) && 'UO 01.001',
+    !(await prisma.programa.findFirst({ where: { entidadeId: cam.id, ano: ANO, codigo: '0001' } })) && 'programa 0001',
+    !(await prisma.acao.findFirst({ where: { codigo: '2000', programa: { entidadeId: cam.id, ano: ANO } } })) && 'ação 2000',
+    !(await prisma.fonteRecursoEntidade.findFirst({ where: { entidadeId: cam.id, ano: ANO, codigo: '001' } })) && 'fonte 001',
+  ].filter(Boolean) as string[]
+  if (faltam.length) console.log(`dims únicas a provisionar: ${faltam.join(' · ')}`)
   if (!APPLY) { console.log('\nDRY-RUN: nada gravado. Rode com --apply.'); return }
   if (semConta.length) throw new Error('há natureza sem conta — abortando')
 
@@ -123,6 +127,12 @@ async function main() {
     await tx.movimentoEmpenho.deleteMany({ where: { entidadeId: cam.id } })
     await tx.empenho.deleteMany({ where: { entidadeId: cam.id, numero: { startsWith: 'CAP-' } } })
     await tx.dotacaoDespesa.deleteMany({ where: { id: { in: antigas } } })
+
+    // provisiona as dimensões ÚNICAS da Câmara se ausentes (nomes reais do PIT)
+    const uo = ((await tx.unidadeOrcamentaria.findFirst({ where: { entidadeId: cam.id, codigo: '01.001' }, select: { id: true } })) ?? (await tx.unidadeOrcamentaria.create({ data: { entidadeId: cam.id, codigo: '01.001', nome: 'Câmara Municipal de Paranaguá' }, select: { id: true } }))).id
+    const prog = ((await tx.programa.findFirst({ where: { entidadeId: cam.id, ano: ANO, codigo: '0001' }, select: { id: true } })) ?? (await tx.programa.create({ data: { entidadeId: cam.id, ano: ANO, codigo: '0001', nome: 'Processo Legislativo', tipo: 'FINALISTICO' }, select: { id: true } }))).id
+    const acao = ((await tx.acao.findFirst({ where: { codigo: '2000', programaId: prog }, select: { id: true } })) ?? (await tx.acao.create({ data: { programaId: prog, codigo: '2000', nome: 'Aprimoramento e Gestão do Processo Legislativo Municipal', tipo: 'ATIVIDADE' }, select: { id: true } }))).id
+    const fonte = ((await tx.fonteRecursoEntidade.findFirst({ where: { entidadeId: cam.id, ano: ANO, codigo: '001' }, select: { id: true } })) ?? (await tx.fonteRecursoEntidade.create({ data: { entidadeId: cam.id, ano: ANO, codigo: '001', nomenclatura: 'Recursos do Tesouro (Descentralizados)', vinculada: false, origem: 'DESDOBRAMENTO' }, select: { id: true } }))).id
 
     const movRows: any[] = []; let comAmbos = 0, soOrc = 0, soEmp = 0
     for (const nat of naturezas) {
