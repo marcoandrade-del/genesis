@@ -58,7 +58,7 @@ const PARAMETROS: Array<{
 // tokens). O motor seleciona em código QUAL evento patrimonial dispara (300/400/
 // 500/560) conforme a parametrização; as CONTAS vêm daqui. E550/E570 são fluxos à
 // parte (lançamento tributário / dívida ativa) — seguem code-driven, sem gatilho.
-type GatilhoReceita = 'ARRECADACAO' | 'DEDUCAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA'
+type GatilhoReceita = 'ARRECADACAO' | 'DEDUCAO' | 'LANCAMENTO_TRIBUTARIO' | 'INSCRICAO_DIVIDA_ATIVA' | 'TRANSFERENCIA_FINANCEIRA'
 const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoReceita; linhas?: Array<[string, string]> }> = [
   { codigo: '100', gatilho: 'ARRECADACAO', descricao: 'Arrecadação orçamentária (cc: natureza)', linhas: [[CE.receitaARealizar, CE.receitaRealizada]] },
   // Dedução na origem (FUNDEB): 2 linhas — completa a realizada até a BRUTA e
@@ -73,6 +73,9 @@ const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoRecei
   { codigo: '550', gatilho: 'LANCAMENTO_TRIBUTARIO', descricao: 'Lançamento de crédito tributário (D ativo / C VPA)', linhas: [[TR.ATIVO, TR.CONTRAPARTIDA]] },
   { codigo: '560', gatilho: 'ARRECADACAO', descricao: 'Arrecadação da receita lançada (baixa do crédito a receber)', linhas: [[TR.CAIXA, TR.CONTRAPARTIDA]] },
   { codigo: '570', gatilho: 'INSCRICAO_DIVIDA_ATIVA', descricao: 'Inscrição em dívida ativa (D dívida ativa / C baixa do circulante)', linhas: [[TR.DIVIDA_ATIVA, TR.ATIVO]] },
+  // Transferência financeira recebida (duodécimo/repasse intra-ente) — patrimonial puro,
+  // sem orçamentário/DDR. Ambas as pernas cc=fonte (o token @REPASSE_VPA força 'fonte').
+  { codigo: '900', gatilho: 'TRANSFERENCIA_FINANCEIRA', descricao: 'Transferência Financeira Recebida (duodécimo/repasse — cc: fonte)', linhas: [[TR.CAIXA, TR.REPASSE_VPA]] },
 ]
 
 async function main() {
