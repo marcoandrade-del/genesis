@@ -20,7 +20,8 @@ Vive na memória do projeto (independente de branch) para todas as sessões enxe
 
 ## Frentes ativas
 
-> ✅ **Sessão `33369826` (2026-07-20) — DONA da frente Paranaguá IPM: RECEITA + DESPESA re-importadas, ao centavo.** Branch `feat/import-paranagua`. O clobber do SICONFI tinha zerado a receita (arrec=0) E a despesa da Câmara/Prev/Fundação (0 dotações). Re-importei tudo dos arquivos que o Marco exportou em 10/jul (ainda em `~/Downloads`) + PIT atual:
+> ✅✅ **Sessão `33369826` (2026-07-20) — frente Paranaguá IPM MERGEADA na master (`#272`, squash `2497952`); branch `feat/import-paranagua` APAGADA (local+remota), CI verde.** PR era só-scripts (memória tirada do diff p/ evitar conflito). Abaixo o que foi feito:
+> ✅ **RECEITA + DESPESA re-importadas, ao centavo.** (histórico) Branch `feat/import-paranagua`. O clobber do SICONFI tinha zerado a receita (arrec=0) E a despesa da Câmara/Prev/Fundação (0 dotações). Re-importei tudo dos arquivos que o Marco exportou em 10/jul (ainda em `~/Downloads`) + PIT atual:
 > - **Receita:** Prefeitura Σprev 1.282.085.954,72 líquida / Σarrec 624.757.427,09 · Previdência 140,35mi/130,26mi · Fundação 11,45mi/17,43mi (FUNDEB aplicado).
 > - **Despesa (4 ent):** TOTAL Σ orçado **1.354.099.680,63** · Σ empenhado **625.459.945,87** (Pref 1.105/587mi · Prev 173/25,7mi · Câmara 53,9/12,4mi · Fundação 21,3mi só orçado).
 > - **1 commit de código** (`importar_camara_paranagua.ts` auto-provisiona dims); resto foi rodar os scripts existentes. **Toquei SÓ o município "Paranaguá" IPM (`d80c2dd7`) — NADA no "Paranaguá (SICONFI)" (`e3eafc89`), conferido antes/depois.** **Sessão SICONFI: seu município intacto.**
