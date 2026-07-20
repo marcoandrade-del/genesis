@@ -20,6 +20,7 @@ const TODAS_FOLHAS = [
   CONTAS_EVENTO.receitaDeducaoFundeb,
   CONTAS_EVENTO.receitaDeducaoRenuncia,
   CONTAS_EVENTO.receitaDeducaoOutras,
+  CONTAS_EVENTO.vpaRepasseRecebido,
   VPA_APLIC,
 ]
 
@@ -347,5 +348,63 @@ describe('MotorEventosReceita — controle de baixa (saldo a receber)', () => {
     const r152 = await motor(mock).resolverDeducao({ ...baseCtx, valor: '10.00' }, '152')
     expect(r152[0]!.eventoCodigo).toBe('152')
     expect(r152[0]!.itens.some((i) => i.contaId === `id:${CONTAS_EVENTO.receitaDeducaoOutras}`)).toBe(true)
+  })
+})
+
+describe('MotorEventosReceita — transferência financeira recebida (evento 900)', () => {
+  let mock: PrismaMock
+  beforeEach(() => {
+    mock = criarPrismaMock()
+  })
+  const tfCtx = { entidadeId: ENT, ano: ANO, fonteCodigo: '001', valor: '4918368.00' }
+  const deb = (e: { itens: { tipo: string; contaId: string }[] }) => e.itens.find((i) => i.tipo === 'DEBITO')!.contaId
+  const cred = (e: { itens: { tipo: string; contaId: string }[] }) => e.itens.find((i) => i.tipo === 'CREDITO')!.contaId
+
+  it('evento 900: D Caixa / C VPA Repasse Recebido (4.5.1.1.2.02)', async () => {
+    comFolhas(mock)
+    const ev = await motor(mock).resolverTransferenciaFinanceira(tfCtx)
+    expect(ev.map((e) => e.eventoCodigo)).toEqual(['900'])
+    expect(deb(ev[0]!)).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+    expect(cred(ev[0]!)).toBe(`id:${CONTAS_EVENTO.vpaRepasseRecebido}`)
+  })
+
+  it('NÃO é receita orçamentária: ambas as pernas com naturezaReceitaCodigo=null e fonteCodigo=001', async () => {
+    comFolhas(mock)
+    const [ev] = await motor(mock).resolverTransferenciaFinanceira(tfCtx)
+    expect(ev!.itens.every((i) => i.naturezaReceitaCodigo == null)).toBe(true)
+    expect(ev!.itens.every((i) => i.fonteCodigo === '001')).toBe(true)
+    // e não toca o orçamentário (6.2.1.x) nem DDR (7/8)
+    expect(ev!.itens.some((i) => i.contaId.includes('6.2.1') || i.contaId.includes('7.2.1') || i.contaId.includes('8.2.1'))).toBe(false)
+  })
+
+  it('valor com 2 casas', async () => {
+    comFolhas(mock)
+    const [ev] = await motor(mock).resolverTransferenciaFinanceira(tfCtx)
+    expect(ev!.itens.every((i) => i.valor === '4918368.00')).toBe(true)
+  })
+
+  it('estorno inverte D↔C (mesmas contas)', async () => {
+    comFolhas(mock)
+    const ev = await motor(mock).resolverTransferenciaFinanceira(tfCtx, { estorno: true })
+    expect(deb(ev[0]!)).toBe(`id:${CONTAS_EVENTO.vpaRepasseRecebido}`) // antes crédito
+    expect(cred(ev[0]!)).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`) // antes débito
+  })
+
+  it('caixaCodigo custom sobrepõe o caixa default', async () => {
+    const OVERRIDE = '1.1.1.1.1.99.00.00.00.00.00.00'
+    comFolhas(mock, [...TODAS_FOLHAS, OVERRIDE])
+    const [ev] = await motor(mock).resolverTransferenciaFinanceira({ ...tfCtx, caixaCodigo: OVERRIDE })
+    expect(deb(ev!)).toBe(`id:${OVERRIDE}`)
+  })
+
+  it('conta ausente no plano → ENTIDADE_NAO_PROCESSAVEL', async () => {
+    comFolhas(mock, TODAS_FOLHAS.filter((c) => c !== CONTAS_EVENTO.vpaRepasseRecebido))
+    await expect(motor(mock).resolverTransferenciaFinanceira(tfCtx)).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
+  })
+
+  it('modelo sem evento 900 → lista vazia', async () => {
+    comFolhas(mock)
+    mock.eventoContabil.findMany.mockResolvedValue([])
+    expect(await motor(mock).resolverTransferenciaFinanceira(tfCtx)).toEqual([])
   })
 })

@@ -75,6 +75,7 @@ export const CONTAS_EVENTO = {
   ddrControleOrdinario: '7.2.1.1.1.00.00.00.00.00.00.00', // RECURSOS ORDINÁRIOS
   ddrControleVinculado: '7.2.1.1.2.00.00.00.00.00.00.00', // RECURSOS VINCULADOS
   ddrDisponibilidade: '8.2.1.1.1.01.00.00.00.00.00.00', // RECURSOS DISPONÍVEIS PARA O EXERCÍCIO
+  vpaRepasseRecebido: '4.5.1.1.2.02.00.00.00.00.00.00', // REPASSE RECEBIDO — VPA de transferência financeira intra OFSS (duodécimo)
 } as const
 
 /**
@@ -89,6 +90,7 @@ export const TOKENS = {
   CONTRAPARTIDA: '@CONTRAPARTIDA',
   ATIVO: '@ATIVO', // créditos a receber (1.1.2.x) — lançamento tributário / dívida ativa
   DIVIDA_ATIVA: '@DIVIDA_ATIVA', // dívida ativa (1.2.1.x) — inscrição
+  REPASSE_VPA: '@REPASSE_VPA', // VPA de repasse recebido — resolve cc='fonte' (transf. financeira NÃO tem natureza de receita)
 } as const
 
 /** Resolve uma máscara para conta-corrente, dado o resolvedor de tokens do estágio. */
@@ -108,6 +110,20 @@ export type ContextoArrecadacao = {
    * Folha contábil de caixa a debitar no E300 — vinda da conta bancária por onde
    * a receita entrou. Se ausente, usa o caixa de arrecadação default da entidade.
    */
+  caixaCodigo?: string | null
+}
+
+/**
+ * Contexto da TRANSFERÊNCIA FINANCEIRA RECEBIDA (duodécimo/repasse intra-ente).
+ * Não há natureza de receita — só fonte; ambas as pernas (Caixa e VPA) carregam a fonte.
+ */
+export type ContextoTransferenciaFinanceira = {
+  entidadeId: string
+  ano: number
+  /** Fonte de recursos do repasse (FonteRecursoEntidade.codigo). */
+  fonteCodigo: string
+  valor: Prisma.Decimal | string | number
+  /** Folha de caixa a debitar; default = caixa de arrecadação da entidade. */
   caixaCodigo?: string | null
 }
 
@@ -299,6 +315,31 @@ export class MotorEventosReceita {
       return null
     }
     return this.montarEventos(ctx, modeloId, 'INSCRICAO_DIVIDA_ATIVA', null, resolverToken, opts, db)
+  }
+
+  /**
+   * Resolve a TRANSFERÊNCIA FINANCEIRA RECEBIDA (duodécimo/repasse do Executivo) —
+   * evento 900, patrimonial puro: D Caixa / C VPA "Repasse Recebido" (4.5.1.1.2.02).
+   * NÃO toca orçamentário (6.2.1.x) nem DDR — não é receita orçamentária. Ambas as
+   * pernas carregam SÓ fonte (o token `@REPASSE_VPA` força cc='fonte', evitando que a
+   * conta classe-4 vire cc='natureza' pela heurística). Estorno inverte D↔C.
+   */
+  async resolverTransferenciaFinanceira(
+    ctx: ContextoTransferenciaFinanceira,
+    opts: { estorno?: boolean } = {},
+    tx?: Prisma.TransactionClient,
+  ): Promise<LancamentoEvento[]> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
+    const caixa = ctx.caixaCodigo || CONTAS_EVENTO.caixaArrecadacao
+    const resolverToken: ResolverToken = (t) => {
+      if (t === TOKENS.CAIXA) return { codigo: caixa, cc: 'fonte' }
+      if (t === TOKENS.REPASSE_VPA) return { codigo: CONTAS_EVENTO.vpaRepasseRecebido, cc: 'fonte' }
+      return null
+    }
+    // naturezaCodigo vazio: as duas pernas resolvem cc='fonte', então leg() nunca lê a natureza.
+    const ctxNucleo = { entidadeId: ctx.entidadeId, ano: ctx.ano, naturezaCodigo: '', fonteCodigo: ctx.fonteCodigo, valor: ctx.valor }
+    return this.montarEventos(ctxNucleo, modeloId, 'TRANSFERENCIA_FINANCEIRA', ['900'], resolverToken, opts, db)
   }
 
   /** Saldo (devedor: D − C) de uma conta-folha da entidade no exercício, pelo código. */
