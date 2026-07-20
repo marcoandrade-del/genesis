@@ -31,18 +31,27 @@ import type { ResultadoSincronizacao } from './sincronizacao-portal.js'
  * SincronizacaoPortal tipo DECRETOS. Idempotente por número do decreto.
  */
 
-const BASE = process.env['PORTAL_MARINGA_URL'] ?? 'https://transparencia.maringa.pr.gov.br/portaltransparencia-api'
-const ENTIDADE_PORTAL = '1'
+const BASE_MARINGA = process.env['PORTAL_MARINGA_URL'] ?? 'https://transparencia.maringa.pr.gov.br/portaltransparencia-api'
 /** Rótulo dos itens sem número — nunca lançado pelo sync (exclusivo do script manual). */
 const SN_MANUAL = 'S/N-SYNC-NUNCA-LANCA'
 
 export class SincronizacaoDecretosService {
-  constructor(private prisma: PrismaClient) {}
+  private readonly base: string
+  private readonly entidadePortal: string
+  /**
+   * `opts` torna o sync reusável por QUALQUER município Elotech (não só Maringá):
+   * `portalUrl` = base da API do portal; `entidadePortal` = id da entidade no portal
+   * (o `/api/creditosadicionais?entidade=`). Default = Maringá (Prefeitura, '1').
+   */
+  constructor(private prisma: PrismaClient, opts: { portalUrl?: string; entidadePortal?: string } = {}) {
+    this.base = opts.portalUrl ?? BASE_MARINGA
+    this.entidadePortal = opts.entidadePortal ?? '1'
+  }
 
   private async getJson<T>(path: string): Promise<T> {
     for (let tentativa = 1; ; tentativa++) {
       try {
-        const res = await fetch(`${BASE}${path}`)
+        const res = await fetch(`${this.base}${path}`)
         if (!res.ok) throw new Error(`HTTP ${res.status} em ${path}`)
         return (await res.json()) as T
       } catch (e) {
@@ -63,7 +72,7 @@ export class SincronizacaoDecretosService {
       const orcamento = await this.prisma.orcamento.findUnique({ where: { entidadeId_ano: { entidadeId, ano } }, select: { id: true } })
       if (!orcamento) return registrar({ status: 'ERRO', mensagem: `Sem orçamento ${ano}.`, valorPortal: 0, valorGravado: 0 })
 
-      const corpo = await this.getJson<{ content: ItemPortalDecreto[] }>(`/api/creditosadicionais?entidade=${ENTIDADE_PORTAL}&exercicio=${ano}&size=5000`)
+      const corpo = await this.getJson<{ content: ItemPortalDecreto[] }>(`/api/creditosadicionais?entidade=${this.entidadePortal}&exercicio=${ano}&size=5000`)
       const porDot = montarRegistrosPorDotacao(corpo.content, SN_MANUAL)
       const atualPorKf = new Map<string, number>()
       for (const [kf, regs] of porDot) atualPorKf.set(kf, regs[0]!.atual)

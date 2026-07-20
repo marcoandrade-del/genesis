@@ -14,6 +14,8 @@
  * Valores monetários SEMPRE em CENTAVOS (inteiro) para não acumular erro de float.
  */
 
+import type { PrismaClient } from '@prisma/client'
+
 export type TipoEntidade = 'PREFEITURA' | 'CAMARA' | 'ADM_INDIRETA'
 
 /**
@@ -89,7 +91,16 @@ export interface ConectorFabricante {
   lerReceita(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaReceita[]>
   /** Dotação inicial (orçado) da despesa de uma entidade. */
   lerDespesa(cfg: MunicipioConfig, ent: EntidadeConfig): Promise<LinhaDespesa[]>
+  /**
+   * FASE 2 (opcional): aplica os créditos adicionais (decretos) do portal sobre o
+   * autorizado da entidade — só fabricantes com API de decretos implementam (ex.:
+   * Elotech). A LOA (fase 1) já precisa estar gravada. Idempotente por nº de decreto.
+   */
+  sincronizarCreditos?(prisma: PrismaClient, cfg: MunicipioConfig, ent: EntidadeConfig, entidadeId: string): Promise<ResultadoCreditos>
 }
+
+/** Resultado da fase-2 de créditos (decretos). */
+export type ResultadoCreditos = { status: 'OK' | 'DIVERGENTE' | 'ERRO'; mensagem: string; valorGravado: number }
 
 /**
  * Fonte da EXECUÇÃO da despesa — o TCE do estado (dados abertos). Agnóstico de
