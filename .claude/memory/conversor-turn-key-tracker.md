@@ -45,10 +45,11 @@ Pref/RPPS: receita ✅ portal Betha (#263); **despesa orç+exec = Ⓢ SICONFI** 
 ### Paranaguá (SICONFI) — *(outra sessão, duplicata IPM)* · Vazios: Cianorte/Curitiba/Naviraí/Sarandi/Vilhena (⬜ stubs?)
 
 ## Bloqueios reais pro 100% portal
-1. **IPM grid anti-bot** (o maior) — atacar por `/ged/r/` + handshake Janela.
-2. **Betha despesa dimensional** — 174485 sem programa/ação por ano.
-3. **CAGEPAR** — portal IPM não expõe → provável ficar SICONFI.
-4. **Execução via PIT** — automat. mas não é o portal (decisão pendente).
+1. **IPM grid anti-bot (`000549`) — MURO DEFINITIVO (2026-07-21):** crackei o handshake da Janela (401→resolvido com a **sessão + referer do IFRAME** `/embed/data/<b64>/item/`; replay via fetch chega no endpoint) MAS o `000549` bloqueia a consulta mesmo com a requisição **byte-a-byte idêntica** ao browser, numa sessão limpa de 3 requests (não é fingerprint, não é handshake, não é rate — é detecção server-side de automação, mesmo via curl, do mesmo IP que o browser do Marco passa). **O grid granular (LOA/arrecadação por natureza) NÃO é automatizável.** `/ged/r/` (PDFs) destrava só duodécimo/decretos/prestação-de-contas. Granular = export manual até o `000549` ceder (o replay do handshake está pronto se ceder). ⭐ Técnica: `getFormularioExigeCaptchaAjax` (rot 1211) é o check de captcha; a consulta = `processaDados rot<R>/aca101` no iframe.
+2. **DECRETOS do Paranaguá — NÃO PRECISA (Marco, 2026-07-21):** verifiquei antes de vasculhar os 1013 PDFs — o CSV de despesa que o Marco exportou (`Relatorio (1).csv`, Total 1.105.490.611,74) **já é o QDD ATUALIZADO** (col. "Recursos Exercício Anterior" = 52.118.764,24 = superávit financeiro = créditos já aplicados; o portal mostra o corrente). Parsear os decretos DUPLICARIA. Dev tem 0 CreditoAdicional (falta segregação inicial-vs-crédito), mas o **total autorizado está correto** e o Paranaguá IPM é scaffold (sem razão contábil completo) → segregação desnecessária. **Decretos do Paranaguá = descartados.**
+3. **Betha despesa dimensional** — 174485 sem programa/ação por ano.
+4. **CAGEPAR** — portal IPM não expõe QDD/receita dela → provável ficar SICONFI.
+5. **Execução via PIT** — automat. mas não é o portal (decisão pendente; aceito como fonte oficial).
 
 ## Elotech (Maringá) — API do portal DECIFRADA (2026-07-20)
 Base `https://transparencia.maringa.pr.gov.br/portaltransparencia-api`. Endpoints:
