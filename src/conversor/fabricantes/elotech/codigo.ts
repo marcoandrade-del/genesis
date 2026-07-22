@@ -5,6 +5,7 @@
  * entrega os dígitos na ordem PCASP — basta AGRUPAR (receita) ou parsear a
  * programática pontuada (despesa).
  */
+import { naturezaReceita as naturezaReceitaPcasp } from '../../nucleo/pcasp.js'
 
 // Receita: 12 grupos de dígitos → "1.1.1.2.50.0.1.00.00.00.00.00".
 const GRUPOS = [1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2, 2]
@@ -28,9 +29,16 @@ export function pad12(codigo: string): string {
   return partes.join('.')
 }
 
-/** Natureza da receita do portal (dígitos crus) → PCASP pontuada de 12 grupos. */
+/**
+ * Natureza da receita do portal → PCASP pontuada de 12 grupos. O portal pode
+ * entregar os dígitos crus ("11125001") OU já pontuados ("1.1.1.2.50.0.1") —
+ * fatiar um código pontuado como se fosse cru corrompe ("1...1..1..2...50",
+ * aconteceu nos 4 municípios importados em 2026-07-21; reparo em
+ * scripts/reparar_codigos_receita_elotech.ts). Delega ao helper do núcleo,
+ * que trata os dois formatos.
+ */
 export function naturezaReceita(raw: string): string {
-  return pad12(agruparDigitos(raw))
+  return naturezaReceitaPcasp(raw)
 }
 
 /**

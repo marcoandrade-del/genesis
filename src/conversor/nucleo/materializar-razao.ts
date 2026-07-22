@@ -1,5 +1,5 @@
 import type { PrismaClient, TipoMovimentoEmpenho } from '@prisma/client'
-import { MotorEventosReceita, type LancamentoEvento } from '../../services/motor-eventos-receita.js'
+import { MotorEventosReceita, CONTAS_EVENTO, type LancamentoEvento } from '../../services/motor-eventos-receita.js'
 import { MotorEventosDespesa, isoData } from '../../services/motor-eventos-despesa.js'
 import { LancamentosService } from '../../services/lancamentos.js'
 import { OrcamentosService } from '../../services/orcamentos.js'
@@ -14,8 +14,13 @@ import { AberturaContabilService } from '../../services/abertura-contabil.js'
  *
  * SEMPRE limpa antes de recriar (o import deleta+recria Arrecadacao/empenho com IDs
  * novos → a idempotência por origemId não alcança os órfãos; sem limpar, dobraria).
- * Só toca os eventos ORÇAMENTÁRIO/CONTROLE (classes 5-8); o patrimonial (Dim II) é
- * outro ciclo. Espelha `scripts/backfill_contabil_execucao.ts` (a prova/dry-run).
+ *
+ * Por padrão materializa TAMBÉM as pernas PATRIMONIAIS (Dim II: E300/E400/E500
+ * arrecadação → caixa/VPA; E702 liquidação → VPD/passivo; E802 pagamento →
+ * passivo/caixa), que dependem do de/para (ParametroReceita/ParametroDespesa) —
+ * sem elas o caixa 1.1.1.* fica zerado e a prova de disponibilidade p/ restos a
+ * pagar (art. 42 LRF) não existe. `patrimonial: false` restringe às classes 5-8
+ * (comportamento anterior). Espelha `scripts/backfill_contabil_execucao.ts`.
  */
 const EVENTO_DEDUCAO = { FUNDEB: '150', RENUNCIA: '151', OUTRAS: '152' } as const
 const ORIGENS_EXECUCAO = ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO'] as const
@@ -52,22 +57,30 @@ async function contabilizarAbertura(prisma: PrismaClient, entidadeId: string, an
   await new AberturaContabilService(prisma).contabilizar(entidadeId, ano, usuarioId)
 }
 
+/** Opções da materialização. */
+export type OpcoesRazao = {
+  /** Materializa as pernas patrimoniais (classes 1-4) além das 5-8. Default: true. */
+  patrimonial?: boolean
+}
+
 /** Contexto compartilhado do replay (motores + writer + mapa de contas). */
 type CtxReplay = {
   prisma: PrismaClient
   entidadeId: string
   ano: number
+  patrimonial: boolean
   motorReceita: MotorEventosReceita
   motorDespesa: MotorEventosDespesa
   lancamentos: LancamentosService
   codigoPorId: Map<string, string>
 }
 
-async function ctxReplay(prisma: PrismaClient, entidadeId: string, ano: number): Promise<CtxReplay> {
+async function ctxReplay(prisma: PrismaClient, entidadeId: string, ano: number, opts: OpcoesRazao): Promise<CtxReplay> {
   return {
     prisma,
     entidadeId,
     ano,
+    patrimonial: opts.patrimonial !== false,
     motorReceita: new MotorEventosReceita(prisma),
     motorDespesa: new MotorEventosDespesa(prisma),
     lancamentos: new LancamentosService(prisma),
@@ -75,6 +88,11 @@ async function ctxReplay(prisma: PrismaClient, entidadeId: string, ano: number):
       (await prisma.contaContabilEntidade.findMany({ where: { entidadeId, ano }, select: { id: true, codigo: true } })).map((c) => [c.id, c.codigo]),
     ),
   }
+}
+
+/** Aplica (ou não) o corte às classes 5-8, conforme a opção patrimonial. */
+function filtrarEventos(c: CtxReplay, eventos: LancamentoEvento[]): LancamentoEvento[] {
+  return c.patrimonial ? eventos : soOrcamentarias(eventos, c.codigoPorId)
 }
 
 type ArrecadacaoReplay = { id: string; tipo: string; deducaoTipo: string | null; valor: unknown; data: Date; previsao: { contaReceita: { codigo: string }; fonteRecurso: { codigo: string; vinculada: boolean } } }
@@ -87,11 +105,11 @@ async function replayArrecadacoes(c: CtxReplay, arrecadacoes: ArrecadacaoReplay[
   for (const a of arrecadacoes) {
     await c.prisma.$transaction(async (tx) => {
       const ctx = { entidadeId: c.entidadeId, ano: c.ano, naturezaCodigo: a.previsao.contaReceita.codigo, fonteCodigo: a.previsao.fonteRecurso.codigo, fonteVinculada: a.previsao.fonteRecurso.vinculada, valor: a.valor as never }
-      const eventos = soOrcamentarias(
+      const eventos = filtrarEventos(
+        c,
         a.tipo === 'DEDUCAO'
           ? await c.motorReceita.resolverDeducao(ctx, EVENTO_DEDUCAO[(a.deducaoTipo ?? 'FUNDEB') as keyof typeof EVENTO_DEDUCAO], {}, tx)
           : await c.motorReceita.resolver(ctx, { estorno: a.tipo === 'ESTORNO' }, tx),
-        c.codigoPorId,
       )
       for (const ev of eventos) {
         await c.lancamentos.criar({ entidadeId: c.entidadeId, data: isoData(a.data), historico: `${ev.descricaoEvento} — materialização`, itens: ev.itens, criadoPorId: 'CONVERSOR', origemTipo: 'ARRECADACAO', origemId: a.id, eventoCodigo: ev.eventoCodigo }, tx)
@@ -104,13 +122,22 @@ async function replayMovimentos(c: CtxReplay, movimentos: MovimentoReplay[]): Pr
   for (const m of movimentos) {
     const { gatilho, estorno } = mapaEstagio(m.tipo)
     await c.prisma.$transaction(async (tx) => {
-      const ctx = { entidadeId: c.entidadeId, ano: c.ano, dotacaoDespesaId: m.empenho.dotacaoDespesaId, naturezaCodigo: m.empenho.dotacaoDespesa.contaDespesa.codigo, valor: m.valor as never }
+      // caixaCodigo: a captura não tem ContaBancaria — o pagamento (E802) credita a
+      // folha de caixa default; sem ele o token @CAIXA não resolve e a perna é pulada.
+      const ctx = {
+        entidadeId: c.entidadeId,
+        ano: c.ano,
+        dotacaoDespesaId: m.empenho.dotacaoDespesaId,
+        naturezaCodigo: m.empenho.dotacaoDespesa.contaDespesa.codigo,
+        valor: m.valor as never,
+        caixaCodigo: c.patrimonial ? CONTAS_EVENTO.caixaArrecadacao : null,
+      }
       const evs =
         gatilho === 'EMPENHO' ? await c.motorDespesa.resolverEmpenho(ctx, { estorno }, tx)
         : gatilho === 'LIQUIDACAO' ? await c.motorDespesa.resolverLiquidacao(ctx, { estorno }, tx)
         : await c.motorDespesa.resolverPagamento(ctx, { estorno }, tx)
       const origemTipo = gatilho === 'EMPENHO' ? 'EMPENHO' : gatilho === 'LIQUIDACAO' ? 'LIQUIDACAO' : 'PAGAMENTO'
-      for (const ev of soOrcamentarias(evs, c.codigoPorId)) {
+      for (const ev of filtrarEventos(c, evs)) {
         await c.lancamentos.criar({ entidadeId: c.entidadeId, data: isoData(m.data), historico: `${ev.descricaoEvento} — materialização`, itens: ev.itens, criadoPorId: 'CONVERSOR', origemTipo, origemId: m.id, eventoCodigo: ev.eventoCodigo }, tx)
       }
     })
@@ -122,8 +149,9 @@ export async function materializarRazao(
   entidadeId: string,
   ano: number,
   usuarioId: string,
+  opts: OpcoesRazao = {},
 ): Promise<{ arrecadacoes: number; movimentos: number }> {
-  const c = await ctxReplay(prisma, entidadeId, ano)
+  const c = await ctxReplay(prisma, entidadeId, ano, opts)
 
   await contabilizarAbertura(prisma, entidadeId, ano, usuarioId)
 
@@ -157,8 +185,9 @@ export async function materializarRazaoIncremental(
   entidadeId: string,
   ano: number,
   usuarioId: string,
+  opts: OpcoesRazao = {},
 ): Promise<{ orfaosExcluidos: number; arrecadacoes: number; movimentos: number }> {
-  const c = await ctxReplay(prisma, entidadeId, ano)
+  const c = await ctxReplay(prisma, entidadeId, ano, opts)
   await contabilizarAbertura(prisma, entidadeId, ano, usuarioId)
 
   const arrIds = new Set((await prisma.arrecadacao.findMany({ where: { previsao: { orcamento: { entidadeId, ano } } }, select: { id: true } })).map((a) => a.id))
