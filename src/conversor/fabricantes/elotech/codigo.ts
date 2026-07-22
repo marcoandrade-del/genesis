@@ -34,6 +34,32 @@ export function naturezaReceita(raw: string): string {
 }
 
 /**
+ * Fronteiras (em nº de caracteres) da programática CONCATENADA do Elotech legado
+ * (eloweb.net, ex. Sarandi): orgao(2) unidade(3) funcao(2) subfuncao(3)
+ * programa(4) acao(4) categoria(1) grupo(1) modalidade(2) elemento(2). Confirmadas
+ * pelos `inicio`/`tamanho` da própria API (nível 1→10).
+ */
+const FRONTEIRAS_CONCAT = [2, 5, 7, 10, 14, 18, 19, 20, 22]
+
+/**
+ * Converte a programática CONCATENADA (sem pontos, Elotech legado) para o formato
+ * PONTUADO padrão, inserindo os pontos nas fronteiras fixas. Nós intermediários
+ * (mais curtos) recebem só os pontos que couberem. Assim o resto do pipeline
+ * (parseProgramatica + mapas de nome) trata os dois formatos de forma idêntica.
+ * Ex.: "040010412200061061449040" → "04.001.04.122.0006.1061.4.4.90.40".
+ */
+export function dotificarProgramatica(concat: string): string {
+  let out = ''
+  let prev = 0
+  for (const b of FRONTEIRAS_CONCAT) {
+    if (concat.length <= b) break
+    out += concat.slice(prev, b) + '.'
+    prev = b
+  }
+  return out + concat.slice(prev)
+}
+
+/**
  * Programática da despesa (nível 11, 10 posições pontuadas), ex.
  * "02.010.04.122.0002.2001.3.1.90.07" → dimensões + natureza no elemento.
  * Devolve null se não tiver 10 posições.
