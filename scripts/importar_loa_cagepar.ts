@@ -28,6 +28,8 @@ import { escreverDespesa } from '../src/conversor/nucleo/escrever-despesa.js'
 import { reconciliarDespesa } from '../src/conversor/nucleo/reconciliar.js'
 import { materializarRazao } from '../src/conversor/nucleo/materializar-razao.js'
 import { pitTcePr } from '../src/conversor/tce/pr/pit.js'
+import { LancamentosService } from '../src/services/lancamentos.js'
+import { AberturaContabilService } from '../src/services/abertura-contabil.js'
 import type { LinhaReceita, LinhaDespesa, MunicipioConfig, EntidadeConfig } from '../src/conversor/nucleo/tipos.js'
 
 const ANO = 2026
@@ -49,28 +51,36 @@ const RECEITA: LinhaReceita[] = [
 ]
 
 /**
- * DESPESA — `Relatorio (11).csv` (rotina 45107, dados abertos): QDD por
- * MODALIDADE. Formato IPM: colunas [Entidade, Conta, Descrição, Desdobramento,
- * Elemento, Categoria] — o VALOR aparece na coluna do NÍVEL da linha; as linhas
- * de MODALIDADE têm valor em "Desdobramento" (as demais são os pais/rollup).
- * Conta IPM: prefixo '3' + dígitos da natureza (ex. 3319→3.1.90 · 33191→3.1.91).
- * Σ modalidades = 5.653.300,00 (portal ATUALIZADO; anexo LOA 5.578.300 + 75.000
- * de créditos via superávit — mesmo padrão do Paranaguá). Verificado ao centavo.
+ * DESPESA — `Relatorio (12).csv` (rotina 45107, dados abertos): QDD por
+ * ELEMENTO. Colunas [Entidade, Categoria "3 - …", Grupo "1 - …", Elemento
+ * "11 - …", Código, Descrição, Prevista para o Ano, Liquidado até o Mês, %].
+ * Natureza = categoria.grupo.MODALIDADE(do código IPM: 3319→90 · 33191→91).
+ * elemento(da coluna). Σ prevista = 5.653.300,00 = QDD por modalidade ✓ (portal
+ * ATUALIZADO; anexo LOA 5.578.300 + 75.000 créditos via superávit). O liquidado
+ * do CSV é usado só como VALIDAÇÃO cruzada (a execução materializada vem do PIT).
  *
- * Dimensões: as MESMAS da execução real (PIT — todas as 16 dotações executadas):
- * UO 24.001 · função 04 · subfunção 122 · programa 0054 · ação 2230. Fonte 000.
+ * Dimensões: as MESMAS da execução real (PIT): UO 24.001 · função 04 ·
+ * subfunção 122 · programa 0054 · ação 2230. Fonte 000 — no MESMO nível do PIT,
+ * então a reconciliação casa LOA e execução na MESMA dotação.
  */
-function lerDespesaCsv(caminho: string): LinhaDespesa[] {
+function lerDespesaCsv(caminho: string): { linhas: LinhaDespesa[]; liquidadoCsv: number } {
   const raw = readFileSync(caminho, 'latin1')
   const linhas: LinhaDespesa[] = []
+  let liquidadoCsv = 0
   for (const row of raw.split(/\r?\n/).slice(1)) {
-    const cols = row.split(';').map((c) => c.replace(/^"|"$/g, '').trim())
-    if (cols.length < 6) continue
-    const conta = (cols[1] ?? '').replace(/\D/g, '')
-    const modalidadeValor = Number((cols[3] ?? '').replace(',', '.')) // col "Desdobramento"
-    if (!conta.startsWith('3') || !(modalidadeValor > 0)) continue // só linhas de modalidade
-    const d = conta.slice(1) // strip do prefixo IPM '3'
-    const nat = `${d[0]}.${d[1]}.${d.slice(2, 4)}.00.00.00` // modalidade, elemento 00
+    const cols = row.split('";"').map((c) => c.replace(/^"|"$/g, '').trim())
+    if (cols.length < 8) continue
+    const cat = cols[1]?.split(' - ')[0] ?? ''
+    const grupo = cols[2]?.split(' - ')[0] ?? ''
+    const elem = cols[3]?.split(' - ')[0] ?? ''
+    const cod = (cols[4] ?? '').replace(/\D/g, '')
+    const prevista = Number(cols[6] || 0)
+    const liquidado = Number(cols[7] || 0)
+    if (!cod.startsWith('3') || !cat || !elem) continue
+    liquidadoCsv += liquidado
+    if (!(prevista > 0)) continue // elemento sem dotação (só execução residual) fica fora da LOA
+    const mod = cod.slice(1).slice(2, 4) // 3319→90 · 33191→91
+    const nat = `${cat}.${grupo}.${mod}.${elem.padStart(2, '0')}.00.00`
     linhas.push({
       orgao: { codigo: '24', nome: 'CAGEPAR' },
       unidade: { codigo: '001', nome: 'CAGEPAR - Central de Água, Esgoto e Serviços Concedidos' },
@@ -80,10 +90,10 @@ function lerDespesaCsv(caminho: string): LinhaDespesa[] {
       acao: { codigo: '2230' },
       naturezaPcasp: nat,
       fonte: { codigo: '000', descricao: 'Recursos Ordinários (Livres)' },
-      autorizado: Math.round(modalidadeValor * 100),
+      autorizado: Math.round(prevista * 100),
     })
   }
-  return linhas
+  return { linhas, liquidadoCsv }
 }
 
 async function main() {
@@ -97,22 +107,37 @@ async function main() {
 
   console.log(`${ent.nome}`)
   console.log(`  receita: 1.3.3 Delegação de Serviços Públicos · fonte 000 · previsto R$ ${R(457_830_000)}`)
-  const despesa = despesaCsv ? lerDespesaCsv(despesaCsv) : []
-  if (despesaCsv) console.log(`  despesa (CSV): ${despesa.length} linhas · Σ autorizado R$ ${R(despesa.reduce((s, d) => s + (d.autorizado ?? 0), 0))}`)
+  const csv = despesaCsv ? lerDespesaCsv(despesaCsv) : { linhas: [], liquidadoCsv: 0 }
+  if (despesaCsv) console.log(`  despesa (CSV, por ELEMENTO): ${csv.linhas.length} linhas · Σ autorizado R$ ${R(csv.linhas.reduce((s, d) => s + (d.autorizado ?? 0), 0))} · Σ liquidado (CSV, p/ validação) R$ ${csv.liquidadoCsv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
   else console.log('  despesa: SEM CSV (--despesa=) — não provisiono (aguardando export da rotina 45107)')
 
   if (!APPLY) { console.log('\nDRY-RUN: nada gravado. Rode com --apply.'); return }
 
   const r = await escreverReceita(prisma, orc.id, ent.id, ANO, RECEITA)
   console.log(`  ✓ receita gravada (${r.previsoes} previsões, ${r.contasCriadas} contas criadas)`)
-  if (despesa.length) {
+  if (csv.linhas.length) {
     // ⚠️ escreverDespesa espera linhas RECONCILIADAS (LOA + execução): ele limpa o
     // ledger CAP-* da entidade e apaga dotações órfãs — passar SÓ a LOA varre a
     // execução (aconteceu em 2026-07-22; recuperado do PIT). SEMPRE reconciliar.
     const cfg = { nome: 'Paranaguá', ibge: '411820', uf: 'PR', ano: ANO, fabricante: 'ipm', tce: 'pr', entidades: [] } as unknown as MunicipioConfig
     const entCfg = { nome: ent.nome, tipo: 'ADM_INDIRETA', matchPit: 'CENTRAL' } as EntidadeConfig
     const exec = await pitTcePr.lerExecucao(cfg, entCfg)
-    const merged = reconciliarDespesa(despesa, exec)
+    const liqPit = exec.reduce((s, l) => s + (l.liquidado ?? 0), 0)
+    console.log(`  validação cruzada liquidado: CSV ${csv.liquidadoCsv.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} × PIT ${R(liqPit)} (Δ ${(csv.liquidadoCsv - liqPit / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} — períodos podem diferir; PIT é a fonte)`)
+    const merged = reconciliarDespesa(csv.linhas, exec)
+
+    // ciclo completo: as dotações da forma ANTERIOR (modalidade) têm lançamentos de
+    // abertura com cc de dotação → não sairiam como órfãs. Limpa a execução do
+    // razão + estorna a abertura ANTES de reescrever; o materializarRazao ao final
+    // recontabiliza a abertura (agora por elemento) e faz o replay da execução.
+    const lancs = new LancamentosService(prisma)
+    const antigos = await prisma.lancamento.findMany({ where: { entidadeId: ent.id, origemTipo: { in: ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO'] } }, select: { id: true } })
+    console.log(`  limpando ${antigos.length} lançamentos de execução...`)
+    for (const l of antigos) await lancs.excluir(l.id)
+    const abertura = new AberturaContabilService(prisma)
+    const st = await abertura.status(ent.id, ANO)
+    if (st.contabilizada) { await abertura.estornar(ent.id, ANO, usuario.id); console.log('  ✓ abertura anterior estornada') }
+
     const d = await escreverDespesa(prisma, orc.id, ent.id, ANO, merged, { historico: `EXECUÇÃO PIT ${ANO} (LOA CAGEPAR)` })
     console.log(`  ✓ despesa gravada (${d.dotacoes} dotações, com empenho ${d.comEmpenho})`)
   }
