@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'
 import { SincronizacaoDecretosService } from './sincronizacao-decretos.js'
+import { SincronizacaoRepassesService } from './sincronizacao-repasses.js'
 
 /**
  * Sincronização automática com o Portal da Transparência (Elotech/OXY) —
@@ -478,6 +479,14 @@ export function agendarSincronizacaoPortal(prisma: PrismaClient, log: (msg: stri
         log(`[sync-portal] arrecadação ${mAnt}/${aAnt} (fechamento): ${r2.status} — ${r2.mensagem}`)
         const d2 = await svc.despesaMes(ent.id, aAnt, mAnt)
         log(`[sync-portal] despesa ${mAnt}/${aAnt} (fechamento): ${d2.status} — ${d2.mensagem}`)
+      }
+      // REPASSES por último: o YTD do portal envelhece — booka o delta (evento
+      // 900) das entidades transfer-financiadas do município (Câmara/autarquias
+      // + aporte-resíduo do RPPS). Não depende da arrecadação/despesa acima.
+      const usuario = await prisma.usuario.findFirst({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
+      if (usuario) {
+        const reps = await new SincronizacaoRepassesService(prisma).sincronizarMunicipio('Maringá', ano, usuario.id)
+        for (const r of reps) log(`[sync-portal] repasse ${r.entidade}: ${r.status} — ${r.mensagem}`)
       }
     } catch (e) {
       log(`[sync-portal] falha: ${e instanceof Error ? e.message : e}`)

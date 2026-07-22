@@ -1,6 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { SincronizacaoPortalService } from '../services/sincronizacao-portal.js'
 import { SincronizacaoDecretosService } from '../services/sincronizacao-decretos.js'
+import { SincronizacaoRepassesService, ALVOS_REPASSES } from '../services/sincronizacao-repasses.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 const ERRO_LEITURA = 'Seu nível de acesso nesta entidade é apenas leitura — você não pode disparar sincronizações.'
@@ -57,6 +58,8 @@ export async function appSincronizacaoRoutes(app: FastifyInstance) {
       decretosBaixados,
       rodando: emExecucao.has(entidadeId),
       agendado: process.env['SINCRONIZAR_PORTAL_MARINGA'] === '1',
+      // botão de repasses só aparece se o MUNICÍPIO tem alvos configurados
+      temRepasses: !!ALVOS_REPASSES[(entidade as { municipio?: { nome?: string } }).municipio?.nome ?? ''],
       aviso: opts.aviso ?? null,
       erro: opts.erro ?? null,
       layout: null,
@@ -97,6 +100,38 @@ export async function appSincronizacaoRoutes(app: FastifyInstance) {
     })()
     return render(req, reply, entidade, {
       aviso: `Sincronização de ${String(mes).padStart(2, '0')}/${ano} iniciada (decretos → receita → despesa). A varredura do portal leva alguns minutos — atualize a página para ver o resultado no log.`,
+    })
+  })
+
+  // Re-sincroniza os REPASSES (evento 900, delta YTD) das entidades transfer-
+  // financiadas do MUNICÍPIO do contexto (Câmara/fundos/autarquias + resíduo do
+  // RPPS). Botão da tela; o mesmo passo roda no job diário.
+  app.post('/sincronizacao/repasses', async (req, reply) => {
+    const entidade = await carregarEntidade(req, reply)
+    if (!entidade) return
+    const { ano, nivel } = req.contexto
+    if (!podeEscrever(nivel)) return render(req, reply, entidade, { erro: ERRO_LEITURA, status: 403 })
+    const municipioNome = entidade.municipio?.nome ?? ''
+    if (!ALVOS_REPASSES[municipioNome]) {
+      return render(req, reply, entidade, { erro: 'Este município não tem alvos de repasse configurados.', status: 400 })
+    }
+    const chave = `repasses:${municipioNome}`
+    if (emExecucao.has(chave)) {
+      return render(req, reply, entidade, { aviso: 'Já há uma re-sincronização de repasses em andamento — acompanhe pelo log.', status: 409 })
+    }
+    emExecucao.add(chave)
+    void (async () => {
+      try {
+        const svcRepasses = new SincronizacaoRepassesService(app.prisma)
+        await svcRepasses.sincronizarMunicipio(municipioNome, ano, req.user.sub)
+      } catch (e) {
+        req.log.error(e, '[sincronizacao] falha na re-sincronização de repasses')
+      } finally {
+        emExecucao.delete(chave)
+      }
+    })()
+    return render(req, reply, entidade, {
+      aviso: `Re-sincronização dos repasses de ${municipioNome} iniciada (delta YTD × portal, evento 900). Atualize a página para ver o resultado no log.`,
     })
   })
 }

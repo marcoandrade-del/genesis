@@ -2321,6 +2321,7 @@ enum TipoSincronizacaoPortal {
   ARRECADACAO
   DESPESA_EXECUCAO
   DECRETOS
+  REPASSES
 }
 
 enum StatusSincronizacaoPortal {
