@@ -98,16 +98,19 @@ export async function escreverReceita(
 
       // Materializa 1 `Arrecadacao` AGREGADA por previsão (o portal dá o arrecadado
       // agregado, não movimento a movimento). Idempotente: apaga as do conversor
-      // (pelo histórico marcador) antes de recriar. ARRECADACAO normal; DEDUCAO p/
-      // linha redutora (o conversor só aplica FUNDEB hoje → deducaoTipo FUNDEB). O
-      // agregado casa com `valorArrecadado` (= Σ Arrecadacao) por construção.
+      // (pelo histórico marcador) antes de recriar. O TIPO segue o SINAL do
+      // arrecadado p/ o razão bater com `valorArrecadado` (= Σ líquida) por
+      // construção: DEDUCAO p/ linha redutora (FUNDEB); ESTORNO p/ arrecadado
+      // NEGATIVO não-redutora (correção/devolução — o portal traz líquido negativo);
+      // ARRECADACAO no caso normal. Sem isso, um arrecadado negativo viraria
+      // arrecadação positiva (razão +X, valorArrecadado −X → Δ 2X).
       await tx.arrecadacao.deleteMany({ where: { previsao: { orcamentoId }, historico: HIST_ARREC } })
       const dataArr = new Date(Date.UTC(ano, 11, 31))
       const arrRows = arrecs
         .filter((a) => a.arrecadado !== 0)
         .map((a) => ({
           previsaoId: a.previsaoId,
-          tipo: (a.redutora ? 'DEDUCAO' : 'ARRECADACAO') as ArrecadacaoTipo,
+          tipo: (a.redutora ? 'DEDUCAO' : a.arrecadado < 0 ? 'ESTORNO' : 'ARRECADACAO') as ArrecadacaoTipo,
           deducaoTipo: (a.redutora ? 'FUNDEB' : null) as DeducaoTipo | null,
           data: dataArr,
           valor: cent(Math.abs(a.arrecadado)),
