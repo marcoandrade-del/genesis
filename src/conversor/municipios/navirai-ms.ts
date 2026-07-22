@@ -8,8 +8,11 @@ import type { MunicipioConfig } from '../nucleo/tipos.js'
  * `tce:'portal'`, dispensando o SICONFI. Fonte da despesa em 9999 (portal não
  * publica fonte por dotação). Decretos fora. Ver [[conversor-turn-key-tracker]].
  *
- * Núcleo importado (Prefeitura/Câmara/Previdência); os fundos municipais (saúde,
- * assistência, FUNDEB, …) são entidades separadas no portal — deferidos.
+ * Cada FUNDO é um órgão DISJUNTO da Prefeitura (Pref=órgão 01, FMS=órgão 10, …),
+ * então entra como entidade própria — soma das entidades = total do município, sem
+ * duplicar. Os 2 fundos vazios do portal (Investimento Social id=8, Desenv.
+ * Econômico id=10) ficam de fora. `tipo:'ADM_INDIRETA'` é o balde do Gênesis p/
+ * fundos/autarquias (a enum não distingue fundo especial de autarquia).
  */
 export const naviraiMs: MunicipioConfig = {
   nome: 'Naviraí',
@@ -24,5 +27,15 @@ export const naviraiMs: MunicipioConfig = {
     { nome: 'Prefeitura Municipal de Naviraí', tipo: 'PREFEITURA', params: { idPortal: '1' } },
     { nome: 'Câmara Municipal de Naviraí', tipo: 'CAMARA', params: { idPortal: '2' } },
     { nome: 'Previdência dos Servidores Públicos de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '3' } },
+    { nome: 'Fundação de Cultura de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '4' } },
+    { nome: 'Fundo Municipal de Saúde de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '6' } },
+    { nome: 'Fundo Municipal de Assistência Social de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '7' } },
+    { nome: 'Fundo Municipal da Criança e do Adolescente de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '9' } },
+    { nome: 'FUNDEB de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '11' } },
+    { nome: 'Fundo Municipal de Meio Ambiente de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '12' } },
+    { nome: 'Fundo Municipal dos Direitos da Pessoa com Deficiência de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '13' } },
+    { nome: 'Fundo Municipal de Habitação de Interesse Social de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '14' } },
+    { nome: 'Fundo Municipal Direitos Difusos de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '15' } },
+    { nome: 'Fundo Municipal dos Direitos da Pessoa Idosa de Naviraí', tipo: 'ADM_INDIRETA', params: { idPortal: '17' } },
   ],
 }
