@@ -4,6 +4,7 @@ import { garantirMunicipio, garantirEntidade } from './nucleo/onboarding.js'
 import { escreverReceita } from './nucleo/escrever-receita.js'
 import { escreverDespesa } from './nucleo/escrever-despesa.js'
 import { reconciliarDespesa } from './nucleo/reconciliar.js'
+import { materializarRazao } from './nucleo/materializar-razao.js'
 import { conectores } from './fabricantes/registry.js'
 import { fontesExecucao } from './tce/registry.js'
 
@@ -25,6 +26,7 @@ export async function importarMunicipio(
   log(`═══ ${cfg.nome}/${cfg.uf} ${cfg.ano} — fabricante ${conector.nome} · execução ${fonteExec.nome} ═══`)
 
   const municipioId = await garantirMunicipio(prisma, cfg)
+  const usuario = await prisma.usuario.findFirstOrThrow({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
   for (const ent of cfg.entidades) {
     const { entidadeId, orcamentoId } = await garantirEntidade(prisma, cfg, municipioId, ent)
 
@@ -45,5 +47,10 @@ export async function importarMunicipio(
       const rc = await conector.sincronizarCreditos(prisma, cfg, ent, entidadeId)
       log(`    créditos (decretos): ${rc.status} — ${rc.mensagem}`)
     }
+
+    // FASE FINAL: materializa o RAZÃO contábil (abertura + execução) — sem isso os
+    // memoriais (balancete/MSC/RCL) ficam vazios. Torna a import turn-key completa.
+    const razao = await materializarRazao(prisma, entidadeId, cfg.ano, usuario.id)
+    log(`    razão: abertura + ${razao.arrecadacoes} arrecadações + ${razao.movimentos} movimentos materializados`)
   }
 }
