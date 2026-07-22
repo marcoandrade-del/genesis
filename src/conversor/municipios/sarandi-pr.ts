@@ -23,5 +23,6 @@ export const sarandiPr: MunicipioConfig = {
     { nome: 'Prefeitura Municipal de Sarandi', tipo: 'PREFEITURA', params: { idPortal: '1' } },
     { nome: 'Câmara Municipal de Sarandi', tipo: 'CAMARA', params: { idPortal: '3' } },
     { nome: 'PreSERV — Previdência dos Servidores de Sarandi', tipo: 'ADM_INDIRETA', params: { idPortal: '2' } },
+    { nome: 'Águas de Sarandi — Serviço Municipal de Saneamento Ambiental', tipo: 'ADM_INDIRETA', params: { idPortal: '4' } },
   ],
 }
