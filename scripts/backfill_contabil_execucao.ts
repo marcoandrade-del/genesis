@@ -37,6 +37,11 @@ import { MotorEventosDespesa, CONTAS_DESPESA, isoData } from '../src/services/mo
 import { LancamentosService, type TipoLancamento } from '../src/services/lancamentos.js'
 
 const APPLY = process.argv.includes('--apply')
+// --limpar: apaga os lançamentos de execução da entidade (via excluir, revertendo
+// ResumoMensalConta) ANTES de recriar. Necessário quando o município foi
+// RE-IMPORTADO (o conversor deleta+recria Arrecadacao/empenho com IDs NOVOS, então
+// a idempotência por origemId não alcança os lançamentos órfãos → dobraria).
+const LIMPAR = process.argv.includes('--limpar')
 const anoArg = process.argv.find((a) => a.startsWith('--ano='))
 const ANO = anoArg ? Number(anoArg.split('=')[1]) : 2026
 const CRIADO_POR = 'BACKFILL_EXEC' // marcador (Lancamento.criadoPorId é String livre, sem FK)
@@ -328,6 +333,11 @@ function carregarMovimentos(entidadeId: string) {
 
 async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movimentos: MovimentoRow[], codigoPorId: Map<string, string>) {
   console.log('APPLY — persistindo o razão (idempotente por origemTipo+origemId)...\n')
+  if (LIMPAR) {
+    const olds = await prisma.lancamento.findMany({ where: { entidadeId, origemTipo: { in: ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO'] } }, select: { id: true } })
+    console.log(`  --limpar: removendo ${olds.length} lançamentos de execução (reverte ResumoMensalConta)...`)
+    for (const o of olds) await lancamentos.excluir(o.id)
+  }
   // Pré-carrega os pares origem já lançados (uma query) — evita um count por linha.
   const jaFeitos = new Set<string>()
   const existentes = await prisma.lancamento.findMany({
