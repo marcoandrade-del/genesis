@@ -37,6 +37,14 @@
         <i class="bi bi-arrow-repeat me-1"></i>Sincronizar agora
       </button>
     </form>
+    <% if (temRepasses) { %>
+    <form method="post" action="/app/sincronizacao/repasses" class="m-0"
+          onsubmit="<%= "return confirm('Re-sincronizar os repasses do município ao YTD do portal? O delta será contabilizado como transferência financeira (evento 900).')" %>">
+      <button type="submit" class="btn btn-outline-primary" <%= podeEscrever ? '' : 'disabled' %>>
+        <i class="bi bi-cash-coin me-1"></i>Re-sincronizar repasses
+      </button>
+    </form>
+    <% } %>
     <div class="small text-muted">
       <% if (rodando) { %>
         <span class="badge text-bg-info"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Em andamento…</span> atualize a página para acompanhar.

@@ -277,6 +277,7 @@ export function criarPrismaMock() {
     },
     fonteRecursoEntidade: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
       createMany: vi.fn(),
@@ -658,6 +659,12 @@ export function criarPrismaMock() {
     sincronizacaoPortal: {
       create: vi.fn(),
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+    },
+    transferenciaFinanceira: {
+      findFirst: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      create: vi.fn(),
       count: vi.fn().mockResolvedValue(0),
     },
     metaFiscal: {
