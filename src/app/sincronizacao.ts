@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { SincronizacaoPortalService } from '../services/sincronizacao-portal.js'
 import { SincronizacaoDecretosService } from '../services/sincronizacao-decretos.js'
 import { SincronizacaoRepassesService, ALVOS_REPASSES } from '../services/sincronizacao-repasses.js'
+import { materializarRazaoIncremental } from '../conversor/nucleo/materializar-razao.js'
 
 const podeEscrever = (nivel: string) => nivel === 'ESCRITA' || nivel === 'ADMIN'
 const ERRO_LEITURA = 'Seu nível de acesso nesta entidade é apenas leitura — você não pode disparar sincronizações.'
@@ -86,12 +87,16 @@ export async function appSincronizacaoRoutes(app: FastifyInstance) {
     const ano = agora.getFullYear()
     const mes = agora.getMonth() + 1
     // dispara e responde: o resultado aparece no log quando terminar
+    const usuarioId = req.user.sub
     void (async () => {
       try {
         // DECRETOS primeiro (autorizado fresco); depois RECEITA antes da DESPESA
         await svcDecretos.sincronizar(entidadeId, ano)
         await svc.arrecadacaoMes(entidadeId, ano, mes)
         await svc.despesaMes(entidadeId, ano, mes)
+        // RAZÃO incremental: o sync churna IDs de Arrecadacao/MovimentoEmpenho —
+        // exclui lançamentos órfãos e replay do delta p/ o balancete acompanhar.
+        await materializarRazaoIncremental(app.prisma, entidadeId, ano, usuarioId)
       } catch (e) {
         req.log.error(e, '[sincronizacao] falha na execução manual')
       } finally {

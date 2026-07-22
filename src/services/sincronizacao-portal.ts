@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { SincronizacaoDecretosService } from './sincronizacao-decretos.js'
 import { SincronizacaoRepassesService } from './sincronizacao-repasses.js'
+import { materializarRazaoIncremental } from '../conversor/nucleo/materializar-razao.js'
 
 /**
  * Sincronização automática com o Portal da Transparência (Elotech/OXY) —
@@ -487,6 +488,12 @@ export function agendarSincronizacaoPortal(prisma: PrismaClient, log: (msg: stri
       if (usuario) {
         const reps = await new SincronizacaoRepassesService(prisma).sincronizarMunicipio('Maringá', ano, usuario.id)
         for (const r of reps) log(`[sync-portal] repasse ${r.entidade}: ${r.status} — ${r.mensagem}`)
+        // RAZÃO incremental: o sync acima deleta+recria Arrecadacao/MovimentoEmpenho
+        // (churn de IDs) → o razão contábil defasaria (lançamentos órfãos + linhas
+        // novas sem lançamento). Exclui órfãos e replay só do delta — mantém o
+        // balancete/MSC/memoriais em dia com o orçamentário sem regenerar tudo.
+        const raz = await materializarRazaoIncremental(prisma, ent.id, ano, usuario.id)
+        log(`[sync-portal] razão incremental: ${raz.orfaosExcluidos} órfãos excluídos · ${raz.arrecadacoes} arrecadações + ${raz.movimentos} movimentos materializados`)
       }
     } catch (e) {
       log(`[sync-portal] falha: ${e instanceof Error ? e.message : e}`)
