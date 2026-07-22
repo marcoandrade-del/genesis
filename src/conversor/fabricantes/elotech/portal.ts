@@ -40,7 +40,16 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 
 type PortalFonte = { receita: string; descricao: string; valorOrcado: number | null; valorArrecadado: number | null }
 type PortalReceitaDetalhe = { receita: string; valorOrcado: number | null; valorArrecadado: number | null }
-type PortalDespesa = { programatica: string; descricao: string; nivel: number; valorPrevisto: number }
+type PortalDespesa = {
+  programatica: string
+  descricao: string
+  nivel: number
+  aceitaMovimentacao: string // 'S' na folha (dotação), 'N' nos níveis intermediários
+  valorPrevisto: number // dotação INICIAL (LOA)
+  valorEmpenhado: number
+  valorLiquidado: number
+  valorPago: number
+}
 
 /**
  * Previsão da receita (LOA) + arrecadação por natureza×fonte. Itera as fontes
@@ -86,10 +95,12 @@ export async function lerReceita(baseUrl: string, ano: number, idPortal: string)
 }
 
 /**
- * Dotação inicial (orçado) da despesa. Busca a árvore programática do exercício,
- * usa os níveis intermediários para os NOMES das dimensões e as folhas (nível 11
- * com valorPrevisto>0) como dotações. O portal NÃO publica fonte por dotação →
- * tudo cai na fonte "9999" (a fonte real da execução vem do TCE/PIT).
+ * Dotação (orçado) + execução (empenhado/liq/pago) da despesa. Busca a árvore
+ * programática do exercício, usa os níveis intermediários para os NOMES das
+ * dimensões e as FOLHAS (`aceitaMovimentacao==='S'`) como dotações. A execução vem
+ * do PRÓPRIO portal (mesmas linhas), então o Elotech é autossuficiente — não
+ * precisa de TCE/SICONFI (`tce:'portal'`). O portal NÃO publica fonte por dotação
+ * → tudo cai na fonte "9999" (a fonte real por dotação só viria do TCE/PIT).
  */
 export async function lerDespesa(baseUrl: string, ano: number, idPortal: string): Promise<LinhaDespesa[]> {
   const rows = await getJson<PortalDespesa[]>(
@@ -113,9 +124,13 @@ export async function lerDespesa(baseUrl: string, ano: number, idPortal: string)
 
   const linhas: LinhaDespesa[] = []
   for (const d of rows) {
-    if (d.nivel !== 11 || d.valorPrevisto <= 0) continue // folha da LOA (>0 = inicial, não crédito especial)
+    // Folha (dotação) = `aceitaMovimentacao==='S'` — NÃO um nível fixo: o Elotech
+    // novo (3.111) fecha no nível 11, o antigo (3.100) no 10. Inclui a linha se há
+    // dotação inicial OU execução (empenho de crédito adicional cai aqui também).
+    if (d.aceitaMovimentacao !== 'S') continue
+    if ((d.valorPrevisto ?? 0) <= 0 && (d.valorEmpenhado ?? 0) <= 0) continue
     const c = parseProgramatica(d.programatica)
-    if (!c) continue
+    if (!c) continue // programática fora do padrão pontuado (ex. Elotech antigo) — ignora
     linhas.push({
       orgao: { codigo: c.orgao, nome: nomeOrgao.get(c.orgao) ?? `Órgão ${c.orgao}` },
       unidade: { codigo: c.unidade, nome: nomeUnidade.get(`${c.orgao}.${c.unidade}`) ?? `Unidade ${c.orgao}.${c.unidade}` },
@@ -124,8 +139,14 @@ export async function lerDespesa(baseUrl: string, ano: number, idPortal: string)
       programa: { codigo: c.programa, ...(nomePrograma.get(c.programa) ? { nome: nomePrograma.get(c.programa) } : {}) },
       acao: { codigo: c.acao, ...(nomeAcao.get(`${c.programa}|${c.acao}`) ? { nome: nomeAcao.get(`${c.programa}|${c.acao}`) } : {}) },
       naturezaPcasp: c.naturezaPcasp,
+      // O portal NÃO publica a fonte por dotação → tudo cai em "9999". A fonte real
+      // por dotação só viria do TCE (PIT); aqui priorizamos 100% portal.
       fonte: { codigo: '9999', descricao: 'Fonte não discriminada (portal Elotech)' },
       autorizado: cent(d.valorPrevisto),
+      // Execução do PRÓPRIO portal (mesmas linhas da LOA) — dispensa TCE/SICONFI.
+      empenhado: cent(d.valorEmpenhado),
+      liquidado: cent(d.valorLiquidado),
+      pago: cent(d.valorPago),
     })
   }
   return linhas

@@ -41,7 +41,7 @@ export async function importarMunicipio(
     // FASE 2 (opcional): créditos adicionais (decretos) do portal → autorizado.
     // Só fabricantes com API de decretos (ex.: Elotech) implementam; a LOA (fase 1)
     // já está gravada acima.
-    if (conector.sincronizarCreditos) {
+    if (conector.sincronizarCreditos && !cfg.pularCreditos) {
       const rc = await conector.sincronizarCreditos(prisma, cfg, ent, entidadeId)
       log(`    créditos (decretos): ${rc.status} — ${rc.mensagem}`)
     }
