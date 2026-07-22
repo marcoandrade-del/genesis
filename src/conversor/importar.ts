@@ -36,9 +36,15 @@ export async function importarMunicipio(
     const loa = await conector.lerDespesa(cfg, ent)
     const exec = await fonteExec.lerExecucao(cfg, ent)
     const merged = reconciliarDespesa(loa, exec)
-    const d = merged.length ? await escreverDespesa(prisma, orcamentoId, entidadeId, cfg.ano, merged) : { dotacoes: 0, comEmpenho: 0, semConta: [] as string[] }
+    const d = merged.length
+      ? await escreverDespesa(prisma, orcamentoId, entidadeId, cfg.ano, merged)
+      : { dotacoes: 0, comEmpenho: 0, semConta: [] as string[], valorSemConta: { autorizado: 0, empenhado: 0 } }
 
-    log(`  ${ent.nome}: previsões ${receita.length} · dotações ${merged.length} (com empenho ${d.comEmpenho})${d.semConta.length ? ` · SEM conta ${d.semConta.length}` : ''}`)
+    const reais = (cent: number) => (cent / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const avisoSemConta = d.semConta.length
+      ? ` · ⚠️ DESCARTADO sem conta: ${d.semConta.length} natureza(s) [${d.semConta.join(', ')}] = autorizado ${reais(d.valorSemConta.autorizado)} / empenhado ${reais(d.valorSemConta.empenhado)}`
+      : ''
+    log(`  ${ent.nome}: previsões ${receita.length} · dotações ${merged.length} (com empenho ${d.comEmpenho})${avisoSemConta}`)
 
     // FASE 2 (opcional): créditos adicionais (decretos) do portal → autorizado.
     // Só fabricantes com API de decretos (ex.: Elotech) implementam; a LOA (fase 1)

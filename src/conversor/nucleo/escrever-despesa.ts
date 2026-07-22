@@ -21,7 +21,7 @@ export async function escreverDespesa(
   ano: number,
   linhas: LinhaDespesa[],
   opts: { historico?: string } = {},
-): Promise<{ dotacoes: number; comEmpenho: number; semConta: string[] }> {
+): Promise<{ dotacoes: number; comEmpenho: number; semConta: string[]; valorSemConta: { autorizado: number; empenhado: number } }> {
   const historico = opts.historico ?? `CAPTURA EXECUÇÃO ${ano}`
   const funcoesDb = new Map((await prisma.funcao.findMany()).map((f) => [f.codigo, f.id]))
   const subfuncoesDb = new Map((await prisma.subfuncao.findMany()).map((s) => [s.codigo, s.id]))
@@ -33,7 +33,14 @@ export async function escreverDespesa(
   const resolverConta = (nat: string): string | null => contasDb.get(nat) ?? contasDb.get(`${nat.split('.').slice(0, 4).join('.')}.00.00`) ?? null
 
   const uoCod = (l: LinhaDespesa) => `${l.orgao.codigo}.${l.unidade.codigo}`
-  const semConta = [...new Set(linhas.filter((l) => !resolverConta(l.naturezaPcasp)).map((l) => l.naturezaPcasp))]
+  const linhasSemConta = linhas.filter((l) => !resolverConta(l.naturezaPcasp))
+  const semConta = [...new Set(linhasSemConta.map((l) => l.naturezaPcasp))]
+  // Valor DESCARTADO por falta de conta (ex.: MSC com natureza vazia que o ente
+  // não informou) — exposto pro log do import: nenhum corte silencioso.
+  const valorSemConta = {
+    autorizado: linhasSemConta.reduce((s, l) => s + (l.autorizado ?? 0), 0),
+    empenhado: linhasSemConta.reduce((s, l) => s + (l.empenhado ?? 0), 0),
+  }
 
   // dimensões a criar
   const novas = { fu: new Map<string, string>(), su: new Map<string, string>(), uo: new Map<string, { orgaoNome: string; nome: string }>(), pr: new Map<string, string>(), ac: new Map<string, { nome: string }>(), fo: new Map<string, string>() }
@@ -122,5 +129,5 @@ export async function escreverDespesa(
     },
     { timeout: 300_000 },
   )
-  return { dotacoes: linhas.length - semConta.length, comEmpenho, semConta }
+  return { dotacoes: linhas.length - semConta.length, comEmpenho, semConta, valorSemConta }
 }
