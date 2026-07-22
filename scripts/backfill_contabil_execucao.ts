@@ -42,6 +42,11 @@ const APPLY = process.argv.includes('--apply')
 // RE-IMPORTADO (o conversor deleta+recria Arrecadacao/empenho com IDs NOVOS, então
 // a idempotência por origemId não alcança os lançamentos órfãos → dobraria).
 const LIMPAR = process.argv.includes('--limpar')
+// --sem-prefeitura: pula entidades tipo PREFEITURA (ex.: Maringá, cujo razão da
+// Prefeitura já existe #236 e não deve ser mexido — só as demais entidades).
+const SEM_PREFEITURA = process.argv.includes('--sem-prefeitura')
+// evento de dedução por tipo (espelha ArrecadacoesService): 150 FUNDEB · 151 renúncia · 152 outras.
+const EVENTO_DEDUCAO = { FUNDEB: '150', RENUNCIA: '151', OUTRAS: '152' } as const
 const anoArg = process.argv.find((a) => a.startsWith('--ano='))
 const ANO = anoArg ? Number(anoArg.split('=')[1]) : 2026
 const CRIADO_POR = 'BACKFILL_EXEC' // marcador (Lancamento.criadoPorId é String livre, sem FK)
@@ -143,15 +148,19 @@ async function processar(entidade: { id: string; nome: string; municipio: { nome
     cobReceita.linhas++
     const valor = dec(a.valor)
     const estorno = a.tipo === 'ESTORNO'
-    capReceita = estorno ? capReceita.minus(valor) : capReceita.plus(valor)
+    const deducao = a.tipo === 'DEDUCAO'
+    // estorno e dedução REDUZEM a realizada líquida capturada.
+    capReceita = estorno || deducao ? capReceita.minus(valor) : capReceita.plus(valor)
     const natureza = a.previsao.contaReceita.codigo
     const fonte = a.previsao.fonteRecurso.codigo
     const vinculada = a.previsao.fonteRecurso.vinculada
-    const chave = `R|${natureza}|${fonte}|${vinculada ? 1 : 0}|${estorno ? 'E' : 'N'}`
+    const dedTipo = (a.deducaoTipo ?? 'FUNDEB') as keyof typeof EVENTO_DEDUCAO
+    const chave = `R|${natureza}|${fonte}|${vinculada ? 1 : 0}|${a.tipo}|${deducao ? dedTipo : ''}`
     let tpl = templates.get(chave)
     if (!tpl) {
       try {
-        const eventos = await motorReceita.resolver({ entidadeId: entidade.id, ano: ANO, naturezaCodigo: natureza, fonteCodigo: fonte, fonteVinculada: vinculada, valor: 1 }, { estorno })
+        const ctx = { entidadeId: entidade.id, ano: ANO, naturezaCodigo: natureza, fonteCodigo: fonte, fonteVinculada: vinculada, valor: 1 }
+        const eventos = deducao ? await motorReceita.resolverDeducao(ctx, EVENTO_DEDUCAO[dedTipo]) : await motorReceita.resolver(ctx, { estorno })
         tpl = templateDeEventos(soOrcamentarias(eventos, codigoPorId), codigoPorId)
       } catch (e) {
         tpl = { erro: msgErro(e) }
@@ -217,7 +226,7 @@ async function main() {
   let entidades: { id: string; nome: string; municipio: { nome: string } | null }[]
   if (munArg) {
     entidades = await prisma.entidade.findMany({
-      where: { municipio: { nome: munArg } },
+      where: { municipio: { nome: munArg }, ...(SEM_PREFEITURA ? { tipo: { not: 'PREFEITURA' } } : {}) },
       select: { id: true, nome: true, municipio: { select: { nome: true } } },
       orderBy: { nome: 'asc' },
     })
@@ -321,7 +330,7 @@ type MovimentoRow = Awaited<ReturnType<typeof carregarMovimentos>>[number]
 function carregarArrecadacoes(entidadeId: string) {
   return prisma.arrecadacao.findMany({
     where: { previsao: { orcamento: { entidadeId, ano: ANO } } },
-    select: { id: true, tipo: true, valor: true, data: true, previsao: { select: { contaReceita: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true, vinculada: true } } } } },
+    select: { id: true, tipo: true, deducaoTipo: true, valor: true, data: true, previsao: { select: { contaReceita: { select: { codigo: true } }, fonteRecurso: { select: { codigo: true, vinculada: true } } } } },
   })
 }
 function carregarMovimentos(entidadeId: string) {
@@ -351,12 +360,11 @@ async function aplicar(entidadeId: string, arrecadacoes: ArrecadacaoRow[], movim
   for (const a of arrecadacoes) {
     if (jaFeitos.has(`ARRECADACAO|${a.id}`)) { recPulados++; continue }
     await prisma.$transaction(async (tx) => {
+      const ctx = { entidadeId, ano: ANO, naturezaCodigo: a.previsao.contaReceita.codigo, fonteCodigo: a.previsao.fonteRecurso.codigo, fonteVinculada: a.previsao.fonteRecurso.vinculada, valor: a.valor }
       const eventos = soOrcamentarias(
-        await motorReceita.resolver(
-          { entidadeId, ano: ANO, naturezaCodigo: a.previsao.contaReceita.codigo, fonteCodigo: a.previsao.fonteRecurso.codigo, fonteVinculada: a.previsao.fonteRecurso.vinculada, valor: a.valor },
-          { estorno: a.tipo === 'ESTORNO' },
-          tx,
-        ),
+        a.tipo === 'DEDUCAO'
+          ? await motorReceita.resolverDeducao(ctx, EVENTO_DEDUCAO[(a.deducaoTipo ?? 'FUNDEB') as keyof typeof EVENTO_DEDUCAO], {}, tx)
+          : await motorReceita.resolver(ctx, { estorno: a.tipo === 'ESTORNO' }, tx),
         codigoPorId,
       )
       for (const ev of eventos) {
