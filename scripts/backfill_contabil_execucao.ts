@@ -107,15 +107,8 @@ function soOrcamentarias(eventos: LancamentoEvento[], codigoPorId: Map<string, s
   return eventos.filter((ev) => !ev.itens.some((it) => ehPatrimonial(it.contaId)))
 }
 
-async function main() {
-  console.log(`\nBackfill contábil da execução — modo: ${APPLY ? 'APPLY (VAI GRAVAR)' : 'DRY-RUN (não grava)'} · ano ${ANO}\n`)
-
-  const entidade = await prisma.entidade.findFirst({
-    where: { tipo: 'PREFEITURA', municipio: { nome: { contains: 'Maring' } } },
-    select: { id: true, nome: true, municipio: { select: { nome: true } } },
-  })
-  if (!entidade) throw new Error('Prefeitura de Maringá não encontrada')
-  console.log(`Entidade: ${entidade.nome} (${entidade.municipio?.nome}) — ${entidade.id}\n`)
+async function processar(entidade: { id: string; nome: string; municipio: { nome: string } | null }) {
+  console.log(`\n${'═'.repeat(78)}\nEntidade: ${entidade.nome} (${entidade.municipio?.nome}) — ${entidade.id}\n`)
 
   // contaId -> código (uma query; usado para nomear as contas do template).
   const contas = await prisma.contaContabilEntidade.findMany({
@@ -211,6 +204,31 @@ async function main() {
   relatorio({ bReceita, bEmpenho, bLiquidacao, bPagamento, cobReceita, cobDespesa, capReceita, capEmpenho, capLiquidacao, capPagamento, templates })
 }
 
+async function main() {
+  console.log(`\nBackfill contábil da execução — modo: ${APPLY ? 'APPLY (VAI GRAVAR)' : 'DRY-RUN (não grava)'} · ano ${ANO}`)
+  // Seleção de entidades: --municipio=<nome> processa TODAS as entidades do
+  // município (turn-key); sem flag = Prefeitura de Maringá (compat. #236).
+  const munArg = process.argv.find((a) => a.startsWith('--municipio='))?.split('=')[1]
+  let entidades: { id: string; nome: string; municipio: { nome: string } | null }[]
+  if (munArg) {
+    entidades = await prisma.entidade.findMany({
+      where: { municipio: { nome: munArg } },
+      select: { id: true, nome: true, municipio: { select: { nome: true } } },
+      orderBy: { nome: 'asc' },
+    })
+    if (!entidades.length) throw new Error(`Nenhuma entidade no município '${munArg}'`)
+  } else {
+    const e = await prisma.entidade.findFirst({
+      where: { tipo: 'PREFEITURA', municipio: { nome: { contains: 'Maring' } } },
+      select: { id: true, nome: true, municipio: { select: { nome: true } } },
+    })
+    if (!e) throw new Error('Prefeitura de Maringá não encontrada')
+    entidades = [e]
+  }
+  console.log(`Entidades a processar: ${entidades.length}`)
+  for (const entidade of entidades) await processar(entidade)
+}
+
 function mapaEstagio(t: TipoMovimentoEmpenho): { gatilho: 'EMPENHO' | 'LIQUIDACAO' | 'PAGAMENTO'; estorno: boolean; bucket: 'empenho' | 'liquidacao' | 'pagamento' } {
   switch (t) {
     case 'EMPENHO': return { gatilho: 'EMPENHO', estorno: false, bucket: 'empenho' }
@@ -267,7 +285,9 @@ function relatorio(x: {
   console.log(`\n${linha}`)
   console.log('3) RECONCILIAÇÃO ORÇAMENTÁRIA (motor × execução capturada = origem do RREO/RGF)')
   console.log(linha)
-  const receitaReal = mov(x.bReceita, CONTAS_EVENTO.receitaRealizada, 'DEBITO').minus(mov(x.bReceita, CONTAS_EVENTO.receitaRealizada, 'CREDITO'))
+  // 6.2.1.2 (receita realizada) é CREDORA — o E100 a CREDITA na arrecadação (fix de
+  // sinal #250). Logo o saldo do razão = CRÉDITO − DÉBITO (igual às contas de despesa).
+  const receitaReal = mov(x.bReceita, CONTAS_EVENTO.receitaRealizada, 'CREDITO').minus(mov(x.bReceita, CONTAS_EVENTO.receitaRealizada, 'DEBITO'))
   const empenhado = mov(x.bEmpenho, CONTAS_DESPESA.empenhadoALiquidar, 'CREDITO').minus(mov(x.bEmpenho, CONTAS_DESPESA.empenhadoALiquidar, 'DEBITO'))
   const liquidado = mov(x.bLiquidacao, CONTAS_DESPESA.liquidadoAPagar, 'CREDITO').minus(mov(x.bLiquidacao, CONTAS_DESPESA.liquidadoAPagar, 'DEBITO'))
   const pago = mov(x.bPagamento, CONTAS_DESPESA.pago, 'CREDITO').minus(mov(x.bPagamento, CONTAS_DESPESA.pago, 'DEBITO'))

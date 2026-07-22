@@ -1,8 +1,11 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type ArrecadacaoTipo, type DeducaoTipo } from '@prisma/client'
 import type { LinhaReceita } from './tipos.js'
 import { ancestrais } from './pcasp.js'
 
 const cent = (n: number): string => (n / 100).toFixed(2)
+
+/** Marcador das arrecadações criadas pelo conversor (idempotência + rastreio). */
+const HIST_ARREC = 'CAPTURA ARRECADAÇÃO (conversor)'
 
 /**
  * Escreve as previsões de receita (previsto + arrecadado) de uma entidade a
@@ -66,6 +69,10 @@ export async function escreverReceita(
       }
 
       const escritas: string[] = []
+      // (previsaoId, arrecadado em centavos, redutora) p/ materializar as linhas
+      // `Arrecadacao` — sem elas o motor de eventos (E100/E200) não gera o razão da
+      // receita realizada e os memoriais (balancete/MSC/RCL) ficam vazios.
+      const arrecs: { previsaoId: string; arrecadado: number; redutora: boolean }[] = []
       for (const l of linhas) {
         const contaId = await garantirConta(l.naturezaPcasp, l.redutora ? `(-) ${l.fonte.descricao || 'Dedução'}` : l.fonte.descricao || `Receita ${l.naturezaPcasp}`)
         const fonteId = await garantirFonte(l.fonte.codigo, l.fonte.descricao)
@@ -85,11 +92,33 @@ export async function escreverReceita(
           select: { id: true },
         })
         escritas.push(pv.id)
+        arrecs.push({ previsaoId: pv.id, arrecadado: l.arrecadado ?? 0, redutora: !!l.redutora })
         previsoes++
       }
+
+      // Materializa 1 `Arrecadacao` AGREGADA por previsão (o portal dá o arrecadado
+      // agregado, não movimento a movimento). Idempotente: apaga as do conversor
+      // (pelo histórico marcador) antes de recriar. ARRECADACAO normal; DEDUCAO p/
+      // linha redutora (o conversor só aplica FUNDEB hoje → deducaoTipo FUNDEB). O
+      // agregado casa com `valorArrecadado` (= Σ Arrecadacao) por construção.
+      await tx.arrecadacao.deleteMany({ where: { previsao: { orcamentoId }, historico: HIST_ARREC } })
+      const dataArr = new Date(Date.UTC(ano, 11, 31))
+      const arrRows = arrecs
+        .filter((a) => a.arrecadado !== 0)
+        .map((a) => ({
+          previsaoId: a.previsaoId,
+          tipo: (a.redutora ? 'DEDUCAO' : 'ARRECADACAO') as ArrecadacaoTipo,
+          deducaoTipo: (a.redutora ? 'FUNDEB' : null) as DeducaoTipo | null,
+          data: dataArr,
+          valor: cent(Math.abs(a.arrecadado)),
+          historico: HIST_ARREC,
+        }))
+      if (arrRows.length) await tx.arrecadacao.createMany({ data: arrRows })
+
       // idempotência: remove as previsões deste orçamento que NÃO fazem parte da
       // escrita atual — órfãs de uma conversão anterior com outro conjunto de
       // chaves (natureza/fonte que sumiu). Sem isso o total inflava no re-import.
+      // (as Arrecadacao órfãs já saíram no deleteMany acima, então o delete é livre.)
       if (escritas.length) await tx.previsaoReceita.deleteMany({ where: { orcamentoId, id: { notIn: escritas } } })
     },
     { timeout: 120_000 },
