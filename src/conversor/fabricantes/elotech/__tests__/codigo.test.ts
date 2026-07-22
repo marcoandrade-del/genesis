@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { naturezaReceita, parseProgramatica, agruparDigitos } from '../codigo.js'
+import { naturezaReceita, parseProgramatica, agruparDigitos, dotificarProgramatica } from '../codigo.js'
 
 describe('elotech · normalização de códigos', () => {
   it('agrupa a receita nos 12 grupos PCASP', () => {
@@ -23,5 +23,29 @@ describe('elotech · normalização de códigos', () => {
 
   it('devolve null para programática fora de 10 posições', () => {
     expect(parseProgramatica('02.010.04.122')).toBeNull()
+  })
+
+  it('dotifica a programática CONCATENADA do Elotech legado (folha 24 dígitos)', () => {
+    // Sarandi (eloweb.net): sem pontos → padrão pontuado nas fronteiras fixas.
+    expect(dotificarProgramatica('040010412200061061449040')).toBe('04.001.04.122.0006.1061.4.4.90.40')
+  })
+
+  it('dotifica nós intermediários (só os pontos que couberem)', () => {
+    expect(dotificarProgramatica('04')).toBe('04') // órgão
+    expect(dotificarProgramatica('04001')).toBe('04.001') // órgão+unidade
+    expect(dotificarProgramatica('04001041220006')).toBe('04.001.04.122.0006') // até programa
+  })
+
+  it('a folha concatenada dotificada parseia igual à pontuada', () => {
+    const c = parseProgramatica(dotificarProgramatica('040010412200061061449040'))
+    expect(c).toEqual({
+      orgao: '04',
+      unidade: '001',
+      funcao: '04',
+      subfuncao: '122',
+      programa: '0006',
+      acao: '1061',
+      naturezaPcasp: '4.4.90.40.00.00',
+    })
   })
 })

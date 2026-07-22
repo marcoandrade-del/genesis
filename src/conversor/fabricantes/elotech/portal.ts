@@ -1,5 +1,5 @@
 import type { LinhaReceita, LinhaDespesa } from '../../nucleo/tipos.js'
-import { naturezaReceita, parseProgramatica } from './codigo.js'
+import { naturezaReceita, parseProgramatica, dotificarProgramatica } from './codigo.js'
 
 /**
  * Cliente do Portal da Transparência ELOTECH (produto OXY). Lê o ORÇAMENTÁRIO
@@ -103,11 +103,14 @@ export async function lerReceita(baseUrl: string, ano: number, idPortal: string)
  * → tudo cai na fonte "9999" (a fonte real por dotação só viria do TCE/PIT).
  */
 export async function lerDespesa(baseUrl: string, ano: number, idPortal: string): Promise<LinhaDespesa[]> {
-  const rows = await getJson<PortalDespesa[]>(
+  const crus = await getJson<PortalDespesa[]>(
     baseUrl,
     `/despesapornivel/detalhada?dataInicial=${ano}-01-01&dataFinal=${ano}-12-31`,
     { entidade: idPortal, exercicio: String(ano) },
   )
+  // Normaliza a programática CONCATENADA (Elotech legado, ex. eloweb.net/Sarandi)
+  // p/ o formato pontuado; o resto do pipeline trata os dois de forma idêntica.
+  const rows = crus.map((d) => (d.programatica.includes('.') ? d : { ...d, programatica: dotificarProgramatica(d.programatica) }))
 
   // nomes das dimensões a partir dos níveis intermediários
   const nomeOrgao = new Map<string, string>()
