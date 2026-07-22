@@ -75,8 +75,10 @@ export type MunicipioConfig = {
   uf: string // "PR"
   ano: number
   fabricante: string // "ipm" | "elotech" | ...
-  tce: string // "pr" — fonte da execução
+  tce: string // "pr" | "siconfi" | "portal" — fonte da execução
   portalUrl?: string
+  /** Pula a fase-2 de créditos (decretos) mesmo que o conector a suporte. */
+  pularCreditos?: boolean
   entidades: EntidadeConfig[]
 }
 
