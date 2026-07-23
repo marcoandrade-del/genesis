@@ -24,6 +24,7 @@ import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import { baixarMsc, naturezaDespesaMsc, fonteMsc } from '../src/conversor/siconfi/api.js'
 import { AberturaContabilService } from '../src/services/abertura-contabil.js'
+import { LancamentosService } from '../src/services/lancamentos.js'
 
 const APPLY = process.argv.includes('--apply')
 const ANO = 2026
@@ -155,11 +156,29 @@ async function main() {
   }
   console.log(invariante ? '✓ invariância de valores confirmada (Σ aut/emp por entidade inalterados)' : '✗ INVARIÂNCIA VIOLADA — investigar')
 
-  // estorna a abertura das entidades afetadas (o cc de dotação da abertura tem a fonte)
+  // ciclo p/ o cc de fonte novo entrar no razão (ordem provada no fix da CAGEPAR):
+  // 1. limpa a execução do razão (o estorno da abertura exige exercício sem movimentos);
+  // 2. estorna a abertura (o cc de dotação dela carrega a fonte velha);
+  // 3. o rematerializar recontabiliza a abertura e refaz o replay.
+  // Cobre TODAS as entidades do município com dotação (robusto a re-run parcial).
   const abertura = new AberturaContabilService(prisma)
-  for (const entId of new Set(plano.map((p) => p.entidadeId))) {
-    const st = await abertura.status(entId, ANO)
-    if (st.contabilizada) { await abertura.estornar(entId, ANO, usuario.id); console.log(`  abertura estornada (${entId}) — rematerializar recontabiliza`) }
+  const lancs = new LancamentosService(prisma)
+  const entidadesMunicipio: { id: string; nome: string }[] = await prisma.$queryRawUnsafe(`
+    SELECT DISTINCT e.id, e.nome FROM entidades e
+    JOIN municipios m ON m.id = e."municipioId"
+    JOIN orcamentos o ON o."entidadeId" = e.id AND o.ano = ${ANO}
+    JOIN dotacoes_despesa d ON d."orcamentoId" = o.id
+    WHERE m.nome = '${alvo!.replace(/'/g, "''")}'`)
+  for (const ent of entidadesMunicipio) {
+    const st = await abertura.status(ent.id, ANO)
+    if (!st.contabilizada) continue
+    const execucao = await prisma.lancamento.findMany({
+      where: { entidadeId: ent.id, origemTipo: { in: ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO'] } },
+      select: { id: true },
+    })
+    for (const l of execucao) await lancs.excluir(l.id)
+    await abertura.estornar(ent.id, ANO, usuario.id)
+    console.log(`  ${ent.nome}: execução limpa (${execucao.length}) + abertura estornada — rematerializar recontabiliza`)
   }
   console.log('\nAgora rode: npx tsx scripts/rematerializar_razao.ts --municipio=' + alvo + ' --apply')
 }
