@@ -27,7 +27,7 @@ import { mkdirSync, existsSync, readFileSync, appendFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
-import { listarEmpenhos, detalheEmpenho, comConcorrencia, type EmpenhoDetalhe } from '../src/conversor/fabricantes/elotech/empenhos.js'
+import { listarEmpenhos, listarEmpenhosPorFaixa, detalheEmpenho, comConcorrencia, type EmpenhoDetalhe } from '../src/conversor/fabricantes/elotech/empenhos.js'
 import { reconciliarDespesa } from '../src/conversor/nucleo/reconciliar.js'
 import { escreverDespesa } from '../src/conversor/nucleo/escrever-despesa.js'
 import { materializarRazao } from '../src/conversor/nucleo/materializar-razao.js'
@@ -71,7 +71,14 @@ async function buscarEmpenhos(baseUrl: string, idPortal: string): Promise<Regist
       cache.set(r.empenho, r)
     }
   }
-  const lista = await listarEmpenhos(baseUrl, idPortal, ANO)
+  // legado (eloweb) degrada com offset — cai p/ o particionamento por faixas
+  let lista
+  try {
+    lista = await listarEmpenhos(baseUrl, idPortal, ANO)
+  } catch {
+    console.log('    lista por offset falhou — particionando por faixas de empenho')
+    lista = await listarEmpenhosPorFaixa(baseUrl, idPortal, ANO)
+  }
   const out: Registro[] = []
   const faltam: typeof lista = []
   for (const e of lista) {

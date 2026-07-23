@@ -71,6 +71,33 @@ export async function listarEmpenhos(baseUrl: string, idPortal: string, ano: num
   return out
 }
 
+/**
+ * Lista por FAIXAS de número de empenho (`id.empenho>=A;id.empenho<=B` no RSQL) —
+ * fallback p/ o Elotech LEGADO, cuja paginação por offset degrada até morrer
+ * (Sarandi: p24 estoura timeout). Cada faixa é uma query com offset 0.
+ */
+export async function listarEmpenhosPorFaixa(baseUrl: string, idPortal: string, ano: number, faixa = 500): Promise<EmpenhoLista[]> {
+  // maior número de empenho: 1 registro ordenado desc
+  const searchEnt = encodeURIComponent(`id.entidade=='${idPortal}'`)
+  const topo = await getJson<{ content?: EmpenhoLista[] }>(
+    `${baseUrl}/empenhos/lista?search=${searchEnt}&entidade=${idPortal}&exercicio=${ano}&page=0&size=1&sort=id.empenho,desc`,
+    `empenhos/lista ${idPortal} topo`,
+  )
+  const max = topo.content?.[0]?.empenho ?? 0
+  const out: EmpenhoLista[] = []
+  for (let ini = 1; ini <= max; ini += faixa) {
+    const fim = Math.min(ini + faixa - 1, max)
+    const search = encodeURIComponent(`id.entidade=='${idPortal}';id.empenho>='${ini}';id.empenho<='${fim}'`)
+    const d = await getJson<{ content?: EmpenhoLista[]; last?: boolean; totalElements?: number }>(
+      `${baseUrl}/empenhos/lista?search=${search}&entidade=${idPortal}&exercicio=${ano}&page=0&size=${faixa}`,
+      `empenhos/lista ${idPortal} faixa ${ini}-${fim}`,
+    )
+    if ((d.totalElements ?? 0) > faixa) throw new Error(`faixa ${ini}-${fim} com mais de ${faixa} empenhos — reduza a faixa`)
+    out.push(...(d.content ?? []))
+  }
+  return out
+}
+
 /** Detalhe (programática estruturada) de um empenho. */
 export function detalheEmpenho(baseUrl: string, idPortal: string, ano: number, empenho: number): Promise<EmpenhoDetalhe> {
   const search = encodeURIComponent(`id.entidade=='${idPortal}'`)
