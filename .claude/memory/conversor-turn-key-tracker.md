@@ -96,6 +96,9 @@ Base `https://transparencia.maringa.pr.gov.br/portaltransparencia-api`. Endpoint
 
 **Escopo de sessão (aguardando confirmação do Marco):** provável foco em Maringá (Elotech) + Paranaguá IPM (meus); Criciúma/SICONFI são de outras sessões. `src/conversor/` é território da sessão SICONFI — mudar de forma ADITIVA (sem quebrar SICONFI/Betha).
 
+## ➕ Gap (a) atacado: **fontes da despesa Elotech via MSC classe 5 (2026-07-23, `atribuir_fontes_despesa_elotech.ts`)**
+Atribuição EXATA sem rateio (grupo poder×função×subfunção×elemento com fonte ÚNICA na dotação MSC cl.5 — imune ao timing portal jul × MSC jun). **Aplicado nos 4: 2.296 dotações re-keyadas (32-42% do autorizado), 22.608 itens do razão realinhados, invariância Σ provada.** 💡 CIRURGIA no cc em vez de estorno: item de despesa aponta a dotação por `dotacaoDespesaId` (emissor DERIVA a fonte na leitura) → só realinhar o `fonteCodigo` denormalizado (o guarda do estorno recusa com TFs no exercício; e não precisa). **Fila do resto (58-68% multi-fonte): `/empenhos/lista` do portal (params a decifrar) = empenho-a-empenho 100%; `/despesapornivel/fonte-recursos` = totais por fonte no snapshot atual (gabarito).**
+
 ## ➕ Refinamento pós-épico: **art. 42 POR FONTE (2026-07-23, `--por-fonte` no verificar_disponibilidade_rap)**
 Agrupa em espaço STN (STN direta · 8-díg trunca p/ 4 · local via `fonteStnCodigo` · resto = SEM-DEPARA quantificado). **1ª rodada expôs 3 gaps de DADO (a fila por-fonte): (a) despesa Elotech sem fonte no portal → dotações 9999 (a-pagar por fonte incompleto em Cianorte/Naviraí/Vilhena/Sarandi); (b) de/para de Maringá cobre 105/185 fontes do razão (cauda de despesa; SEM-DEPARA −132,4mi); (c) fontes 2xxx (exerc. anteriores) pagam sem saldo inicial da mesma fonte (greenfield facet B).** Onde limpo, leitura de auditor: Criciúma 1500 folga −121,1mi (meio de exercício).
 
