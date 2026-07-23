@@ -52,7 +52,8 @@ async function verificar(entidadeId: string): Promise<{ ok: boolean; linhas: str
   linhas.push(`6.2.1.2 ${R(realizada)} = arrecadado bruto ${R(D(arr?.bruto))} ${okArr ? '✓' : '✗'}`)
 
   const [fluxo]: { pago: unknown; tf: unknown }[] = await prisma.$queryRawUnsafe(
-    `SELECT (SELECT COALESCE(SUM(valor),0) FROM movimentos_empenho WHERE "entidadeId" = $1 AND tipo = 'PAGAMENTO') AS pago,
+    `SELECT (SELECT COALESCE(SUM(CASE WHEN tipo = 'PAGAMENTO' THEN valor ELSE -valor END),0)
+             FROM movimentos_empenho WHERE "entidadeId" = $1 AND tipo IN ('PAGAMENTO','ESTORNO_PAGAMENTO')) AS pago,
             (SELECT COALESCE(SUM(valor),0) FROM transferencias_financeiras WHERE "entidadeId" = $1) AS tf`, entidadeId)
   const caixa = await saldo('1.1.1', false)
   const esperado = D(arr?.liq).minus(D(fluxo?.pago)).plus(D(fluxo?.tf))
