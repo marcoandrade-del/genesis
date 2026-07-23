@@ -1,82 +1,78 @@
 # Memory Index
 
-- [Épico turn-key: contabilidade completa — ENCERRADO](conversor-turn-key-tracker.md) — **100% entregue (2026-07-22, #272–#292): 8 municípios (Maringá, Paranaguá IPM+SICONFI, Criciúma, Cianorte, Naviraí, Vilhena, Sarandi) com razão contábil AO CENTAVO e AUTO-MANTIDO** (job diário + botão re-materializam razão/repasses); import self-service /app/conversor (1 clique = orçamentário+razão+abertura via `materializar-razao.ts` full+incremental); FUNDEB canônico E150 (dado real por natureza-base); CAGEPAR até elemento; descartes auditados; regra RPPS = só resíduo (patronal já é receita orçamentária). Elotech decifrado (folha por aceitaMovimentacao, execução no próprio portal `tce:'portal'`, /actuator/mappings, legado eloweb dotificarProgramatica); IPM anti-bot 000549 (PDFs via /ged/r/; dados-abertos rot 45081/45107 via navegador do Marco)
-
-- [De/para fontes local↔STN: 100% (cauda fechada)](msc-siconfi-fonte-oficial.md) — fonte local = grupo+spec TCE ANTIGA; conversão = Nota 008-2021 (data/nota_008...pdf) + prova vs MSC oficial; NÃO é 1:1 (fonte×APLICAÇÃO→STN) → `PrevisaoReceita.fonteStnCodigo` por previsão (#256). **Cauda das 11 fontes fechada por RESIDUAL (2026-07-15): 72/72 fontes, 403/403 previsões, 0 NULL, 29/31 STN ao centavo; único Δ = ±6,17mi 1501/1752 = split de aplicação da previsão 19111401 da 1097. op.crédito→1754, convênios cap→1701, 1003/1004/1097→1501.** deduções FUNDEB aplicadas (5/5 previstas + 25/25 realizadas AO CENTAVO; abertura regenerada pela BRUTA 3.301.053.997,00 = oficial). FILA restante: Δ captura líquida ~46,3mi (SYNC), eventos 151/152 já feitos (#257)
-- [rm só do que EU criei](feedback-rm-so-do-que-criei.md) — apaguei _demo_pdf.ts de outra frente (untracked, irrecuperável); conferir rm contra o git status do INÍCIO da sessão; árvore principal = zona vermelha
-- [escreverDespesa SÓ reconciliada](feedback-escrever-despesa-reconciliada.md) — passar só-LOA varre o ledger CAP-* (limpeza por design); sempre reconciliarDespesa(loa, exec) antes; varri a execução da CAGEPAR e recuperei do PIT
-- [Conferir o dev antes de importar](feedback-conferir-dev-antes-de-importar.md) — import é idempotente e SOBRESCREVE por nome de entidade; "sem runner commitado" ≠ "não está no dev"; sobrescrevi Paranaguá IPM sem querer (revert = re-importar a fonte anterior)
-- [MSC oficial via Siconfi (fonte)](msc-siconfi-fonte-oficial.md) — API pública decifrada (param é `id_tv`, não `id_tc`!); abertura 2026 de Maringá baixada (19,8k linhas, balanço Δ0,00) em data/abertura-2026/msc_siconfi/; destrava abertura patrimonial + GABARITO do emissor + poder/órgão fase 2c; questão aberta: consolidado 807mi × Prefeitura 775mi
-
-- [Varredura de segredos + setup](varredura-segredos-setup.md) — nenhum segredo no histórico do git; `.claudeignore` é INERTE (Claude Code não lê) → bloqueio real é `permissions.deny` em `.claude/settings.json` (versionado); scanner = `varredura-segredos.sh` + `.gitleaks.toml`; PR #253. Rotação de ANTHROPIC_API_KEY + senha Postgres (mandrade1965) FEITA em 2026-07-14
-- [Padrões do estado são canônicos](padroes-do-estado-canonicos.md) — todo estado tem tabela de eventos + planos de contas/receita/despesa padrão no modelo; NÃO fugir deles (hardcode/chute quebra a estrutura); contábil dirige sempre pelo padrão do modelo
-- [ICF / Ranking Siconfi como alvo](icf-ranking-siconfi.md) — Portaria 1.833/2026 só divulga o ranking; metodologia de 185 verificações (nota A–E); gap-list p/ "medidor de ICF". **MSC:** backbone #225/#226 + **fase 2 #228 (conta-corrente) + fase 2b #230 (atributo F/natureza-despesa/subfunção) MERGEADAS**; **validador estrutural Dim I #231 MERGEADO** (contrato 1.16.0). Validado na Maringá real (partida-dobrada+reconciliação Δ0; reconciliação pegou drift no dev). FALTA: fase 2c poder/órgão; validação completa precisa de ente com execução de despesa (dev tem 0 empenho). `LinhaMsc` final no board. **Dim IV (execução): backfill do motor #236/#243 populou o razão da Prefeitura de Maringá (dev TEM execução: 22,7k movimentos); RECEITA_SEM_FONTE fechado #238; sinal do E100 corrigido+aplicado no dev (#250, regenerado 2026-07-14) e ABERTURA materializada c/ cc de dotação (#251) → ORCAMENTARIA_INVERTIDA mês 1 OK, resíduos 1-20 = achados reais de dados (dotação estourada V6 + empenhos líquidos negativos)**
-- [Sinal do E100 (6.2.1.2): RESOLVIDO](icf-e100-sinal-proposta.md) — opção B executada: PCASP TCE-PR confirma 6.2.1.2 CREDORA; #250 (código E100+abertura) + regeneração do razão da receita no dev + abertura materializada c/ cc de dotação (#251); resíduos do check = achados reais de dados; follow-ups (f99999, reconciliação do backfill, 3 strays)
-- [Rematerializar conjunto ANTIGO ∪ NOVO](feedback-rematerializar-conjunto-antigo.md) — re-run que redistribui movimentos deixa fichas órfãs com materializado velho (bug do #217, fix #218 + reparo one-off)
-- [Consolidação por ente + intra-OFSS](consolidacao-ente-intra.md) — elimina mod 91/cat 7-8 DERIVADO dos códigos; despesa #216 + receita #219 consolidadas; equilíbrio LOA (V5) é do MUNICÍPIO e BRUTO, fechado Δ0 em #221 (previsto = orçado INICIAL, não atualizado); falta Fase 3 DCL/RGF
-- [Maringá: município completo](maringa-municipio-completo.md) — TODAS as entidades com LOA (QDD ao centavo) + execução jan–jun (guard 30/30); mapa órgão↔portal↔PIT; IPPLAM/IAM criadas via onboarding; #213
-- [Registrar frente ANTES de começar](feedback-registrar-frente-antes-de-comecar.md) — claim no quadro é a 1ª escrita da frente; colisão real de 2026-07-07 (saldos bancários em 2 sessões)
-- [OXY: manual de interpretação fiscal p/ IA](oxy-manual-interpretacao-fiscal.md) — HANDOFF: regras por indicador + ressalvas de auditor + requisitos p/ análises encaminháveis; Gênesis calcula/explica, OXY exibe/narra via contrato 1.9.0
-- [OXY: playbook de verificação e narrativa](oxy-playbook-verificacao-narrativa.md) — HANDOFF 2: bateria V1–V8 de identidades contábeis (testáveis por máquina), armadilhas de dados reais, padrões de narrativa p/ gestor; ideia: /memoriais/consistencia com selo
-- [Saldos de abertura 2026 CRAVADOS](saldos-abertura-2026-maringa.md) — 775,08mi conta a conta por fonte (31/12/2025, Δ0,00), DC composta 643,26mi, DCL inicial −137.507.930,95 (REVISADA no RGF 1ºQ26 — Gemini acertou; doc 2025 era pré-revisão); docs em data/abertura-2026/; import = fecha backlog nº 1
-- [MDF 9ª ed. Parte IV (RGF): referência Tesouro](mdf-rgf-tesouro-referencia.md) — mapa das seções/anexos 1–6 com ids de URL, prazos (quadrimestral, 30 dias; <50mil hab semestral); Gênesis tem Anexo 5+Guardião, ÉPICO EXECUTADO 06/07: Anexos 1–6 todos vivos, contrato 1.9.0, Guardião 9 indicadores
-- [PIT/TCE-PR: dados abertos da execução](tce-pr-pit-dados-abertos.md) — download estruturado nível EMPENHO (XML, função×fonte completas, todas as entidades) por município/ano + consolidado estadual; URLs cravadas c/ amostra Maringá 2026; SEM tema Receita
-- [⚠️ Coordenação entre sessões](coordenacao-sessoes.md) — QUADRO VIVO: ler ao iniciar e atualizar ao assumir/concluir trabalho; quem está em qual branch/PR e zonas de colisão
-- [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — como usar o quadro entre sessões simultâneas; caveats (hook só p/ sessões novas, async, não força)
-- [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — mesmo .git/índice/working-tree: conferir `git show --stat` antes de pushar, branch única, reset --hard pro origin pra recuperar divergência
-- [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada ao vivo (Wise) + governança + vira-modelo + import-IA multi-formato; resolver 3 níveis Estado>Modelo>default; PRs #178→#184; ENCERRADO (só LRF-despesa gated na Elotech)
-- [LRF-despesa: ÉPICO COMPLETO](lrf-despesa-epico-plano.md) — 7/7 em 2026-07-02 (#185 QDD, #186/#187 índices MDE 36,09%/ASPS 16,06%, #188 Anexo 5, #189 RREO função, #190 Metas Fiscais); contrato 1.7.0; follow-ups: bancada p/ índices, metas reais da LDO, medidor Oxy
-- [Alterações orçamentárias (decretos)](alteracoes-orcamentarias-dinamica.md) — autorizado é VIVO (créditos aplicam no valorAutorizado); meta fiscal fica FIXA na LOA inicial e o Δ mostra o desvio; importar decretos reais de Maringá = pendente
-- [Gemini: confirmar 2× com deep search](feedback-gemini-deep-search.md) — 1ª resposta mistura apurado/meta; deep search trouxe DCL inicial −137,51mi que fecha ao centavo; MCP gemini-cli MORTO no free tier (cota zero + Code Assist aposentado) → usar WebSearch/WebFetch nativos
-- [Sync automático + execução jan–jun](alteracoes-orcamentarias-dinamica.md) — job diário receita→despesa (#194/#195, env-gated, valida vs dashboard antes de gravar); receita 1.672,0mi e despesa 1.746,2mi capturadas ao centavo; Anexo 5 VIVO; falta: saldos bancários → nominal/DCL vivos
-- [Decretos: import + SYNC AUTOMÁTICO](decretos-import-aprendizados.md) — API decifrada (par {delta, atual−delta} ambíguo, solver por equação INCREMENTAL #220); automatizado no job diário #222/#223 (núcleo em decretos-solver.ts; sync recusa conciliação/drift → script manual); histórico na tela #224; 229 decretos Δ 0,00 × portal
-- [Apurados TCE 2026](apurados-tce-2026.md) — gabaritos oficiais: receita até jun 1.732,2mi (banco: 1.461,2 jan–mai), despesa empenhada 1.746,4mi (alvo do import), primário +320,89, DCL −539,62; nominal 402,12 é APURADO não meta
-- [Portal Maringá: API de arquivos](portal-maringa-api-arquivos.md) — baixar publicações via /api/files/arquivo/{idArquivo}; LDO 2026: renúncia XLS baixada, Metas Anuais NÃO publicadas (slides 1118420 = melhor pista, baixar no navegador)
-- [Perfil do Usuário](user_profile.md) — Marco, programador COBOL veterano voltando a programar, desenvolvendo o Gênesis
+- [Épico turn-key + Dim II patrimonial — AMBOS COMPLETOS](conversor-turn-key-tracker.md) — turn-key #272–#292 (8 municípios com razão AO CENTAVO e AUTO-MANTIDO; import self-service /app/conversor; FUNDEB canônico E150; RPPS = só resíduo; Elotech/IPM decifrados) + **Dim II #293–#295 (2026-07-23): razão PATRIMONIAL (E300/E702/E802 + de/para grosso MCASP 100%), abertura patrimonial MSC beginning_balance (SaldoInicialAno/Cc), TF concedida evento 901 — prova art. 42 viva (`verificar_disponibilidade_rap.ts`), identidade do caixa Δ0 nas 48 entidades; bug Elotech de códigos pontuados corrigido+reparado**
+- [MSC oficial Siconfi + de/para fontes local↔STN 100%](msc-siconfi-fonte-oficial.md) — API decifrada (param `id_tv`!); conversão Nota 008-2021, NÃO é 1:1 → `fonteStnCodigo` por previsão; cauda fechada 72/72 fontes, 29/31 STN ao centavo; deduções FUNDEB ao centavo; fila: Δ captura líquida ~46,3mi (SYNC)
+- [rm só do que EU criei](feedback-rm-so-do-que-criei.md) — conferir rm contra o git status do INÍCIO da sessão; árvore principal = zona vermelha
+- [escreverDespesa SÓ reconciliada](feedback-escrever-despesa-reconciliada.md) — passar só-LOA varre o ledger CAP-*; sempre reconciliarDespesa(loa, exec) antes
+- [Conferir o dev antes de importar](feedback-conferir-dev-antes-de-importar.md) — import idempotente SOBRESCREVE por nome de entidade; "sem runner commitado" ≠ "não está no dev"
+- [Varredura de segredos + setup](varredura-segredos-setup.md) — `.claudeignore` é INERTE; bloqueio real = `permissions.deny`; scanner versionado; chaves rotacionadas 2026-07-14
+- [Padrões do estado são canônicos](padroes-do-estado-canonicos.md) — tabela de eventos + planos padrão do modelo; NÃO fugir deles; contábil dirige sempre pelo padrão
+- [ICF / Ranking Siconfi como alvo](icf-ranking-siconfi.md) — 185 verificações (nota A–E); MSC backbone+fases 2/2b+validador Dim I mergeados; Dim IV com razão real; FALTA fase 2c poder/órgão
+- [Sinal do E100 (6.2.1.2): RESOLVIDO](icf-e100-sinal-proposta.md) — 6.2.1.2 CREDORA (PCASP TCE-PR); #250/#251; resíduos do check = achados reais de dados
+- [Rematerializar conjunto ANTIGO ∪ NOVO](feedback-rematerializar-conjunto-antigo.md) — re-run que redistribui movimentos deixa fichas órfãs (bug #217, fix #218)
+- [Consolidação por ente + intra-OFSS](consolidacao-ente-intra.md) — intra DERIVADO dos códigos (mod 91/cat 7-8); equilíbrio LOA é do MUNICÍPIO e BRUTO (#221); falta Fase 3 DCL/RGF
+- [Maringá: município completo](maringa-municipio-completo.md) — todas as entidades com LOA + execução; mapa órgão↔portal↔PIT; #213
+- [Registrar frente ANTES de começar](feedback-registrar-frente-antes-de-comecar.md) — claim no quadro é a 1ª escrita da frente
+- [OXY: manual de interpretação fiscal p/ IA](oxy-manual-interpretacao-fiscal.md) — HANDOFF: regras por indicador + ressalvas de auditor; Gênesis calcula, OXY narra
+- [OXY: playbook de verificação e narrativa](oxy-playbook-verificacao-narrativa.md) — bateria V1–V8 de identidades contábeis + padrões de narrativa p/ gestor
+- [Saldos de abertura 2026 CRAVADOS](saldos-abertura-2026-maringa.md) — 775,08mi conta a conta por fonte (31/12/2025); DCL inicial −137,51mi (revisada RGF 1ºQ26); docs em data/abertura-2026/
+- [MDF 9ª ed. Parte IV (RGF): referência Tesouro](mdf-rgf-tesouro-referencia.md) — mapa anexos 1–6 + prazos; ÉPICO 06/07: Anexos 1–6 vivos, Guardião 9 indicadores
+- [PIT/TCE-PR: dados abertos da execução](tce-pr-pit-dados-abertos.md) — nível EMPENHO (XML, todas as entidades) por município/ano; SEM tema Receita
+- [⚠️ Coordenação entre sessões](coordenacao-sessoes.md) — QUADRO VIVO: ler ao iniciar, atualizar ao assumir/concluir; zonas de colisão
+- [Protocolo de coordenação (feedback)](feedback-protocolo-coordenacao.md) — caveats do quadro (hook só p/ sessões novas, async, não força)
+- [Git tree compartilhada entre sessões](git-tree-compartilhada-entre-sessoes.md) — conferir `git show --stat` antes de pushar; reset --hard pro origin recupera divergência
+- [Editor de Memoriais (épico completo)](memoriais-editor-epico.md) — bancada + governança + vira-modelo + import-IA; PRs #178→#184; ENCERRADO
+- [LRF-despesa: ÉPICO COMPLETO](lrf-despesa-epico-plano.md) — 7/7 (#185–#190, MDE 36,09%/ASPS 16,06%); contrato 1.7.0
+- [Alterações orçamentárias + sync automático](alteracoes-orcamentarias-dinamica.md) — autorizado é VIVO (créditos → valorAutorizado), meta fiscal FIXA na LOA inicial; job diário receita→despesa (#194/#195) valida vs dashboard antes de gravar
+- [Gemini: confirmar 2× com deep search](feedback-gemini-deep-search.md) — 1ª resposta mistura apurado/meta; MCP gemini-cli MORTO no free tier → WebSearch/WebFetch nativos
+- [Decretos: import + SYNC AUTOMÁTICO](decretos-import-aprendizados.md) — solver incremental #220; job diário #222/#223; 229 decretos Δ 0,00 × portal
+- [Apurados TCE 2026](apurados-tce-2026.md) — gabaritos oficiais Maringá (receita/despesa/primário/DCL); nominal 402,12 é APURADO não meta
+- [Portal Maringá: API de arquivos](portal-maringa-api-arquivos.md) — /api/files/arquivo/{id}; Metas Anuais da LDO não publicadas
+- [Perfil do Usuário](user_profile.md) — Marco, contador e programador COBOL veterano, desenvolvendo o Gênesis
 - [Stack do Projeto](project_stack.md) — Node.js + TypeScript + Prisma + PostgreSQL + Fastify
-- [Estado do Projeto](project_estado.md) — O que está pronto (CRUD+admin+ativação+testes 100%), o que falta, decisões técnicas
-- [Spec Modelos Contábeis](project_contabil.md) — Próximo trabalho: sistema contábil (plano de contas, modelos, estados/municípios)
-- [RCL/LRF: plano](contabil-rcl-lrf-plano.md) — motor parametrizável por Estado (STN default + deltas; PR um pouco diferente); per-entidade primeiro; deduções fora do import (a informar); futuro: UI intuitiva ou IA importando xls
-- [Três planos de contas (setor público)](contabil-tres-planos-de-contas.md) — contábil/receita/despesa em tabelas separadas; layout das fontes TCE-PR
-- [Regras do orçamentário](contabil-regras-orcamentario.md) — modelo TCE imutável vs desdobramento da entidade; saldo por fonte com rollup; fonte→contas bancárias (Febraban)
-- [Revisão de regras 2026-06-01](spec-revisao-2026-06-01.md) — 7 gaps; pacote permissão+login+exercício COMPLETO (PR-A/B/C/D/D2 mergeados); Compras #35/36/38 abertos (outra sessão)
-- [Specs usabilidade 2026-06-09](spec-usabilidade-2026-06-09.md) — pivot p/ usabilidade: /app menus dinâmicos, drill-down Estados→Municípios→Entidades+planos, picker de view/campos em relatórios, formatação cabeçalho/rodapé; gap #5 PR-3 pausado
-- [Skills e Configurações](project_skills.md) — Design system Linear, skills instaladas, hooks configurados
+- [Estado do Projeto](project_estado.md) — o que está pronto, o que falta, decisões técnicas
+- [Spec Modelos Contábeis](project_contabil.md) — sistema contábil: plano de contas, modelos, estados/municípios
+- [RCL/LRF: plano](contabil-rcl-lrf-plano.md) — motor parametrizável por Estado (STN default + deltas); per-entidade primeiro
+- [Três planos de contas (setor público)](contabil-tres-planos-de-contas.md) — contábil/receita/despesa separados; layout fontes TCE-PR
+- [Regras do orçamentário](contabil-regras-orcamentario.md) — modelo TCE imutável vs desdobramento da entidade; saldo por fonte com rollup
+- [Revisão de regras 2026-06-01](spec-revisao-2026-06-01.md) — 7 gaps; pacote permissão+login+exercício COMPLETO
+- [Specs usabilidade 2026-06-09](spec-usabilidade-2026-06-09.md) — /app menus dinâmicos, drill-down, picker de views em relatórios
+- [Skills e Configurações](project_skills.md) — design system Linear, skills, hooks
 - [Regra: salvar erros](salvar-erros-em-memoria.md) — todo erro meu vira arquivo feedback no mesmo turno
-- [Split de SQL c/ comentários pulou statements](feedback-split-sql-comentarios.md) — migração "aplicada" sem aplicar nada e registrada; verificar EFEITO (information_schema/pg_enum), statements explícitos, registrar só após verificação
-- [Prisma: `generate` após `migrate dev`](prisma-generate-apos-migrate.md) — neste setup, o client em node_modules não atualiza sozinho
-- [Tema: text-primary vira ink](text-primary-remapeado-no-tema.md) — usar var(--primary) direto se precisar de lime fora do CTA
-- [Módulo Compras: plano 3 PRs](compras-modulo-plano.md) — Lei 14.133; PR-1/2/3 ✅ TODOS mergeados em master (#35/#36/#38)
-- [Merge stack squash: usar -X ours](merge-stack-squash-x-ours.md) — mergear PRs encadeadas+squash sem perder outra frente; nunca `git checkout --ours`
-- [Reabrir PR p/ re-disparar CI](reabrir-pr-para-redisparar-ci.md) — head sem run + ci.yml sem workflow_dispatch → `gh pr close && reopen`
-- [Não operar worktree de outra sessão](feedback-nao-operar-worktree-de-outra-sessao.md) — coord só mergeia PR + sinaliza no quadro; a sessão dona é que rebaseia
-- [Diff antes de rodar import](feedback-import-diff-antes-de-rodar.md) — diferenciar arquivo×banco em memória antes de escrever; openpyxl lê código numérico como float (.0) → coagir a int; "idempotente" ≠ "não escreve"
-- [Compras no /app (operador): plano](compras-no-app-plano.md) — trazer Compras p/ área do usuário escopada ao contexto; reusa services; aguarda #42 mergear
-- [Gerador de Relatórios: plano 3 PRs](relatorios-gerador-plano.md) — /app, escopo por entidade; R1 cabeçalho/rodapé+editor WYSIWYG em andamento
-- [Orçamento Maringá 2026 importado](orcamento-maringa-importado.md) — LOA real no banco dev (403 previsões + 2.325 dotações); fonte 9999 na despesa, receita bruta; script aguarda PR
-- [Arrecadação Maringá importada (por fonte)](arrecadacao-maringa-importada.md) — execução da receita realizada no dev, por fonte EXATA (relatório TCE-PR jan-maio, 1559 movs, 97% cobertura); PR #167 (substitui #165 aprox); FUNDEB/Dívida batem ao centavo; alimenta valores-mensais/OXY
-- [Import em massa não dispara sync](contabil-import-massa-bypassa-sync.md) — importar plano-MODELO via script fura o SincronizadorContas → entidades defasam; remediar com scripts/ressincronizar_entidades_modelo.ts (feito p/ Maringá 2026-06-09)
-- [Drift de migração no banco dev](prisma-migrate-drift-genesis.md) — NÃO `migrate reset`; aplicar migração via diff+db execute+resolve
-- [Bug do engine de migração Prisma 7.7](prisma-migrate-engine-bug-7.7.md) — `H.replace` crasha diff/db execute/resolve; aplicar migração via psql + INSERT à mão em _prisma_migrations
-- [Rodar/dirigir o app admin](rodar-app-admin.md) — npm run dev (3000); admin é cookie-auth, cunhar JWT p/ navegar via script
-- [curl POST sem corpo vira GET](feedback-curl-post-sem-corpo-vira-get.md) — rota POST-only dá 404 (view "não encontrado"); usar -X POST em ações sem body
-- [reply.locals injeta view compartilhada](fastify-view-reply-locals.md) — hook seta reply.locals.X → aparece em toda view sem tocar rota; usado no menu dinâmico do /app (#66)
-- [EJS: JSON em atributo de evento](ejs-json-em-atributo-de-evento.md) — onsubmit/onclick exige `<%=`; `<%-` mata prompt/confirm (bug do hub, fix no #69); em `<script>` é o contrário
-- [Drag debug muta banco dev](feedback-drag-debug-muta-banco.md) — dirigir drag-drop via Playwright avulso completa o drop e escreve no banco; interceptar endpoints como o e2e ou não dar mouse.up
-- [Saldo do balancete por natureza](feedback-saldo-balancete-natureza.md) — rollup em saldo devedor COM SINAL; credora/retificadora subtrai; nunca somar saldos "positivos por natureza" (MCASP p.531)
-- [Integração receita→contábil (Tabela de Eventos)](integracao-receita-eventos.md) — arrecadação dispara E100/E200/E300; conta-corrente=dimensão no LancamentoItem (não código); de/para NR→VPA em ParametroReceita; PR #90
-- [Memoriais × planos: dependência e integridade](memoriais-dependencia-planos-integridade.md) — FUTURO: dependência por CÓDIGO/prefixo (não FK); excluir conta usada só em Parametro NÃO é bloqueado. DECISÃO: inteligência no sistema (ResolvedorDeVinculos + validação autoria/seleção/exclusão + painel saúde), FK só reforço pontual
-- [Conciliação bancária](conciliacao-bancaria.md) — extrato × arrecadações por conta (1:1, audita); parsers CSV/OFX/CNAB; auto-match valor+data; PR #94/#96
-- [Config dashboard: granularidade dos planos](config-dashboard-granularidade.md) — por entidade, painéis exibem plano padrão (modelo) ou com desdobramentos locais; PADRAO colapsa, totais batem; PR #99; seletor por relatório com memória
-- [Construir com defaults](feedback-construir-com-defaults.md) — direção clara → construir anunciando escolhas, não fazer várias perguntas; perguntar só o caro/bifurcante
-- [Favoritos + painel reordenável do /app](app-favoritos-e-painel-ordenavel.md) — barra de favoritos (#102) + reordenar cards por arrasto (#105); reusa FavoritoItem; OrdemItemUsuario esparso; ambos por usuário
-- [Despesa: proposta de eventos contábeis](despesa-eventos-contabeis-proposta.md) — E600/E700/E800 (empenho/liquidação/pagamento → partida dobrada); contas PCASP confirmadas; OUTRA sessão constrói (feat/despesa-realizacao-ledger); de/para deve cobrir a funcional-programática completa, não só natureza
-- [Abertura do exercício (PCASP)](abertura-exercicio-pcasp.md) — PR #110: contabiliza a LOA aprovada (previsão D 6.2.1.1.0/C 5.2.1.1.1; fixação D 5.2.2.1.1.01/C 6.2.2.1.1) + transporte SaldoInicialAno (magnitude); APROVADO→EM_EXECUCAO; cadeia orçamento→abertura→**acumulado diário** (próxima camada: materializar saldo conta×dia)
-- [Realização da despesa (spec+progresso)](spec-realizacao-despesa-2026-06-22.md) — épico #109: razão imutável+estorno value-driven, ficha 6 colunas, classificação completa (9 dimensões); motor contábil E600/E700/E800 em #114 (Fase 1: ParametroDespesa)
-- [Oxy Dashboards × Gênesis](oxy-dashboards-integracao.md) — 2º projeto do Marco (BI+IA); Gênesis=registro, Oxy=BI/IA/LRF; integra via MSC/Siconfi + views rel_*; memoriais LRF vivem no Oxy. **Ponte ENTIDADES (cada entidade=unidade de BI):** Gênesis `GET /api/memoriais/entidades` (#260) + oxy-bi-jpa `GET /entidades` (PR-C, oxy-repo #56, contrato OXY 1.8.0); acesso-por-entidade deferido. **502 dos painéis por entidade RESOLVIDO (oxy-repo #58): `EntidadeResolver` resolve clienteId=entidadeId direto (fallback município→prefeitura); e2e das telas de dados pendente na sessão OXY**
-- [OXY↔Gênesis: cada um comita o que fizer](oxy-genesis-cada-um-comita.md) — repos separados; eu commito o lado que construo (Gênesis OU oxy-bi-jpa), a sessão OXY commita o front; comunicação por doc de contrato
-- [Betha Transparência: API decifrada + conversor](betha-transparencia-api-decifrada.md) — token OAuth anônimo + header app-context + POST /api/busca-textual/{id} (+ `/totalizadores` p/ validação rápida); RECEITA de Criciúma FECHADA ao centavo (#263 mergeado). **#264 (despesa via 174485) ENCERRADO sem merge** — validado ao vivo: 174485 é histórico MULTI-ANO (12,7bi, filtro de ano inerte, sem programa/ação, dims só-nome) → SICONFI supera. **Espinha SICONFI (trilogia #265 execução + #266 receita + #267 dotação/standalone) importa QUALQUER município por IBGE; Criciúma/SC no dev ao centavo** (ver [[msc-siconfi-fonte-oficial]], [[padroes-do-estado-canonicos]])
-- [Infra de memória (path/sync/git)](memoria-infra-versionada.md) — projeto movido p/ Projetos/genesis (chave nova do harness); chave antiga é symlink; sync_memory.py copia p/ in-repo; .claude/memory versionado no git; escrever memória no dir canônico
-- [Claude dirige o versionamento](feedback-claude-dirige-versionamento.md) — Marco delega o controle do repo ao Claude; conduzir branch→PR→CI→merge→limpeza, código via PR+CI, memória/docs direto na master; confirmar só o arriscado
-- [Front: CI roda lint + gate de merge](feedback-front-ci-lint-e-merge-gate.md) — rodar eslint antes do push; não mergear com CI vermelho
-- [Import Paranaguá/PR (IPM)](import-paranagua-ipm.md) — frente `feat/import-paranagua`; reuso do pipeline Maringá via PIT/TCE-PR (município-agnóstico); IPM atende.net é captcha-walled (Marco exporta CSV/xls). Prefeitura FINALIZADA (orçado 1,1bi + empenhado 587mi PIT ao centavo, fixes `5d70d78`); Câmara/Prev/Fundação/arrecadação/FUNDEB deferidos (faltam os CSVs). Convive com "Paranaguá (SICONFI)" da outra sessão — município IPM = "Paranaguá" (d80c2dd7), escopo EXATO.
+- [Split de SQL c/ comentários pulou statements](feedback-split-sql-comentarios.md) — verificar EFEITO da migração (information_schema), registrar só após verificação
+- [Prisma: `generate` após `migrate dev`](prisma-generate-apos-migrate.md) — o client não atualiza sozinho neste setup
+- [Tema: text-primary vira ink](text-primary-remapeado-no-tema.md) — var(--primary) direto p/ lime fora do CTA
+- [Módulo Compras: plano 3 PRs](compras-modulo-plano.md) — Lei 14.133; #35/#36/#38 todos mergeados
+- [Merge stack squash: usar -X ours](merge-stack-squash-x-ours.md) — nunca `git checkout --ours`
+- [Reabrir PR p/ re-disparar CI](reabrir-pr-para-redisparar-ci.md) — `gh pr close && reopen` quando o head fica sem run
+- [Não operar worktree de outra sessão](feedback-nao-operar-worktree-de-outra-sessao.md) — coord só mergeia PR + sinaliza; a dona rebaseia
+- [Diff antes de rodar import](feedback-import-diff-antes-de-rodar.md) — diferenciar arquivo×banco antes de escrever; "idempotente" ≠ "não escreve"
+- [Compras no /app (operador): plano](compras-no-app-plano.md) — Compras na área do usuário escopada ao contexto
+- [Gerador de Relatórios: plano 3 PRs](relatorios-gerador-plano.md) — /app, escopo por entidade; R1 em andamento
+- [Orçamento Maringá 2026 importado](orcamento-maringa-importado.md) — LOA real no dev (403 previsões + 2.325 dotações)
+- [Arrecadação Maringá importada (por fonte)](arrecadacao-maringa-importada.md) — receita realizada por fonte EXATA (TCE-PR); FUNDEB/Dívida ao centavo; #167
+- [Import em massa não dispara sync](contabil-import-massa-bypassa-sync.md) — plano-MODELO via script fura o SincronizadorContas; remediar com ressincronizar_entidades_modelo.ts
+- [Drift de migração no banco dev](prisma-migrate-drift-genesis.md) — NÃO `migrate reset`; aplicar via diff+db execute+resolve
+- [Bug do engine de migração Prisma 7.7](prisma-migrate-engine-bug-7.7.md) — aplicar migração via psql + INSERT à mão em _prisma_migrations
+- [Rodar/dirigir o app admin](rodar-app-admin.md) — npm run dev (3000); cookie-auth, cunhar JWT via script
+- [curl POST sem corpo vira GET](feedback-curl-post-sem-corpo-vira-get.md) — usar -X POST em ações sem body
+- [reply.locals injeta view compartilhada](fastify-view-reply-locals.md) — hook seta reply.locals.X → toda view; menu dinâmico do /app
+- [EJS: JSON em atributo de evento](ejs-json-em-atributo-de-evento.md) — onsubmit/onclick exige `<%=`; em `<script>` é o contrário
+- [Drag debug muta banco dev](feedback-drag-debug-muta-banco.md) — Playwright avulso completa o drop e escreve; interceptar endpoints como o e2e
+- [Saldo do balancete por natureza](feedback-saldo-balancete-natureza.md) — rollup em saldo devedor COM SINAL; nunca somar "positivos por natureza" (MCASP p.531)
+- [Integração receita→contábil (Tabela de Eventos)](integracao-receita-eventos.md) — arrecadação dispara E100/E200/E300; cc = dimensão no LancamentoItem; de/para NR→VPA
+- [Memoriais × planos: dependência e integridade](memoriais-dependencia-planos-integridade.md) — dependência por CÓDIGO/prefixo (não FK); ResolvedorDeVinculos futuro
+- [Conciliação bancária](conciliacao-bancaria.md) — extrato × arrecadações por conta; parsers CSV/OFX/CNAB; #94/#96
+- [Config dashboard: granularidade dos planos](config-dashboard-granularidade.md) — plano padrão × desdobramentos por relatório; #99
+- [Construir com defaults](feedback-construir-com-defaults.md) — direção clara → construir anunciando escolhas; perguntar só o caro/bifurcante
+- [Favoritos + painel reordenável do /app](app-favoritos-e-painel-ordenavel.md) — #102/#105, ambos por usuário
+- [Despesa: proposta de eventos contábeis](despesa-eventos-contabeis-proposta.md) — E600/E700/E800; de/para cobre a funcional-programática completa
+- [Abertura do exercício (PCASP)](abertura-exercicio-pcasp.md) — #110: contabiliza a LOA aprovada + transporte SaldoInicialAno; APROVADO→EM_EXECUCAO
+- [Realização da despesa (spec+progresso)](spec-realizacao-despesa-2026-06-22.md) — razão imutável+estorno value-driven; motor E600/E700/E800 #114
+- [Oxy Dashboards × Gênesis](oxy-dashboards-integracao.md) — Gênesis=registro, Oxy=BI/IA/LRF; ponte ENTIDADES (contrato OXY 1.8.0); 502 por entidade resolvido (EntidadeResolver)
+- [OXY↔Gênesis: cada um comita o que fizer](oxy-genesis-cada-um-comita.md) — repos separados; comunicação por doc de contrato
+- [Betha Transparência + espinha SICONFI](betha-transparencia-api-decifrada.md) — Betha OAuth anônimo (receita Criciúma #263); espinha SICONFI #265–#267 importa QUALQUER município por IBGE
+- [Infra de memória (path/sync/git)](memoria-infra-versionada.md) — dir canônico + sync_memory.py copia p/ in-repo versionado
+- [Claude dirige o versionamento](feedback-claude-dirige-versionamento.md) — código via PR+CI, memória/docs direto na master; confirmar só o arriscado
+- [Front: CI roda lint + gate de merge](feedback-front-ci-lint-e-merge-gate.md) — eslint antes do push; não mergear com CI vermelho
+- [Import Paranaguá/PR (IPM)](import-paranagua-ipm.md) — IPM atende.net captcha-walled (Marco exporta); município IPM = "Paranaguá" exato, convive com "Paranaguá (SICONFI)"
