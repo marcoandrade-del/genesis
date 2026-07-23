@@ -11,10 +11,9 @@
  *   empenho; fila).
  *
  * NENHUM valor muda — o script prova Σ autorizado/empenhado por entidade
- * inalterado. Depois do apply, re-materializar o razão (a abertura e o cc de
- * fonte dos lançamentos derivam da dotação):
- *   npx tsx scripts/rematerializar_razao.ts --municipio=<X> --apply
- * (a abertura é estornada aqui p/ o ciclo recontabilizar com o cc novo)
+ * inalterado. O razão NÃO precisa re-materializar: os itens de despesa apontam a
+ * dotação por `dotacaoDespesaId` (o emissor deriva a fonte da dotação); o script
+ * só realinha o `fonteCodigo` denormalizado dos itens (abertura + execução).
  *
  *   npx tsx scripts/atribuir_fontes_despesa_elotech.ts --municipio=<nome> [--apply]
  */
@@ -23,8 +22,6 @@ import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
 import { baixarMsc, naturezaDespesaMsc, fonteMsc } from '../src/conversor/siconfi/api.js'
-import { AberturaContabilService } from '../src/services/abertura-contabil.js'
-import { LancamentosService } from '../src/services/lancamentos.js'
 
 const APPLY = process.argv.includes('--apply')
 const ANO = 2026
@@ -115,7 +112,6 @@ async function main() {
 
   // garante as fontes STN nas entidades e re-keya as dotações; estorna a abertura
   // (o rematerializar recontabiliza com o cc de fonte novo)
-  const usuario = await prisma.usuario.findFirstOrThrow({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
   const fonteIds = new Map<string, string>() // `${entidadeId}|${stn}` → id
   for (const p of plano) {
     const k = `${p.entidadeId}|${p.fonteStn}`
@@ -156,30 +152,20 @@ async function main() {
   }
   console.log(invariante ? '✓ invariância de valores confirmada (Σ aut/emp por entidade inalterados)' : '✗ INVARIÂNCIA VIOLADA — investigar')
 
-  // ciclo p/ o cc de fonte novo entrar no razão (ordem provada no fix da CAGEPAR):
-  // 1. limpa a execução do razão (o estorno da abertura exige exercício sem movimentos);
-  // 2. estorna a abertura (o cc de dotação dela carrega a fonte velha);
-  // 3. o rematerializar recontabiliza a abertura e refaz o replay.
-  // Cobre TODAS as entidades do município com dotação (robusto a re-run parcial).
-  const abertura = new AberturaContabilService(prisma)
-  const lancs = new LancamentosService(prisma)
-  const entidadesMunicipio: { id: string; nome: string }[] = await prisma.$queryRawUnsafe(`
-    SELECT DISTINCT e.id, e.nome FROM entidades e
+  // cc no razão: os itens de despesa referenciam a dotação por `dotacaoDespesaId`
+  // (o emissor DERIVA a fonte da dotação na leitura); só o `fonteCodigo`
+  // denormalizado no item fica desatualizado. Cirurgia: realinha os itens de
+  // TODAS as dotações do município cuja fonte diverge (abertura + execução de uma
+  // vez; robusto a re-run; sem estorno/re-materialização).
+  const realinhados: number = await prisma.$executeRawUnsafe(`
+    UPDATE lancamento_itens li SET "fonteCodigo" = f.codigo
+    FROM dotacoes_despesa d
+    JOIN fontes_recurso_entidade f ON f.id = d."fonteRecursoEntidadeId"
+    JOIN orcamentos o ON o.id = d."orcamentoId" AND o.ano = ${ANO}
+    JOIN entidades e ON e.id = o."entidadeId"
     JOIN municipios m ON m.id = e."municipioId"
-    JOIN orcamentos o ON o."entidadeId" = e.id AND o.ano = ${ANO}
-    JOIN dotacoes_despesa d ON d."orcamentoId" = o.id
-    WHERE m.nome = '${alvo!.replace(/'/g, "''")}'`)
-  for (const ent of entidadesMunicipio) {
-    const st = await abertura.status(ent.id, ANO)
-    if (!st.contabilizada) continue
-    const execucao = await prisma.lancamento.findMany({
-      where: { entidadeId: ent.id, origemTipo: { in: ['ARRECADACAO', 'EMPENHO', 'LIQUIDACAO', 'PAGAMENTO'] } },
-      select: { id: true },
-    })
-    for (const l of execucao) await lancs.excluir(l.id)
-    await abertura.estornar(ent.id, ANO, usuario.id)
-    console.log(`  ${ent.nome}: execução limpa (${execucao.length}) + abertura estornada — rematerializar recontabiliza`)
-  }
-  console.log('\nAgora rode: npx tsx scripts/rematerializar_razao.ts --municipio=' + alvo + ' --apply')
+    WHERE li."dotacaoDespesaId" = d.id AND m.nome = '${alvo!.replace(/'/g, "''")}'
+      AND li."fonteCodigo" IS DISTINCT FROM f.codigo`)
+  console.log(`✓ cc de fonte realinhado em ${realinhados} itens do razão (abertura + execução).`)
 }
 main().catch((e) => { console.error('FALHOU:', e instanceof Error ? e.stack || e.message : e); process.exitCode = 1 }).finally(async () => { await prisma.$disconnect(); await pool.end() })
