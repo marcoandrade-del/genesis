@@ -8,6 +8,13 @@ describe('elotech · normalização de códigos', () => {
     expect(naturezaReceita('11125001')).toBe('1.1.1.2.50.0.1.00.00.00.00.00')
   })
 
+  it('aceita código JÁ PONTUADO sem corromper (regressão 2026-07-22)', () => {
+    // alguns portais entregam a natureza já pontuada; fatiá-la como dígitos
+    // crus corrompia p/ "1...1..1..2...50..0..1" (municípios de 21/07)
+    expect(naturezaReceita('1.1.1.2.50.0.1')).toBe('1.1.1.2.50.0.1.00.00.00.00.00')
+    expect(naturezaReceita('1.7.2.3.50.0.1.0.1')).toBe('1.7.2.3.50.0.1.0.1.00.00.00')
+  })
+
   it('parseia a programática da despesa (nível 11)', () => {
     const c = parseProgramatica('02.010.04.122.0002.2001.3.1.90.07')
     expect(c).toEqual({
