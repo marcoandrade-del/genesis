@@ -76,6 +76,7 @@ export const CONTAS_EVENTO = {
   ddrControleVinculado: '7.2.1.1.2.00.00.00.00.00.00.00', // RECURSOS VINCULADOS
   ddrDisponibilidade: '8.2.1.1.1.01.00.00.00.00.00.00', // RECURSOS DISPONÍVEIS PARA O EXERCÍCIO
   vpaRepasseRecebido: '4.5.1.1.2.02.00.00.00.00.00.00', // REPASSE RECEBIDO — VPA de transferência financeira intra OFSS (duodécimo)
+  vpdRepasseConcedido: '3.5.1.1.2.02.00.00.00.00.00.00', // REPASSE CONCEDIDO — VPD do lado do Executivo (espelho do 900)
 } as const
 
 /**
@@ -91,6 +92,7 @@ export const TOKENS = {
   ATIVO: '@ATIVO', // créditos a receber (1.1.2.x) — lançamento tributário / dívida ativa
   DIVIDA_ATIVA: '@DIVIDA_ATIVA', // dívida ativa (1.2.1.x) — inscrição
   REPASSE_VPA: '@REPASSE_VPA', // VPA de repasse recebido — resolve cc='fonte' (transf. financeira NÃO tem natureza de receita)
+  REPASSE_VPD: '@REPASSE_VPD', // VPD de repasse concedido (evento 901, espelho no Executivo) — cc='fonte'
 } as const
 
 /** Resolve uma máscara para conta-corrente, dado o resolvedor de tokens do estágio. */
@@ -340,6 +342,29 @@ export class MotorEventosReceita {
     // naturezaCodigo vazio: as duas pernas resolvem cc='fonte', então leg() nunca lê a natureza.
     const ctxNucleo = { entidadeId: ctx.entidadeId, ano: ctx.ano, naturezaCodigo: '', fonteCodigo: ctx.fonteCodigo, valor: ctx.valor }
     return this.montarEventos(ctxNucleo, modeloId, 'TRANSFERENCIA_FINANCEIRA', ['900'], resolverToken, opts, db)
+  }
+
+  /**
+   * Resolve a TRANSFERÊNCIA FINANCEIRA CONCEDIDA (o espelho do 900 no Executivo) —
+   * evento 901, patrimonial puro: D VPD "Repasse Concedido" (3.5.1.1.2.02) / C Caixa.
+   * Sem ele o caixa da concedente superavalia exatamente o valor dos duodécimos.
+   * Mesmas regras do 900: só fonte como cc, sem orçamentário/DDR; estorno inverte.
+   */
+  async resolverTransferenciaConcedida(
+    ctx: ContextoTransferenciaFinanceira,
+    opts: { estorno?: boolean } = {},
+    tx?: Prisma.TransactionClient,
+  ): Promise<LancamentoEvento[]> {
+    const db = tx ?? this.prisma
+    const modeloId = await this.modeloDaEntidade(ctx.entidadeId, db)
+    const caixa = ctx.caixaCodigo || CONTAS_EVENTO.caixaArrecadacao
+    const resolverToken: ResolverToken = (t) => {
+      if (t === TOKENS.CAIXA) return { codigo: caixa, cc: 'fonte' }
+      if (t === TOKENS.REPASSE_VPD) return { codigo: CONTAS_EVENTO.vpdRepasseConcedido, cc: 'fonte' }
+      return null
+    }
+    const ctxNucleo = { entidadeId: ctx.entidadeId, ano: ctx.ano, naturezaCodigo: '', fonteCodigo: ctx.fonteCodigo, valor: ctx.valor }
+    return this.montarEventos(ctxNucleo, modeloId, 'TRANSFERENCIA_FINANCEIRA', ['901'], resolverToken, opts, db)
   }
 
   /** Saldo (devedor: D − C) de uma conta-folha da entidade no exercício, pelo código. */

@@ -21,6 +21,7 @@ const TODAS_FOLHAS = [
   CONTAS_EVENTO.receitaDeducaoRenuncia,
   CONTAS_EVENTO.receitaDeducaoOutras,
   CONTAS_EVENTO.vpaRepasseRecebido,
+  CONTAS_EVENTO.vpdRepasseConcedido,
   VPA_APLIC,
 ]
 
@@ -406,5 +407,50 @@ describe('MotorEventosReceita — transferência financeira recebida (evento 900
     comFolhas(mock)
     mock.eventoContabil.findMany.mockResolvedValue([])
     expect(await motor(mock).resolverTransferenciaFinanceira(tfCtx)).toEqual([])
+  })
+})
+
+describe('MotorEventosReceita — transferência financeira CONCEDIDA (evento 901, espelho)', () => {
+  let mock: PrismaMock
+  beforeEach(() => {
+    mock = criarPrismaMock()
+  })
+  const tfCtx = { entidadeId: ENT, ano: ANO, fonteCodigo: '001', valor: '4918368.00' }
+  const deb = (e: { itens: { tipo: string; contaId: string }[] }) => e.itens.find((i) => i.tipo === 'DEBITO')!.contaId
+  const cred = (e: { itens: { tipo: string; contaId: string }[] }) => e.itens.find((i) => i.tipo === 'CREDITO')!.contaId
+
+  it('evento 901: D VPD Repasse Concedido (3.5.1.1.2.02) / C Caixa', async () => {
+    comFolhas(mock)
+    const ev = await motor(mock).resolverTransferenciaConcedida(tfCtx)
+    expect(ev.map((e) => e.eventoCodigo)).toEqual(['901'])
+    expect(deb(ev[0]!)).toBe(`id:${CONTAS_EVENTO.vpdRepasseConcedido}`)
+    expect(cred(ev[0]!)).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+  })
+
+  it('ambas as pernas com naturezaReceitaCodigo=null e cc=fonte; sem orçamentário/DDR', async () => {
+    comFolhas(mock)
+    const [ev] = await motor(mock).resolverTransferenciaConcedida(tfCtx)
+    expect(ev!.itens.every((i) => i.naturezaReceitaCodigo == null)).toBe(true)
+    expect(ev!.itens.every((i) => i.fonteCodigo === '001')).toBe(true)
+    expect(ev!.itens.some((i) => i.contaId.includes('6.2.1') || i.contaId.includes('7.2.1') || i.contaId.includes('8.2.1'))).toBe(false)
+  })
+
+  it('estorno inverte D↔C (mesmas contas)', async () => {
+    comFolhas(mock)
+    const ev = await motor(mock).resolverTransferenciaConcedida(tfCtx, { estorno: true })
+    expect(deb(ev[0]!)).toBe(`id:${CONTAS_EVENTO.caixaArrecadacao}`)
+    expect(cred(ev[0]!)).toBe(`id:${CONTAS_EVENTO.vpdRepasseConcedido}`)
+  })
+
+  it('NÃO dispara o 900 junto (o gatilho tem os dois; o filtro por código isola)', async () => {
+    comFolhas(mock)
+    const ev = await motor(mock).resolverTransferenciaConcedida(tfCtx)
+    expect(ev).toHaveLength(1)
+    expect(ev[0]!.eventoCodigo).toBe('901')
+  })
+
+  it('conta VPD ausente no plano → ENTIDADE_NAO_PROCESSAVEL', async () => {
+    comFolhas(mock, TODAS_FOLHAS.filter((c) => c !== CONTAS_EVENTO.vpdRepasseConcedido))
+    await expect(motor(mock).resolverTransferenciaConcedida(tfCtx)).rejects.toMatchObject({ code: 'ENTIDADE_NAO_PROCESSAVEL' })
   })
 })

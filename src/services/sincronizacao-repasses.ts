@@ -166,7 +166,7 @@ export class SincronizacaoRepassesService {
       const portal = await this.portalYtd(cfg.portalUrl, alvo.idPortal, ano)
       // alvo contábil: RPPS desconta a patronal já orçamentária (não duplicar)
       const meta = alvo.modo === 'residuo' ? portal.minus(await this.patronalArrecadada(ent.id)) : portal
-      const tfs = await this.prisma.transferenciaFinanceira.findMany({ where: { entidadeId: ent.id }, select: { valor: true } })
+      const tfs = await this.prisma.transferenciaFinanceira.findMany({ where: { entidadeId: ent.id, tipo: 'RECEBIDA' }, select: { valor: true } })
       const booked = tfs.reduce((s, t) => s.plus(new Prisma.Decimal(t.valor)), new Prisma.Decimal(0))
       const delta = meta.minus(booked)
       if (delta.lte(TOLERANCIA)) {
@@ -197,9 +197,55 @@ export class SincronizacaoRepassesService {
         historico: `Ajuste do repasse recebido ao YTD do portal (re-sincronização ${hoje})`,
         criadoPorId: usuarioId,
       })
-      return registrar(ent.id, { entidade: ent.nome, status: 'OK', mensagem: `Delta lançado: ${delta.toFixed(2)} (portal ${portal.toFixed(2)}, alvo ${meta.toFixed(2)}).`, valorGravado: Number(delta) })
+      // ESPELHO no Executivo (evento 901): sem ele o caixa da prefeitura fica
+      // superavaliado exatamente no valor do repasse. Falha do espelho não desfaz
+      // a recebida — loga ERRO p/ correção (o backfill espelhar_tf_concedidas repara).
+      const espelho = await this.bookarEspelhoConcedido(municipioNome, ent.nome, hoje, delta.toFixed(2), cfg.fonte, ano, usuarioId)
+      return registrar(ent.id, {
+        entidade: ent.nome,
+        status: 'OK',
+        mensagem: `Delta lançado: ${delta.toFixed(2)} (portal ${portal.toFixed(2)}, alvo ${meta.toFixed(2)}); espelho concedido: ${espelho}.`,
+        valorGravado: Number(delta),
+      })
     } catch (e) {
       return { entidade: alvo.match, status: 'ERRO', mensagem: e instanceof Error ? e.message : String(e), valorGravado: 0 }
+    }
+  }
+
+  /**
+   * Booka a TF CONCEDIDA (evento 901) na Prefeitura do município — espelho 1:1 do
+   * delta recebido. Retorna um resumo p/ o log; não lança (a recebida já está
+   * gravada; divergência fica visível e o backfill repara).
+   */
+  private async bookarEspelhoConcedido(
+    municipioNome: string,
+    destino: string,
+    data: string,
+    valor: string,
+    fonte: string,
+    ano: number,
+    usuarioId: string,
+  ): Promise<string> {
+    try {
+      const pref = await this.prisma.entidade.findFirst({
+        where: { nome: { contains: 'Prefeitura' }, municipio: { is: { nome: municipioNome } } },
+        select: { id: true },
+      })
+      if (!pref) return 'SEM PREFEITURA no município'
+      const temFonte = await this.prisma.fonteRecursoEntidade.findFirst({ where: { entidadeId: pref.id, ano, codigo: fonte }, select: { id: true } })
+      if (!temFonte) return `prefeitura sem fonte ${fonte}`
+      await this.transferencias.registrar({
+        entidadeId: pref.id,
+        tipo: 'CONCEDIDA',
+        data,
+        valor,
+        fonteCodigo: fonte,
+        historico: `Espelho: repasse concedido a ${destino} (re-sincronização ${data})`,
+        criadoPorId: usuarioId,
+      })
+      return `OK (${valor})`
+    } catch (e) {
+      return `ERRO: ${e instanceof Error ? e.message : String(e)}`
     }
   }
 }

@@ -76,6 +76,8 @@ const EVENTOS: Array<{ codigo: string; descricao: string; gatilho?: GatilhoRecei
   // Transferência financeira recebida (duodécimo/repasse intra-ente) — patrimonial puro,
   // sem orçamentário/DDR. Ambas as pernas cc=fonte (o token @REPASSE_VPA força 'fonte').
   { codigo: '900', gatilho: 'TRANSFERENCIA_FINANCEIRA', descricao: 'Transferência Financeira Recebida (duodécimo/repasse — cc: fonte)', linhas: [[TR.CAIXA, TR.REPASSE_VPA]] },
+  // O espelho no Executivo (lado concedente): D VPD Repasse Concedido / C Caixa.
+  { codigo: '901', gatilho: 'TRANSFERENCIA_FINANCEIRA', descricao: 'Transferência Financeira Concedida (duodécimo/repasse — cc: fonte)', linhas: [[TR.REPASSE_VPD, TR.CAIXA]] },
 ]
 
 async function main() {
