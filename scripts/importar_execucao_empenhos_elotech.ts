@@ -151,35 +151,40 @@ async function main() {
     if (!ent) { console.log(`  ${entCfg.nome}: não está no dev — pulado`); continue }
     console.log(`\n  ── ${ent.nome} (portal ${idPortal}) ──`)
 
-    const regs = await buscarEmpenhos(url, idPortal)
-    console.log(`    empenhos: ${regs.length}`)
-    if (!regs.length) continue
-
-    // GATE: Σ por fonte × gabarito do portal (mesmo snapshot)
-    const porFonte = new Map<string, { emp: number; pago: number }>()
-    for (const r of regs) {
-      const t = porFonte.get(r.fonte) ?? { emp: 0, pago: 0 }
-      t.emp += r.empenhadoLiq
-      t.pago += r.pago
-      porFonte.set(r.fonte, t)
-    }
-    const gabarito = (await (async () => {
+    // GATE com RETRY: em portal VIVO (dia útil) empenhos entram entre a lista e o
+    // gabarito — re-busca em janela apertada (detalhes já cacheados; a lista é
+    // barata) até 3× antes de desistir da entidade.
+    let regs: Registro[] = []
+    let gateOk = false
+    for (let tent = 1; tent <= 3 && !gateOk; tent++) {
+      regs = await buscarEmpenhos(url, idPortal)
+      if (!regs.length) break
+      const porFonte = new Map<string, { emp: number; pago: number }>()
+      for (const r of regs) {
+        const t = porFonte.get(r.fonte) ?? { emp: 0, pago: 0 }
+        t.emp += r.empenhadoLiq
+        t.pago += r.pago
+        porFonte.set(r.fonte, t)
+      }
       const res = await fetch(`${url}/despesapornivel/fonte-recursos`, { headers: { entidade: idPortal, exercicio: String(ANO), 'User-Agent': 'Mozilla/5.0' } })
       if (!res.ok) throw new Error(`gabarito HTTP ${res.status}`)
-      return (await res.json()) as { codigo: string; valorEmpenhado: number; valorPago: number }[]
-    })())
-    let gateOk = true
-    for (const g of gabarito) {
-      const t = porFonte.get(g.codigo) ?? { emp: 0, pago: 0 }
-      const de = t.emp - cents(g.valorEmpenhado)
-      const dp = t.pago - cents(g.valorPago)
-      if (Math.abs(de) > 1 || Math.abs(dp) > 1) {
-        console.log(`    ✗ GATE fonte ${g.codigo}: Δ empenhado ${R(de)} · Δ pago ${R(dp)}`)
-        gateOk = false
+      const gabarito = (await res.json()) as { codigo: string; valorEmpenhado: number; valorPago: number }[]
+      gateOk = true
+      for (const g of gabarito) {
+        const t = porFonte.get(g.codigo) ?? { emp: 0, pago: 0 }
+        const de = t.emp - cents(g.valorEmpenhado)
+        const dp = t.pago - cents(g.valorPago)
+        if (Math.abs(de) > 1 || Math.abs(dp) > 1) {
+          if (tent === 3) console.log(`    ✗ GATE fonte ${g.codigo}: Δ empenhado ${R(de)} · Δ pago ${R(dp)}`)
+          gateOk = false
+        }
       }
+      if (gateOk) console.log(`    ✓ GATE: ${gabarito.length} fontes batem com o gabarito do portal ao centavo (tentativa ${tent})`)
+      else if (tent < 3) console.log(`    … gate divergente (portal vivo?) — re-tentando em janela apertada (${tent}/3)`)
     }
-    console.log(gateOk ? `    ✓ GATE: ${gabarito.length} fontes batem com o gabarito do portal ao centavo` : '    ✗ gabarito divergente — entidade PULADA')
-    if (!gateOk) continue
+    console.log(`    empenhos: ${regs.length}`)
+    if (!regs.length) continue
+    if (!gateOk) { console.log('    ✗ gabarito divergente após 3 tentativas — entidade PULADA'); continue }
 
     // execução agregada por dotação×fonte
     const exec = new Map<string, LinhaDespesa>()

@@ -52,13 +52,17 @@ async function getJson<T>(url: string, rotulo: string): Promise<T> {
   }
 }
 
-/** Lista paginada de empenhos do exercício de uma entidade do portal. */
-export async function listarEmpenhos(baseUrl: string, idPortal: string, ano: number): Promise<EmpenhoLista[]> {
+/**
+ * Lista paginada de empenhos do exercício de uma entidade do portal.
+ * `size` pequeno por default: o Elotech LEGADO (eloweb.net) degrada com páginas
+ * grandes (67s+ na page 0 com 500; segundos com 100).
+ */
+export async function listarEmpenhos(baseUrl: string, idPortal: string, ano: number, size = 100): Promise<EmpenhoLista[]> {
   const out: EmpenhoLista[] = []
   const search = encodeURIComponent(`id.entidade=='${idPortal}'`)
   for (let page = 0; ; page++) {
     const d = await getJson<{ content?: EmpenhoLista[]; last?: boolean }>(
-      `${baseUrl}/empenhos/lista?search=${search}&entidade=${idPortal}&exercicio=${ano}&page=${page}&size=500`,
+      `${baseUrl}/empenhos/lista?search=${search}&entidade=${idPortal}&exercicio=${ano}&page=${page}&size=${size}`,
       `empenhos/lista ${idPortal} p${page}`,
     )
     out.push(...(d.content ?? []))
