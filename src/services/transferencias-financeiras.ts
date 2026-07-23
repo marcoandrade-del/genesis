@@ -5,6 +5,8 @@ import { LancamentosService } from './lancamentos.js'
 
 export interface DadosTransferenciaFinanceira {
   entidadeId: string
+  /** RECEBIDA (default, evento 900) ou CONCEDIDA (espelho no Executivo, evento 901). */
+  tipo?: 'RECEBIDA' | 'CONCEDIDA'
   data: string // YYYY-MM-DD
   valor: string
   fonteCodigo: string
@@ -12,15 +14,17 @@ export interface DadosTransferenciaFinanceira {
   criadoPorId: string // autor (para os lançamentos contábeis gerados)
   /** Estorno: inverte D↔C dos lançamentos gerados. */
   estorno?: boolean
-  /** Folha de caixa a debitar; default = caixa de arrecadação da entidade. */
+  /** Folha de caixa a debitar (recebida) / creditar (concedida); default = caixa de arrecadação. */
   caixaCodigo?: string | null
 }
 
 /**
- * Registra uma TRANSFERÊNCIA FINANCEIRA RECEBIDA (duodécimo/repasse intra-ente, ex.:
- * Executivo → Câmara) e dispara, na MESMA transação, o evento contábil 900 no razão:
- * D Caixa / C VPA "Repasse Recebido" (4.5.1.1.2.02). NÃO é receita orçamentária — não
- * toca 6.2.1.x nem DDR. Espelha `ArrecadacoesService.criar` (motor → LancamentosService).
+ * Registra uma TRANSFERÊNCIA FINANCEIRA intra-ente (duodécimo/repasse) e dispara,
+ * na MESMA transação, o evento contábil no razão:
+ *  - RECEBIDA (câmara/fundo/RPPS): evento 900 — D Caixa / C VPA 4.5.1.1.2.02;
+ *  - CONCEDIDA (o espelho no Executivo): evento 901 — D VPD 3.5.1.1.2.02 / C Caixa.
+ * NÃO é receita/despesa orçamentária — não toca 6.x nem DDR. Espelha
+ * `ArrecadacoesService.criar` (motor → LancamentosService).
  */
 export class TransferenciasFinanceirasService {
   private motor: MotorEventosReceita
@@ -38,12 +42,14 @@ export class TransferenciasFinanceirasService {
     if (!dados.fonteCodigo?.trim()) throw new ErroNegocio('REQUISICAO_INVALIDA', 'Fonte de recurso obrigatória.')
     const ano = Number(dados.data.slice(0, 4))
     const fonteCodigo = dados.fonteCodigo.trim()
-    const histBase = dados.historico?.trim() || 'Transferência financeira recebida'
+    const tipo = dados.tipo ?? 'RECEBIDA'
+    const histBase = dados.historico?.trim() || (tipo === 'CONCEDIDA' ? 'Transferência financeira concedida' : 'Transferência financeira recebida')
 
     return this.prisma.$transaction(async (tx) => {
       const tf = await tx.transferenciaFinanceira.create({
         data: {
           entidadeId: dados.entidadeId,
+          tipo,
           data: new Date(dados.data),
           valor,
           fonteCodigo,
@@ -51,13 +57,13 @@ export class TransferenciasFinanceirasService {
           criadoPorId: dados.criadoPorId,
         },
       })
-      // Integração contábil (Tabela de Eventos): dispara o evento 900 no razão, na
-      // mesma transação. O estorno gera os lançamentos invertidos.
-      const eventos = await this.motor.resolverTransferenciaFinanceira(
-        { entidadeId: dados.entidadeId, ano, fonteCodigo, valor, caixaCodigo: dados.caixaCodigo },
-        { estorno: dados.estorno },
-        tx,
-      )
+      // Integração contábil (Tabela de Eventos): dispara o evento (900 recebida /
+      // 901 concedida) no razão, na mesma transação. Estorno inverte D↔C.
+      const ctx = { entidadeId: dados.entidadeId, ano, fonteCodigo, valor, caixaCodigo: dados.caixaCodigo }
+      const eventos =
+        tipo === 'CONCEDIDA'
+          ? await this.motor.resolverTransferenciaConcedida(ctx, { estorno: dados.estorno }, tx)
+          : await this.motor.resolverTransferenciaFinanceira(ctx, { estorno: dados.estorno }, tx)
       for (const ev of eventos) {
         await this.lancamentos.criar(
           {

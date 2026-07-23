@@ -535,16 +535,25 @@ model Lancamento {
 // ex.: Executivo → Câmara). NÃO é receita orçamentária — é movimento de caixa que
 // vira VPA de transferência (D Caixa / C 4.5.1.1.2.02). Serve de origem (origemId)
 // para os lançamentos do razão, como Arrecadacao faz para a arrecadação.
+// Lado da transferência financeira intra-ente: RECEBIDA (câmara/fundo/RPPS,
+// evento 900) ou CONCEDIDA (o espelho no Executivo, evento 901 — sem ele o
+// caixa da prefeitura superavalia o valor dos repasses).
+enum TipoTransferenciaFinanceira {
+  RECEBIDA
+  CONCEDIDA
+}
+
 model TransferenciaFinanceira {
-  id          String   @id @default(uuid())
+  id          String                      @id @default(uuid())
   entidadeId  String
-  data        DateTime @db.Date
-  valor       Decimal  @db.Decimal(18, 2)
+  tipo        TipoTransferenciaFinanceira @default(RECEBIDA)
+  data        DateTime                    @db.Date
+  valor       Decimal                     @db.Decimal(18, 2)
   fonteCodigo String // fonte de recurso (ex.: "001" — Recursos do Tesouro)
   historico   String?
   criadoPorId String
-  criadoEm    DateTime @default(now())
-  entidade    Entidade @relation(fields: [entidadeId], references: [id])
+  criadoEm    DateTime                    @default(now())
+  entidade    Entidade                    @relation(fields: [entidadeId], references: [id])
 
   @@index([entidadeId, data])
   @@map("transferencias_financeiras")

@@ -24,6 +24,7 @@ export const MATRIZ_RECEITA = [
   { codigo: '550', gatilho: 'LANCAMENTO_TRIBUTARIO', descricao: 'Lançamento de crédito tributário (direito a receber)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.ATIVO, contaCreditoMascara: T.CONTRAPARTIDA }] },
   { codigo: '570', gatilho: 'INSCRICAO_DIVIDA_ATIVA', descricao: 'Inscrição em dívida ativa (reclassificação do crédito)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.DIVIDA_ATIVA, contaCreditoMascara: T.ATIVO }] },
   { codigo: '900', gatilho: 'TRANSFERENCIA_FINANCEIRA', descricao: 'Transferência Financeira Recebida (duodécimo/repasse)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.CAIXA, contaCreditoMascara: T.REPASSE_VPA }] },
+  { codigo: '901', gatilho: 'TRANSFERENCIA_FINANCEIRA', descricao: 'Transferência Financeira Concedida (espelho no Executivo)', lancamentos: [{ ordem: 1, contaDebitoMascara: T.REPASSE_VPD, contaCreditoMascara: T.CAIXA }] },
 ]
 
 /** Mocka `eventoContabil.findMany` p/ devolver a matriz da arrecadação (gatilho + codigo in). */
