@@ -42,6 +42,29 @@ export type LinhaMsc = {
 }
 
 /** GET paginado no ORDS (5.000/página) com retry p/ 500 transitório. */
+async function baixarOrds<T>(url: string, params: Record<string, string>, rotulo: string): Promise<T[]> {
+  const out: T[] = []
+  const limite = 5000
+  for (let offset = 0; ; offset += limite) {
+    const qs = new URLSearchParams({ ...params, offset: String(offset), limit: String(limite) })
+    let j: { items?: T[]; hasMore?: boolean }
+    for (let tent = 0; ; tent++) {
+      try {
+        const res = await fetch(`${url}?${qs}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        j = (await res.json()) as typeof j
+        break
+      } catch (e) {
+        if (tent >= 5) throw new Error(`SICONFI MSC ${rotulo} falhou: ${(e as Error).message}`)
+        await new Promise((r) => setTimeout(r, 1000 * (tent + 1)))
+      }
+    }
+    out.push(...(j.items ?? []))
+    if (!j.hasMore) break
+  }
+  return out
+}
+
 export async function baixarMsc(opts: { ibge: string; ano: number; mes: number; classe: '5' | '6' }): Promise<LinhaMsc[]> {
   const base = {
     an_referencia: String(opts.ano),
@@ -51,26 +74,43 @@ export async function baixarMsc(opts: { ibge: string; ano: number; mes: number; 
     classe_conta: opts.classe,
     id_tv: 'ending_balance',
   }
-  const out: LinhaMsc[] = []
-  const limite = 5000
-  for (let offset = 0; ; offset += limite) {
-    const qs = new URLSearchParams({ ...base, offset: String(offset), limit: String(limite) })
-    let j: { items?: LinhaMsc[]; hasMore?: boolean }
-    for (let tent = 0; ; tent++) {
-      try {
-        const res = await fetch(`${BASE}?${qs}`)
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
-        j = (await res.json()) as typeof j
-        break
-      } catch (e) {
-        if (tent >= 5) throw new Error(`SICONFI MSC ${opts.ibge} ${opts.ano}/${opts.mes} classe ${opts.classe} falhou: ${(e as Error).message}`)
-        await new Promise((r) => setTimeout(r, 1000 * (tent + 1)))
-      }
-    }
-    out.push(...(j.items ?? []))
-    if (!j.hasMore) break
+  return baixarOrds<LinhaMsc>(BASE, base, `${opts.ibge} ${opts.ano}/${opts.mes} classe ${opts.classe}`)
+}
+
+/** Linha crua da MSC PATRIMONIAL (classes 1-2) — saldo de abertura/fechamento. */
+export type LinhaMscPatrimonial = {
+  conta_contabil: string
+  poder_orgao: string
+  fonte_recursos: string | null
+  ano_fonte_recursos: number | null
+  financeiro_permanente: number | null
+  valor: number
+  natureza_conta: 'D' | 'C'
+}
+
+const BASE_PATRIMONIAL = 'https://apidatalake.tesouro.gov.br/ords/siconfi/tt/msc_patrimonial'
+
+/**
+ * MSC patrimonial (classes 1-2). `beginning_balance` de janeiro = o BALANÇO DE
+ * ABERTURA do exercício (saldos de 31/12 do ano anterior, por conta×fonte×poder)
+ * — a fonte do SaldoInicialAno/SaldoInicialCc dos municípios importados.
+ */
+export async function baixarMscPatrimonial(opts: {
+  ibge: string
+  ano: number
+  mes: number
+  classe: '1' | '2'
+  tipoValor: 'beginning_balance' | 'ending_balance'
+}): Promise<LinhaMscPatrimonial[]> {
+  const base = {
+    an_referencia: String(opts.ano),
+    me_referencia: String(opts.mes),
+    co_tipo_matriz: 'MSCC',
+    id_ente: opts.ibge,
+    classe_conta: opts.classe,
+    id_tv: opts.tipoValor,
   }
-  return out
+  return baixarOrds<LinhaMscPatrimonial>(BASE_PATRIMONIAL, base, `${opts.ibge} ${opts.ano}/${opts.mes} classe ${opts.classe} (patrimonial)`)
 }
 
 /** Descobre o último mês homologado (12→1) de um ente/ano na MSC. */
