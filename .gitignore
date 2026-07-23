@@ -72,3 +72,4 @@ prisma/seed.d.ts.map
 
 # Dados capturados do portal (regeneráveis; consumidos pela outra sessão)
 scripts/dados/
+data/empenhos-elotech/
