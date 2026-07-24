@@ -52,11 +52,6 @@
   .gx-side-nav::-webkit-scrollbar { width: 8px; }
   .gx-side-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
 
-  .gx-side-label { font-size: .64rem; font-weight: 700; letter-spacing: .12em;
-    text-transform: uppercase; color: rgba(232,235,230,.4); padding: .5rem .6rem .3rem;
-    display: flex; align-items: center; gap: .35rem; }
-  .gx-side-label .bi { color: #f4b400; }
-
   /* ── Grupo (domínio) ──────────────────────────────────────────────────── */
   .gx-side-group { margin-bottom: .1rem; }
   .gx-side-group-hd {
@@ -104,9 +99,10 @@
   .gx-side-link[data-fav-pad] { padding-right: 1.9rem; }
   .gx-side-linkwrap .gx-side-link { padding-right: 1.9rem; }
 
-  /* Seção de favoritos fixados */
+  /* Seção de favoritos fixados (mesmo padrão de grupo; estrela dourada no header) */
   .gx-side-fav-sec[hidden] { display: none; }
-  .gx-side-fav-sec { margin-bottom: .4rem; }
+  .gx-side-fav-sec { margin-bottom: .35rem; }
+  .gx-side-fav-sec .gx-side-ghd-ico { color: #f4b400; }
   .gx-side-fav .bi { color: #f4b400; }
 
   /* ── Mobile: rail vira off-canvas ─────────────────────────────────────── */
@@ -133,10 +129,15 @@
   <% } %>
 
   <nav class="gx-side-nav">
-    <%# ── Favoritos fixados (estilo navegador) ── %>
-    <div class="gx-side-fav-sec" id="gx-side-fav-sec" <%= _sideFav.length ? '' : 'hidden' %>>
-      <div class="gx-side-label"><i class="bi bi-star-fill"></i>Favoritos</div>
-      <div id="gx-side-fav-list">
+    <% if (_sideMenu.length) { %>
+    <%# ── Favoritos fixados (colapsável como os grupos; abre por padrão) ── %>
+    <div class="gx-side-group gx-side-fav-sec is-open" id="gx-side-fav-sec" data-gx-group="fav" <%= _sideFav.length ? '' : 'hidden' %>>
+      <button class="gx-side-group-hd" type="button" data-gx-toggle="fav" aria-expanded="true">
+        <i class="bi bi-star-fill gx-side-ghd-ico"></i>
+        <span class="gx-side-ghd-nome">Favoritos</span>
+        <i class="bi bi-chevron-down gx-side-caret"></i>
+      </button>
+      <div class="gx-side-group-body" id="gx-side-fav-list">
         <% _sideFav.forEach(function (it) { %>
           <a class="gx-side-link gx-side-fav" href="<%= it.rota %>" data-gx-route="<%= it.rota %>" data-fav-id="<%= it.id %>">
             <i class="bi <%= it.icone %>"></i><span><%= it.nome %></span>
@@ -144,6 +145,7 @@
         <% }) %>
       </div>
     </div>
+    <% } %>
 
     <%# ── 6 domínios ── %>
     <% _sideMenu.forEach(function (area, gi) { %>
