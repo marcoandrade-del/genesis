@@ -23,10 +23,16 @@ import { CONTAS_EVENTO } from './motor-eventos-receita.js'
  */
 
 type Modo = 'delta' | 'residuo'
-type Alvo = { match: string; idPortal: string; modo: Modo }
+type Alvo = { match: string; idPortal: string; modo: Modo; fonte?: string }
 type AlvosMunicipio = { portalUrl: string; fonte: string; alvos: Alvo[] }
 
-/** Municípios Elotech com repasses bookados. Fonte segue a convenção de cada um. */
+/**
+ * Municípios Elotech com repasses bookados. Fonte segue a convenção de cada um;
+ * `fonte` no ALVO sobrepõe a do município — usada nas Câmaras cuja fonte REAL
+ * foi provada pela MSC oficial (caixa do poder 20231 em fonte única, script
+ * atribuir_fonte_tf_camaras_msc.ts); fundos seguem 9999 (consolidados no po
+ * 10131, sem evidência oficial por fundo).
+ */
 export const ALVOS_REPASSES: Record<string, AlvosMunicipio> = {
   'Maringá': {
     portalUrl: 'https://transparencia.maringa.pr.gov.br/portaltransparencia-api',
@@ -43,7 +49,7 @@ export const ALVOS_REPASSES: Record<string, AlvosMunicipio> = {
     portalUrl: 'https://cianorte.oxy.elotech.com.br/portaltransparencia-api',
     fonte: '9999',
     alvos: [
-      { match: 'Câmara Municipal de Cianorte', idPortal: '2', modo: 'delta' },
+      { match: 'Câmara Municipal de Cianorte', idPortal: '2', modo: 'delta', fonte: '1501' },
       { match: 'CAPSECI', idPortal: '3', modo: 'residuo' },
     ],
   },
@@ -51,7 +57,7 @@ export const ALVOS_REPASSES: Record<string, AlvosMunicipio> = {
     portalUrl: 'https://navirai.oxy.elotech.com.br/portaltransparencia-api',
     fonte: '9999',
     alvos: [
-      { match: 'Câmara Municipal de Naviraí', idPortal: '2', modo: 'delta' },
+      { match: 'Câmara Municipal de Naviraí', idPortal: '2', modo: 'delta', fonte: '1500' },
       { match: 'Previdência dos Servidores Públicos de Naviraí', idPortal: '3', modo: 'residuo' },
       { match: 'Fundação de Cultura', idPortal: '4', modo: 'delta' },
       { match: 'Fundo Municipal de Saúde de Naviraí', idPortal: '6', modo: 'delta' },
@@ -69,7 +75,7 @@ export const ALVOS_REPASSES: Record<string, AlvosMunicipio> = {
     portalUrl: 'https://transparencia.vilhena.ro.gov.br/portaltransparencia-api',
     fonte: '9999',
     alvos: [
-      { match: 'Câmara Municipal de Vilhena', idPortal: '14', modo: 'delta' },
+      { match: 'Câmara Municipal de Vilhena', idPortal: '14', modo: 'delta', fonte: '1500' },
       { match: 'Instituto de Previdência Municipal de Vilhena', idPortal: '16', modo: 'residuo' },
       { match: 'Fundação Cultural', idPortal: '2', modo: 'delta' },
       { match: 'Fundo Municipal de Saúde de Vilhena', idPortal: '3', modo: 'delta' },
@@ -84,7 +90,7 @@ export const ALVOS_REPASSES: Record<string, AlvosMunicipio> = {
     portalUrl: 'https://sarandi.eloweb.net/portaltransparencia-api',
     fonte: '9999',
     alvos: [
-      { match: 'Câmara Municipal de Sarandi', idPortal: '3', modo: 'delta' },
+      { match: 'Câmara Municipal de Sarandi', idPortal: '3', modo: 'delta', fonte: '1501' },
       { match: 'PreSERV', idPortal: '2', modo: 'residuo' },
       { match: 'Águas de Sarandi', idPortal: '4', modo: 'delta' },
     ],
@@ -174,12 +180,13 @@ export class SincronizacaoRepassesService {
       }
 
       // pré-validação contábil (caixa/VPA [MOV] + fonte) — aborta claro se faltar
+      const fonte = alvo.fonte ?? cfg.fonte
       const contas = new Map(
         (await this.prisma.contaContabilEntidade.findMany({ where: { entidadeId: ent.id, ano, codigo: { in: [CAIXA, VPA] } }, select: { codigo: true, admiteMovimento: true } })).map((c) => [c.codigo, c.admiteMovimento]),
       )
-      const temFonte = await this.prisma.fonteRecursoEntidade.findFirst({ where: { entidadeId: ent.id, ano, codigo: cfg.fonte }, select: { id: true } })
+      const temFonte = await this.prisma.fonteRecursoEntidade.findFirst({ where: { entidadeId: ent.id, ano, codigo: fonte }, select: { id: true } })
       if (contas.get(CAIXA) !== true || contas.get(VPA) !== true || !temFonte) {
-        return registrar(ent.id, { entidade: ent.nome, status: 'ERRO', mensagem: `Sem caixa/VPA [MOV] ou fonte ${cfg.fonte} — repasse não lançado.`, valorGravado: 0 })
+        return registrar(ent.id, { entidade: ent.nome, status: 'ERRO', mensagem: `Sem caixa/VPA [MOV] ou fonte ${fonte} — repasse não lançado.`, valorGravado: 0 })
       }
 
       // idempotência por (entidade, data): 1 ajuste por dia no máximo
@@ -193,14 +200,14 @@ export class SincronizacaoRepassesService {
         entidadeId: ent.id,
         data: hoje,
         valor: delta.toFixed(2),
-        fonteCodigo: cfg.fonte,
+        fonteCodigo: fonte,
         historico: `Ajuste do repasse recebido ao YTD do portal (re-sincronização ${hoje})`,
         criadoPorId: usuarioId,
       })
       // ESPELHO no Executivo (evento 901): sem ele o caixa da prefeitura fica
       // superavaliado exatamente no valor do repasse. Falha do espelho não desfaz
       // a recebida — loga ERRO p/ correção (o backfill espelhar_tf_concedidas repara).
-      const espelho = await this.bookarEspelhoConcedido(municipioNome, ent.nome, hoje, delta.toFixed(2), cfg.fonte, ano, usuarioId)
+      const espelho = await this.bookarEspelhoConcedido(municipioNome, ent.nome, hoje, delta.toFixed(2), fonte, ano, usuarioId)
       return registrar(ent.id, {
         entidade: ent.nome,
         status: 'OK',
