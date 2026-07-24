@@ -763,6 +763,7 @@ export function criarPrismaMock() {
       count: vi.fn().mockResolvedValue(0),
     },
     $transaction: vi.fn(),
+    $queryRawUnsafe: vi.fn().mockResolvedValue([]),
   }
 
   // Suporta as duas assinaturas do $transaction:

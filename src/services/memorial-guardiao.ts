@@ -205,9 +205,10 @@ export class MemorialGuardiaoService {
       }
 
       // 5) Dívida Consolidada Líquida (% da RCL, limite 120% — Res. Senado 40/2001).
-      // Agora VIVA (RGF Anexo 2): DC do cadastro − deduções de caixa/RP. A DCL
-      // informada na LDO fica no memorial como comparativo — o Δ mostra o que a
-      // base ainda não captura (ex.: saldos bancários reais). Negativa = caixa
+      // Agora VIVA (RGF Anexo 2): DC do cadastro − deduções de caixa/RP, com o
+      // caixa vindo do RAZÃO (saldo inicial 1.1.1 + fluxo, identidade do art.
+      // 42). A DCL informada na LDO fica como comparativo — o Δ restante é
+      // metodológico (a LDO é estimativa de outra data-base). Negativa = caixa
       // supera a dívida.
       if (rcl.rcl > 0) {
         const dcl = await new DclService(this.prisma).calcular(entidadeId, ano)
