@@ -42,7 +42,16 @@ const GENTIL_FLAG = process.argv.includes('--gentil')
 const ANO = 2026
 const CACHE_DIR = 'data/empenhos-elotech'
 const alvo = process.argv.find((a) => a.startsWith('--municipio='))?.split('=')[1]
-if (!alvo) { console.error('uso: --municipio=<nome> [--apply] [--gentil]'); process.exit(1) }
+// SMOKE: teste limitado de conectividade/ritmo — lista por faixas + no máx N
+// detalhes NOVOS por entidade, SEM gate/apply (o cache alimenta a coleta real).
+const smokeArg = process.argv.find((a) => a === '--smoke' || a.startsWith('--smoke='))
+const SMOKE = smokeArg ? Number(smokeArg.split('=')[1] ?? 25) : 0
+// deadline dura (HH:MM de hoje) — só vale em SMOKE: permite testar fora da
+// janela padrão com fim garantido (ex.: almoço --ate=12:50)
+const ATE = process.argv.find((a) => a.startsWith('--ate='))?.split('=')[1]
+const prazo = SMOKE && ATE ? (() => { const [h, m] = ATE.split(':').map(Number); const d = new Date(); d.setHours(h ?? 0, m ?? 0, 0, 0); return d })() : null
+const naJanela = () => dentroDaJanelaGentil(new Date()) || (prazo !== null && new Date() < prazo)
+if (!alvo) { console.error('uso: --municipio=<nome> [--apply] [--gentil] [--smoke[=N] --ate=HH:MM]'); process.exit(1) }
 
 /**
  * MODO GENTIL — p/ o Elotech LEGADO (eloweb/Delphi) em PRODUÇÃO: o sistema
@@ -55,7 +64,7 @@ const ehGentil = (url: string) => GENTIL_FLAG || url.includes('eloweb.net')
 let ritmoRun: Ritmo | null = null
 const ritmoDe = (url: string): Ritmo | undefined => {
   if (!ehGentil(url)) return undefined
-  ritmoRun ??= criarRitmo({ dentroDaJanela: () => dentroDaJanelaGentil(new Date()) })
+  ritmoRun ??= criarRitmo({ dentroDaJanela: naJanela })
   return ritmoRun
 }
 
@@ -118,7 +127,7 @@ async function buscarEmpenhos(baseUrl: string, idPortal: string): Promise<Regist
     }
   }
   const out: Registro[] = []
-  const faltam: typeof lista = []
+  let faltam: typeof lista = []
   for (const e of lista) {
     const [fCod, ...fDesc] = (e.fonteRecurso ?? '').split(' - ')
     const base = {
@@ -133,6 +142,10 @@ async function buscarEmpenhos(baseUrl: string, idPortal: string): Promise<Regist
     // valores SEMPRE da lista atual (snapshot); só o detalhe (programática) é cacheável
     if (c) out.push({ ...base, det: c.det })
     else faltam.push(e)
+  }
+  if (SMOKE && faltam.length > SMOKE) {
+    console.log(`    [smoke] limitando detalhes novos a ${SMOKE} (de ${faltam.length} pendentes)`)
+    faltam = faltam.slice(0, SMOKE)
   }
   if (faltam.length) {
     console.log(`    detalhes a buscar: ${faltam.length} (cache: ${cache.size})${ritmo ? ' [modo gentil: serial]' : ''}`)
@@ -194,7 +207,9 @@ async function main() {
   const usuario = await prisma.usuario.findFirstOrThrow({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
   if (ehGentil(baseUrl as string)) {
     console.log(`  [modo GENTIL: eloweb legado em produção — serial, pausa adaptativa, janela 22h–06h + fim de semana]`)
-    if (!dentroDaJanelaGentil(new Date())) { console.log('  ✗ fora da janela de coleta — nada a fazer agora (rode à noite/fim de semana)'); process.exitCode = 3; return }
+    if (SMOKE) console.log(`  [SMOKE: máx ${SMOKE} detalhes novos/entidade, sem gate/apply${prazo ? `, deadline ${ATE}` : ''}]`)
+    if (SMOKE && !dentroDaJanelaGentil(new Date()) && !ATE) { console.log('  ✗ smoke fora da janela exige deadline explícito (--ate=HH:MM)'); process.exitCode = 3; return }
+    if (!naJanela()) { console.log('  ✗ fora da janela de coleta — nada a fazer agora (rode à noite/fim de semana)'); process.exitCode = 3; return }
     if (!(await healthCheck(baseUrl as string))) { process.exitCode = 2; return }
   }
   for (const entCfg of cfg.entidades) {
@@ -207,6 +222,13 @@ async function main() {
     })
     if (!ent) { console.log(`  ${entCfg.nome}: não está no dev — pulado`); continue }
     console.log(`\n  ── ${ent.nome} (portal ${idPortal}) ──`)
+
+    if (SMOKE) {
+      const t0 = Date.now()
+      const regs = await buscarEmpenhos(url, idPortal)
+      console.log(`    [smoke] ok em ${Math.round((Date.now() - t0) / 1000)}s · registros com detalhe no cache: ${regs.length}${ritmoRun ? ` · pausa atual ${ritmoRun.estado().pausaMs}ms · cooldowns ${ritmoRun.estado().cooldowns}` : ''}`)
+      continue
+    }
 
     // GATE com RETRY: em portal VIVO (dia útil) empenhos entram entre a lista e o
     // gabarito — re-busca em janela apertada (detalhes já cacheados; a lista é
