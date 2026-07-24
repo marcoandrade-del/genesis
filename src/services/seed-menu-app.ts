@@ -14,26 +14,31 @@ type ItemSeed = {
 /** Espelha as telas navegáveis do `/app`. `/login`/`/logout`/`/contexto` são infra e ficam fora. */
 const AREAS: readonly ItemSeed[] = [
   {
-    rota: '/app/orcamento', nome: 'Orçamento', icone: 'bi-cash-coin', tipo: 'SUBMENU',
-    descricao: 'Dotações e previsões',
+    rota: '/app/orcamento', nome: 'Planejamento / LOA', icone: 'bi-journal-text', tipo: 'SUBMENU',
+    descricao: 'Lei Orçamentária: dotações, previsões e anexos (Lei 4.320)',
     filhos: [
-      { rota: '/app/orcamento/saldo', nome: 'Saldos', icone: 'bi-wallet2', tipo: 'FUNCIONALIDADE' },
-      { rota: '/app/orcamento/creditos', nome: 'Créditos adicionais', icone: 'bi-plus-square', tipo: 'FUNCIONALIDADE' },
-      { rota: '/app/orcamento/lancamento-tributario', nome: 'Lançamento tributário', icone: 'bi-file-earmark-ruled', tipo: 'FUNCIONALIDADE' },
-      { rota: '/app/orcamento/arrecadacao', nome: 'Arrecadação', icone: 'bi-cash-stack', tipo: 'FUNCIONALIDADE' },
-      { rota: '/app/orcamento/conciliacao', nome: 'Conciliação bancária', icone: 'bi-arrow-left-right', tipo: 'FUNCIONALIDADE' },
-    ],
-  },
-  {
-    rota: '/app/orcamento/relatorios', nome: 'Anexos da LOA', icone: 'bi-file-earmark-text', tipo: 'SUBMENU',
-    descricao: 'Demonstrativos legais do orçamento (Lei 4.320)',
-    filhos: [
+      { rota: '/app/orcamento/saldo', nome: 'Saldos', icone: 'bi-wallet2', tipo: 'FUNCIONALIDADE', descricao: 'Autorizado × empenhado × liquidado × pago' },
+      { rota: '/app/orcamento/creditos', nome: 'Créditos adicionais', icone: 'bi-plus-square', tipo: 'FUNCIONALIDADE', descricao: 'Suplementações e alterações da LOA' },
       { rota: '/app/orcamento/relatorios/receita-prevista', nome: 'Receita orçada', icone: 'bi-cash-coin', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 2 — Resumo Geral da Receita' },
       { rota: '/app/orcamento/relatorios/despesa-fixada', nome: 'Despesa fixada', icone: 'bi-graph-down', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 2/9 — natureza, unidade e função' },
       { rota: '/app/orcamento/relatorios/programa-trabalho', nome: 'Programa de trabalho', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 6 — UO → função → ação' },
       { rota: '/app/orcamento/relatorios/programa-governo', nome: 'Programa de trabalho de governo', icone: 'bi-diagram-2', tipo: 'FUNCIONALIDADE', descricao: 'Anexo 7 — consolidado por função' },
       { rota: '/app/orcamento/relatorios/despesa-funcoes-programas', nome: 'Despesa por funções e programas', icone: 'bi-bar-chart-steps', tipo: 'FUNCIONALIDADE', descricao: 'Função → programa → subfunção' },
       { rota: '/app/orcamento/relatorios/sumario', nome: 'Sumário geral', icone: 'bi-list-columns', tipo: 'FUNCIONALIDADE', descricao: 'Receita por fontes × despesa por funções' },
+    ],
+  },
+  {
+    // Rota-sentinela (#): cabeçalho de grupo — só expande/colapsa, não navega.
+    rota: '#execucao', nome: 'Execução', icone: 'bi-play-circle', tipo: 'SUBMENU',
+    descricao: 'Execução orçamentária: empenho, liquidação, pagamento e arrecadação',
+    filhos: [
+      { rota: '/app/orcamento/despesa/execucao', nome: 'Execução da Despesa', icone: 'bi-list-check', tipo: 'FUNCIONALIDADE', descricao: 'Empenho, liquidação e pagamento por dotação' },
+      { rota: '/app/orcamento/despesa/diario', nome: 'Despesa diária', icone: 'bi-calendar-week', tipo: 'FUNCIONALIDADE', descricao: 'Acúmulo diário × fixado' },
+      { rota: '/app/orcamento/arrecadacao', nome: 'Arrecadação', icone: 'bi-cash-stack', tipo: 'FUNCIONALIDADE', descricao: 'Registro da receita arrecadada' },
+      { rota: '/app/orcamento/arrecadacao/diario', nome: 'Arrecadação diária', icone: 'bi-calendar-range', tipo: 'FUNCIONALIDADE', descricao: 'Acúmulo diário × previsto' },
+      { rota: '/app/orcamento/lancamento-tributario', nome: 'Lançamento tributário', icone: 'bi-file-earmark-ruled', tipo: 'FUNCIONALIDADE', descricao: 'Constituição do crédito (antes da arrecadação)' },
+      { rota: '/app/orcamento/conciliacao', nome: 'Conciliação bancária', icone: 'bi-arrow-left-right', tipo: 'FUNCIONALIDADE', descricao: 'Extrato bancário × arrecadação por conta' },
+      { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício (partida dobrada)' },
     ],
   },
   {
@@ -57,14 +62,17 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/orcamento/relatorios/guardiao', nome: 'Guardião LRF', icone: 'bi-shield-check', tipo: 'FUNCIONALIDADE', descricao: 'Todos os indicadores fiscais num painel' },
     ],
   },
-  { rota: '/app/contas-bancarias', nome: 'Contas bancárias', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Cadastro Febraban por fonte de recurso' },
-  { rota: '/app/lancamentos', nome: 'Lançamentos', icone: 'bi-receipt', tipo: 'FUNCIONALIDADE', descricao: 'Execução contábil do exercício' },
-  { rota: '/app/contas', nome: 'Plano de Contas', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Contas contábeis do exercício' },
-  { rota: '/app/contas-receita', nome: 'Plano de Receita', icone: 'bi-graph-up-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de receita do exercício' },
-  { rota: '/app/contas-despesa', nome: 'Plano de Despesa', icone: 'bi-graph-down-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de despesa do exercício' },
-  { rota: '/app/relatorios', nome: 'Relatórios', icone: 'bi-file-earmark-bar-graph', tipo: 'FUNCIONALIDADE', descricao: 'Cabeçalhos e rodapés' },
-  { rota: '/app/configuracao', nome: 'Configuração', icone: 'bi-gear', tipo: 'FUNCIONALIDADE', descricao: 'Configuração do dashboard (granularidade dos planos)' },
-  { rota: '/app/sincronizacao', nome: 'Sincronização', icone: 'bi-arrow-repeat', tipo: 'FUNCIONALIDADE', descricao: 'Portal da Transparência: sincronizar agora + log das execuções' },
+  {
+    // Rota-sentinela (#): cabeçalho de grupo.
+    rota: '#planos', nome: 'Planos & Cadastros', icone: 'bi-list-columns-reverse', tipo: 'SUBMENU',
+    descricao: 'Planos de contas do exercício e cadastros de apoio',
+    filhos: [
+      { rota: '/app/contas', nome: 'Plano de Contas', icone: 'bi-diagram-3', tipo: 'FUNCIONALIDADE', descricao: 'Contas contábeis do exercício' },
+      { rota: '/app/contas-receita', nome: 'Plano de Receita', icone: 'bi-graph-up-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de receita do exercício' },
+      { rota: '/app/contas-despesa', nome: 'Plano de Despesa', icone: 'bi-graph-down-arrow', tipo: 'FUNCIONALIDADE', descricao: 'Contas de despesa do exercício' },
+      { rota: '/app/contas-bancarias', nome: 'Contas bancárias', icone: 'bi-bank', tipo: 'FUNCIONALIDADE', descricao: 'Cadastro Febraban por fonte de recurso' },
+    ],
+  },
   {
     rota: '/app/compras', nome: 'Compras', icone: 'bi-cart', tipo: 'SUBMENU',
     descricao: 'Planejamento (Lei 14.133)',
@@ -82,11 +90,19 @@ const AREAS: readonly ItemSeed[] = [
       { rota: '/app/compras/ordens-pagamento', nome: 'Ordens de pagamento', icone: 'bi-credit-card', tipo: 'FUNCIONALIDADE' },
     ],
   },
-  // Item RESTRITO (semGrant): a bancada de memoriais de cálculo é um poder específico —
-  // criada no menu, mas só quem o admin conceder (PermissaoAcesso) vê e usa.
   {
-    rota: '/app/memoriais/bancada', nome: 'Memoriais de cálculo', icone: 'bi-sliders', tipo: 'FUNCIONALIDADE',
-    descricao: 'Bancada: adaptar RCL/fonte/pessoal ao TCE com cálculo ao vivo', semGrant: true,
+    // Rota-sentinela (#): cabeçalho de grupo.
+    rota: '#ferramentas', nome: 'Ferramentas', icone: 'bi-tools', tipo: 'SUBMENU',
+    descricao: 'Relatórios, configuração, sincronização e importação',
+    filhos: [
+      { rota: '/app/relatorios', nome: 'Relatórios', icone: 'bi-file-earmark-bar-graph', tipo: 'FUNCIONALIDADE', descricao: 'Cabeçalhos e rodapés dos relatórios' },
+      { rota: '/app/configuracao', nome: 'Configuração', icone: 'bi-gear', tipo: 'FUNCIONALIDADE', descricao: 'Granularidade dos planos no dashboard' },
+      { rota: '/app/sincronizacao', nome: 'Sincronização', icone: 'bi-arrow-repeat', tipo: 'FUNCIONALIDADE', descricao: 'Portal da Transparência: sincronizar agora + log' },
+      { rota: '/app/conversor', nome: 'Conversor', icone: 'bi-magic', tipo: 'FUNCIONALIDADE', descricao: 'Importar município de fonte oficial (Selo de integridade)' },
+      // Item RESTRITO (semGrant): a bancada de memoriais é um poder específico — criada no
+      // menu, mas só quem o admin conceder (PermissaoAcesso) vê e usa.
+      { rota: '/app/memoriais/bancada', nome: 'Memoriais de cálculo', icone: 'bi-sliders', tipo: 'FUNCIONALIDADE', descricao: 'Bancada: adaptar RCL/fonte/pessoal ao TCE com cálculo ao vivo', semGrant: true },
+    ],
   },
 ]
 
@@ -121,12 +137,26 @@ export async function semearMenusApp(
   const garantirItem = async (seed: ItemSeed, ordem: number, parentId: string | null): Promise<string> => {
     const existente = await prisma.itemFuncionalidade.findFirst({
       where: { menuId: menu.id, rota: seed.rota },
-      select: { id: true, parentId: true, ordem: true },
+      select: { id: true, parentId: true, ordem: true, nome: true, descricao: true, icone: true, tipo: true },
     })
     if (existente) {
-      // reorganizações do menu (ex.: LOA × LRF) movem itens já semeados
-      if (existente.parentId !== parentId || existente.ordem !== ordem) {
-        await prisma.itemFuncionalidade.update({ where: { id: existente.id }, data: { parentId, ordem } })
+      // reorganizações do menu (ex.: 6 grupos) movem/renomeiam itens já semeados.
+      // Casamos por `rota` → o `id` é preservado (permissões/favoritos/ordem seguem válidos);
+      // sincronizamos parent/ordem E rótulo/ícone/tipo para que renames de grupo aterrissem.
+      const descNova = seed.descricao ?? null
+      const tipoFunc = seed.tipo === 'FUNCIONALIDADE' ? 'TELA' : null
+      const mudou =
+        existente.parentId !== parentId ||
+        existente.ordem !== ordem ||
+        existente.nome !== seed.nome ||
+        (existente.descricao ?? null) !== descNova ||
+        existente.icone !== seed.icone ||
+        existente.tipo !== seed.tipo
+      if (mudou) {
+        await prisma.itemFuncionalidade.update({
+          where: { id: existente.id },
+          data: { parentId, ordem, nome: seed.nome, descricao: descNova, icone: seed.icone, tipo: seed.tipo, tipoFuncionalidade: tipoFunc },
+        })
       }
       if (!seed.semGrant) idsItens.push(existente.id)
       return existente.id

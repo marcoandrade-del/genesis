@@ -88,7 +88,7 @@ describe('appDashboardRoutes', () => {
     expect(res.body).toContain('Admin')
   })
 
-  it('exibe estrela PREENCHIDA no card e no pill de topo quando o item está nos favoritos', async () => {
+  it('exibe estrela PREENCHIDA no card quando o item está nos favoritos', async () => {
     ;({ app, prisma } = await criarApp({
       registrar: registrarComCards(['a1']),
       comView: true,
@@ -100,7 +100,6 @@ describe('appDashboardRoutes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toContain('data-fav-id="a1"')
     expect(res.body).toContain('gx-fav-star-card is-fav')
-    expect(res.body).toContain('gx-fav-star-pill is-fav')
     expect(res.body).toContain('title="Remover dos favoritos"')
   })
 

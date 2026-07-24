@@ -1,26 +1,22 @@
 <%# ─────────────────────────────────────────────────────────────────────────────
-   GÊNESIS · COMMAND BAR  (barra superior do /app)
-   Proposta de UX mais arrojada. Mantém o vocabulário Wise (ink + lime + pílulas
-   24px) mas empurra a marca: barra ink com fio lime, navegação em pílulas com
-   estado ativo, mega-painéis de dropdown com tiles de ícone + descrição, um
-   "workspace switcher" (entidade · exercício) como pílula clicável, ações em
-   botões circulares e um command palette (⌘K) que navega por qualquer item.
-
-   Escapadas conscientes do DESIGN.md estão anotadas no fim do arquivo.
+   GÊNESIS · CHROME do /app  (faixa superior fina + SIDEBAR lateral)
+   A navegação principal virou uma sidebar vertical (`_sidebar.ejs`) que escala sem
+   overflow. Este arquivo é a "casca": faixa superior com o contexto (entidade ·
+   exercício) e ações, mais o command palette (⌘K), os favoritos e o comportamento
+   da sidebar (colapso, rota ativa, off-canvas mobile). Segue incluído por TODAS as
+   44 views do /app, então mantém o bundle Bootstrap e o offset global do body.
 
    Requer: entidade (com municipio.estado), ano.
-   Opcional: menuApp (árvore permitida), nivel (LEITURA|ESCRITA|ADMIN). %>
+   Opcional: menuApp (árvore permitida), nivel (LEITURA|ESCRITA|ADMIN), favoritoIds. %>
 
 <%
-  // Achata as folhas navegáveis (com rota) para alimentar o command palette e a
-  // barra de favoritos. Cada entrada carrega o id (favorito), a rota e o grupo
-  // (área-pai) que dá contexto na busca.
+  // Achata as folhas navegáveis (com rota) para o command palette e os favoritos.
   const _favSet = new Set(typeof favoritoIds !== 'undefined' && favoritoIds ? favoritoIds : []);
   const _gxFlat = [];
   (typeof menuApp !== 'undefined' && menuApp ? menuApp : []).forEach(function (area) {
-    if (area.rota) _gxFlat.push({ id: area.id, nome: area.nome, grupo: 'Áreas', rota: area.rota, icone: area.icone || 'bi-grid' });
+    if (area.rota && area.rota.charAt(0) === '/') _gxFlat.push({ id: area.id, nome: area.nome, grupo: 'Áreas', rota: area.rota, icone: area.icone || 'bi-grid' });
     (area.filhos || []).forEach(function (f) {
-      if (f.rota) _gxFlat.push({ id: f.id, nome: f.nome, grupo: area.nome, rota: f.rota, icone: f.icone || 'bi-dot' });
+      if (f.rota && f.rota.charAt(0) === '/') _gxFlat.push({ id: f.id, nome: f.nome, grupo: area.nome, rota: f.rota, icone: f.icone || 'bi-dot' });
     });
   });
   // Favoritos = itens achatados marcados pelo usuário (já filtrados pela permissão).
@@ -28,117 +24,48 @@
 %>
 
 <style>
-  /* ── Command bar ──────────────────────────────────────────────────────── */
-  .gx-topbar {
-    position: sticky; top: 0; z-index: 1040;
-    display: flex; align-items: center; gap: 1rem;
-    height: 64px; padding: 0 1.25rem;
+  /* ── Offset global (Opção A): abre espaço para a sidebar fixa + a faixa ──── */
+  :root { --gx-side-w: 264px; --gx-strip-h: 56px; }
+  body { padding-left: var(--gx-side-w); padding-top: var(--gx-strip-h); }
+  @media (max-width: 991.98px) { body { padding-left: 0; } }
+
+  /* ── Faixa superior (contexto + ações) ────────────────────────────────── */
+  .gx-strip {
+    position: fixed; top: 0; left: var(--gx-side-w); right: 0; height: var(--gx-strip-h);
+    z-index: 1040; display: flex; align-items: center; gap: .8rem; padding: 0 1rem;
     background:
-      radial-gradient(120% 180% at 0% 0%, rgba(159,232,112,.10), transparent 45%),
+      radial-gradient(120% 180% at 100% 0%, rgba(159,232,112,.08), transparent 50%),
       linear-gradient(180deg, #14160f 0%, var(--ink, #0e0f0c) 100%);
     border-bottom: 1px solid rgba(159,232,112,.18);
-    box-shadow: 0 1px 0 rgba(159,232,112,.35), 0 8px 24px rgba(0,0,0,.28);
+    box-shadow: 0 1px 0 rgba(159,232,112,.28);
   }
+  @media (max-width: 991.98px) { .gx-strip { left: 0; } }
 
-  /* ── Marca ────────────────────────────────────────────────────────────── */
-  .gx-brand {
-    display: inline-flex; align-items: center; gap: .55rem;
-    padding: .35rem .7rem; border-radius: 14px;
-    color: var(--canvas-soft, #e8ebe6) !important; text-decoration: none;
-    font-family: 'Manrope', sans-serif; font-weight: 800; letter-spacing: -.01em;
-    border: 1px solid rgba(255,255,255,.08); flex-shrink: 0;
-    transition: border-color .15s, background .15s;
+  .gx-burger {
+    display: none; width: 40px; height: 40px; flex-shrink: 0; border: 0; border-radius: 9999px;
+    place-items: center; cursor: pointer; background: rgba(255,255,255,.06); color: rgba(232,235,230,.85);
   }
-  .gx-brand:hover { border-color: rgba(159,232,112,.4); background: rgba(255,255,255,.03); }
-  .gx-brand .bi { color: var(--primary, #9fe870); font-size: 1.15rem; }
-  .gx-brand small { display:block; font-size:.6rem; font-weight:600; letter-spacing:.16em;
-    text-transform:uppercase; color: rgba(232,235,230,.45); line-height:1; margin-top:2px; }
+  .gx-burger:hover { background: rgba(255,255,255,.1); }
+  .gx-burger .bi { font-size: 1.15rem; }
+  @media (max-width: 991.98px) { .gx-burger { display: grid; } }
 
-  /* ── Navegação em pílulas ─────────────────────────────────────────────── */
-  /* Priority+: nada de scroll escondido — o que não cabe colapsa no "Mais". */
-  .gx-nav { display: flex; align-items: center; gap: .25rem; min-width: 0;
-    overflow: visible; flex: 1 1 auto; flex-wrap: nowrap; }
-  .gx-nav .gx-oculto { display: none !important; }
-  .gx-mega-sec + .gx-mega-sec { margin-top: .6rem; border-top: 1px solid var(--bs-border-color, rgba(14,15,12,.08)); padding-top: .6rem; }
-  .gx-pill {
-    display: inline-flex; align-items: center; gap: .45rem; white-space: nowrap;
-    padding: .5rem .85rem; border-radius: 9999px; border: 0; background: transparent;
-    color: rgba(232,235,230,.78) !important; text-decoration: none; cursor: pointer;
-    font-size: .875rem; font-weight: 600; font-family: 'Inter', sans-serif;
-    transition: background .15s, color .15s;
-  }
-  .gx-pill .bi { font-size: 1rem; opacity: .85; }
-  .gx-pill:hover { background: rgba(255,255,255,.07); color: #fff !important; }
-  .gx-pill.show, .gx-pill[aria-expanded="true"] { background: rgba(255,255,255,.09); color: #fff !important; }
-  .gx-pill.is-active {
-    color: var(--ink, #0e0f0c) !important; background: var(--primary, #9fe870);
-  }
-  .gx-pill.is-active .bi { opacity: 1; }
-  .gx-pill .gx-caret { font-size: .7rem; opacity: .55; margin-left: -.15rem; }
-
-  /* ── Mega-painel de dropdown ──────────────────────────────────────────── */
-  .gx-mega {
-    --bs-dropdown-min-width: 0;
-    border: 0; border-radius: 24px; padding: .85rem;
-    background: var(--canvas, #fff);
-    box-shadow: 0 18px 48px rgba(14,15,12,.28); margin-top: .6rem !important;
-    min-width: 340px; max-width: min(620px, 92vw);
-  }
-  .gx-mega-head { font-size: .68rem; font-weight: 700; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--mute, #868685); padding: .15rem .5rem .55rem; }
-  .gx-mega-grid { display: grid; grid-template-columns: 1fr; gap: .15rem; }
-  .gx-mega.is-wide .gx-mega-grid { grid-template-columns: 1fr 1fr; }
-  .gx-tile {
-    display: flex; align-items: flex-start; gap: .7rem; text-decoration: none;
-    padding: .55rem .6rem; border-radius: 14px; color: var(--ink, #0e0f0c);
-    transition: background .12s;
-  }
-  .gx-tile:hover { background: var(--canvas-soft, #e8ebe6); }
-  .gx-tile .gx-ico {
-    flex-shrink: 0; width: 36px; height: 36px; border-radius: 11px;
-    display: grid; place-items: center; font-size: 1.05rem;
-    background: var(--primary-pale, #e2f6d5); color: var(--ink-deep, #163300);
-  }
-  .gx-tile:hover .gx-ico { background: var(--primary, #9fe870); }
-  .gx-tile-body { min-width: 0; }
-  .gx-tile-title { font-weight: 600; font-size: .9rem; line-height: 1.2; }
-  .gx-tile-desc { font-size: .76rem; color: var(--mute, #868685); line-height: 1.25;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .gx-tile.gx-overview .gx-ico { background: var(--ink, #0e0f0c); color: var(--primary, #9fe870); }
-
-  /* ── Lado direito: busca + workspace + ações ──────────────────────────── */
-  .gx-right { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; }
-  .gx-search {
-    display: inline-flex; align-items: center; gap: .5rem;
-    padding: .45rem .7rem; border-radius: 9999px; cursor: pointer;
-    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
-    color: rgba(232,235,230,.7); font-size: .82rem; font-family: 'Inter', sans-serif;
-    transition: border-color .15s, background .15s;
-  }
-  .gx-search:hover { border-color: rgba(159,232,112,.45); background: rgba(255,255,255,.09); }
-  .gx-search kbd {
-    font-family: 'Inter', sans-serif; font-size: .7rem; font-weight: 600;
-    background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12);
-    border-radius: 6px; padding: .05rem .35rem; color: rgba(232,235,230,.8);
-  }
+  .gx-strip-spacer { flex: 1 1 auto; min-width: 0; }
 
   .gx-workspace {
     display: inline-flex; align-items: center; gap: .6rem;
-    padding: .35rem .35rem .35rem .8rem; border-radius: 9999px; text-decoration: none;
+    padding: .3rem .3rem .3rem .75rem; border-radius: 9999px; text-decoration: none;
     background: rgba(159,232,112,.08); border: 1px solid rgba(159,232,112,.28);
     transition: border-color .15s, background .15s;
   }
   .gx-workspace:hover { border-color: var(--primary, #9fe870); background: rgba(159,232,112,.14); }
   .gx-ws-meta { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
-  .gx-ws-top { font-size: .65rem; letter-spacing: .08em; text-transform: uppercase;
-    color: rgba(232,235,230,.5); }
-  .gx-ws-name { font-size: .82rem; font-weight: 700; color: #fff;
-    max-width: 16ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gx-ws-top { font-size: .62rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(232,235,230,.5); }
+  .gx-ws-name { font-size: .8rem; font-weight: 700; color: #fff;
+    max-width: 20ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gx-ws-year {
     flex-shrink: 0; display: inline-grid; place-items: center;
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700;
-    font-size: .78rem; color: var(--ink, #0e0f0c); background: var(--primary, #9fe870);
-    padding: .2rem .5rem; border-radius: 9999px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; font-size: .76rem;
+    color: var(--ink, #0e0f0c); background: var(--primary, #9fe870); padding: .2rem .5rem; border-radius: 9999px;
   }
   .gx-ws-swap { color: rgba(232,235,230,.6); font-size: .9rem; padding-right: .25rem; }
 
@@ -151,7 +78,9 @@
   .gx-icon-btn:hover { background: rgba(208,50,56,.18); color: #ffb4b7; }
   .gx-icon-btn .bi { font-size: 1.05rem; }
 
-  /* ── Command palette ──────────────────────────────────────────────────── */
+  @media (max-width: 991.98px) { .gx-ws-meta { display: none; } .gx-workspace { padding: .3rem; } }
+
+  /* ── Command palette (⌘K) ─────────────────────────────────────────────── */
   #gx-palette { position: fixed; inset: 0; z-index: 2000; display: none;
     align-items: flex-start; justify-content: center; padding-top: 12vh;
     background: rgba(14,15,12,.55); backdrop-filter: blur(4px); }
@@ -167,219 +96,41 @@
   .gx-pal-item { display: flex; align-items: center; gap: .7rem; padding: .6rem .7rem;
     border-radius: 14px; text-decoration: none; color: var(--ink, #0e0f0c); cursor: pointer; }
   .gx-pal-item .gx-ico { width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
-    display: grid; place-items: center; background: var(--primary-pale, #e2f6d5);
-    color: var(--ink-deep, #163300); }
+    display: grid; place-items: center; background: var(--primary-pale, #e2f6d5); color: var(--ink-deep, #163300); }
   .gx-pal-item.active, .gx-pal-item:hover { background: var(--canvas-soft, #e8ebe6); }
   .gx-pal-item.active .gx-ico { background: var(--primary, #9fe870); }
   .gx-pal-grp { font-size: .72rem; color: var(--mute, #868685); margin-left: auto; }
   .gx-pal-empty { padding: 1.5rem; text-align: center; color: var(--mute, #868685); font-size: .9rem; }
-
-  @media (max-width: 991.98px) {
-    .gx-brand small, .gx-search span, .gx-ws-meta { display: none; }
-    .gx-workspace { padding: .35rem; }
-  }
-
-  /* ── Barra de favoritos (estilo navegador) ────────────────────────────── */
-  .gx-favbar {
-    position: sticky; top: 64px; z-index: 1039;
-    display: flex; align-items: center; gap: .3rem;
-    padding: .3rem .9rem; min-height: 38px;
-    background: var(--canvas, #fff);
-    border-bottom: 1px solid var(--bs-border-color, rgba(14,15,12,.08));
-    overflow-x: auto; scrollbar-width: none;
-  }
-  .gx-favbar::-webkit-scrollbar { display: none; }
-  .gx-favbar[hidden] { display: none; }  /* author display:flex venceria o [hidden] do UA */
-  .gx-favbar-label { flex-shrink: 0; color: var(--mute, #868685); font-size: .85rem;
-    padding-right: .25rem; }
-  .gx-fav {
-    display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap;
-    padding: .28rem .6rem; border-radius: 9999px; text-decoration: none;
-    color: var(--ink, #0e0f0c); font-size: .82rem; font-weight: 600;
-    font-family: 'Inter', sans-serif; transition: background .12s, color .12s;
-  }
-  .gx-fav .bi { font-size: .92rem; color: var(--ink-deep, #163300); opacity: .8; }
-  .gx-fav:hover { background: var(--primary-pale, #e2f6d5); color: var(--ink-deep, #163300); }
-
-  /* ── Estrela de favoritar (sobreposta ao tile do mega-painel) ─────────── */
-  .gx-tile-wrap { position: relative; }
-  .gx-tile-wrap .gx-tile { padding-right: 2.2rem; }
-  .gx-fav-star {
-    position: absolute; top: 50%; right: .35rem; transform: translateY(-50%);
-    width: 30px; height: 30px; border: 0; border-radius: 9999px; cursor: pointer;
-    display: grid; place-items: center; background: transparent;
-    color: var(--mute, #868685); transition: background .12s, color .12s;
-  }
-  .gx-fav-star:hover { background: rgba(14,15,12,.06); color: var(--ink, #0e0f0c); }
-  .gx-fav-star.is-fav { color: #e8a200; }
-  .gx-fav-star .bi { font-size: 1rem; }
-
-  /* ── Estrela nos pills de topo (itens sem dropdown) ───────────────────────
-     Some por padrão p/ não poluir a command bar; aparece no hover do pill e
-     fica fixa (dourada) quando favoritado. Chip escuro p/ legibilidade no ink. */
-  .gx-pill-wrap { position: relative; display: inline-flex; align-items: center; flex-shrink: 0; }
-  .gx-fav-star-pill {
-    top: -3px; right: -1px; transform: none; width: 20px; height: 20px;
-    color: rgba(232,235,230,.65); background: rgba(20,22,15,.85);
-    opacity: 0; pointer-events: none;
-  }
-  .gx-pill-wrap:hover .gx-fav-star-pill { opacity: 1; pointer-events: auto; }
-  .gx-fav-star-pill.is-fav { opacity: 1; pointer-events: auto; color: #f4b400; }
-  .gx-fav-star-pill:hover { background: rgba(20,22,15,1); color: #fff; }
-  .gx-fav-star-pill .bi { font-size: .8rem; }
 </style>
 
-<nav class="gx-topbar">
-  <a class="gx-brand" href="/app">
-    <i class="bi bi-heptagon-fill"></i>
-    <span>Gênesis<small>Operador</small></span>
+<%# ── Sidebar lateral (navegação principal) ──────────────────────────────── %>
+<%- include('_sidebar', { favSet: _favSet, favList: _gxFav }) %>
+
+<%# ── Faixa superior: hambúrguer (mobile) + contexto + ações ──────────────── %>
+<div class="gx-strip">
+  <button class="gx-burger" type="button" id="gx-burger" aria-label="Abrir menu">
+    <i class="bi bi-list"></i>
+  </button>
+  <div class="gx-strip-spacer"></div>
+
+  <a href="/app/contexto" class="gx-workspace" title="Trocar contexto de trabalho">
+    <div class="gx-ws-meta">
+      <span class="gx-ws-top"><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %></span>
+      <span class="gx-ws-name"><%= entidade.nome %></span>
+    </div>
+    <span class="gx-ws-year"><%= ano %></span>
+    <i class="bi bi-arrow-left-right gx-ws-swap"></i>
   </a>
 
-  <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
-    <div class="gx-nav">
-      <% menuApp.forEach(function (area, areaIdx) { %>
-        <% if (area.filhos && area.filhos.length) { %>
-          <% const wide = (area.filhos.length + (area.rota ? 1 : 0)) > 5 %>
-          <div class="dropdown" data-gx-area="<%= areaIdx %>">
-            <button class="gx-pill" data-gx-route="<%= area.rota || '' %>" type="button"
-                    data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
-              <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
-              <i class="bi bi-chevron-down gx-caret"></i>
-            </button>
-            <div class="dropdown-menu gx-mega <%= wide ? 'is-wide' : '' %>">
-              <div class="gx-mega-head"><%= area.nome %></div>
-              <div class="gx-mega-grid">
-                <% if (area.rota) { %>
-                  <div class="gx-tile-wrap">
-                    <a class="gx-tile gx-overview" href="<%= area.rota %>">
-                      <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
-                      <span class="gx-tile-body">
-                        <span class="gx-tile-title">Visão geral</span>
-                        <span class="gx-tile-desc"><%= area.nome %></span>
-                      </span>
-                    </a>
-                    <button type="button" class="gx-fav-star <%= _favSet.has(area.id) ? 'is-fav' : '' %>"
-                            data-fav-id="<%= area.id %>" data-fav-nome="<%= area.nome %>"
-                            data-fav-rota="<%= area.rota %>" data-fav-icone="<%= area.icone || 'bi-grid' %>"
-                            title="<%= _favSet.has(area.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
-                      <i class="bi <%= _favSet.has(area.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
-                    </button>
-                  </div>
-                <% } %>
-                <% area.filhos.forEach(function (f) { %>
-                  <div class="gx-tile-wrap">
-                    <a class="gx-tile" href="<%= f.rota || '#' %>">
-                      <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
-                      <span class="gx-tile-body">
-                        <span class="gx-tile-title"><%= f.nome %></span>
-                        <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
-                      </span>
-                    </a>
-                    <% if (f.rota) { %>
-                      <button type="button" class="gx-fav-star <%= _favSet.has(f.id) ? 'is-fav' : '' %>"
-                              data-fav-id="<%= f.id %>" data-fav-nome="<%= f.nome %>"
-                              data-fav-rota="<%= f.rota %>" data-fav-icone="<%= f.icone || 'bi-dot' %>"
-                              title="<%= _favSet.has(f.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
-                        <i class="bi <%= _favSet.has(f.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
-                      </button>
-                    <% } %>
-                  </div>
-                <% }) %>
-              </div>
-            </div>
-          </div>
-        <% } else { %>
-          <div class="gx-pill-wrap" data-gx-area="<%= areaIdx %>">
-            <a class="gx-pill" data-gx-route="<%= area.rota || '' %>" href="<%= area.rota || '#' %>">
-              <i class="bi <%= area.icone || 'bi-grid' %>"></i><%= area.nome %>
-            </a>
-            <% if (area.rota) { %>
-              <button type="button" class="gx-fav-star gx-fav-star-pill <%= _favSet.has(area.id) ? 'is-fav' : '' %>"
-                      data-fav-id="<%= area.id %>" data-fav-nome="<%= area.nome %>"
-                      data-fav-rota="<%= area.rota %>" data-fav-icone="<%= area.icone || 'bi-grid' %>"
-                      title="<%= _favSet.has(area.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
-                <i class="bi <%= _favSet.has(area.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
-              </button>
-            <% } %>
-          </div>
-        <% } %>
-      <% }) %>
-
-      <%# Priority+: recebe as áreas que não couberem na barra (JS decide). %>
-      <div class="dropdown gx-oculto" id="gx-mais">
-        <button class="gx-pill" type="button" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
-          <i class="bi bi-three-dots"></i>Mais
-          <i class="bi bi-chevron-down gx-caret"></i>
-        </button>
-        <div class="dropdown-menu gx-mega">
-          <% menuApp.forEach(function (area, areaIdx) { %>
-            <div class="gx-mega-sec gx-oculto" data-gx-more="<%= areaIdx %>">
-              <div class="gx-mega-head"><%= area.nome %></div>
-              <div class="gx-mega-grid">
-                <% if (area.rota) { %>
-                  <a class="gx-tile gx-overview" href="<%= area.rota %>">
-                    <span class="gx-ico"><i class="bi <%= area.icone || 'bi-grid' %>"></i></span>
-                    <span class="gx-tile-body">
-                      <span class="gx-tile-title"><%= area.nome %></span>
-                      <% if (area.descricao) { %><span class="gx-tile-desc"><%= area.descricao %></span><% } %>
-                    </span>
-                  </a>
-                <% } %>
-                <% (area.filhos || []).forEach(function (f) { %>
-                  <a class="gx-tile" href="<%= f.rota || '#' %>">
-                    <span class="gx-ico"><i class="bi <%= f.icone || 'bi-dot' %>"></i></span>
-                    <span class="gx-tile-body">
-                      <span class="gx-tile-title"><%= f.nome %></span>
-                      <% if (f.descricao) { %><span class="gx-tile-desc"><%= f.descricao %></span><% } %>
-                    </span>
-                  </a>
-                <% }) %>
-              </div>
-            </div>
-          <% }) %>
-        </div>
-      </div>
-    </div>
-  <% } else { %>
-    <div class="flex-grow-1"></div>
+  <% if (typeof nivel !== 'undefined' && nivel === 'ADMIN') { %>
+    <a href="/app/entidade/acessos" class="gx-icon-btn" title="Acessos da entidade" aria-label="Acessos da entidade">
+      <i class="bi bi-people"></i>
+    </a>
   <% } %>
 
-  <div class="gx-right">
-    <% if (_gxFlat.length) { %>
-      <button class="gx-search" type="button" id="gx-search-trigger" aria-label="Buscar (Ctrl+K)">
-        <i class="bi bi-search"></i><span>Buscar…</span><kbd>⌘K</kbd>
-      </button>
-    <% } %>
-
-    <a href="/app/contexto" class="gx-workspace" title="Trocar contexto de trabalho">
-      <div class="gx-ws-meta">
-        <span class="gx-ws-top"><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %></span>
-        <span class="gx-ws-name"><%= entidade.nome %></span>
-      </div>
-      <span class="gx-ws-year"><%= ano %></span>
-      <i class="bi bi-arrow-left-right gx-ws-swap"></i>
-    </a>
-
-    <% if (typeof nivel !== 'undefined' && nivel === 'ADMIN') { %>
-      <a href="/app/entidade/acessos" class="gx-icon-btn" title="Acessos da entidade" aria-label="Acessos da entidade">
-        <i class="bi bi-people"></i>
-      </a>
-    <% } %>
-
-    <a href="/app/logout" class="gx-icon-btn" title="Sair" aria-label="Sair">
-      <i class="bi bi-box-arrow-right"></i>
-    </a>
-  </div>
-</nav>
-
-<%# ── Barra de favoritos: atalhos do usuário (estilo navegador) ──────────── %>
-<div id="gx-favbar" class="gx-favbar" <%= _gxFav.length ? '' : 'hidden' %>>
-  <span class="gx-favbar-label" title="Favoritos"><i class="bi bi-star-fill"></i></span>
-  <% _gxFav.forEach(function (it) { %>
-    <a class="gx-fav" href="<%= it.rota %>" data-fav-id="<%= it.id %>">
-      <i class="bi <%= it.icone %>"></i><span><%= it.nome %></span>
-    </a>
-  <% }) %>
+  <a href="/app/logout" class="gx-icon-btn" title="Sair" aria-label="Sair">
+    <i class="bi bi-box-arrow-right"></i>
+  </a>
 </div>
 
 <% if (_gxFlat.length) { %>
@@ -402,16 +153,27 @@
     var trigger = document.getElementById('gx-search-trigger');
     var cursor = 0, filtered = ITEMS;
 
-    function esc(s) { var d = document.createElement('div'); d.textContent = String(s == null ? '' : s); return d.innerHTML; }
-
+    // Render por métodos DOM (sem innerHTML) — os rótulos vêm do banco, mas evitamos
+    // qualquer superfície de injeção montando os nós e usando textContent.
     function render() {
-      if (!filtered.length) { list.innerHTML = '<div class="gx-pal-empty">Nada encontrado.</div>'; return; }
-      list.innerHTML = filtered.map(function (it, i) {
-        return '<a class="gx-pal-item' + (i === cursor ? ' active' : '') + '" href="' + esc(it.rota) + '" data-i="' + i + '">' +
-          '<span class="gx-ico"><i class="bi ' + esc(it.icone) + '"></i></span>' +
-          '<span>' + esc(it.nome) + '</span>' +
-          '<span class="gx-pal-grp">' + esc(it.grupo) + '</span></a>';
-      }).join('');
+      list.textContent = '';
+      if (!filtered.length) {
+        var empty = document.createElement('div');
+        empty.className = 'gx-pal-empty'; empty.textContent = 'Nada encontrado.';
+        list.appendChild(empty);
+        return;
+      }
+      filtered.forEach(function (it, i) {
+        var a = document.createElement('a');
+        a.className = 'gx-pal-item' + (i === cursor ? ' active' : '');
+        a.href = it.rota; a.setAttribute('data-i', i);
+        var ico = document.createElement('span'); ico.className = 'gx-ico';
+        var icoI = document.createElement('i'); icoI.className = 'bi ' + it.icone; ico.appendChild(icoI);
+        var nome = document.createElement('span'); nome.textContent = it.nome;
+        var grp = document.createElement('span'); grp.className = 'gx-pal-grp'; grp.textContent = it.grupo;
+        a.appendChild(ico); a.appendChild(nome); a.appendChild(grp);
+        list.appendChild(a);
+      });
       var active = list.querySelector('.gx-pal-item.active');
       if (active) active.scrollIntoView({ block: 'nearest' });
     }
@@ -451,96 +213,100 @@
 </script>
 <% } %>
 
-<%# ── Priority+: colapsa no "Mais" os itens que não couberem na barra ─────── %>
-<script>
-  (function () {
-    var nav = document.querySelector('.gx-nav');
-    var mais = document.getElementById('gx-mais');
-    if (!nav || !mais) return;
-    var itens = Array.prototype.slice.call(nav.querySelectorAll('[data-gx-area]'));
-    var secoes = {};
-    mais.querySelectorAll('[data-gx-more]').forEach(function (el) { secoes[el.getAttribute('data-gx-more')] = el; });
-
-    function recalc() {
-      // 1) mostra tudo p/ medir de verdade
-      itens.forEach(function (el) { el.classList.remove('gx-oculto'); });
-      mais.classList.remove('gx-oculto');
-      var maisW = mais.offsetWidth + 6;
-      var limite = nav.clientWidth;
-      // 2) acumula larguras; primeiro que estourar (reservando o Mais) → esconde dali em diante
-      var usado = 0, corte = itens.length;
-      for (var i = 0; i < itens.length; i++) {
-        usado += itens[i].offsetWidth + 4; // gap
-        var reserva = i < itens.length - 1 ? maisW : 0; // último cabendo dispensa o Mais
-        if (usado + reserva > limite) { corte = i; break; }
-      }
-      var algumOculto = corte < itens.length;
-      itens.forEach(function (el, i) {
-        var esconde = i >= corte;
-        el.classList.toggle('gx-oculto', esconde);
-        var sec = secoes[el.getAttribute('data-gx-area')];
-        if (sec) sec.classList.toggle('gx-oculto', !esconde);
-      });
-      mais.classList.toggle('gx-oculto', !algumOculto);
-    }
-
-    var t;
-    window.addEventListener('resize', function () { clearTimeout(t); t = setTimeout(recalc, 120); });
-    // fontes podem carregar depois e mudar larguras
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(recalc);
-    recalc();
-  })();
-</script>
-
-<%# ── Marca item ativo comparando a rota com o pathname atual ─────────────── %>
+<%# ── Marca o link ativo (rota) e auto-expande o grupo que o contém ───────── %>
 <script>
   (function () {
     var path = window.location.pathname.replace(/\/$/, '');
     var best = null, bestLen = -1;
-    document.querySelectorAll('.gx-pill[data-gx-route]').forEach(function (el) {
+    document.querySelectorAll('.gx-side-link[data-gx-route]').forEach(function (el) {
       var r = (el.getAttribute('data-gx-route') || '').replace(/\/$/, '');
       if (!r || r === '/app') return;
       if ((path === r || path.indexOf(r + '/') === 0) && r.length > bestLen) { best = el; bestLen = r.length; }
     });
-    if (best) best.classList.add('is-active');
+    if (!best) return;
+    var route = best.getAttribute('data-gx-route');
+    document.querySelectorAll('.gx-side-link[data-gx-route="' + route + '"]').forEach(function (el) { el.classList.add('is-active'); });
+    var grp = best.closest('.gx-side-group');
+    if (!grp) { var inGrp = document.querySelector('.gx-side-group .gx-side-link[data-gx-route="' + route + '"]'); if (inGrp) grp = inGrp.closest('.gx-side-group'); }
+    if (grp) grp.classList.add('is-open');
   })();
 </script>
 
-<%# ── Favoritar/desfavoritar via estrela + atualização da barra em tempo real ─ %>
+<%# ── Colapso dos grupos (persistido em localStorage) ─────────────────────── %>
 <script>
   (function () {
-    var bar = document.getElementById('gx-favbar');
+    var KEY = 'gx_side_groups';
+    var groups = Array.prototype.slice.call(document.querySelectorAll('.gx-side-group'));
+    function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
+    function save() {
+      var open = groups.filter(function (g) { return g.classList.contains('is-open'); })
+        .map(function (g) { return g.getAttribute('data-gx-group'); });
+      try { localStorage.setItem(KEY, JSON.stringify(open)); } catch (e) {}
+    }
+    // restaura o salvo (sem fechar o grupo ativo, já aberto pelo script de rota)
+    var saved = load();
+    groups.forEach(function (g) {
+      if (saved.indexOf(g.getAttribute('data-gx-group')) !== -1) g.classList.add('is-open');
+      var hd = g.querySelector('.gx-side-group-hd');
+      if (hd) hd.setAttribute('aria-expanded', g.classList.contains('is-open') ? 'true' : 'false');
+    });
+    document.addEventListener('click', function (e) {
+      var hd = e.target.closest('.gx-side-group-hd'); if (!hd) return;
+      var g = hd.closest('.gx-side-group'); if (!g) return;
+      g.classList.toggle('is-open');
+      hd.setAttribute('aria-expanded', g.classList.contains('is-open') ? 'true' : 'false');
+      save();
+    });
+  })();
+</script>
+
+<%# ── Off-canvas mobile (hambúrguer) ──────────────────────────────────────── %>
+<script>
+  (function () {
+    var side = document.getElementById('gx-side');
+    var scrim = document.getElementById('gx-side-scrim');
+    var burger = document.getElementById('gx-burger');
+    if (!side) return;
+    function abrir() { side.classList.add('gx-side-open'); if (scrim) scrim.hidden = false; }
+    function fechar() { side.classList.remove('gx-side-open'); if (scrim) scrim.hidden = true; }
+    if (burger) burger.addEventListener('click', function () { side.classList.contains('gx-side-open') ? fechar() : abrir(); });
+    if (scrim) scrim.addEventListener('click', fechar);
+    side.addEventListener('click', function (e) {
+      if (e.target.closest('.gx-side-link') && window.matchMedia('(max-width: 991.98px)').matches) fechar();
+    });
+  })();
+</script>
+
+<%# ── Favoritar/desfavoritar via estrela + atualização da seção em tempo real ─ %>
+<script>
+  (function () {
+    var sec = document.getElementById('gx-side-fav-sec');
+    var listEl = document.getElementById('gx-side-fav-list');
 
     function pintarEstrela(btn, fav) {
       btn.classList.toggle('is-fav', fav);
-      var i = btn.querySelector('i');
-      if (i) i.className = 'bi ' + (fav ? 'bi-star-fill' : 'bi-star');
+      var i = btn.querySelector('i'); if (i) i.className = 'bi ' + (fav ? 'bi-star-fill' : 'bi-star');
       btn.title = fav ? 'Remover dos favoritos' : 'Favoritar';
     }
-
     function adicionarAtalho(d) {
-      if (!bar || bar.querySelector('.gx-fav[data-fav-id="' + d.id + '"]')) return;
+      if (!listEl || listEl.querySelector('.gx-side-fav[data-fav-id="' + d.id + '"]')) return;
       var a = document.createElement('a');
-      a.className = 'gx-fav'; a.href = d.rota; a.setAttribute('data-fav-id', d.id);
+      a.className = 'gx-side-link gx-side-fav'; a.href = d.rota;
+      a.setAttribute('data-fav-id', d.id); a.setAttribute('data-gx-route', d.rota);
       var ico = document.createElement('i'); ico.className = 'bi ' + d.icone;
       var txt = document.createElement('span'); txt.textContent = d.nome;
-      a.appendChild(ico); a.appendChild(txt); bar.appendChild(a);
+      a.appendChild(ico); a.appendChild(txt); listEl.appendChild(a);
     }
-
     function removerAtalho(id) {
-      if (!bar) return;
-      var el = bar.querySelector('.gx-fav[data-fav-id="' + id + '"]');
-      if (el) el.remove();
+      if (!listEl) return;
+      var el = listEl.querySelector('.gx-side-fav[data-fav-id="' + id + '"]'); if (el) el.remove();
     }
-
-    function sincronizarBarra() {
-      if (bar) bar.hidden = !bar.querySelector('.gx-fav');
-    }
+    function sincronizar() { if (sec) sec.hidden = !(listEl && listEl.querySelector('.gx-side-fav')); }
 
     document.addEventListener('click', function (e) {
-      var btn = e.target.closest('.gx-fav-star');
+      var btn = e.target.closest('.gx-side-star');
       if (!btn) return;
-      e.preventDefault();
+      e.preventDefault(); e.stopPropagation();
       var id = btn.getAttribute('data-fav-id');
       btn.disabled = true;
       fetch('/app/favoritos/' + encodeURIComponent(id) + '/toggle', {
@@ -548,18 +314,13 @@
       })
         .then(function (r) { return r.ok ? r.json() : Promise.reject(r); })
         .then(function (res) {
-          document.querySelectorAll('.gx-fav-star[data-fav-id="' + id + '"]').forEach(function (b) {
-            pintarEstrela(b, res.favoritado);
-          });
+          document.querySelectorAll('.gx-side-star[data-fav-id="' + id + '"]').forEach(function (b) { pintarEstrela(b, res.favoritado); });
           if (res.favoritado) {
-            adicionarAtalho({
-              id: id, nome: btn.getAttribute('data-fav-nome'),
-              rota: btn.getAttribute('data-fav-rota'), icone: btn.getAttribute('data-fav-icone'),
-            });
+            adicionarAtalho({ id: id, nome: btn.getAttribute('data-fav-nome'), rota: btn.getAttribute('data-fav-rota'), icone: btn.getAttribute('data-fav-icone') });
           } else {
             removerAtalho(id);
           }
-          sincronizarBarra();
+          sincronizar();
         })
         .catch(function () { /* silencioso — mantém o estado atual */ })
         .finally(function () { btn.disabled = false; });
@@ -568,20 +329,15 @@
 </script>
 
 <% if (typeof menuApp !== 'undefined' && menuApp && menuApp.length) { %>
-<%# Bundle Bootstrap (Popper + dropdowns). As views do /app só carregam o CSS; o JS entra aqui. %>
+<%# Bundle Bootstrap (Popper + dropdowns/modais usados pelas telas). As views só carregam o CSS. %>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <% } %>
 
 <%# ─────────────────────────────────────────────────────────────────────────────
    ESCAPADAS CONSCIENTES DO DESIGN.md:
-   • `nav-bar` é especificado como fundo branco (canvas). Aqui invertemos para
-     ink com fio lime — um topo "command bar" de produto, mais arrojado que o
-     nav de marketing. O lime continua sendo o único acento (regra mantida).
-   • Introduzimos um command palette (⌘K) e tiles de ícone nos dropdowns —
-     padrões de app não cobertos pelo DESIGN.md de marketing, mas coerentes com
-     os tokens (rounded.xl 24px, primary-pale, ink-deep).
-   • O "workspace switcher" usa lime como borda/realce de uma pílula informativa,
-     não como CTA — escapa levemente do "lime só para CTA", de forma controlada.
+   • A sidebar/faixa usam fundo ink com fio lime (chrome de produto), não o nav
+     branco do marketing. O lime segue como único acento (item ativo/CTA).
+   • Command palette (⌘K) e a estrela de favoritos são padrões de app coerentes
+     com os tokens (rounded 24px, primary-pale, ink-deep), fora do DESIGN.md.
+   • O "workspace switcher" usa lime como borda/realce de pílula informativa.
    ───────────────────────────────────────────────────────────────────────────── %>
-</content>
-</invoke>

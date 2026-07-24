@@ -1,0 +1,184 @@
+<%# ─────────────────────────────────────────────────────────────────────────────
+   GÊNESIS · SIDEBAR  (navegação lateral do /app)
+   Barra vertical com os 6 domínios (grupos colapsáveis) — escala sem overflow.
+   Incluída por `_navbar.ejs`, que também injeta o offset do body e os scripts.
+
+   Recebe via include: favSet (Set de ids favoritados), favList (favoritos achatados).
+   Usa de locals: menuApp (árvore permitida). Mantém o vocabulário Wise (ink + lime). %>
+<%
+  const _sideFavSet = (typeof favSet !== 'undefined' && favSet) ? favSet : new Set();
+  const _sideFav = (typeof favList !== 'undefined' && favList) ? favList : [];
+  const _sideMenu = (typeof menuApp !== 'undefined' && menuApp) ? menuApp : [];
+  // Grupo "navegável" tem rota real (/…); sentinela (#…) só expande/colapsa.
+  const _isNav = function (r) { return !!r && r.charAt(0) === '/'; };
+%>
+
+<style>
+  /* ── Rail lateral ─────────────────────────────────────────────────────── */
+  .gx-side {
+    position: fixed; top: 0; left: 0; width: var(--gx-side-w, 264px); height: 100vh;
+    z-index: 1045; display: flex; flex-direction: column;
+    background:
+      radial-gradient(120% 40% at 0% 0%, rgba(159,232,112,.08), transparent 55%),
+      linear-gradient(180deg, #14160f 0%, var(--ink, #0e0f0c) 100%);
+    border-right: 1px solid rgba(159,232,112,.18);
+    font-family: 'Inter', sans-serif;
+  }
+  .gx-side-brand {
+    display: inline-flex; align-items: center; gap: .55rem; flex-shrink: 0;
+    padding: .9rem 1rem .7rem; color: var(--canvas-soft, #e8ebe6) !important;
+    text-decoration: none; font-family: 'Manrope', sans-serif; font-weight: 800;
+    letter-spacing: -.01em; font-size: 1.05rem;
+  }
+  .gx-side-brand .bi { color: var(--primary, #9fe870); font-size: 1.25rem; }
+  .gx-side-brand small { display: block; font-size: .58rem; font-weight: 600;
+    letter-spacing: .16em; text-transform: uppercase; color: rgba(232,235,230,.45);
+    line-height: 1; margin-top: 2px; }
+
+  .gx-side-search {
+    flex-shrink: 0; margin: 0 .8rem .5rem; display: flex; align-items: center; gap: .5rem;
+    padding: .5rem .7rem; border-radius: 12px; cursor: pointer; width: calc(100% - 1.6rem);
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+    color: rgba(232,235,230,.7); font-size: .82rem; font-family: 'Inter', sans-serif;
+    transition: border-color .15s, background .15s;
+  }
+  .gx-side-search:hover { border-color: rgba(159,232,112,.45); background: rgba(255,255,255,.09); }
+  .gx-side-search kbd { margin-left: auto; font-family: 'Inter', sans-serif; font-size: .68rem;
+    font-weight: 600; background: rgba(0,0,0,.35); border: 1px solid rgba(255,255,255,.12);
+    border-radius: 6px; padding: .05rem .35rem; color: rgba(232,235,230,.8); }
+
+  .gx-side-nav { flex: 1 1 auto; overflow-y: auto; overflow-x: hidden;
+    padding: .3rem .6rem 1.2rem; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.18) transparent; }
+  .gx-side-nav::-webkit-scrollbar { width: 8px; }
+  .gx-side-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,.15); border-radius: 8px; }
+
+  .gx-side-label { font-size: .64rem; font-weight: 700; letter-spacing: .12em;
+    text-transform: uppercase; color: rgba(232,235,230,.4); padding: .5rem .6rem .3rem;
+    display: flex; align-items: center; gap: .35rem; }
+  .gx-side-label .bi { color: #f4b400; }
+
+  /* ── Grupo (domínio) ──────────────────────────────────────────────────── */
+  .gx-side-group { margin-bottom: .1rem; }
+  .gx-side-group-hd {
+    display: flex; align-items: center; gap: .55rem; width: 100%; border: 0;
+    padding: .55rem .6rem; border-radius: 10px; cursor: pointer; text-align: left;
+    background: transparent; color: rgba(232,235,230,.82);
+    font-size: .82rem; font-weight: 700; font-family: 'Inter', sans-serif;
+    transition: background .12s, color .12s;
+  }
+  .gx-side-group-hd:hover { background: rgba(255,255,255,.06); color: #fff; }
+  .gx-side-ghd-ico { font-size: 1rem; opacity: .9; }
+  .gx-side-ghd-nome { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gx-side-caret { font-size: .7rem; opacity: .5; transition: transform .18s; }
+  .gx-side-group.is-open > .gx-side-group-hd .gx-side-caret { transform: rotate(180deg); }
+
+  .gx-side-group-body { display: none; padding: .1rem 0 .3rem .35rem;
+    margin-left: .55rem; border-left: 1px solid rgba(255,255,255,.08); }
+  .gx-side-group.is-open > .gx-side-group-body { display: block; }
+
+  /* ── Link (folha) ─────────────────────────────────────────────────────── */
+  .gx-side-linkwrap { position: relative; display: flex; align-items: center; }
+  .gx-side-link {
+    display: flex; align-items: center; gap: .55rem; flex: 1 1 auto; min-width: 0;
+    padding: .42rem .55rem; border-radius: 9px; text-decoration: none;
+    color: rgba(232,235,230,.72); font-size: .82rem; font-weight: 500;
+    transition: background .12s, color .12s;
+  }
+  .gx-side-link .bi { font-size: .92rem; opacity: .85; flex-shrink: 0; }
+  .gx-side-link span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gx-side-link:hover { background: rgba(255,255,255,.07); color: #fff; }
+  .gx-side-link.is-active { background: var(--primary, #9fe870); color: var(--ink, #0e0f0c); font-weight: 600; }
+  .gx-side-link.is-active .bi { opacity: 1; }
+
+  /* Estrela de favoritar (aparece no hover; fixa quando favoritado) */
+  .gx-side-star {
+    position: absolute; right: .3rem; width: 24px; height: 24px; border: 0; border-radius: 7px;
+    display: grid; place-items: center; cursor: pointer; background: transparent;
+    color: rgba(232,235,230,.5); opacity: 0; pointer-events: none; transition: opacity .12s, color .12s, background .12s;
+  }
+  .gx-side-linkwrap:hover .gx-side-star { opacity: 1; pointer-events: auto; }
+  .gx-side-star:hover { background: rgba(0,0,0,.3); color: #fff; }
+  .gx-side-star.is-fav { opacity: 1; pointer-events: auto; color: #f4b400; }
+  .gx-side-star .bi { font-size: .82rem; }
+  .gx-side-linkwrap:has(.gx-side-star.is-fav) .gx-side-link,
+  .gx-side-link[data-fav-pad] { padding-right: 1.9rem; }
+  .gx-side-linkwrap .gx-side-link { padding-right: 1.9rem; }
+
+  /* Seção de favoritos fixados */
+  .gx-side-fav-sec[hidden] { display: none; }
+  .gx-side-fav-sec { margin-bottom: .4rem; }
+  .gx-side-fav .bi { color: #f4b400; }
+
+  /* ── Mobile: rail vira off-canvas ─────────────────────────────────────── */
+  .gx-side-scrim { position: fixed; inset: 0; z-index: 1044; background: rgba(14,15,12,.5);
+    backdrop-filter: blur(2px); }
+  .gx-side-scrim[hidden] { display: none; }
+  @media (max-width: 991.98px) {
+    .gx-side { transform: translateX(-100%); transition: transform .22s ease;
+      box-shadow: 0 0 40px rgba(0,0,0,.5); }
+    .gx-side.gx-side-open { transform: translateX(0); }
+  }
+</style>
+
+<aside class="gx-side" id="gx-side" aria-label="Navegação principal">
+  <a class="gx-side-brand" href="/app">
+    <i class="bi bi-heptagon-fill"></i>
+    <span>Gênesis<small>Operador</small></span>
+  </a>
+
+  <% if (_sideMenu.length) { %>
+    <button class="gx-side-search" type="button" id="gx-search-trigger" aria-label="Buscar (Ctrl+K)">
+      <i class="bi bi-search"></i><span>Buscar…</span><kbd>⌘K</kbd>
+    </button>
+  <% } %>
+
+  <nav class="gx-side-nav">
+    <%# ── Favoritos fixados (estilo navegador) ── %>
+    <div class="gx-side-fav-sec" id="gx-side-fav-sec" <%= _sideFav.length ? '' : 'hidden' %>>
+      <div class="gx-side-label"><i class="bi bi-star-fill"></i>Favoritos</div>
+      <div id="gx-side-fav-list">
+        <% _sideFav.forEach(function (it) { %>
+          <a class="gx-side-link gx-side-fav" href="<%= it.rota %>" data-gx-route="<%= it.rota %>" data-fav-id="<%= it.id %>">
+            <i class="bi <%= it.icone %>"></i><span><%= it.nome %></span>
+          </a>
+        <% }) %>
+      </div>
+    </div>
+
+    <%# ── 6 domínios ── %>
+    <% _sideMenu.forEach(function (area, gi) { %>
+      <div class="gx-side-group" data-gx-group="<%= gi %>">
+        <button class="gx-side-group-hd" type="button" data-gx-toggle="<%= gi %>" aria-expanded="false">
+          <i class="bi <%= area.icone || 'bi-grid' %> gx-side-ghd-ico"></i>
+          <span class="gx-side-ghd-nome"><%= area.nome %></span>
+          <i class="bi bi-chevron-down gx-side-caret"></i>
+        </button>
+        <div class="gx-side-group-body">
+          <% if (_isNav(area.rota)) { %>
+            <div class="gx-side-linkwrap">
+              <a class="gx-side-link" href="<%= area.rota %>" data-gx-route="<%= area.rota %>">
+                <i class="bi bi-grid-1x2"></i><span>Visão geral</span>
+              </a>
+            </div>
+          <% } %>
+          <% (area.filhos || []).forEach(function (f) { %>
+            <div class="gx-side-linkwrap">
+              <a class="gx-side-link" href="<%= f.rota || '#' %>"<% if (_isNav(f.rota)) { %> data-gx-route="<%= f.rota %>"<% } %>>
+                <i class="bi <%= f.icone || 'bi-dot' %>"></i><span><%= f.nome %></span>
+              </a>
+              <% if (_isNav(f.rota)) { %>
+                <button type="button" class="gx-side-star <%= _sideFavSet.has(f.id) ? 'is-fav' : '' %>"
+                        data-fav-id="<%= f.id %>" data-fav-nome="<%= f.nome %>"
+                        data-fav-rota="<%= f.rota %>" data-fav-icone="<%= f.icone || 'bi-dot' %>"
+                        title="<%= _sideFavSet.has(f.id) ? 'Remover dos favoritos' : 'Favoritar' %>" aria-label="Favoritar">
+                  <i class="bi <%= _sideFavSet.has(f.id) ? 'bi-star-fill' : 'bi-star' %>"></i>
+                </button>
+              <% } %>
+            </div>
+          <% }) %>
+        </div>
+      </div>
+    <% }) %>
+  </nav>
+</aside>
+<div class="gx-side-scrim" id="gx-side-scrim" hidden></div>
