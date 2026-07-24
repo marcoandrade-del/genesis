@@ -116,7 +116,9 @@ async function getJson<T>(url: string, rotulo: string, ritmo?: Ritmo): Promise<T
     if (ritmo) await ritmo.antes()
     const t0 = Date.now()
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } })
+      // timeout duro: sem ele um socket pendurado do legado segura a coleta p/
+      // SEMPRE (nem o circuit breaker dispara, porque nada lança)
+      const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(120_000) })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const buf = await res.arrayBuffer()
       ritmo?.depois(Date.now() - t0)
@@ -157,17 +159,16 @@ export async function listarEmpenhos(baseUrl: string, idPortal: string, ano: num
  * (Sarandi: p24 estoura timeout). Cada faixa é uma query com offset 0.
  */
 export async function listarEmpenhosPorFaixa(baseUrl: string, idPortal: string, ano: number, faixa = 500, ritmo?: Ritmo): Promise<EmpenhoLista[]> {
-  // maior número de empenho: 1 registro ordenado desc
-  const searchEnt = encodeURIComponent(`id.entidade=='${idPortal}'`)
-  const topo = await getJson<{ content?: EmpenhoLista[] }>(
-    `${baseUrl}/empenhos/lista?search=${searchEnt}&entidade=${idPortal}&exercicio=${ano}&page=0&size=1&sort=id.empenho,desc`,
-    `empenhos/lista ${idPortal} topo`,
-    ritmo,
-  )
-  const max = topo.content?.[0]?.empenho ?? 0
+  // Sem `sort` e sem descoberta prévia do teto: no eloweb legado o ORDER BY do
+  // topo PENDURA a conexão (observado no smoke de 24/07 — 15min sem resposta).
+  // Varre faixas ascendentes de id.empenho (offset sempre 0) e para após
+  // `vaziasSeguidas` faixas vazias (numeração de empenho é sequencial no ano;
+  // buracos são pequenos).
   const out: EmpenhoLista[] = []
-  for (let ini = 1; ini <= max; ini += faixa) {
-    const fim = Math.min(ini + faixa - 1, max)
+  const vaziasSeguidas = 4
+  let vazias = 0
+  for (let ini = 1; vazias < vaziasSeguidas; ini += faixa) {
+    const fim = ini + faixa - 1
     const search = encodeURIComponent(`id.entidade=='${idPortal}';id.empenho>='${ini}';id.empenho<='${fim}'`)
     const d = await getJson<{ content?: EmpenhoLista[]; last?: boolean; totalElements?: number }>(
       `${baseUrl}/empenhos/lista?search=${search}&entidade=${idPortal}&exercicio=${ano}&page=0&size=${faixa}`,
@@ -175,7 +176,9 @@ export async function listarEmpenhosPorFaixa(baseUrl: string, idPortal: string, 
       ritmo,
     )
     if ((d.totalElements ?? 0) > faixa) throw new Error(`faixa ${ini}-${fim} com mais de ${faixa} empenhos — reduza a faixa`)
-    out.push(...(d.content ?? []))
+    const lote = d.content ?? []
+    out.push(...lote)
+    vazias = lote.length ? 0 : vazias + 1
   }
   return out
 }
