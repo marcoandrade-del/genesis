@@ -27,7 +27,7 @@ import { mkdirSync, existsSync, readFileSync, appendFileSync } from 'node:fs'
 import { Pool } from 'pg'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { PrismaClient } from '@prisma/client'
-import { listarEmpenhos, listarEmpenhosPorFaixa, detalheEmpenho, comConcorrencia, type EmpenhoDetalhe } from '../src/conversor/fabricantes/elotech/empenhos.js'
+import { listarEmpenhos, listarEmpenhosPorFaixa, detalheEmpenho, comConcorrencia, criarRitmo, dentroDaJanelaGentil, JanelaFechada, RitmoEsgotado, type EmpenhoDetalhe, type Ritmo } from '../src/conversor/fabricantes/elotech/empenhos.js'
 import { reconciliarDespesa } from '../src/conversor/nucleo/reconciliar.js'
 import { escreverDespesa } from '../src/conversor/nucleo/escrever-despesa.js'
 import { materializarRazao } from '../src/conversor/nucleo/materializar-razao.js'
@@ -38,10 +38,42 @@ import { sarandiPr } from '../src/conversor/municipios/sarandi-pr.js'
 import { vilhenaRo } from '../src/conversor/municipios/vilhena-ro.js'
 
 const APPLY = process.argv.includes('--apply')
+const GENTIL_FLAG = process.argv.includes('--gentil')
 const ANO = 2026
 const CACHE_DIR = 'data/empenhos-elotech'
 const alvo = process.argv.find((a) => a.startsWith('--municipio='))?.split('=')[1]
-if (!alvo) { console.error('uso: --municipio=<nome> [--apply]'); process.exit(1) }
+if (!alvo) { console.error('uso: --municipio=<nome> [--apply] [--gentil]'); process.exit(1) }
+
+/**
+ * MODO GENTIL — p/ o Elotech LEGADO (eloweb/Delphi) em PRODUÇÃO: o sistema
+ * atende a prefeitura (milhares de usuários) e a coleta agressiva de 23/07 o
+ * derrubou (502). Automático p/ hosts eloweb.net; liga: serial 1-a-1 com pausa
+ * adaptativa, circuit breaker, janela 22h–06h + fim de semana e health-check
+ * antes de qualquer carga. Coleta interrompida retoma do cache na próxima janela.
+ */
+const ehGentil = (url: string) => GENTIL_FLAG || url.includes('eloweb.net')
+let ritmoRun: Ritmo | null = null
+const ritmoDe = (url: string): Ritmo | undefined => {
+  if (!ehGentil(url)) return undefined
+  ritmoRun ??= criarRitmo({ dentroDaJanela: () => dentroDaJanelaGentil(new Date()) })
+  return ritmoRun
+}
+
+/** Sonda leve antes de QUALQUER carga no host gentil: portal fora do ar/lento → não coletar. */
+async function healthCheck(baseUrl: string): Promise<boolean> {
+  const t0 = Date.now()
+  try {
+    const res = await fetch(`${baseUrl}/api/entidades`, { headers: { exercicio: String(ANO), 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(10_000) })
+    const ms = Date.now() - t0
+    if (!res.ok) { console.log(`  ✗ health-check: HTTP ${res.status} — coleta NÃO iniciada`); return false }
+    if (ms > 5_000) { console.log(`  ✗ health-check: portal lento (${ms}ms) — coleta NÃO iniciada (não vamos piorar)`); return false }
+    console.log(`  ✓ health-check: portal são (${ms}ms)`)
+    return true
+  } catch (e) {
+    console.log(`  ✗ health-check: ${e instanceof Error ? e.message : e} — coleta NÃO iniciada`)
+    return false
+  }
+}
 
 const CONFIGS: MunicipioConfig[] = [cianortePr, naviraiMs, sarandiPr, vilhenaRo]
 const pool = new Pool({ connectionString: process.env['DATABASE_URL'] })
@@ -71,13 +103,19 @@ async function buscarEmpenhos(baseUrl: string, idPortal: string): Promise<Regist
       cache.set(r.empenho, r)
     }
   }
-  // legado (eloweb) degrada com offset — cai p/ o particionamento por faixas
+  // legado (eloweb) degrada com offset — no modo GENTIL nem tenta (vai direto às
+  // faixas, offset sempre 0); nos modernos o offset segue como caminho rápido
+  const ritmo = ritmoDe(baseUrl)
   let lista
-  try {
-    lista = await listarEmpenhos(baseUrl, idPortal, ANO)
-  } catch {
-    console.log('    lista por offset falhou — particionando por faixas de empenho')
-    lista = await listarEmpenhosPorFaixa(baseUrl, idPortal, ANO)
+  if (ritmo) {
+    lista = await listarEmpenhosPorFaixa(baseUrl, idPortal, ANO, 500, ritmo)
+  } else {
+    try {
+      lista = await listarEmpenhos(baseUrl, idPortal, ANO)
+    } catch {
+      console.log('    lista por offset falhou — particionando por faixas de empenho')
+      lista = await listarEmpenhosPorFaixa(baseUrl, idPortal, ANO)
+    }
   }
   const out: Registro[] = []
   const faltam: typeof lista = []
@@ -97,9 +135,16 @@ async function buscarEmpenhos(baseUrl: string, idPortal: string): Promise<Regist
     else faltam.push(e)
   }
   if (faltam.length) {
-    console.log(`    detalhes a buscar: ${faltam.length} (cache: ${cache.size})`)
-    const novos = await comConcorrencia(faltam, 8, async (e) => {
-      const det = await detalheEmpenho(baseUrl, idPortal, ANO, e.empenho)
+    console.log(`    detalhes a buscar: ${faltam.length} (cache: ${cache.size})${ritmo ? ' [modo gentil: serial]' : ''}`)
+    const t0 = Date.now()
+    let feitos = 0
+    const novos = await comConcorrencia(faltam, ritmo ? 1 : 8, async (e) => {
+      const det = await detalheEmpenho(baseUrl, idPortal, ANO, e.empenho, ritmo)
+      if (ritmo && ++feitos % 50 === 0) {
+        const porReq = (Date.now() - t0) / feitos
+        const eta = Math.round(((faltam.length - feitos) * porReq) / 60_000)
+        console.log(`      … ${feitos}/${faltam.length} (${Math.round(porReq)}ms/req · pausa ${ritmo.estado().pausaMs}ms · ETA ~${eta}min)`)
+      }
       const [fc, ...fd] = (e.fonteRecurso ?? '').split(' - ')
       const reg: Registro = {
         empenho: e.empenho,
@@ -147,6 +192,11 @@ async function main() {
   console.log(`\n═══ Execução EMPENHO A EMPENHO — ${cfg.nome} ${APPLY ? '[APPLY]' : '[DRY-RUN]'} ═══`)
 
   const usuario = await prisma.usuario.findFirstOrThrow({ orderBy: { criadoEm: 'asc' }, select: { id: true } })
+  if (ehGentil(baseUrl as string)) {
+    console.log(`  [modo GENTIL: eloweb legado em produção — serial, pausa adaptativa, janela 22h–06h + fim de semana]`)
+    if (!dentroDaJanelaGentil(new Date())) { console.log('  ✗ fora da janela de coleta — nada a fazer agora (rode à noite/fim de semana)'); process.exitCode = 3; return }
+    if (!(await healthCheck(baseUrl as string))) { process.exitCode = 2; return }
+  }
   for (const entCfg of cfg.entidades) {
     const idPortal = entCfg.params?.['idPortal'] as string | undefined
     const url = (entCfg.params?.['portalUrl'] as string | undefined) ?? (baseUrl as string | undefined)
@@ -173,6 +223,7 @@ async function main() {
         t.pago += r.pago
         porFonte.set(r.fonte, t)
       }
+      if (ritmoRun) await ritmoRun.antes() // gabarito também respeita o ritmo no host gentil
       const res = await fetch(`${url}/despesapornivel/fonte-recursos`, { headers: { entidade: idPortal, exercicio: String(ANO), 'User-Agent': 'Mozilla/5.0' } })
       if (!res.ok) throw new Error(`gabarito HTTP ${res.status}`)
       const gabarito = (await res.json()) as { codigo: string; valorEmpenhado: number; valorPago: number }[]
@@ -247,4 +298,15 @@ async function main() {
   }
   if (!APPLY) console.log('\nDRY-RUN: nada gravado. Rode com --apply.')
 }
-main().catch((e) => { console.error('FALHOU:', e instanceof Error ? e.stack || e.message : e); process.exitCode = 1 }).finally(async () => { await prisma.$disconnect(); await pool.end() })
+main().catch((e) => {
+  if (e instanceof JanelaFechada) {
+    console.log('\n⏸ janela de coleta encerrada — progresso salvo no cache; re-rode na próxima janela (retoma de onde parou).')
+    process.exitCode = 3
+  } else if (e instanceof RitmoEsgotado) {
+    console.log(`\n⏸ ${e.message}\n   coleta abortada SEM insistir (servidor em produção); progresso salvo no cache — re-rode na próxima janela.`)
+    process.exitCode = 2
+  } else {
+    console.error('FALHOU:', e instanceof Error ? e.stack || e.message : e)
+    process.exitCode = 1
+  }
+}).finally(async () => { await prisma.$disconnect(); await pool.end() })
