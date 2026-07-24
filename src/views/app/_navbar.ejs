@@ -61,7 +61,7 @@
   .gx-ws-meta { display: flex; flex-direction: column; line-height: 1.05; min-width: 0; }
   .gx-ws-top { font-size: .64rem; letter-spacing: .08em; text-transform: uppercase; color: rgba(232,235,230,.5); }
   .gx-ws-name { font-size: 1rem; font-weight: 700; color: #fff; line-height: 1.15;
-    max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    max-width: 68ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gx-ws-year {
     flex-shrink: 0; display: inline-grid; place-items: center;
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; font-size: .76rem;
@@ -116,7 +116,7 @@
   <a href="/app/contexto" class="gx-workspace" title="Trocar contexto de trabalho">
     <div class="gx-ws-meta">
       <span class="gx-ws-top"><%= entidade.municipio.estado.sigla %> · <%= entidade.municipio.nome %></span>
-      <span class="gx-ws-name"><%= entidade.nome %></span>
+      <span class="gx-ws-name" title="<%= entidade.nome %>"><%= entidade.nome %></span>
     </div>
     <span class="gx-ws-year"><%= ano %></span>
     <i class="bi bi-arrow-left-right gx-ws-swap"></i>
