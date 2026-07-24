@@ -40,7 +40,20 @@ describe('DisponibilidadeFonteService.calcular', () => {
     prisma.movimentoEmpenho.findMany.mockResolvedValue([])
   })
 
-  it('caixa por fonte = saldo acumulado das contas bancárias da fonte', async () => {
+  it('caixa por fonte vem do RAZÃO (saldo inicial 1.1.1 + fluxo) quando materializado — subledger bancário é ignorado', async () => {
+    prisma.$queryRawUnsafe.mockResolvedValue([
+      { fonte: '1000', inicial: '100.00', fluxo: '50.00' },
+      { fonte: '1104', inicial: '0', fluxo: '30.00' },
+    ])
+    const r = await svc.calcular('e1', 2026)
+    expect(r.linhas).toEqual([
+      { fonte: '1000', nomenclatura: 'Recursos Ordinários (Livres)', caixa: 150, rpProcessados: 0, rpNaoProcessados: 0, disponibilidade: 150 },
+      { fonte: '1104', nomenclatura: 'MDE 25%', caixa: 30, rpProcessados: 0, rpNaoProcessados: 0, disponibilidade: 30 },
+    ])
+    expect(r.totais.caixa).toBe(180) // nada de somar 400/300 do subledger bancário
+  })
+
+  it('fallback: sem caixa no razão, caixa por fonte = saldo acumulado das contas bancárias da fonte', async () => {
     const r = await svc.calcular('e1', 2026)
     expect(r.temDados).toBe(true)
     expect(r.linhas).toEqual([

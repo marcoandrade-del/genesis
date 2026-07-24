@@ -778,7 +778,7 @@ export function montarRgfAnexo2(dados: DadosRgfAnexo2): string {
     `<tr><td>LIMITE DE ALERTA — 108% da RCL (LRF art. 59 §1º, III)</td><td class="num">${formatarReais(Math.round(rcl * 108) / 100)}</td></tr>` +
     `</tfoot></table>` +
     `<div class="dem-sub">Situação: <strong>${esc(situacao)}</strong>` +
-    (metaLdo != null ? ` · DCL informada na LDO: <span${neg(metaLdo)}>${formatarReais(metaLdo)}</span> (comparativo — a diferença reflete o que a base ainda não captura, ex.: saldos bancários reais)` : '') +
+    (metaLdo != null ? ` · DCL informada na LDO: <span${neg(metaLdo)}>${formatarReais(metaLdo)}</span> (comparativo — a LDO é estimativa de outra data-base; a DCL acima usa o caixa REAL do razão, deduzido conforme o MDF)` : '') +
     `</div>` +
     rodapeHtml(c) +
     `</div>`
