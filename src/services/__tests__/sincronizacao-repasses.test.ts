@@ -65,6 +65,18 @@ describe('SincronizacaoRepassesService', () => {
     expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ valor: '20835073.42' }))
   })
 
+  it('fonte do ALVO sobrepõe a do município (câmara com fonte real provada na MSC)', async () => {
+    stubPortal(1_000)
+    prisma.transferenciaFinanceira.findMany.mockResolvedValue([]) // nada bookado
+    prisma.previsaoReceita.findMany.mockResolvedValue([])
+    // 1º alvo de Cianorte = Câmara, fonte '1501' no alvo (município default '9999')
+    const r = (await svc.sincronizarMunicipio('Cianorte', 2026, 'u1'))[0]!
+    expect(r.status).toBe('OK')
+    expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ fonteCodigo: '1501', valor: '1000.00' }))
+    // espelho concedido na Prefeitura sai com a MESMA fonte
+    expect(registrar).toHaveBeenCalledWith(expect.objectContaining({ tipo: 'CONCEDIDA', fonteCodigo: '1501' }))
+  })
+
   it('ERRO (sem gravar) quando falta caixa/VPA [MOV] ou a fonte', async () => {
     stubPortal(1_000_000)
     prisma.transferenciaFinanceira.findMany.mockResolvedValue([])
