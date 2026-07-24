@@ -6,6 +6,12 @@ const cent = (n: number): string => (n / 100).toFixed(2)
 
 /** Marcador das arrecadações criadas pelo conversor (idempotência + rastreio). */
 const HIST_ARREC = 'CAPTURA ARRECADAÇÃO (conversor)'
+/**
+ * Prefixo da FAMÍLIA de marcadores: o mensalizador (mensalizar_receita_msc.ts)
+ * substitui a agregada por linhas mensais com sufixos próprios — o re-import
+ * precisa apagar TODAS (senão duplicaria com a agregada recriada).
+ */
+export const HIST_ARREC_PREFIXO = 'CAPTURA ARRECADAÇÃO'
 
 /**
  * Escreve as previsões de receita (previsto + arrecadado) de uma entidade a
@@ -104,7 +110,7 @@ export async function escreverReceita(
       // NEGATIVO não-redutora (correção/devolução — o portal traz líquido negativo);
       // ARRECADACAO no caso normal. Sem isso, um arrecadado negativo viraria
       // arrecadação positiva (razão +X, valorArrecadado −X → Δ 2X).
-      await tx.arrecadacao.deleteMany({ where: { previsao: { orcamentoId }, historico: HIST_ARREC } })
+      await tx.arrecadacao.deleteMany({ where: { previsao: { orcamentoId }, historico: { startsWith: HIST_ARREC_PREFIXO } } })
       const dataArr = new Date(Date.UTC(ano, 11, 31))
       const arrRows = arrecs
         .filter((a) => a.arrecadado !== 0)
