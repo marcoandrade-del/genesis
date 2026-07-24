@@ -213,7 +213,37 @@
 </script>
 <% } %>
 
-<%# ── Marca o link ativo (rota) e auto-expande o grupo que o contém ───────── %>
+<%# ── Colapso dos grupos, persistido (mapa por grupo → respeita o default de cada um) ── %>
+<script>
+  (function () {
+    var KEY = 'gx_side_groups';
+    var groups = Array.prototype.slice.call(document.querySelectorAll('.gx-side-group'));
+    function load() {
+      try { var v = JSON.parse(localStorage.getItem(KEY) || '{}'); return (v && typeof v === 'object' && !Array.isArray(v)) ? v : {}; }
+      catch (e) { return {}; }
+    }
+    var state = load();
+    function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+    // Aplica só as escolhas EXPLÍCITAS do usuário; o resto mantém o default do markup
+    // (Favoritos abre por padrão; domínios fecham; o grupo ativo é reaberto abaixo).
+    groups.forEach(function (g) {
+      var key = g.getAttribute('data-gx-group');
+      if (Object.prototype.hasOwnProperty.call(state, key)) g.classList.toggle('is-open', !!state[key]);
+      var hd = g.querySelector('.gx-side-group-hd');
+      if (hd) hd.setAttribute('aria-expanded', g.classList.contains('is-open') ? 'true' : 'false');
+    });
+    document.addEventListener('click', function (e) {
+      var hd = e.target.closest('.gx-side-group-hd'); if (!hd) return;
+      var g = hd.closest('.gx-side-group'); if (!g) return;
+      var open = g.classList.toggle('is-open');
+      hd.setAttribute('aria-expanded', open ? 'true' : 'false');
+      state[g.getAttribute('data-gx-group')] = open;
+      save();
+    });
+  })();
+</script>
+
+<%# ── Marca o link ativo (rota) e FORÇA aberto o grupo que o contém ────────── %>
 <script>
   (function () {
     var path = window.location.pathname.replace(/\/$/, '');
@@ -228,35 +258,7 @@
     document.querySelectorAll('.gx-side-link[data-gx-route="' + route + '"]').forEach(function (el) { el.classList.add('is-active'); });
     var grp = best.closest('.gx-side-group');
     if (!grp) { var inGrp = document.querySelector('.gx-side-group .gx-side-link[data-gx-route="' + route + '"]'); if (inGrp) grp = inGrp.closest('.gx-side-group'); }
-    if (grp) grp.classList.add('is-open');
-  })();
-</script>
-
-<%# ── Colapso dos grupos (persistido em localStorage) ─────────────────────── %>
-<script>
-  (function () {
-    var KEY = 'gx_side_groups';
-    var groups = Array.prototype.slice.call(document.querySelectorAll('.gx-side-group'));
-    function load() { try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { return []; } }
-    function save() {
-      var open = groups.filter(function (g) { return g.classList.contains('is-open'); })
-        .map(function (g) { return g.getAttribute('data-gx-group'); });
-      try { localStorage.setItem(KEY, JSON.stringify(open)); } catch (e) {}
-    }
-    // restaura o salvo (sem fechar o grupo ativo, já aberto pelo script de rota)
-    var saved = load();
-    groups.forEach(function (g) {
-      if (saved.indexOf(g.getAttribute('data-gx-group')) !== -1) g.classList.add('is-open');
-      var hd = g.querySelector('.gx-side-group-hd');
-      if (hd) hd.setAttribute('aria-expanded', g.classList.contains('is-open') ? 'true' : 'false');
-    });
-    document.addEventListener('click', function (e) {
-      var hd = e.target.closest('.gx-side-group-hd'); if (!hd) return;
-      var g = hd.closest('.gx-side-group'); if (!g) return;
-      g.classList.toggle('is-open');
-      hd.setAttribute('aria-expanded', g.classList.contains('is-open') ? 'true' : 'false');
-      save();
-    });
+    if (grp) { grp.classList.add('is-open'); var hd = grp.querySelector('.gx-side-group-hd'); if (hd) hd.setAttribute('aria-expanded', 'true'); }
   })();
 </script>
 

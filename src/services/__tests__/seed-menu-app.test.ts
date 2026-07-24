@@ -132,9 +132,10 @@ describe('_sidebar.ejs — render dos 6 domínios', () => {
 
   it('renderiza a sidebar com os 6 grupos e um link navegável marcável', async () => {
     const html = await ejs.renderFile('src/views/app/_navbar.ejs', dados)
-    // Um cabeçalho de grupo por domínio (conta o botão, não as regras CSS).
-    const grupos = (html.match(/class="gx-side-group-hd"/g) || []).length
-    expect(grupos).toBe(6)
+    // Um cabeçalho por domínio (toggle numérico); a seção de Favoritos usa toggle "fav".
+    const domGrupos = (html.match(/data-gx-toggle="\d+"/g) || []).length
+    expect(domGrupos).toBe(6)
+    expect(html).toContain('data-gx-toggle="fav"') // Favoritos também colapsável
     for (const nome of GRUPOS_ESPERADOS) expect(html).toContain(nome)
     // A âncora sentinela (#g1) NÃO vira data-gx-route (só expande); a real vira.
     expect(html).toContain('data-gx-route="/app/tela-0"')
